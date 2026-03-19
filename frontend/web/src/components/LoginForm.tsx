@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/authService';
 
 interface LoginFormProps {
@@ -8,6 +9,7 @@ interface LoginFormProps {
 
 export const LoginForm = ({ onSwitchMode }: LoginFormProps) => {
     const { t } = useTranslation();
+    const nav = useNavigate();
     const [email, setEmail] = useState('');
     const [pwd, setPwd] = useState('');
     const [errMsg, setErrMsg] = useState('');
@@ -18,6 +20,7 @@ export const LoginForm = ({ onSwitchMode }: LoginFormProps) => {
 
         try {
             await apiClient.post('/api/auth/login', { email, password: pwd });
+            nav('/');
         } catch {
             setErrMsg(t('auth.loginError'));
         }

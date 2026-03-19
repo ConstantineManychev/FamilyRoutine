@@ -13,11 +13,11 @@ export const RegisterForm = ({ onSwitchMode }: RegisterFormProps) => {
     const [email, setEmail] = useState('');
     const [dob, setDob] = useState('');
     const [pwd, setPwd] = useState('');
-    const [regState, setRegState] = useState<'idle' | 'success' | 'error'>('idle');
+    const [errMsg, setErrMsg] = useState('');
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setRegState('idle');
+        setErrMsg('');
 
         try {
             await apiClient.post('/api/auth/register', {
@@ -27,24 +27,11 @@ export const RegisterForm = ({ onSwitchMode }: RegisterFormProps) => {
                 birth_date: dob,
                 password: pwd
             });
-            setRegState('success');
+            onSwitchMode();
         } catch {
-            setRegState('error');
+            setErrMsg(t('auth.registerError'));
         }
     };
-
-    if (regState === 'success') {
-        return (
-            <div className="flex flex-col items-center gap-4 text-center">
-                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mb-2">✓</div>
-                <h2 className="text-2xl font-bold text-gray-800">{t('auth.registerSuccessTitle')}</h2>
-                <p className="text-gray-600">{t('auth.registerSuccessMessage')}</p>
-                <button onClick={onSwitchMode} className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold">
-                    {t('auth.returnToLogin')}
-                </button>
-            </div>
-        );
-    }
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full">
@@ -52,9 +39,9 @@ export const RegisterForm = ({ onSwitchMode }: RegisterFormProps) => {
                 {t('auth.registerTitle')}
             </h2>
 
-            {regState === 'error' && (
+            {errMsg && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">
-                    {t('auth.registerError')}
+                    {errMsg}
                 </div>
             )}
 

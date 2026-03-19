@@ -21,3 +21,5 @@ shared-schema = { path = "../shared-schema" }
 
 argon2 = "0.5"
 validator = { version = "0.16", features = ["derive"] }
+
+uuid = { version = "1.7", features = ["v4", "serde"] }

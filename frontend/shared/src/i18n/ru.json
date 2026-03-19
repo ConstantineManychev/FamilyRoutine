@@ -20,5 +20,16 @@
     "registerSuccessTitle": "Успешно",
     "registerSuccessMessage": "Ваш аккаунт создан.",
     "returnToLogin": "На главную"
+  },
+  "nav": {
+    "settings": "Настройки",
+    "schedule": "Расписание",
+    "families": "Семейные группы",
+    "createFamily": "Создать новую",
+    "dicts": "Справочники",
+    "items": "Товары и услуги",
+    "events": "События",
+    "currencies": "Валюты",
+    "logout": "Выход"
   }
 }

@@ -1,17 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthenticationScreen } from './pages/AuthenticationScreen';
+import { MainScreen } from './pages/MainScreen';
 
-function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<AuthenticationScreen />} />
-        
-        <Route path="/" element={<Navigate to="/auth" replace />} />
-        
-      </Routes>
-    </BrowserRouter>
-  );
-}
-
-export default App;
+export const App = () => {
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/auth" element={<AuthenticationScreen />} />
+                <Route path="/*" element={<MainScreen />} />
+            </Routes>
+        </BrowserRouter>
+    );
+};

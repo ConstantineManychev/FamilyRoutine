@@ -20,3 +20,7 @@ pub async fn handle_user_login(
     let authenticated_user_data = authenticate_user(&database_pool, login_payload).await?;
     Ok((StatusCode::OK, Json(authenticated_user_data)))
 }
+
+pub async fn handle_user_logout() -> StatusCode {
+    StatusCode::OK
+}

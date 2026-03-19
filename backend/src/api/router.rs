@@ -1,4 +1,5 @@
-use crate::api::auth_handlers::{handle_user_login, handle_user_registration};
+use crate::api::auth_handlers::{handle_user_login, handle_user_registration, handle_user_logout};
+use crate::api::user_handlers::{get_curr_user, get_user_fams};
 use axum::{
     http::{
         header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
@@ -38,6 +39,9 @@ pub fn configure_application_router(db: PgPool) -> Router {
         .route("/", get(handle_health_check))
         .route("/api/auth/register", post(handle_user_registration))
         .route("/api/auth/login", post(handle_user_login))
+        .route("/api/auth/logout", post(handle_user_logout))
+        .route("/api/user/me", get(get_curr_user))
+        .route("/api/families", get(get_user_fams))
         .layer(build_cors())
         .with_state(db)
 }

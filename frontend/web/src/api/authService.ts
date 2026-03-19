@@ -1,12 +1,14 @@
-import axios from 'axios';
+export interface UserProfile {
+    first_name: string;
+    last_name: string;
+}
 
-const retrieveApiBaseUrl = (): string => {
-    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export interface Family {
+    id: number;
+    name: string;
+}
+
+export const userService = {
+    fetchProfile: () => apiClient.get<UserProfile>('/api/user/me'),
+    fetchFamilies: () => apiClient.get<Family[]>('/api/families'),
 };
-
-export const apiClient = axios.create({
-    baseURL: retrieveApiBaseUrl(),
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
