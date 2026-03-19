@@ -1,20 +1,23 @@
 use crate::api::auth_handlers::{handle_user_login, handle_user_registration};
 use axum::{
-    http::{HeaderValue, Method},
-    routing::post,
+    http::{
+        header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
+        HeaderValue, Method,
+    },
+    routing::{get, post},
     Router,
 };
 use sqlx::PgPool;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
-fn create_cors_layer() -> CorsLayer {
-    let allowed_frontend_origin = std::env::var("FRONTEND_URL")
-        .unwrap_or_else(|_| "http://localhost:5173".to_string())
+fn build_cors() -> CorsLayer {
+    let origin = std::env::var("FRONTEND_URL")
+        .unwrap_or_else(|_| "http://localhost:5173".into())
         .parse::<HeaderValue>()
-        .expect("INVALID_FRONTEND_URL_FORMAT");
+        .expect("INVALID_ORIGIN");
 
     CorsLayer::new()
-        .allow_origin(allowed_frontend_origin)
+        .allow_origin(origin)
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -22,16 +25,19 @@ fn create_cors_layer() -> CorsLayer {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers(Any)
+        .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true)
 }
 
-pub fn configure_application_router(database_pool: PgPool) -> Router {
-    let security_cors_layer = create_cors_layer();
+async fn handle_health_check() -> &'static str {
+    "API_IS_RUNNING"
+}
 
+pub fn configure_application_router(db: PgPool) -> Router {
     Router::new()
+        .route("/", get(handle_health_check))
         .route("/api/auth/register", post(handle_user_registration))
         .route("/api/auth/login", post(handle_user_login))
-        .layer(security_cors_layer)
-        .with_state(database_pool)
+        .layer(build_cors())
+        .with_state(db)
 }

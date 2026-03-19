@@ -1504,6 +1504,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "serde",
+ "sqlx",
  "ts-rs",
  "uuid",
 ]
@@ -2073,8 +2074,10 @@ version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d3fa4606cdab1e9b668cc65ce2545941d01f52bc27536a195c66c55b91cb84"
 dependencies = [
+ "chrono",
  "thiserror",
  "ts-rs-macros",
+ "uuid",
 ]
 
 [[package]]

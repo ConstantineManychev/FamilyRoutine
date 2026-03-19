@@ -57,3 +57,29 @@ pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
+#[sqlx(type_name = "acc_type_t", rename_all = "snake_case")]
+pub enum AccountType {
+    Cash,
+    Card,
+    BankAcc,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct Currency {
+    pub id: uuid::Uuid,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct Account {
+    pub id: uuid::Uuid,
+    pub user_id: Option<uuid::Uuid>,
+    pub family_id: Option<uuid::Uuid>,
+    pub curr_id: uuid::Uuid,
+    pub account_type: AccountType,
+    pub name: String,
+    pub mask: Option<String>,
+    pub is_active: bool,
+}

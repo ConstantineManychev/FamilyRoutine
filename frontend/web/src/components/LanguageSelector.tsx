@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const AVAILABLE_LANGUAGES = [
+const AVAIL_LANGS = [
     { code: 'en', label: 'En' },
     { code: 'ru', label: 'Ru' },
     { code: 'de', label: 'De' },
@@ -13,51 +13,46 @@ const AVAILABLE_LANGUAGES = [
 export const LanguageSelector = () => {
     const { i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropRef = useRef<HTMLDivElement>(null);
 
-    const activeLanguage = AVAILABLE_LANGUAGES.find(lang => lang.code === i18n.language) || AVAILABLE_LANGUAGES[0];
+    const activeLang = AVAIL_LANGS.find(l => l.code === i18n.language) || AVAIL_LANGS[0];
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        const handleOutsideClick = (e: MouseEvent) => {
+            if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, []);
 
-    const handleSelectLanguage = (code: string) => {
-        i18n.changeLanguage(code);
-        setIsOpen(false);
-    };
-
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative" ref={dropRef}>
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="bg-white/90 hover:bg-white text-gray-800 font-bold py-1.5 px-3 rounded-md shadow-sm transition-colors border border-gray-300 flex items-center gap-1.5 text-sm"
+                className="w-11 h-11 bg-white/90 hover:bg-white text-gray-800 font-bold rounded-lg shadow-sm transition-colors border border-gray-300 flex items-center justify-center text-sm uppercase"
             >
-                {activeLanguage.label}
-                <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="19 9l-7 7-7-7" />
-                </svg>
+                {activeLang.code}
             </button>
 
             {isOpen && (
-                <div className="absolute top-full left-0 mt-1 flex flex-col bg-white border border-gray-200 rounded-md shadow-xl z-[100] min-w-[70px] max-h-[180px] overflow-y-auto">
-                    {AVAILABLE_LANGUAGES.map((language) => (
+                <div className="absolute top-full left-0 mt-2 flex flex-col bg-white border border-gray-200 rounded-lg shadow-xl z-[100] min-w-[80px] max-h-[180px] overflow-y-auto">
+                    {AVAIL_LANGS.map((lang) => (
                         <button
-                            key={language.code}
+                            key={lang.code}
                             type="button"
-                            className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-blue-50 flex-shrink-0 ${
-                                i18n.language === language.code ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-700'
+                            className={`block w-full text-center px-4 py-2 text-sm transition-colors hover:bg-blue-50 flex-shrink-0 ${
+                                i18n.language === lang.code ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-700'
                             }`}
-                            onClick={() => handleSelectLanguage(language.code)}
+                            onClick={() => {
+                                i18n.changeLanguage(lang.code);
+                                setIsOpen(false);
+                            }}
                         >
-                            {language.label}
+                            {lang.label}
                         </button>
                     ))}
                 </div>
