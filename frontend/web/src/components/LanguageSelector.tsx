@@ -43,12 +43,12 @@ export const LanguageSelector = () => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-xl z-[100] min-w-[70px] max-h-[160px] overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 flex flex-col bg-white border border-gray-200 rounded-md shadow-xl z-[100] min-w-[70px] max-h-[180px] overflow-y-auto">
                     {AVAILABLE_LANGUAGES.map((language) => (
                         <button
                             key={language.code}
                             type="button"
-                            className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-blue-50 ${
+                            className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-blue-50 flex-shrink-0 ${
                                 i18n.language === language.code ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-700'
                             }`}
                             onClick={() => handleSelectLanguage(language.code)}

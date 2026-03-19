@@ -18,6 +18,7 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
     const handleRegisterSubmit = async (event: FormEvent) => {
         event.preventDefault();
         setRegistrationStatus('idle');
+
         try {
             await apiClient.post('/api/auth/register', {
                 first_name: firstName,
@@ -58,35 +59,34 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
             )}
 
             <div className="flex flex-col gap-4">
-                <div className="flex gap-3">
-                    <div className="flex flex-col gap-1 w-full">
-                        <label className="text-sm font-semibold text-gray-700">{t('auth.firstNameLabel')}</label>
-                        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full" required />
-                    </div>
-                    <div className="flex flex-col gap-1 w-full">
-                        <label className="text-sm font-semibold text-gray-700">{t('auth.lastNameLabel')}</label>
-                        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full" required />
-                    </div>
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">{t('auth.firstNameLabel')}</label>
+                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" required />
                 </div>
                 
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-semibold text-gray-700">{t('auth.emailLabel')}</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">{t('auth.lastNameLabel')}</label>
+                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" required />
+                </div>
+
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">{t('auth.emailLabel')}</label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" required />
                 </div>
                 
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-semibold text-gray-700">{t('auth.birthDateLabel')}</label>
-                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">{t('auth.birthDateLabel')}</label>
+                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 min-w-0" required />
                 </div>
                 
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-semibold text-gray-700">{t('auth.passwordLabel')}</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">{t('auth.passwordLabel')}</label>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" required />
                 </div>
             </div>
 
-            <div className="flex flex-row gap-3 mt-2">
-                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 font-semibold transition-colors">
+            <div className="flex flex-row gap-3 mt-4">
+                <button type="submit" className="flex-1 bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 font-semibold transition-colors shadow-md">
                     {t('auth.registerSubmit')}
                 </button>
                 <button type="button" onClick={onSwitchToLogin} className="flex-1 bg-gray-100 text-gray-800 p-3 rounded-lg hover:bg-gray-200 font-semibold transition-colors border border-gray-200">

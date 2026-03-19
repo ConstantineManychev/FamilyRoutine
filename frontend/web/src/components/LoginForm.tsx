@@ -15,6 +15,7 @@ export const LoginForm = ({ onSwitchToRegister }: LoginFormProps) => {
     const handleLoginSubmit = async (event: FormEvent) => {
         event.preventDefault();
         setErrorMessage('');
+
         try {
             await apiClient.post('/api/auth/login', { email, password });
         } catch (error) {
@@ -35,32 +36,37 @@ export const LoginForm = ({ onSwitchToRegister }: LoginFormProps) => {
             )}
 
             <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-semibold text-gray-700">{t('auth.emailLabel')}</label>
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">
+                        {t('auth.emailLabel')}
+                    </label>
                     <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
                         required
                     />
                 </div>
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-semibold text-gray-700">{t('auth.passwordLabel')}</label>
+                
+                <div className="flex flex-row items-center gap-4 w-full">
+                    <label className="w-[140px] flex-shrink-0 text-sm font-semibold text-gray-700 text-left">
+                        {t('auth.passwordLabel')}
+                    </label>
                     <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-grow border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
                         required
                     />
                 </div>
             </div>
 
-            <div className="flex flex-row gap-3 mt-2">
+            <div className="flex flex-row gap-3 mt-4">
                 <button 
                     type="submit" 
-                    className="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+                    className="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold transition-colors shadow-md"
                 >
                     {t('auth.loginSubmit')}
                 </button>
