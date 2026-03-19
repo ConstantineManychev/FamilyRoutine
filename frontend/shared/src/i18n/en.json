@@ -4,7 +4,21 @@
     "version": "1.0.0"
   },
   "auth": {
-    "login": "Login",
-    "register": "Register"
+    "loginTitle": "System Login",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "loginSubmit": "Sign In",
+    "switchToRegister": "Sign Up",
+    "registerTitle": "Create Account",
+    "firstNameLabel": "First Name",
+    "lastNameLabel": "Last Name",
+    "birthDateLabel": "Birth Date",
+    "registerSubmit": "Create",
+    "switchToLogin": "Back",
+    "loginError": "Invalid credentials",
+    "registerError": "Registration failed",
+    "registerSuccessTitle": "Success",
+    "registerSuccessMessage": "Your account has been created.",
+    "returnToLogin": "Return"
   }
 }

@@ -1,41 +1,59 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const AVAILABLE_LANGUAGES = [
+    { code: 'en', label: 'EN' },
+    { code: 'ru', label: 'RU' }
+];
 
 export const LanguageSelector = () => {
     const { i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const languages = [
-        { code: 'en', label: 'EN' },
-        { code: 'ru', label: 'RU' }
-    ];
+    const activeLanguage = AVAILABLE_LANGUAGES.find(lang => lang.code === i18n.language) || AVAILABLE_LANGUAGES[0];
 
-    const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleSelectLanguage = (code: string) => {
+        i18n.changeLanguage(code);
+        setIsOpen(false);
+    };
 
     return (
-        <div className="relative flex justify-end mb-4">
+        <div className="relative" ref={dropdownRef}>
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-1 px-3 rounded-md text-xs transition-colors border border-gray-300"
+                className="bg-white/90 hover:bg-white text-gray-800 font-bold py-1.5 px-3 rounded-md shadow-sm transition-colors border border-gray-300 flex items-center gap-1.5 text-sm"
             >
-                {currentLanguage.label}
+                {activeLanguage.label}
+                <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="19 9l-7 7-7-7" />
+                </svg>
             </button>
 
             {isOpen && (
-                <div className="absolute top-8 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 min-w-[60px]">
-                    {languages.map((lang) => (
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-xl z-[100] min-w-[70px] max-h-[160px] overflow-y-auto">
+                    {AVAILABLE_LANGUAGES.map((language) => (
                         <button
-                            key={lang.code}
-                            className={`block w-full text-left px-4 py-2 text-xs hover:bg-blue-50 transition-colors ${
-                                i18n.language === lang.code ? 'text-blue-600 font-bold' : 'text-gray-700'
+                            key={language.code}
+                            type="button"
+                            className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-blue-50 ${
+                                i18n.language === language.code ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-gray-700'
                             }`}
-                            onClick={() => {
-                                i18n.changeLanguage(lang.code);
-                                setIsOpen(false);
-                            }}
+                            onClick={() => handleSelectLanguage(language.code)}
                         >
-                            {lang.label}
+                            {language.label}
                         </button>
                     ))}
                 </div>

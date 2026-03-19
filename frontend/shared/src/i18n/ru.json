@@ -4,7 +4,21 @@
     "version": "1.0.0"
   },
   "auth": {
-    "login": "Логин",
-    "register": "Регистрация"
+    "loginTitle": "Вход в систему",
+    "emailLabel": "Электронная почта",
+    "passwordLabel": "Пароль",
+    "loginSubmit": "Войти",
+    "switchToRegister": "Регистрация",
+    "registerTitle": "Создание аккаунта",
+    "firstNameLabel": "Имя",
+    "lastNameLabel": "Фамилия",
+    "birthDateLabel": "Дата рождения",
+    "registerSubmit": "Создать",
+    "switchToLogin": "Назад",
+    "loginError": "Неверная почта или пароль",
+    "registerError": "Ошибка при регистрации",
+    "registerSuccessTitle": "Успешно",
+    "registerSuccessMessage": "Ваш аккаунт создан.",
+    "returnToLogin": "На главную"
   }
 }
