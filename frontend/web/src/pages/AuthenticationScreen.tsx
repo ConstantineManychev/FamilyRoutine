@@ -13,10 +13,10 @@ export const AuthenticationScreen = () => {
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-blue-500 bg-[url('/src/assets/background.jpg')] bg-cover bg-center bg-no-repeat relative">
+        <div className="h-screen w-screen overflow-hidden flex items-center justify-center bg-blue-500 bg-[url('/src/assets/background.jpg')] bg-cover bg-center bg-no-repeat relative">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-0"></div>
             
-            <div className="fixed top-4 left-4 z-[9999]">
+            <div className="absolute top-4 left-4 z-50">
                 <LanguageSelector />
             </div>
 

@@ -2,8 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const AVAILABLE_LANGUAGES = [
-    { code: 'en', label: 'EN' },
-    { code: 'ru', label: 'RU' }
+    { code: 'en', label: 'En' },
+    { code: 'ru', label: 'Ru' },
+    { code: 'de', label: 'De' },
+    { code: 'fr', label: 'Fr' },
+    { code: 'es', label: 'Es' },
+    { code: 'it', label: 'It' }
 ];
 
 export const LanguageSelector = () => {
