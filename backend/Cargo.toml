@@ -23,3 +23,8 @@ argon2 = "0.5"
 validator = { version = "0.16", features = ["derive"] }
 
 uuid = { version = "1.7", features = ["v4", "serde"] }
+
+jsonwebtoken = "9.3"
+axum-extra = { version = "0.9", features = ["cookie"] }
+chrono = { version = "0.4", features = ["serde"] }
+time = "0.3"

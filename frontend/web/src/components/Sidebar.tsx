@@ -23,7 +23,9 @@ export const Sidebar = ({ fName, lName, families, avatarUrl }: SidebarProps) => 
     const [isFamiliesOpen, setIsFamiliesOpen] = useState(false);
     const [isDictsOpen, setIsDictsOpen] = useState(false);
 
-    const initials = `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase();
+    const initials = (fName && lName) 
+    ? `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase() 
+    : fName.charAt(0).toUpperCase() || "?";
 
     const handleLogout = async () => {
         try {

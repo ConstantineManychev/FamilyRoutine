@@ -1,24 +1,63 @@
+use crate::api::auth_middleware::AuthClaims;
 use crate::domain::errors::ApiError;
 use crate::services::auth_service::{authenticate_user, register_new_user};
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum_extra::extract::{
+    cookie::{Cookie, SameSite},
+    CookieJar,
+};
+use chrono::{Duration as ChronoDuration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde_json::Value;
-use shared_schema::{CreateUserRequest, LoginRequest, UserResponse};
+use shared_schema::{CreateUserRequest, LoginRequest};
 use sqlx::PgPool;
+use time::Duration as TimeDuration;
 
 pub async fn handle_user_registration(
-    State(database_pool): State<PgPool>,
-    Json(registration_payload): Json<CreateUserRequest>,
+    State(db): State<PgPool>,
+    Json(payload): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
-    let registration_result = register_new_user(&database_pool, registration_payload).await?;
-    Ok((StatusCode::CREATED, Json(registration_result)))
+    let res = register_new_user(&db, payload).await?;
+    Ok((StatusCode::CREATED, Json(res)))
 }
 
 pub async fn handle_user_login(
-    State(database_pool): State<PgPool>,
-    Json(login_payload): Json<LoginRequest>,
-) -> Result<(StatusCode, Json<UserResponse>), ApiError> {
-    let authenticated_user_data = authenticate_user(&database_pool, login_payload).await?;
-    Ok((StatusCode::OK, Json(authenticated_user_data)))
+    State(db): State<PgPool>,
+    jar: CookieJar,
+    Json(payload): Json<LoginRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let user = authenticate_user(&db, payload).await?;
+    
+    let now = Utc::now();
+    let expiration_chrono = now + ChronoDuration::days(7);
+    
+    let claims = AuthClaims { 
+        sub: user.id, 
+        exp: expiration_chrono.timestamp() as usize 
+    };
+    
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "very_secret_key_123".into());
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref())
+    ).map_err(|_| ApiError::InternalServerError)?;
+
+    let cookie = Cookie::build(("jwt_token", token.clone()))
+    .path("/")
+    .http_only(true)
+    .same_site(SameSite::Lax) // Было Strict
+    .max_age(TimeDuration::days(7))
+    .build();
+
+    let mut res = Json(user).into_response();
+    res.headers_mut().insert(
+        axum::http::header::SET_COOKIE,
+        cookie.to_string().parse().unwrap()
+    );
+    res.headers_mut().insert("X-Auth-Token", token.parse().unwrap());
+
+    Ok((jar, res))
 }
 
 pub async fn handle_user_logout() -> StatusCode {
