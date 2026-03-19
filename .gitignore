@@ -1,24 +1,38 @@
-.env
-.env.local
-.env.development
-.env.test
-.env.production
+.DS_Store
+Thumbs.db
+*.sw?
+.history
+.direnv/
 
-/target/
-**/*.rs.bk
-
-node_modules/
-/dist/
-/build/
-.npm/
-.eslintcache
+.env*
+!.env.example
 
 pgdata/
 *.db
+/logs/
 
-.vscode/
+**/target/
+**/*.rs.bk
+
+**/node_modules/
+**/dist/
+**/build/
+**/.eslintcache
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+frontend/shared/src/types/
+
+**/src-tauri/gen/
+**/src-tauri/binaries/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
 .idea/
-*.sw?
+*.sublime-project
+*.sublime-workspace
 
-.DS_Store
-Thumbs.db
+.docker-build-cache/

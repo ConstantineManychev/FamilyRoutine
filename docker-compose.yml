@@ -1,19 +1,15 @@
-version: '3.8'
-
 services:
-  app:
+  backend:
     build:
-      context: ./backend 
+      context: .
       dockerfile: Dockerfile
-    container_name: rust_app
     ports:
-      - "3000:3000" 
+      - "3000:3000"
     environment:
-      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-      - RUST_LOG=debug
+      - DATABASE_URL=postgres://user:pass@db:5432/family_db
     depends_on:
       db:
-        condition: service_started 
+        condition: service_healthy
     networks:
       - app-network
 
@@ -31,6 +27,13 @@ services:
       - pgdata:/var/lib/postgresql/data 
     networks:
       - app-network
+
+  frontend:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
 
 networks:
   app-network:

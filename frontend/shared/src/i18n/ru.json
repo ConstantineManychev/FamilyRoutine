@@ -1,0 +1,10 @@
+{
+  "common": {
+    "app_name": "Family Routine",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "login": "Логин",
+    "register": "Регистрация"
+  }
+}
