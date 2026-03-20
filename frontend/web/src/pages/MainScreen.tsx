@@ -38,13 +38,13 @@ export const MainScreen = () => {
         return (
             <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-white">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-                <span>Загрузка профиля...</span>
+                <span>Loading...</span>
             </div>
         );
     }
 
     if (error) {
-        return <div className="p-10 text-red-500">Ошибка: {error}</div>;
+        return <div className="p-10 text-red-500">Error: {error}</div>;
     }
 
     return (

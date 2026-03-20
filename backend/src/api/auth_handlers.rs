@@ -46,7 +46,7 @@ pub async fn handle_user_login(
     let cookie = Cookie::build(("jwt_token", token.clone()))
     .path("/")
     .http_only(true)
-    .same_site(SameSite::Lax) // Было Strict
+    .same_site(SameSite::Lax)
     .max_age(TimeDuration::days(7))
     .build();
 
