@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "login_tab": "Login",
+    "reg_tab": "Register",
+    "email": "Email",
+    "pwd": "Password",
+    "f_name": "First Name",
+    "l_name": "Last Name",
+    "submit": "Submit",
+    "err_auth": "Authentication Error"
+  },
+  "sidebar": {
+    "routine": "Routine",
+    "settings": "Settings",
+    "calendar": "Calendar",
+    "hierarchy": "Hierarchy",
+    "families": "Family Groups",
+    "references": "References",
+    "dictionaries": "Dictionaries",
+    "task_groups": "Task Groups",
+    "task_types": "Task Types",
+    "create_user": "Create User",
+    "create_task": "Create Task"
+  },
+  "profile": {
+    "sign_out": "Sign Out"
+  },
+  "dashboard": {
+    "welcome": "Welcome",
+    "active_fams": "Active Families",
+    "err_load": "Error loading data"
+  }
+}

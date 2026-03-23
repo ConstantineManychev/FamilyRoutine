@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "login_tab": "Вход",
+    "reg_tab": "Регистрация",
+    "email": "Электронная почта",
+    "pwd": "Пароль",
+    "f_name": "Имя",
+    "l_name": "Фамилия",
+    "submit": "Отправить",
+    "err_auth": "Ошибка авторизации"
+  },
+  "sidebar": {
+    "routine": "Рутина",
+    "settings": "Настройки",
+    "calendar": "Календарь",
+    "hierarchy": "Иерархия",
+    "families": "Семейные группы",
+    "references": "Связи",
+    "dictionaries": "Справочники",
+    "task_groups": "Группы задач",
+    "task_types": "Типы задач",
+    "create_user": "Создать пользователя",
+    "create_task": "Создать задачу"
+  },
+  "profile": {
+    "sign_out": "Выйти"
+  },
+  "dashboard": {
+    "welcome": "Добро пожаловать",
+    "active_fams": "Активные семьи",
+    "err_load": "Ошибка загрузки данных"
+  }
+}

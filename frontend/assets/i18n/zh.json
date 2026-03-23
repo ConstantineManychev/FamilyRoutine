@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "login_tab": "登录",
+    "reg_tab": "注册",
+    "email": "电子邮件",
+    "pwd": "密码",
+    "f_name": "名字",
+    "l_name": "姓氏",
+    "submit": "提交",
+    "err_auth": "认证错误"
+  },
+  "sidebar": {
+    "routine": "日常",
+    "settings": "设置",
+    "calendar": "日历",
+    "hierarchy": "层级",
+    "families": "家庭组",
+    "references": "引用",
+    "dictionaries": "字典",
+    "task_groups": "任务组",
+    "task_types": "任务类型",
+    "create_user": "创建用户",
+    "create_task": "创建任务"
+  },
+  "profile": {
+    "sign_out": "登出"
+  },
+  "dashboard": {
+    "welcome": "欢迎",
+    "active_fams": "活跃家庭",
+    "err_load": "加载数据错误"
+  }
+}

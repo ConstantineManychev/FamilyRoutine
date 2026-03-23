@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "login_tab": "ログイン",
+    "reg_tab": "登録",
+    "email": "メールアドレス",
+    "pwd": "パスワード",
+    "f_name": "名",
+    "l_name": "姓",
+    "submit": "送信",
+    "err_auth": "認証エラー"
+  },
+  "sidebar": {
+    "routine": "日常",
+    "settings": "設定",
+    "calendar": "カレンダー",
+    "hierarchy": "階層",
+    "families": "家族グループ",
+    "references": "参照",
+    "dictionaries": "辞書",
+    "task_groups": "タスクグループ",
+    "task_types": "タスクタイプ",
+    "create_user": "ユーザー作成",
+    "create_task": "タスク作成"
+  },
+  "profile": {
+    "sign_out": "ログアウト"
+  },
+  "dashboard": {
+    "welcome": "ようこそ",
+    "active_fams": "アクティブな家族",
+    "err_load": "データの読み込みエラー"
+  }
+}
