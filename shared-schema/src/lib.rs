@@ -30,6 +30,13 @@ pub struct UserResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/CreateFamMemDto.ts")]
+pub struct CreateFamMemDto {
+    pub email: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../bindings/CreateFamilyRequest.ts")]
 pub struct CreateFamilyRequest {
     pub name: String,
@@ -39,6 +46,7 @@ pub struct CreateFamilyRequest {
     pub street: Option<String>,
     pub building: Option<String>,
     pub apartment: Option<String>,
+    pub members: Vec<CreateFamMemDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -68,18 +76,43 @@ pub enum AccountType {
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct Currency {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub code: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct Account {
-    pub id: uuid::Uuid,
-    pub user_id: Option<uuid::Uuid>,
-    pub family_id: Option<uuid::Uuid>,
-    pub curr_id: uuid::Uuid,
+    pub id: Uuid,
+    pub user_id: Option<Uuid>,
+    pub family_id: Option<Uuid>,
+    pub curr_id: Uuid,
     pub account_type: AccountType,
     pub name: String,
     pub mask: Option<String>,
     pub is_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FamMemberDto {
+    pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FamDetailDto {
+    pub id: Uuid,
+    pub name: String,
+    pub members: Vec<FamMemberDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateFamNameDto {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateFamMemRoleDto {
+    pub role: String,
 }

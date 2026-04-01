@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../domain/models.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/api_prov.dart';
 
 class Sidebar extends ConsumerStatefulWidget {
   final bool isExpanded;
@@ -27,12 +29,28 @@ class Sidebar extends ConsumerStatefulWidget {
 
 class _SidebarState extends ConsumerState<Sidebar> {
   bool _isDictExpanded = false;
+  bool _isFamHovered = false;
+  List<DictMetaDto> _dicts = [];
 
   String get _initials {
     if (widget.fName.isNotEmpty && widget.lName.isNotEmpty) {
       return '${widget.fName[0]}${widget.lName[0]}'.toUpperCase();
     }
     return widget.fName.isNotEmpty ? widget.fName[0].toUpperCase() : '?';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDicts();
+  }
+
+  Future<void> _fetchDicts() async {
+    final api = ref.read(apiProv);
+    try {
+      final res = await api.getDictsMeta();
+      if (mounted) setState(() => _dicts = res);
+    } catch (_) {}
   }
 
   @override
@@ -48,33 +66,86 @@ class _SidebarState extends ConsumerState<Sidebar> {
       child: Column(
         children: [
           _buildHeader(),
-          Expanded(
-            child: _buildNavigationList(),
-          ),
+          Expanded(child: _buildNavList()),
           _buildFooter(),
         ],
       ),
     );
   }
 
-  Widget _buildNavigationList() {
+  Widget _buildNavList() {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
       children: [
-        _buildNavItem(LucideIcons.home, 'sidebar.routine'.tr()),
-        _buildNavItem(LucideIcons.settings, 'sidebar.settings'.tr()),
-        _buildNavItem(LucideIcons.calendarDays, 'sidebar.calendar'.tr()),
-        _buildNavItem(LucideIcons.barChart, 'sidebar.hierarchy'.tr()),
-        if (widget.isExpanded && widget.families.isNotEmpty) ...[
-          const SizedBox(height: 24.0),
-          _buildSectionTitle('sidebar.families'.tr()),
-          _buildHierarchyList(LucideIcons.fileText, 'sidebar.hierarchy'.tr(), widget.families),
-        ],
+        _buildNavItem(LucideIcons.home, 'sidebar.routine'.tr(), () {
+          context.go('/app');
+        }),
+        _buildFamMenu(),
         if (widget.isExpanded) ...[
           const SizedBox(height: 24.0),
           _buildSectionTitle('sidebar.references'.tr()),
-          _buildExpandableDict(),
+          _buildDictMenu(),
         ],
+        const SizedBox(height: 24.0),
+        _buildNavItem(LucideIcons.settings, 'sidebar.settings'.tr(), () {}),
+      ],
+    );
+  }
+
+  Widget _buildFamMenu() {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isFamHovered = true),
+      onExit: (_) => setState(() => _isFamHovered = false),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildNavItem(LucideIcons.users, 'sidebar.family_groups'.tr(), () {
+            context.go('/app/families');
+          }),
+          if (widget.isExpanded && _isFamHovered) ...[
+            ...widget.families.map((f) => _buildSubItem(f.name, () {
+                  context.go('/app/families/${f.id}');
+                })),
+            _buildSubItem('sidebar.create'.tr(), () {
+              context.go('/app/families/new');
+            }, icon: LucideIcons.plusCircle),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDictMenu() {
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => setState(() => _isDictExpanded = !_isDictExpanded),
+          child: Container(
+            height: 40.0,
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('sidebar.dictionaries'.tr()),
+                Icon(
+                  _isDictExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                  size: 18.0,
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          child: _isDictExpanded
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+                  child: Column(
+                    children: _dicts.map((d) => _buildSubItem(d.name, () {})).toList(),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
@@ -92,7 +163,14 @@ class _SidebarState extends ConsumerState<Sidebar> {
           _buildAvatar(),
           if (widget.isExpanded) ...[
             const SizedBox(width: 16.0),
-            _buildUserInfo(),
+            Expanded(
+              child: Text(
+                '${widget.fName} ${widget.lName}',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.0, color: Color(0xFF1F2937)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ]
         ],
       ),
@@ -105,45 +183,23 @@ class _SidebarState extends ConsumerState<Sidebar> {
       child: Container(
         width: 48.0,
         height: 48.0,
-        decoration: const BoxDecoration(
-          color: Color(0xFF2563EB),
-          shape: BoxShape.circle,
-        ),
+        decoration: const BoxDecoration(color: Color(0xFF2563EB), shape: BoxShape.circle),
         child: Center(
           child: Text(
             _initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18.0,
-            ),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18.0),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUserInfo() {
-    return Expanded(
-      child: Text(
-        '${widget.fName} ${widget.lName}',
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 14.0,
-          color: Color(0xFF1F2937),
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label) {
+  Widget _buildNavItem(IconData icon, String label, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
         borderRadius: BorderRadius.circular(12.0),
-        onTap: () {},
+        onTap: onTap,
         child: Container(
           height: 48.0,
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -153,26 +209,18 @@ class _SidebarState extends ConsumerState<Sidebar> {
               Icon(icon, size: 24.0, color: const Color(0xFF4B5563)),
               if (widget.isExpanded) ...[
                 const SizedBox(width: 16.0),
-                _buildNavLabel(label),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16.0, color: Color(0xFF374151)),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                  ),
+                ),
               ]
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildNavLabel(String label) {
-    return Expanded(
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 16.0,
-          color: Color(0xFF374151),
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.clip,
       ),
     );
   }
@@ -182,113 +230,25 @@ class _SidebarState extends ConsumerState<Sidebar> {
       padding: const EdgeInsets.only(left: 12.0, bottom: 8.0),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10.0,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF9CA3AF),
-          letterSpacing: 1.2,
-        ),
+        style: const TextStyle(fontSize: 10.0, fontWeight: FontWeight.bold, color: Color(0xFF9CA3AF), letterSpacing: 1.2),
       ),
     );
   }
 
-  Widget _buildHierarchyList(IconData icon, String label, List<FamDto> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHierarchyHeader(icon, label),
-        _buildHierarchyItems(items),
-      ],
-    );
-  }
-
-  Widget _buildHierarchyHeader(IconData icon, String label) {
-    return Container(
-      height: 40.0,
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20.0, color: const Color(0xFF4B5563)),
-          const SizedBox(width: 12.0),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 16.0,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHierarchyItems(List<FamDto> items) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 32.0, top: 4.0),
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(left: BorderSide(color: Color(0xFFF3F4F6), width: 2.0)),
-        ),
-        child: Column(
-          children: items.map((item) => _buildSubItem(item.name)).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpandableDict() {
-    return Column(
-      children: [
-        _buildDictToggle(),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          child: _isDictExpanded ? _buildDictContent() : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDictToggle() {
+  Widget _buildSubItem(String label, VoidCallback onTap, {IconData? icon}) {
     return InkWell(
-      onTap: () => setState(() => _isDictExpanded = !_isDictExpanded),
-      child: Container(
-        height: 40.0,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12.0, left: 12.0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('sidebar.dictionaries'.tr()),
-            Icon(
-              _isDictExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-              size: 18.0,
-            ),
+            if (icon != null) ...[
+              Icon(icon, size: 16.0, color: const Color(0xFF6B7280)),
+              const SizedBox(width: 8.0),
+            ],
+            Text(label, style: const TextStyle(fontSize: 14.0, color: Color(0xFF6B7280))),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDictContent() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16.0, top: 8.0),
-      child: Column(
-        children: [
-          _buildSubItem('sidebar.task_groups'.tr()),
-          _buildSubItem('sidebar.task_types'.tr()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubItem(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0, left: 12.0),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 14.0, color: Color(0xFF6B7280)),
       ),
     );
   }
@@ -301,32 +261,11 @@ class _SidebarState extends ConsumerState<Sidebar> {
       ),
       child: Column(
         children: [
-          _buildNavItem(LucideIcons.userPlus, 'sidebar.create_user'.tr()),
-          _buildLogoutButton(),
+          _buildNavItem(LucideIcons.userPlus, 'sidebar.create_user'.tr(), () {}),
+          _buildNavItem(LucideIcons.logOut, 'profile.sign_out'.tr(), () async {
+            await ref.read(authStateProvider.notifier).logout();
+          }),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return InkWell(
-      onTap: () async => await ref.read(authStateProvider.notifier).logout(),
-      child: Container(
-        height: 48.0,
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        child: Row(
-          mainAxisAlignment: widget.isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.logOut, size: 24.0, color: Color(0xFFDC2626)),
-            if (widget.isExpanded) ...[
-              const SizedBox(width: 16.0),
-              Text(
-                'profile.sign_out'.tr(),
-                style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
-              ),
-            ]
-          ],
-        ),
       ),
     );
   }

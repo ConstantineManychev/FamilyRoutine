@@ -1,12 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../domain/models.dart';
 
 class ApiSvc {
   final Dio _dio;
   final FlutterSecureStorage _storage;
 
   ApiSvc(this._dio, this._storage) {
-    _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1:3000');
+    _dio.options.baseUrl = const String.fromEnvironment('VITE_API_URL', defaultValue: 'http://127.0.0.1:3000');
     
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (opts, hnd) async {
@@ -34,4 +35,36 @@ class ApiSvc {
 
   Future<Response> get(String path) => _dio.get(path);
   Future<Response> post(String path, {dynamic data}) => _dio.post(path, data: data);
+  Future<Response> delete(String path) => _dio.delete(path);
+
+  Future<List<DictMetaDto>> getDictsMeta() async {
+    final res = await _dio.get('/api/dicts');
+    return (res.data as List).map((e) => DictMetaDto.fromJson(e)).toList();
+  }
+
+  Future<List<FamDto>> getFams() async {
+    final res = await _dio.get('/api/families');
+    return (res.data as List).map((e) => FamDto.fromJson(e)).toList();
+  }
+
+  Future<FamDetailDto> createFam(String name, List<Map<String, String>> members) async {
+    final res = await _dio.post('/api/families', data: {
+      'name': name,
+      'members': members,
+    });
+    return FamDetailDto.fromJson(res.data);
+  }
+
+  Future<FamDetailDto> getFamDetails(String id) async {
+    final res = await _dio.get('/api/families/$id');
+    return FamDetailDto.fromJson(res.data);
+  }
+
+  Future<void> deleteFam(String id) async => await _dio.delete('/api/families/$id');
+  Future<void> leaveFam(String id) async => await _dio.delete('/api/families/$id/leave');
+
+  Future<void> updateFamName(String id, String name) async => await _dio.put('/api/families/$id', data: {'name': name});
+  Future<void> addFamMember(String famId, String email, String role) async => await _dio.post('/api/families/$famId/members', data: {'email': email, 'role': role});
+  Future<void> updateFamMemberRole(String famId, String userId, String role) async => await _dio.put('/api/families/$famId/members/$userId', data: {'role': role});
+  Future<void> removeFamMember(String famId, String userId) async => await _dio.delete('/api/families/$famId/members/$userId');
 }

@@ -5,16 +5,24 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[derive(Serialize)]
+pub struct DictMetaDto {
+    pub id: String,
+    pub name: String,
+}
+
 #[derive(Serialize, sqlx::FromRow)]
 pub struct ProfileDto {
     pub first_name: String,
     pub last_name: String,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
-pub struct FamilyDto {
+#[derive(Debug, Serialize)]
+pub struct FamListDto {
     pub id: Uuid,
     pub name: String,
+    pub role: String,
+    pub member_count: i64,
 }
 
 pub async fn get_curr_user(
@@ -36,11 +44,15 @@ pub async fn get_curr_user(
 pub async fn get_user_fams(
     State(db): State<PgPool>,
     user: AuthenticatedUser,
-) -> Result<Json<Vec<FamilyDto>>, ApiError> {
+) -> Result<Json<Vec<FamListDto>>, ApiError> {
     let fams = sqlx::query_as!(
-        FamilyDto,
+        FamListDto,
         r#"
-        SELECT f.id, f.name 
+        SELECT 
+            f.id, 
+            f.name, 
+            fm.role::text as "role!",
+            (SELECT COUNT(*) FROM family_mems WHERE family_id = f.id) as "member_count!"
         FROM families f
         JOIN family_mems fm ON f.id = fm.family_id
         WHERE fm.user_id = $1
@@ -52,4 +64,17 @@ pub async fn get_user_fams(
     .map_err(ApiError::DatabaseError)?;
 
     Ok(Json(fams))
+}
+
+pub async fn get_avail_dicts(
+    State(_db): State<PgPool>,
+    _user: AuthenticatedUser,
+) -> Result<Json<Vec<DictMetaDto>>, ApiError> {
+    let dicts = vec![
+        DictMetaDto { id: "events".into(), name: "События".into() },
+        DictMetaDto { id: "exercises".into(), name: "Упражнения".into() },
+        DictMetaDto { id: "items".into(), name: "Предметы".into() },
+    ];
+    
+    Ok(Json(dicts))
 }

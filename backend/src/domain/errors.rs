@@ -12,6 +12,8 @@ pub enum ApiError {
     HashError,
     InvalidCredentials,
     UserAlreadyExists,
+    Unauthorized,
+    CannotLeaveLastAdmin,
 }
 
 impl IntoResponse for ApiError {
@@ -22,6 +24,8 @@ impl IntoResponse for ApiError {
             Self::HashError => (StatusCode::INTERNAL_SERVER_ERROR, "PASSWORD_HASH_ERROR"),
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, "INVALID_CREDENTIALS"),
             Self::UserAlreadyExists => (StatusCode::BAD_REQUEST, "USER_ALREADY_EXISTS"),
+            Self::Unauthorized => (StatusCode::FORBIDDEN, "UNAUTHORIZED_ACCESS"),
+            Self::CannotLeaveLastAdmin => (StatusCode::BAD_REQUEST, "CANNOT_LEAVE_LAST_ADMIN"),
         };
 
         let response_body = Json(json!({ "error": error_code }));

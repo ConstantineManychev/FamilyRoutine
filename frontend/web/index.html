@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base href="$FLUTTER_BASE_HREF">
+  <base href="/">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Family Routine Management System">
@@ -48,19 +48,12 @@
   </div>
 
   <script>
-    window.addEventListener('load', function() {
-      var loadingIndicator = document.getElementById('loading-indicator');
-      
-      _flutter.loader.loadEntrypoint({
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            if (loadingIndicator) loadingIndicator.remove();
-            appRunner.runApp();
-          });
-        }
-      });
+    window.addEventListener('flutter-first-frame', function() {
+      var el = document.getElementById('loading-indicator');
+      if (el) el.remove();
     });
   </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

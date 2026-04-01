@@ -5,6 +5,8 @@ import '../providers/auth_provider.dart';
 import '../ui/auth/auth_screen.dart';
 import '../ui/home/main_screen.dart';
 import '../ui/home/dashboard_screen.dart';
+import '../ui/home/fam_groups_screen.dart';
+import '../ui/home/fam_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuth = ref.watch(authStateProvider);
@@ -30,6 +32,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/app',
             builder: (context, state) => const DashboardScreen(),
+            routes: [
+              GoRoute(
+                path: 'families',
+                builder: (context, state) => const FamGroupsScreen(),
+              ),
+              GoRoute(
+                path: 'families/new',
+                builder: (context, state) => FamDetailScreen(
+                  onSaved: () => context.go('/app/families'),
+                ),
+              ),
+              GoRoute(
+                path: 'families/:id',
+                builder: (context, state) => FamDetailScreen(
+                  famId: state.pathParameters['id'],
+                  onSaved: () => context.go('/app/families'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

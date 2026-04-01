@@ -15,12 +15,53 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _isLogin = true;
+  DateTime? _bDate;
+  
   final _emailCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
   final _fNameCtrl = TextEditingController();
   final _lNameCtrl = TextEditingController();
+  final _bDateCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _pwdCtrl.dispose();
+    _fNameCtrl.dispose();
+    _lNameCtrl.dispose();
+    _bDateCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickBDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 20, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _bDate = picked;
+        _bDateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  void _showSnack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
 
   Future<void> _submit() async {
+    if (!_isLogin && _bDate == null) {
+      _showSnack('auth.err_empty_bdate'.tr());
+      return;
+    }
+
     try {
       final api = ref.read(apiProv);
       if (_isLogin) {
@@ -28,23 +69,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           'email': _emailCtrl.text,
           'password': _pwdCtrl.text,
         });
-        
-      ref.read(authStateProvider.notifier).setLoggedIn();
+        ref.read(authStateProvider.notifier).setLoggedIn();
       } else {
         await api.post('/api/auth/register', data: {
           'first_name': _fNameCtrl.text,
           'last_name': _lNameCtrl.text,
           'email': _emailCtrl.text,
           'password': _pwdCtrl.text,
+          'birth_date': _bDateCtrl.text,
         });
       }
       if (mounted) context.go('/app');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('auth.err_auth'.tr())),
-        );
-      }
+      _showSnack('auth.err_auth'.tr());
     }
   }
 
@@ -61,7 +98,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           ),
         ],
       ),
-        body: Center(
+      body: Center(
         child: Container(
           width: 380,
           padding: const EdgeInsets.all(32),
@@ -78,69 +115,95 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    onPressed: () => setState(() => _isLogin = true),
-                    child: Text(
-                      'auth.login_tab'.tr(),
-                      style: TextStyle(
-                        fontWeight: _isLogin ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  TextButton(
-                    onPressed: () => setState(() => _isLogin = false),
-                    child: Text(
-                      'auth.reg_tab'.tr(),
-                      style: TextStyle(
-                        fontWeight: !_isLogin ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildTabs(),
               const SizedBox(height: 32),
-              if (!_isLogin) ...[
-                TextField(
-                  controller: _fNameCtrl,
-                  decoration: InputDecoration(labelText: 'auth.f_name'.tr()),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _lNameCtrl,
-                  decoration: InputDecoration(labelText: 'auth.l_name'.tr()),
-                ),
-                const SizedBox(height: 16),
-              ],
-              TextField(
-                controller: _emailCtrl,
-                decoration: InputDecoration(labelText: 'auth.email'.tr()),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _pwdCtrl,
-                obscureText: true,
-                decoration: InputDecoration(labelText: 'auth.pwd'.tr()),
-              ),
+              if (!_isLogin) ..._buildRegFields(),
+              _buildAuthFields(),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text('auth.submit'.tr()),
-                ),
-              ),
+              _buildSubmitBtn(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTabs() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TextButton(
+          onPressed: () => setState(() => _isLogin = true),
+          child: Text(
+            'auth.login_tab'.tr(),
+            style: TextStyle(fontWeight: _isLogin ? FontWeight.bold : FontWeight.normal),
+          ),
+        ),
+        const SizedBox(width: 16),
+        TextButton(
+          onPressed: () => setState(() => _isLogin = false),
+          child: Text(
+            'auth.reg_tab'.tr(),
+            style: TextStyle(fontWeight: !_isLogin ? FontWeight.bold : FontWeight.normal),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildRegFields() {
+    return [
+      TextField(
+        controller: _fNameCtrl,
+        decoration: InputDecoration(labelText: 'auth.f_name'.tr()),
+      ),
+      const SizedBox(height: 16),
+      TextField(
+        controller: _lNameCtrl,
+        decoration: InputDecoration(labelText: 'auth.l_name'.tr()),
+      ),
+      const SizedBox(height: 16),
+      TextField(
+        controller: _bDateCtrl,
+        readOnly: true,
+        onTap: _pickBDate,
+        decoration: InputDecoration(
+          labelText: 'auth.b_date'.tr(),
+          suffixIcon: const Icon(Icons.calendar_today, size: 20),
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  Widget _buildAuthFields() {
+    return Column(
+      children: [
+        TextField(
+          controller: _emailCtrl,
+          decoration: InputDecoration(labelText: 'auth.email'.tr()),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _pwdCtrl,
+          obscureText: true,
+          decoration: InputDecoration(labelText: 'auth.pwd'.tr()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitBtn() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+        ),
+        child: Text('auth.submit'.tr()),
       ),
     );
   }

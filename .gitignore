@@ -13,16 +13,25 @@ pgdata/
 
 **/target/
 **/*.rs.bk
+.rust-analyzer/
 
 **/node_modules/
 **/dist/
-**/build/
 **/.eslintcache
 **/npm-debug.log*
 **/yarn-debug.log*
 **/yarn-error.log*
 
 frontend/shared/src/types/
+backend/bindings/
+
+**/build/
+**/.dart_tool/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/generated_plugin_registrant.dart
+**/*.iml
 
 **/src-tauri/gen/
 **/src-tauri/binaries/
