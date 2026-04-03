@@ -43,13 +43,29 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     try {
-      final prof = await ref.read(profProv.future);
-      _currUserId = prof.id;
+      try {
+        final prof = await ref.read(profProv.future);
+        _currUserId = prof.id;
+      } catch (_) {}
 
       if (_isEdit) {
         _famData = await ref.read(apiProv).getFamDetails(widget.famId!);
         _nameCtrl.text = _famData!.name;
-        _isAdmin = _famData!.members.any((m) => m.id == _currUserId && m.role == 'admin');
+
+        if (_currUserId != null) {
+          _isAdmin = _famData!.members.any((m) => 
+            m.id.toLowerCase() == _currUserId!.toLowerCase() && 
+            m.role.toLowerCase() == 'admin'
+          );
+        }
+
+        if (!_isAdmin) {
+          try {
+            final fams = await ref.read(apiProv).getFams();
+            final currentFam = fams.firstWhere((f) => f.id == widget.famId);
+            _isAdmin = currentFam.role.toLowerCase() == 'admin';
+          } catch (_) {}
+        }
       } else {
         _isAdmin = true;
       }
@@ -80,6 +96,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen> {
         widget.onSaved();
       } else {
         await ref.read(apiProv).updateFamName(widget.famId!, name);
+        ref.invalidate(famsProv);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('common.saved'.tr())));
       }
     } finally {
@@ -92,7 +109,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen> {
     if (email.isEmpty) return;
 
     if (!_isEdit) {
-      if (!_newMems.any((m) => m.email == email)) {
+      if (!_newMems.any((m) => m.email.toLowerCase() == email.toLowerCase())) {
         setState(() {
           _newMems.add(_LocalMem(email, 'standard'));
           _emailCtrl.clear();
@@ -244,11 +261,12 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen> {
   }
 
   Widget _buildExistingMemTile(FamMemberDto m) {
-    final bool isMe = m.id == _currUserId;
+    final bool isMe = _currUserId != null && m.id.toLowerCase() == _currUserId!.toLowerCase();
+    
     return ListTile(
       leading: CircleAvatar(child: Text(m.fName.isNotEmpty ? m.fName[0] : '?')),
       title: Text('${m.fName} ${m.lName}'),
-      subtitle: Text(m.role.toUpperCase(), style: TextStyle(color: m.role == 'admin' ? Colors.blue : Colors.grey)),
+      subtitle: Text(m.role.toUpperCase(), style: TextStyle(color: m.role.toLowerCase() == 'admin' ? Colors.blue : Colors.grey)),
       trailing: _isAdmin && !isMe ? _buildRoleMenu(m.role, (val) {
         if (val == 'remove') _removeMem(m.id);
         else _updateMemRole(m.id, val);
@@ -260,7 +278,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen> {
     return ListTile(
       leading: const CircleAvatar(child: Icon(LucideIcons.user)),
       title: Text(m.email),
-      subtitle: Text(m.role.toUpperCase(), style: TextStyle(color: m.role == 'admin' ? Colors.blue : Colors.grey)),
+      subtitle: Text(m.role.toUpperCase(), style: TextStyle(color: m.role.toLowerCase() == 'admin' ? Colors.blue : Colors.grey)),
       trailing: _buildRoleMenu(m.role, (val) {
         if (val == 'remove') setState(() => _newMems.remove(m));
         else setState(() => m.role = val);

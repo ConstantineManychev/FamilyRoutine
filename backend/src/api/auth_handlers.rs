@@ -15,8 +15,9 @@ use time::Duration as TimeDuration;
 
 pub async fn handle_user_registration(
     State(db): State<PgPool>,
-    Json(payload): Json<CreateUserRequest>,
+    Json(mut payload): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
+    payload.email = payload.email.to_lowercase();
     let res = register_new_user(&db, payload).await?;
     Ok((StatusCode::CREATED, Json(res)))
 }
@@ -24,8 +25,9 @@ pub async fn handle_user_registration(
 pub async fn handle_user_login(
     State(db): State<PgPool>,
     jar: CookieJar,
-    Json(payload): Json<LoginRequest>,
+    Json(mut payload): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    payload.email = payload.email.to_lowercase();
     let user = authenticate_user(&db, payload).await?;
     
     let now = Utc::now();

@@ -49,6 +49,16 @@ pub struct CreateFamilyRequest {
     pub members: Vec<CreateFamMemDto>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateFamNameDto {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateFamMemRoleDto {
+    pub role: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../frontend/shared/src/types/CreateUserRequest.ts")]
 pub struct CreateUserRequest {
@@ -66,30 +76,79 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
 #[sqlx(type_name = "acc_type_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../bindings/AccountType.ts")]
 pub enum AccountType {
     Cash,
     Card,
     BankAcc,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
-pub struct Currency {
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
+#[sqlx(type_name = "bank_type_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../bindings/BankType.ts")]
+pub enum BankType {
+    Monobank,
+    Aib,
+    Other,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
+#[sqlx(type_name = "tx_type_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../bindings/TxType.ts")]
+pub enum TxType {
+    Income,
+    Expense,
+    Transfer,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/CurrencyDto.ts")]
+pub struct CurrencyDto {
     pub id: Uuid,
     pub code: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
-pub struct Account {
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/CurrencyRateDto.ts")]
+pub struct CurrencyRateDto {
+    pub id: Uuid,
+    pub base_curr_id: Uuid,
+    pub target_curr_id: Uuid,
+    pub rate: f64,
+    pub date: NaiveDate,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/AccountDto.ts")]
+pub struct AccountDto {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
     pub family_id: Option<Uuid>,
     pub curr_id: Uuid,
     pub account_type: AccountType,
+    pub bank_type: Option<BankType>,
     pub name: String,
     pub mask: Option<String>,
+    #[ts(type = "Record<string, any> | null")]
+    pub sync_credentials: Option<serde_json::Value>,
     pub is_active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/TransactionDto.ts")]
+pub struct TransactionDto {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub account_id: Uuid,
+    pub curr_id: Uuid,
+    pub amount: f64,
+    pub tx_type: TxType,
+    pub date: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,14 +164,4 @@ pub struct FamDetailDto {
     pub id: Uuid,
     pub name: String,
     pub members: Vec<FamMemberDto>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateFamNameDto {
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateFamMemRoleDto {
-    pub role: String,
 }

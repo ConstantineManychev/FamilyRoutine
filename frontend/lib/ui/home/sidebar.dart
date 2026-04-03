@@ -141,7 +141,10 @@ class _SidebarState extends ConsumerState<Sidebar> {
               ? Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8.0),
                   child: Column(
-                    children: _dicts.map((d) => _buildSubItem(d.name, () {})).toList(),
+                    children: [
+                      _buildSubItem('sidebar.wallets'.tr(), () => context.go('/app/wallets'), icon: LucideIcons.wallet),
+                      ..._dicts.map((d) => _buildSubItem(d.name, () {})).toList(),
+                    ],
                   ),
                 )
               : const SizedBox.shrink(),

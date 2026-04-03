@@ -24,7 +24,8 @@
     "create_user": "Create User",
     "create_task": "Create Task",
     "family_groups": "Family Groups",
-    "create": "Create"
+    "create": "Create",
+    "wallets": "Wallets"
   },
   "profile": {
     "sign_out": "Sign Out"
@@ -54,5 +55,30 @@
     "yes": "Yes",
     "no": "No",
     "ok": "OK"
+  },
+  "wallet": {
+    "title": "Wallets",
+    "add": "Add",
+    "edit": "Edit",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "delete": "Delete",
+    "show_archived": "Show Archived",
+    "hide_archived": "Hide Archived",
+    "delete_warning": "If you delete this wallet, all transaction history will be permanently lost. Are you sure?",
+    "delete_captcha_desc": "Type {word} to confirm:",
+    "delete_word": "DELETE",
+    "type_cash": "Cash",
+    "type_card": "Card",
+    "type_bank_acc": "Account",
+    "bank_mono": "Monobank",
+    "bank_aib": "AIB",
+    "bank_other": "Other",
+    "api_key": "API Key",
+    "name": "Title",
+    "mask": "Mask (last numbers)",
+    "type": "Type",
+    "bank": "Bank",
+    "currency": "Currency"
   }
 }

@@ -19,3 +19,7 @@ final famsProv = FutureProvider<List<FamDto>>((ref) async {
   final res = await api.get('/api/families');
   return (res.data as List).map((e) => FamDto.fromJson(e)).toList();
 });
+
+final walletsProv = FutureProvider.autoDispose<List<AccountDto>>((ref) async {
+  return ref.watch(apiProv).getWallets();
+});

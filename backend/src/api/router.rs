@@ -3,18 +3,21 @@ use crate::api::fam_handlers::{
     add_fam_member, create_fam, delete_fam, get_fam_details, leave_fam, remove_fam_member,
     update_fam_member, update_fam_name,
 };
-use axum::routing::put;
 use crate::api::user_handlers::{get_avail_dicts, get_curr_user, get_user_fams};
+use crate::api::wallet_handlers::{
+    archive_wallet, create_wallet, delete_wallet, get_currencies, get_wallet_detail, get_wallets, update_wallet,
+};
 use axum::{
     http::{
         header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
         HeaderName, HeaderValue, Method,
     },
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
+
 
 fn build_cors() -> CorsLayer {
     let origin = std::env::var("FRONTEND_URL")
@@ -53,6 +56,10 @@ pub fn configure_application_router(db: PgPool) -> Router {
         .route("/api/families/:id/leave", delete(leave_fam))
         .route("/api/families/:id/members", post(add_fam_member))
         .route("/api/families/:id/members/:user_id", put(update_fam_member).delete(remove_fam_member))
+        .route("/api/wallets", get(get_wallets).post(create_wallet))
+        .route("/api/wallets/:id", get(get_wallet_detail).put(update_wallet).delete(delete_wallet))
+        .route("/api/wallets/:id/archive", put(archive_wallet))
+        .route("/api/currencies", get(get_currencies))
         .layer(build_cors())
         .with_state(db)
 }

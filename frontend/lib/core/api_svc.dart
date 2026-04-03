@@ -35,6 +35,7 @@ class ApiSvc {
 
   Future<Response> get(String path) => _dio.get(path);
   Future<Response> post(String path, {dynamic data}) => _dio.post(path, data: data);
+  Future<Response> put(String path, {dynamic data}) => _dio.put(path, data: data);
   Future<Response> delete(String path) => _dio.delete(path);
 
   Future<List<DictMetaDto>> getDictsMeta() async {
@@ -62,9 +63,41 @@ class ApiSvc {
 
   Future<void> deleteFam(String id) async => await _dio.delete('/api/families/$id');
   Future<void> leaveFam(String id) async => await _dio.delete('/api/families/$id/leave');
-
   Future<void> updateFamName(String id, String name) async => await _dio.put('/api/families/$id', data: {'name': name});
   Future<void> addFamMember(String famId, String email, String role) async => await _dio.post('/api/families/$famId/members', data: {'email': email, 'role': role});
   Future<void> updateFamMemberRole(String famId, String userId, String role) async => await _dio.put('/api/families/$famId/members/$userId', data: {'role': role});
   Future<void> removeFamMember(String famId, String userId) async => await _dio.delete('/api/families/$famId/members/$userId');
+
+  Future<List<AccountDto>> getWallets() async {
+    final res = await _dio.get('/api/wallets');
+    return (res.data as List).map((e) => AccountDto.fromJson(e)).toList();
+  }
+
+  Future<AccountDto> createWallet(Map<String, dynamic> data) async {
+    final res = await _dio.post('/api/wallets', data: data);
+    return AccountDto.fromJson(res.data);
+  }
+
+  Future<AccountDto> updateWallet(String id, Map<String, dynamic> data) async {
+    final res = await _dio.put('/api/wallets/$id', data: data);
+    return AccountDto.fromJson(res.data);
+  }
+
+  Future<void> archiveWallet(String id, bool isActive) async {
+    await _dio.put('/api/wallets/$id/archive', data: {'is_active': isActive});
+  }
+
+  Future<void> deleteWallet(String id) async {
+    await _dio.delete('/api/wallets/$id');
+  }
+
+  Future<AccountDto> getWalletDetail(String id) async {
+    final res = await _dio.get('/api/wallets/$id');
+    return AccountDto.fromJson(res.data);
+  }
+
+  Future<List<CurrencyDto>> getCurrencies() async {
+    final res = await _dio.get('/api/currencies');
+    return (res.data as List).map((e) => CurrencyDto.fromJson(e)).toList();
+  }
 }

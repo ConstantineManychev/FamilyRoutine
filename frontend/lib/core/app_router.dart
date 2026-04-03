@@ -7,6 +7,8 @@ import '../ui/home/main_screen.dart';
 import '../ui/home/dashboard_screen.dart';
 import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/fam_detail_screen.dart';
+import '../ui/wallets/wallets_screen.dart';
+import '../ui/wallets/wallet_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuth = ref.watch(authStateProvider);
@@ -48,6 +50,23 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => FamDetailScreen(
                   famId: state.pathParameters['id'],
                   onSaved: () => context.go('/app/families'),
+                ),
+              ),
+              GoRoute(
+                path: 'wallets',
+                builder: (context, state) => const WalletsScreen(),
+              ),
+              GoRoute(
+                path: 'wallets/new',
+                builder: (context, state) => WalletDetailScreen(
+                  onSaved: () => context.go('/app/wallets'),
+                ),
+              ),
+              GoRoute(
+                path: 'wallets/:id',
+                builder: (context, state) => WalletDetailScreen(
+                  walletId: state.pathParameters['id'],
+                  onSaved: () => context.go('/app/wallets'),
                 ),
               ),
             ],

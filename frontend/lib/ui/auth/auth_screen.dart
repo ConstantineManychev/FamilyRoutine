@@ -87,6 +87,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.locale;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,

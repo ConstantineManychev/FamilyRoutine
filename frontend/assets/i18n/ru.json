@@ -24,7 +24,8 @@
     "create_user": "Создать пользователя",
     "create_task": "Создать задачу",
     "family_groups": "Семейные группы",
-    "create": "Создать"
+    "create": "Создать",
+    "wallets": "Кошельки"
   },
   "profile": {
     "sign_out": "Выйти"
@@ -54,5 +55,30 @@
     "yes": "Да",
     "no": "Нет",
     "ok": "ОК"
+  },
+  "wallet": {
+    "title": "Кошельки",
+    "add": "Добавить",
+    "edit": "Изменить",
+    "archive": "В архив",
+    "unarchive": "Восстановить",
+    "delete": "Удалить",
+    "show_archived": "Показать архивные",
+    "hide_archived": "Скрыть архивные",
+    "delete_warning": "В случае удаления кошелька вся информация по транзакциям будет полностью удалена. Вы уверены?",
+    "delete_captcha_desc": "Введите слово {word} для подтверждения:",
+    "delete_word": "УДАЛИТЬ",
+    "type_cash": "Наличные",
+    "type_card": "Карта",
+    "type_bank_acc": "Счет",
+    "bank_mono": "Monobank",
+    "bank_aib": "AIB",
+    "bank_other": "Другой",
+    "api_key": "API Ключ",
+    "name": "Название",
+    "mask": "Маска (последние цифры)",
+    "type": "Тип",
+    "bank": "Банк",
+    "currency": "Валюта"
   }
 }
