@@ -25,7 +25,10 @@
     "create_task": "Create Task",
     "family_groups": "Family Groups",
     "create": "Create",
-    "wallets": "Wallets"
+    "wallets": "Wallets",
+    "places": "Places",
+    "cities": "Cities",
+    "streets": "Streets"
   },
   "profile": {
     "sign_out": "Sign Out"
@@ -80,5 +83,21 @@
     "type": "Type",
     "bank": "Bank",
     "currency": "Currency"
+  },
+  "places": {
+    "title": "Title",
+    "add": "Add title",
+    "name": "Name",
+    "main_addr": "Main adsres",
+    "add_addr": "Additional addres",
+    "country": "Country",
+    "city": "City",
+    "street": "Street",
+    "house": "House",
+    "apt": "Appartament",
+    "zip": "ZIP",
+    "merchant_id": "Merchant ID",
+    "create_city_prompt": "Do you want to create city {city} for country {country}?",
+    "create_street_prompt": "Do you want to create street {street} for city {city} in country {country}?"
   }
 }

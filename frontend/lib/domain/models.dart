@@ -137,3 +137,113 @@ class CurrencyDto {
         code: json['code'] ?? '',
       );
 }
+
+class CountryDto {
+  final String id;
+  final String code;
+  final String name;
+
+  CountryDto({required this.id, required this.code, required this.name});
+
+  factory CountryDto.fromJson(Map<String, dynamic> json) => CountryDto(
+        id: json['id'],
+        code: json['code'],
+        name: json['name'],
+      );
+}
+
+class CityDto {
+  final String id;
+  final String countryId;
+  final String name;
+
+  CityDto({required this.id, required this.countryId, required this.name});
+
+  factory CityDto.fromJson(Map<String, dynamic> json) => CityDto(
+        id: json['id'],
+        countryId: json['country_id'],
+        name: json['name'],
+      );
+}
+
+class StreetDto {
+  final String id;
+  final String cityId;
+  final String name;
+
+  StreetDto({required this.id, required this.cityId, required this.name});
+
+  factory StreetDto.fromJson(Map<String, dynamic> json) => StreetDto(
+        id: json['id'],
+        cityId: json['city_id'],
+        name: json['name'],
+      );
+}
+
+class PlaceAddrDto {
+  final String? id;
+  final bool isMain;
+  final String countryId;
+  final String cityId;
+  final String streetId;
+  final String houseNum;
+  final String? apt;
+  final String zip;
+  final String? merchantId;
+
+  PlaceAddrDto({
+    this.id,
+    required this.isMain,
+    required this.countryId,
+    required this.cityId,
+    required this.streetId,
+    required this.houseNum,
+    this.apt,
+    required this.zip,
+    this.merchantId,
+  });
+
+  factory PlaceAddrDto.fromJson(Map<String, dynamic> json) => PlaceAddrDto(
+        id: json['id'],
+        isMain: json['is_main'] ?? false,
+        countryId: json['country_id'],
+        cityId: json['city_id'],
+        streetId: json['street_id'],
+        houseNum: json['house_num'],
+        apt: json['apt'],
+        zip: json['zip'],
+        merchantId: json['merchant_id'],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'is_main': isMain,
+        'country_id': countryId,
+        'city_id': cityId,
+        'street_id': streetId,
+        'house_num': houseNum,
+        'apt': apt,
+        'zip': zip,
+        'merchant_id': merchantId,
+      };
+}
+
+class PlaceDto {
+  final String id;
+  final String name;
+  final List<PlaceAddrDto> addrs;
+
+  PlaceDto({required this.id, required this.name, required this.addrs});
+
+  factory PlaceDto.fromJson(Map<String, dynamic> json) => PlaceDto(
+        id: json['id'],
+        name: json['name'],
+        addrs: (json['addrs'] as List?)?.map((e) => PlaceAddrDto.fromJson(e)).toList() ?? [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'addrs': addrs.map((e) => e.toJson()).toList(),
+      };
+}

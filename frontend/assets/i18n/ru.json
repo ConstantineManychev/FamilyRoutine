@@ -25,7 +25,9 @@
     "create_task": "Создать задачу",
     "family_groups": "Семейные группы",
     "create": "Создать",
-    "wallets": "Кошельки"
+    "wallets": "Кошельки",
+    "cities": "Города",
+    "streets": "Улицы"
   },
   "profile": {
     "sign_out": "Выйти"
@@ -80,5 +82,21 @@
     "type": "Тип",
     "bank": "Банк",
     "currency": "Валюта"
+  },
+  "places": {
+    "title": "Места",
+    "add": "Добавить место",
+    "name": "Название",
+    "main_addr": "Основной адрес",
+    "add_addr": "Дополнительный адрес",
+    "country": "Страна",
+    "city": "Город",
+    "street": "Улица",
+    "house": "Дом",
+    "apt": "Дополнение",
+    "zip": "Индекс",
+    "merchant_id": "Merchant ID",
+    "create_city_prompt": "Хотите создать город {city} для страны {country}?",
+    "create_street_prompt": "Хотите создать улицу {street} для города {city} в стране {country}?"
   }
 }

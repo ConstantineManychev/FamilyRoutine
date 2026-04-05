@@ -100,4 +100,57 @@ class ApiSvc {
     final res = await _dio.get('/api/currencies');
     return (res.data as List).map((e) => CurrencyDto.fromJson(e)).toList();
   }
+
+  Future<List<CountryDto>> getCountries() async {
+    final res = await _dio.get('/api/geo/countries');
+    return (res.data as List).map((e) => CountryDto.fromJson(e)).toList();
+  }
+
+  Future<List<CityDto>> getCities(String countryId) async {
+    final res = await _dio.get('/api/geo/countries/$countryId/cities');
+    return (res.data as List).map((e) => CityDto.fromJson(e)).toList();
+  }
+
+  Future<CityDto> createCity(String countryId, String name) async {
+    final res = await _dio.post('/api/geo/countries/$countryId/cities', data: {'name': name});
+    return CityDto.fromJson(res.data);
+  }
+
+  Future<CityDto> updateCity(String id, String name) async {
+    final res = await _dio.put('/api/geo/cities/$id', data: {'name': name});
+    return CityDto.fromJson(res.data);
+  }
+
+  Future<void> deleteCity(String id) async {
+    await _dio.delete('/api/geo/cities/$id');
+  }
+
+  Future<List<StreetDto>> getStreets(String cityId) async {
+    final res = await _dio.get('/api/geo/cities/$cityId/streets');
+    return (res.data as List).map((e) => StreetDto.fromJson(e)).toList();
+  }
+
+  Future<StreetDto> createStreet(String cityId, String name) async {
+    final res = await _dio.post('/api/geo/cities/$cityId/streets', data: {'name': name});
+    return StreetDto.fromJson(res.data);
+  }
+
+  Future<StreetDto> updateStreet(String id, String name) async {
+    final res = await _dio.put('/api/geo/streets/$id', data: {'name': name});
+    return StreetDto.fromJson(res.data);
+  }
+
+  Future<void> deleteStreet(String id) async {
+    await _dio.delete('/api/geo/streets/$id');
+  }
+
+  Future<List<PlaceDto>> getPlaces() async {
+    final res = await _dio.get('/api/places');
+    return (res.data as List).map((e) => PlaceDto.fromJson(e)).toList();
+  }
+
+  Future<PlaceDto> createPlace(PlaceDto place) async {
+    final res = await _dio.post('/api/places', data: place.toJson());
+    return PlaceDto.fromJson(res.data);
+  }
 }

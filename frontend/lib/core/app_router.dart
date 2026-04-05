@@ -9,6 +9,10 @@ import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/fam_detail_screen.dart';
 import '../ui/wallets/wallets_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
+import '../ui/dicts/cities_dict_screen.dart';
+import '../ui/dicts/streets_dict_screen.dart';
+//import '../ui/places/places_screen.dart'; 
+import '../ui/places/place_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuth = ref.watch(authStateProvider);
@@ -67,6 +71,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => WalletDetailScreen(
                   walletId: state.pathParameters['id'],
                   onSaved: () => context.go('/app/wallets'),
+                ),
+              ),
+              GoRoute(
+                path: 'cities',
+                builder: (context, state) => const CitiesDictScreen(),
+              ),
+              GoRoute(
+                path: 'streets',
+                builder: (context, state) => const StreetsDictScreen(),
+              ),
+              /*GoRoute(
+                path: 'places',
+                builder: (context, state) => const PlacesScreen(),
+              ),*/
+              GoRoute(
+                path: 'places/new',
+                builder: (context, state) => PlaceDetailScreen(
+                  onSaved: () => context.go('/app/places'),
                 ),
               ),
             ],

@@ -15,6 +15,7 @@ dependencies:
   easy_localization: ^3.0.3
   flutter_riverpod: ^2.4.9
   lucide_icons: ^0.257.0
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:

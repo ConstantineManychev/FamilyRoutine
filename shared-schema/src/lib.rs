@@ -165,3 +165,61 @@ pub struct FamDetailDto {
     pub name: String,
     pub members: Vec<FamMemberDto>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/CountryDto.ts")]
+pub struct CountryDto {
+    pub id: Uuid,
+    pub code: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/CityDto.ts")]
+pub struct CityDto {
+    pub id: Uuid,
+    pub country_id: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/StreetDto.ts")]
+pub struct StreetDto {
+    pub id: Uuid,
+    pub city_id: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/PlaceAddrDto.ts")]
+pub struct PlaceAddrDto {
+    pub id: Option<Uuid>,
+    pub is_main: bool,
+    pub country_id: Uuid,
+    pub city_id: Uuid,
+    pub street_id: Uuid,
+    pub house_num: String,
+    #[serde(default)]
+    pub apt: Option<String>,
+    pub zip: String,
+    #[serde(default)]
+    pub merchant_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/PlaceDto.ts")]
+pub struct PlaceDto {
+    pub id: Uuid,
+    pub name: String,
+    pub addrs: Vec<PlaceAddrDto>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCityReq {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateStreetReq {
+    pub name: String,
+}
