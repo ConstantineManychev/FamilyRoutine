@@ -34,9 +34,10 @@ pub async fn get_curr_user(
         "SELECT first_name, last_name FROM users WHERE id = $1",
         user.0
     )
-    .fetch_one(&db)
+    .fetch_optional(&db)
     .await
-    .map_err(ApiError::DatabaseError)?;
+    .map_err(ApiError::DatabaseError)?
+    .ok_or(ApiError::Unauthorized)?;
 
     Ok(Json(profile))
 }
@@ -71,9 +72,9 @@ pub async fn get_avail_dicts(
     _user: AuthenticatedUser,
 ) -> Result<Json<Vec<DictMetaDto>>, ApiError> {
     let dicts = vec![
-        DictMetaDto { id: "events".into(), name: "События".into() },
-        DictMetaDto { id: "exercises".into(), name: "Упражнения".into() },
-        DictMetaDto { id: "items".into(), name: "Предметы".into() },
+        DictMetaDto { id: "events".into(), name: "dicts.events".into() },
+        DictMetaDto { id: "exercises".into(), name: "dicts.exercises".into() },
+        DictMetaDto { id: "items".into(), name: "dicts.items".into() },
     ];
     
     Ok(Json(dicts))

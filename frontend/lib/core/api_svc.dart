@@ -149,8 +149,22 @@ class ApiSvc {
     return (res.data as List).map((e) => PlaceDto.fromJson(e)).toList();
   }
 
+  Future<PlaceDto> getPlaceDetail(String id) async {
+    final res = await _dio.get('/api/places/$id');
+    return PlaceDto.fromJson(res.data);
+  }
+
   Future<PlaceDto> createPlace(PlaceDto place) async {
     final res = await _dio.post('/api/places', data: place.toJson());
     return PlaceDto.fromJson(res.data);
+  }
+
+  Future<PlaceDto> updatePlace(String id, PlaceDto place) async {
+    final res = await _dio.put('/api/places/$id', data: place.toJson());
+    return PlaceDto.fromJson(res.data);
+  }
+
+  Future<void> deletePlace(String id) async {
+    await _dio.delete('/api/places/$id');
   }
 }

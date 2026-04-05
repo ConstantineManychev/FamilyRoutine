@@ -3,9 +3,17 @@ use crate::api::fam_handlers::{
     add_fam_member, create_fam, delete_fam, get_fam_details, leave_fam, remove_fam_member,
     update_fam_member, update_fam_name,
 };
+use crate::api::geo_handlers::{
+    create_city, create_street, delete_city, delete_street, get_cities, get_countries, get_streets,
+    update_city, update_street,
+};
+use crate::api::place_handlers::{
+    create_place, delete_place, get_place_detail, get_places, update_place,
+};
 use crate::api::user_handlers::{get_avail_dicts, get_curr_user, get_user_fams};
 use crate::api::wallet_handlers::{
-    archive_wallet, create_wallet, delete_wallet, get_currencies, get_wallet_detail, get_wallets, update_wallet,
+    archive_wallet, create_wallet, delete_wallet, get_currencies, get_wallet_detail, get_wallets,
+    update_wallet,
 };
 use axum::{
     http::{
@@ -17,7 +25,6 @@ use axum::{
 };
 use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
-
 
 fn build_cors() -> CorsLayer {
     let origin = std::env::var("FRONTEND_URL")
@@ -56,10 +63,17 @@ pub fn configure_application_router(db: PgPool) -> Router {
         .route("/api/families/:id/leave", delete(leave_fam))
         .route("/api/families/:id/members", post(add_fam_member))
         .route("/api/families/:id/members/:user_id", put(update_fam_member).delete(remove_fam_member))
+        .route("/api/currencies", get(get_currencies))
         .route("/api/wallets", get(get_wallets).post(create_wallet))
         .route("/api/wallets/:id", get(get_wallet_detail).put(update_wallet).delete(delete_wallet))
         .route("/api/wallets/:id/archive", put(archive_wallet))
-        .route("/api/currencies", get(get_currencies))
+        .route("/api/geo/countries", get(get_countries))
+        .route("/api/geo/countries/:id/cities", get(get_cities).post(create_city))
+        .route("/api/geo/cities/:id", put(update_city).delete(delete_city))
+        .route("/api/geo/cities/:id/streets", get(get_streets).post(create_street))
+        .route("/api/geo/streets/:id", put(update_street).delete(delete_street))
+        .route("/api/places", get(get_places).post(create_place))
+        .route("/api/places/:id", get(get_place_detail).put(update_place).delete(delete_place))
         .layer(build_cors())
         .with_state(db)
 }

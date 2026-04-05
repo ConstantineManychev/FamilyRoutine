@@ -11,7 +11,7 @@ import '../ui/wallets/wallets_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
 import '../ui/dicts/cities_dict_screen.dart';
 import '../ui/dicts/streets_dict_screen.dart';
-//import '../ui/places/places_screen.dart'; 
+import '../ui/places/places_screen.dart'; 
 import '../ui/places/place_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -81,13 +81,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'streets',
                 builder: (context, state) => const StreetsDictScreen(),
               ),
-              /*GoRoute(
+              GoRoute(
                 path: 'places',
                 builder: (context, state) => const PlacesScreen(),
-              ),*/
+              ),
               GoRoute(
                 path: 'places/new',
                 builder: (context, state) => PlaceDetailScreen(
+                  onSaved: () => context.go('/app/places'),
+                ),
+              ),
+              GoRoute(
+                path: 'places/:id',
+                builder: (context, state) => PlaceDetailScreen(
+                  placeId: state.pathParameters['id'],
                   onSaved: () => context.go('/app/places'),
                 ),
               ),

@@ -27,7 +27,13 @@
     "create": "Создать",
     "wallets": "Кошельки",
     "cities": "Города",
-    "streets": "Улицы"
+    "streets": "Улицы",
+    "places": "Места"
+  },
+  "dicts": {
+     "events": "События",
+    "exercises": "Упражнения",
+    "items": "Товары/услуги"
   },
   "profile": {
     "sign_out": "Выйти"
@@ -56,7 +62,10 @@
     "save": "Сохранить",
     "yes": "Да",
     "no": "Нет",
-    "ok": "ОК"
+    "ok": "ОК",
+    "cancel": "Отмена",
+    "no_data": "Данные отсутствуют",
+    "delete_confirm": "Вы уверены, что хотите удалить?"
   },
   "wallet": {
     "title": "Кошельки",
@@ -97,6 +106,18 @@
     "zip": "Индекс",
     "merchant_id": "Merchant ID",
     "create_city_prompt": "Хотите создать город {city} для страны {country}?",
-    "create_street_prompt": "Хотите создать улицу {street} для города {city} в стране {country}?"
+    "create_street_prompt": "Хотите создать улицу {street} для города {city} в стране {country}?",
+    "no_address": "Нет адреса",
+    "edit": "Редактировать место"
+  },
+  "geo": {
+    "no_cities": "Города отсутствуют",
+    "add_street": "Добавить улицу",
+    "add_city": "Добавить город",
+    "cities_dict": "Города",
+    "streets_dict": "Улицы",
+    "city_name": "Название города",
+    "country": "Страна",
+    "street_name": "Название улицы"
   }
 }
