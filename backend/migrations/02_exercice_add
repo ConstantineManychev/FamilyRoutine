@@ -1,0 +1,9 @@
+CREATE TYPE ex_weight_type_t AS ENUM ('external', 'hybrid', 'bodyweight');
+CREATE TYPE kcal_calc_mode_t AS ENUM ('met', 'tonnage');
+
+ALTER TABLE user_prefs 
+ADD COLUMN kcal_calc_mode kcal_calc_mode_t NOT NULL DEFAULT 'met';
+
+ALTER TABLE dict_exs 
+ADD COLUMN weight_type ex_weight_type_t NOT NULL DEFAULT 'external',
+ADD COLUMN bw_pct NUMERIC(5, 2) NOT NULL DEFAULT 0;

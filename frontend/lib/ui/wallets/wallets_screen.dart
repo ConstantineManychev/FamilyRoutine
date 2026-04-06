@@ -19,7 +19,7 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen> {
   Future<void> _toggleArchive(String id, bool currentStatus) async {
     try {
       await ref.read(apiProv).archiveWallet(id, !currentStatus);
-      ref.invalidate(walletsProv); // Обновляем после архивации
+      ref.invalidate(walletsProv);
     } catch (_) {}
   }
 
@@ -82,13 +82,12 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen> {
 
     try {
       await ref.read(apiProv).deleteWallet(id);
-      ref.invalidate(walletsProv); // Обновляем после удаления
+      ref.invalidate(walletsProv); 
     } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    // Подключаем реактивный провайдер
     final walletsAsync = ref.watch(walletsProv);
 
     return Padding(

@@ -167,4 +167,28 @@ class ApiSvc {
   Future<void> deletePlace(String id) async {
     await _dio.delete('/api/places/$id');
   }
+
+  Future<List<ExDto>> getExercises() async {
+    final res = await _dio.get('/api/exercises');
+    return (res.data as List).map((e) => ExDto.fromJson(e)).toList();
+  }
+
+  Future<ExDto> getExerciseDetail(String id) async {
+    final res = await _dio.get('/api/exercises/$id');
+    return ExDto.fromJson(res.data);
+  }
+
+  Future<ExDto> createExercise(ExDto dto) async {
+    final res = await _dio.post('/api/exercises', data: dto.toJson());
+    return ExDto.fromJson(res.data);
+  }
+
+  Future<ExDto> updateExercise(String id, ExDto dto) async {
+    final res = await _dio.put('/api/exercises/$id', data: dto.toJson());
+    return ExDto.fromJson(res.data);
+  }
+
+  Future<void> deleteExercise(String id) async {
+    await _dio.delete('/api/exercises/$id');
+  }
 }

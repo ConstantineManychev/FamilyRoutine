@@ -223,3 +223,25 @@ pub struct CreateCityReq {
 pub struct CreateStreetReq {
     pub name: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/EnergyEventType.ts")]
+pub enum EnergyEventType {
+    BmrBase,
+    Meal,
+    Workout,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/EnergyNodeDto.ts")]
+pub struct EnergyNodeDto {
+    pub ts: DateTime<Utc>,
+    pub event_type: EnergyEventType,
+    pub val: f64,
+    pub cum_val: f64,
+}
+
+#[derive(Deserialize)]
+pub struct EnergyGraphReq {
+    pub target_date: NaiveDate,
+}

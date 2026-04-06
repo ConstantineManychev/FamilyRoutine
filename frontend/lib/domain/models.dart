@@ -247,3 +247,133 @@ class PlaceDto {
         'addrs': addrs.map((e) => e.toJson()).toList(),
       };
 }
+
+class BodySnapDto {
+  final String id;
+  final String userId;
+  final double weight;
+  final double height;
+  final double? fatPct;
+  final double? muscPct;
+  final double? skelMuscPct;
+  final DateTime recTs;
+
+  BodySnapDto({
+    required this.id,
+    required this.userId,
+    required this.weight,
+    required this.height,
+    this.fatPct,
+    this.muscPct,
+    this.skelMuscPct,
+    required this.recTs,
+  });
+
+  factory BodySnapDto.fromJson(Map<String, dynamic> json) => BodySnapDto(
+        id: json['id'],
+        userId: json['user_id'],
+        weight: json['weight'],
+        height: json['height'],
+        fatPct: json['fat_pct'],
+        muscPct: json['musc_pct'],
+        skelMuscPct: json['skel_musc_pct'],
+        recTs: DateTime.parse(json['rec_ts']),
+      );
+}
+
+class EnergyNodeDto {
+  final DateTime ts;
+  final String eventType;
+  final double val;
+  final double cumVal;
+
+  EnergyNodeDto({
+    required this.ts,
+    required this.eventType,
+    required this.val,
+    required this.cumVal,
+  });
+
+  factory EnergyNodeDto.fromJson(Map<String, dynamic> json) => EnergyNodeDto(
+        ts: DateTime.parse(json['ts']),
+        eventType: json['event_type'],
+        val: json['val'],
+        cumVal: json['cum_val'],
+      );
+}
+
+class FamBudgetDto {
+  final String currCode;
+  final double totalBalance;
+
+  FamBudgetDto({
+    required this.currCode,
+    required this.totalBalance,
+  });
+
+  factory FamBudgetDto.fromJson(Map<String, dynamic> json) => FamBudgetDto(
+        currCode: json['curr_code'],
+        totalBalance: json['total_balance'],
+      );
+}
+
+class ExMuscleDto {
+  final String muscle;
+  final double pct;
+
+  ExMuscleDto({required this.muscle, required this.pct});
+
+  factory ExMuscleDto.fromJson(Map<String, dynamic> json) => ExMuscleDto(
+        muscle: json['muscle'],
+        pct: (json['pct'] as num).toDouble(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'muscle': muscle,
+        'pct': pct,
+      };
+}
+
+class ExDto {
+  final String id;
+  final String name;
+  final String exType;
+  final double metVal;
+  final bool isCustom;
+  final String weightType;
+  final double bwPct;
+  final List<ExMuscleDto> muscles;
+
+  ExDto({
+    required this.id,
+    required this.name,
+    required this.exType,
+    required this.metVal,
+    required this.isCustom,
+    required this.weightType,
+    required this.bwPct,
+    required this.muscles,
+  });
+
+  factory ExDto.fromJson(Map<String, dynamic> json) => ExDto(
+        id: json['id'],
+        name: json['name'],
+        exType: json['ex_type'],
+        metVal: (json['met_val'] as num).toDouble(),
+        isCustom: json['is_custom'] ?? false,
+        weightType: json['weight_type'] ?? 'external',
+        bwPct: (json['bw_pct'] as num).toDouble(),
+        muscles: (json['muscles'] as List?)?.map((e) => ExMuscleDto.fromJson(e)).toList() ?? [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'ex_type': exType,
+        'met_val': metVal,
+        'is_custom': isCustom,
+        'weight_type': weightType,
+        'bw_pct': bwPct,
+        'muscles': muscles.map((e) => e.toJson()).toList(),
+      };
+}

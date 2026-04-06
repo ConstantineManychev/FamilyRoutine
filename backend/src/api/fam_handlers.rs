@@ -8,6 +8,8 @@ use axum::{
 use shared_schema::{CreateFamMemDto, CreateFamilyRequest, FamDetailDto, FamMemberDto, UpdateFamMemRoleDto, UpdateFamNameDto};
 use sqlx::PgPool;
 use uuid::Uuid;
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 pub async fn create_fam(
     State(db): State<PgPool>,
@@ -365,4 +367,30 @@ async fn fetch_fam_aggregate(db: &PgPool, fam_id: Uuid) -> Result<Json<FamDetail
     }))
 
     
+}
+
+#[derive(Deserialize)]
+pub struct FamBudgetReq {
+    pub target_curr_code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/FamBudgetDto.ts")]
+pub struct FamBudgetDto {
+    pub curr_code: String,
+    pub total_balance: f64,
+}
+
+pub async fn get_fam_budget(
+    State(_db): State<PgPool>,
+    Path(_fam_id): Path<Uuid>,
+) -> Result<Json<()>, ApiError> {
+    Ok(Json(()))
+}
+
+pub async fn get_fam_timeline(
+    State(_db): State<PgPool>,
+    Path(_fam_id): Path<Uuid>,
+) -> Result<Json<()>, ApiError> {
+    Ok(Json(()))
 }

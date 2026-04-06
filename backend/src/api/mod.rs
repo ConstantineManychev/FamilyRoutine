@@ -6,3 +6,5 @@ pub mod fam_handlers;
 pub mod wallet_handlers;
 pub mod geo_handlers;
 pub mod place_handlers;
+pub mod energy_handler;
+pub mod ex_handlers;

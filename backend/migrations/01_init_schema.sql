@@ -1,7 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-
-
 CREATE TYPE meas_data_t AS ENUM ('absolute', 'percentage');
 CREATE TYPE meas_calc_t AS ENUM ('snapshot', 'delta');
 CREATE TYPE recur_freq_t AS ENUM ('once', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly');
@@ -14,9 +12,9 @@ CREATE TYPE ex_type_t AS ENUM ('cardio', 'strength', 'flexibility', 'mixed');
 CREATE TYPE meal_t AS ENUM ('breakfast', 'lunch', 'dinner', 'snack');
 CREATE TYPE curr_status_t AS ENUM ('home', 'work', 'school', 'gym', 'transit', 'other');
 CREATE TYPE bank_type_t AS ENUM ('monobank', 'aib', 'other');
+CREATE TYPE item_t AS ENUM ('product', 'service', 'food');
 
-
-
+CREATE TYPE muscle_grp_t AS ENUM ('chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body', 'cardio');
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -27,12 +25,22 @@ CREATE TABLE users (
     last_name VARCHAR(100) NOT NULL,
     birth_date DATE NOT NULL,
     gender VARCHAR(10),
-    height_cm NUMERIC(5, 2),
-    weight_kg NUMERIC(5, 2),
     avatar_url TEXT,
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE body_snaps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    weight NUMERIC(5, 2) NOT NULL,
+    height NUMERIC(5, 2) NOT NULL,
+    fat_pct NUMERIC(4, 2),
+    musc_pct NUMERIC(4, 2),
+    skel_musc_pct NUMERIC(4, 2),
+    rec_ts TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_body_snaps_user_ts ON body_snaps(user_id, rec_ts DESC);
 
 CREATE TABLE families (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -61,17 +69,22 @@ CREATE TABLE currencies (
 
 CREATE TABLE items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    type VARCHAR(50) NOT NULL,
+    type item_t NOT NULL,
     name VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE food_nutr (
+    item_id UUID PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+    kcal NUMERIC(6, 2) NOT NULL,
+    prot NUMERIC(6, 2) NOT NULL,
+    fat NUMERIC(6, 2) NOT NULL,
+    carb NUMERIC(6, 2) NOT NULL
 );
 
 CREATE TABLE places (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL
 );
-
-
-
 
 CREATE TABLE user_prefs (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -129,10 +142,6 @@ CREATE TABLE item_meas (
     PRIMARY KEY (item_id, meas_id)
 );
 
-
-
-
-
 CREATE TABLE streets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     city_id UUID NOT NULL REFERENCES cities(id) ON DELETE CASCADE,
@@ -160,11 +169,6 @@ CREATE TABLE accounts (
         (user_id IS NULL AND family_id IS NOT NULL)
     )
 );
-
-
-
-
-
 
 CREATE TABLE place_addrs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -221,6 +225,16 @@ CREATE TABLE plan_execs (
     completed_ts TIMESTAMPTZ
 );
 
+CREATE TABLE plan_occ (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plan_id UUID REFERENCES plans(id) ON DELETE CASCADE,
+    occ_start_ts TIMESTAMPTZ NOT NULL,
+    occ_end_ts TIMESTAMPTZ NOT NULL,
+    status curr_status_t NOT NULL
+);
+CREATE INDEX idx_plan_occ_time ON plan_occ(occ_start_ts, occ_end_ts);
+
+
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id),
@@ -268,6 +282,13 @@ CREATE TABLE dict_exs (
     created_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE dict_ex_muscles (
+    ex_id UUID REFERENCES dict_exs(id) ON DELETE CASCADE,
+    muscle muscle_grp_t NOT NULL,
+    pct NUMERIC(5, 2) NOT NULL CHECK (pct > 0 AND pct <= 100),
+    PRIMARY KEY (ex_id, muscle)
+);
+
 CREATE TABLE user_workouts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -312,8 +333,6 @@ CREATE TABLE user_curr_status (
     loc_lng NUMERIC(10, 7),
     updated_ts TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-
 
 INSERT INTO countries (code, name) VALUES 
 ('IRL', 'Ireland'), ('UKR', 'Ukraine'), ('POL', 'Poland'), ('GBR', 'United Kingdom')

@@ -70,6 +70,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           'password': _pwdCtrl.text,
         });
         ref.read(authStateProvider.notifier).setLoggedIn();
+        if (mounted) context.go('/app');
       } else {
         await api.post('/api/auth/register', data: {
           'first_name': _fNameCtrl.text,
@@ -78,8 +79,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           'password': _pwdCtrl.text,
           'birth_date': _bDateCtrl.text,
         });
+        if (mounted) {
+          setState(() {
+            _isLogin = true;
+            _fNameCtrl.clear();
+            _lNameCtrl.clear();
+            _bDateCtrl.clear();
+            _pwdCtrl.clear();
+            _bDate = null;
+          });
+          _showSnack('auth.reg_success'.tr());
+        }
       }
-      if (mounted) context.go('/app');
     } catch (e) {
       _showSnack('auth.err_auth'.tr());
     }

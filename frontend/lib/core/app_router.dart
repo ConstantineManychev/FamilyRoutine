@@ -13,6 +13,8 @@ import '../ui/dicts/cities_dict_screen.dart';
 import '../ui/dicts/streets_dict_screen.dart';
 import '../ui/places/places_screen.dart'; 
 import '../ui/places/place_detail_screen.dart';
+import '../ui/dicts/exercises_screen.dart';
+import '../ui/dicts/exercise_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuth = ref.watch(authStateProvider);
@@ -96,6 +98,23 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => PlaceDetailScreen(
                   placeId: state.pathParameters['id'],
                   onSaved: () => context.go('/app/places'),
+                ),
+              ),
+              GoRoute(
+                path: 'exercises',
+                builder: (context, state) => const ExercisesScreen(),
+              ),
+              GoRoute(
+                path: 'exercises/new',
+                builder: (context, state) => ExerciseDetailScreen(
+                  onSaved: () => context.go('/app/exercises'),
+                ),
+              ),
+              GoRoute(
+                path: 'exercises/:id',
+                builder: (context, state) => ExerciseDetailScreen(
+                  exId: state.pathParameters['id'],
+                  onSaved: () => context.go('/app/exercises'),
                 ),
               ),
             ],

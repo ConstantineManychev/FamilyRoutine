@@ -146,7 +146,9 @@ class _SidebarState extends ConsumerState<Sidebar> {
                       _buildSubItem('sidebar.places'.tr(), () => context.go('/app/places'), icon: LucideIcons.mapPin),
                       _buildSubItem('sidebar.cities'.tr(), () => context.go('/app/cities'), icon: LucideIcons.building2),
                       _buildSubItem('sidebar.streets'.tr(), () => context.go('/app/streets'), icon: LucideIcons.navigation),
-                      ..._dicts.map((d) => _buildSubItem(d.name.tr(), () {})).toList(),
+                      ..._dicts.map((d) => _buildSubItem(d.name.tr(), () {
+                            if (d.id == 'exercises') context.go('/app/exercises');
+                          })).toList(),
                     ],
                   ),
                 )
