@@ -13,8 +13,7 @@ CREATE TYPE meal_t AS ENUM ('breakfast', 'lunch', 'dinner', 'snack');
 CREATE TYPE curr_status_t AS ENUM ('home', 'work', 'school', 'gym', 'transit', 'other');
 CREATE TYPE bank_type_t AS ENUM ('monobank', 'aib', 'other');
 CREATE TYPE item_t AS ENUM ('product', 'service', 'food');
-
-CREATE TYPE muscle_grp_t AS ENUM ('chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body', 'cardio');
+CREATE TYPE musc_grp_t AS ENUM ('chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'cardio', 'full_body');
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -234,7 +233,6 @@ CREATE TABLE plan_occ (
 );
 CREATE INDEX idx_plan_occ_time ON plan_occ(occ_start_ts, occ_end_ts);
 
-
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id),
@@ -282,11 +280,11 @@ CREATE TABLE dict_exs (
     created_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE dict_ex_muscles (
+CREATE TABLE ex_musc_grps (
     ex_id UUID REFERENCES dict_exs(id) ON DELETE CASCADE,
-    muscle muscle_grp_t NOT NULL,
+    grp musc_grp_t NOT NULL,
     pct NUMERIC(5, 2) NOT NULL CHECK (pct > 0 AND pct <= 100),
-    PRIMARY KEY (ex_id, muscle)
+    PRIMARY KEY (ex_id, grp)
 );
 
 CREATE TABLE user_workouts (

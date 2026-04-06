@@ -27,6 +27,7 @@ use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
 use crate::api::ex_handlers::{create_ex, delete_ex, get_ex_detail, get_exs, update_ex};
 
+
 fn build_cors() -> CorsLayer {
     let origin = std::env::var("FRONTEND_URL")
         .unwrap_or_else(|_| "http://localhost:5173".into())
@@ -60,6 +61,8 @@ pub fn configure_application_router(db: PgPool) -> Router {
         .route("/api/user/me", get(get_curr_user))
         .route("/api/users/:id/energy-timeline", get(get_energy_timeline))
         .route("/api/dicts", get(get_avail_dicts))
+        .route("/api/dicts/exercises", get(get_exs).post(create_ex))
+        .route("/api/dicts/exercises/:id", get(get_ex_detail).put(update_ex).delete(delete_ex))
         .route("/api/families", get(get_user_fams).post(create_fam))
         .route("/api/families/:id", get(get_fam_details).delete(delete_fam).put(update_fam_name))
         .route("/api/families/:id/leave", delete(leave_fam))

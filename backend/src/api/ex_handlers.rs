@@ -1,63 +1,45 @@
 use crate::api::auth_middleware::AuthenticatedUser;
+use crate::domain::errors::ApiError;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
 };
-use serde::{Deserialize, Serialize};
+use shared_schema::{DictExDto, ExMuscGrpDto, MutateExDto};
 use sqlx::PgPool;
-use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/ExMuscleDto.ts")]
-pub struct ExMuscleDto {
-    pub muscle: String,
-    pub pct: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/ExDto.ts")]
-pub struct ExDto {
-    #[ts(type = "string")]
-    pub id: Uuid,
-    pub name: String,
-    pub ex_type: String,
-    pub met_val: f64,
-    pub is_custom: bool,
-    pub weight_type: String,
-    pub bw_pct: f64,
-    pub muscles: Vec<ExMuscleDto>,
-}
-
-pub async fn get_exs(State(db): State<PgPool>) -> Result<Json<Vec<ExDto>>, StatusCode> {
+pub async fn get_exs(State(db): State<PgPool>) -> Result<Json<Vec<DictExDto>>, ApiError> {
     let exs = sqlx::query!(
-        r#"SELECT id, name, type::text as "ex_type!", met_val::float8 as "met_val!", is_custom, weight_type::text as "weight_type!", bw_pct::float8 as "bw_pct!" FROM dict_exs ORDER BY name"#
+        r#"SELECT id, name, type::text as "type_!", met_val::float8 as "met_val!", is_custom FROM dict_exs ORDER BY name"#
     )
     .fetch_all(&db)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(ApiError::DatabaseError)?;
 
-    let mut res = Vec::new();
+    let mut res = Vec::with_capacity(exs.len());
+
     for ex in exs {
-        let muscles = sqlx::query_as!(
-            ExMuscleDto,
-            r#"SELECT muscle::text as "muscle!", pct::float8 as "pct!" FROM dict_ex_muscles WHERE ex_id = $1"#,
+        let grp_data = sqlx::query!(
+            r#"SELECT grp::text as "grp!", pct::float8 as "pct!" FROM ex_musc_grps WHERE ex_id = $1"#,
             ex.id
         )
         .fetch_all(&db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ApiError::DatabaseError)?;
 
-        res.push(ExDto {
+        let musc_grps = grp_data.into_iter().map(|g| ExMuscGrpDto {
+            grp: serde_json::from_str(&format!("\"{}\"", g.grp)).unwrap(),
+            pct: g.pct,
+        }).collect();
+
+        res.push(DictExDto {
             id: ex.id,
             name: ex.name,
-            ex_type: ex.ex_type,
+            type_: ex.type_,
             met_val: ex.met_val,
             is_custom: ex.is_custom,
-            weight_type: ex.weight_type,
-            bw_pct: ex.bw_pct,
-            muscles,
+            musc_grps,
         });
     }
 
@@ -67,140 +49,165 @@ pub async fn get_exs(State(db): State<PgPool>) -> Result<Json<Vec<ExDto>>, Statu
 pub async fn get_ex_detail(
     State(db): State<PgPool>,
     Path(id): Path<Uuid>,
-) -> Result<Json<ExDto>, StatusCode> {
-    let ex = sqlx::query!(
-        r#"SELECT id, name, type::text as "ex_type!", met_val::float8 as "met_val!", is_custom, weight_type::text as "weight_type!", bw_pct::float8 as "bw_pct!" FROM dict_exs WHERE id = $1"#,
-        id
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
-
-    let muscles = sqlx::query_as!(
-        ExMuscleDto,
-        r#"SELECT muscle::text as "muscle!", pct::float8 as "pct!" FROM dict_ex_muscles WHERE ex_id = $1"#,
-        id
-    )
-    .fetch_all(&db)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(ExDto {
-        id: ex.id,
-        name: ex.name,
-        ex_type: ex.ex_type,
-        met_val: ex.met_val,
-        is_custom: ex.is_custom,
-        weight_type: ex.weight_type,
-        bw_pct: ex.bw_pct,
-        muscles,
-    }))
+) -> Result<Json<DictExDto>, ApiError> {
+    get_ex_by_id(&db, id).await
 }
 
 pub async fn create_ex(
     State(db): State<PgPool>,
     user: AuthenticatedUser,
-    Json(payload): Json<ExDto>,
-) -> Result<(StatusCode, Json<ExDto>), StatusCode> {
-    if payload.muscles.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
+    Json(payload): Json<MutateExDto>,
+) -> Result<(StatusCode, Json<DictExDto>), ApiError> {
+    if payload.musc_grps.is_empty() {
+        return Err(ApiError::ValidationError("err_no_musc_grp".into()));
     }
 
-    let mut tx = db.begin().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut tx = db.begin().await.map_err(ApiError::DatabaseError)?;
 
     let ex_id = sqlx::query_scalar!(
-        "INSERT INTO dict_exs (name, type, met_val, is_custom, created_by, weight_type, bw_pct) VALUES ($1, $2::text::ex_type_t, $3::float8, $4, $5, $6::text::ex_weight_type_t, $7::float8) RETURNING id",
+        "INSERT INTO dict_exs (name, type, met_val, is_custom, created_by) VALUES ($1, $2::text::ex_type_t, $3::numeric, true, $4) RETURNING id",
         payload.name,
-        payload.ex_type,
-        payload.met_val,
-        true,
-        user.0,
-        payload.weight_type,
-        payload.bw_pct
+        payload.type_,
+        payload.met_val as f64, // Явно указываем тип
+        user.0
     )
     .fetch_one(&mut *tx)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(ApiError::DatabaseError)?;
 
-    for m in &payload.muscles {
-        sqlx::query!(
-            "INSERT INTO dict_ex_muscles (ex_id, muscle, pct) VALUES ($1, $2::text::muscle_grp_t, $3::float8)",
+    for mg in &payload.musc_grps {
+        let grp_str = serde_json::to_string(&mg.grp).unwrap().replace("\"", "");
+       sqlx::query!(
+            "INSERT INTO ex_musc_grps (ex_id, grp, pct) VALUES ($1, $2::text::musc_grp_t, $3::numeric)",
             ex_id,
-            m.muscle,
-            m.pct
+            grp_str,
+            mg.pct as f64
         )
         .execute(&mut *tx)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ApiError::DatabaseError)?;
     }
 
-    tx.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    tx.commit().await.map_err(ApiError::DatabaseError)?;
 
-    let mut created = payload.clone();
-    created.id = ex_id;
-    created.is_custom = true;
-
-    Ok((StatusCode::CREATED, Json(created)))
+    let ex_dto = get_ex_by_id(&db, ex_id).await?.0;
+    Ok((StatusCode::CREATED, Json(ex_dto)))
 }
 
 pub async fn update_ex(
     State(db): State<PgPool>,
     Path(id): Path<Uuid>,
-    Json(payload): Json<ExDto>,
-) -> Result<Json<ExDto>, StatusCode> {
-    if payload.muscles.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
+    user: AuthenticatedUser,
+    Json(payload): Json<MutateExDto>,
+) -> Result<Json<DictExDto>, ApiError> {
+    if payload.musc_grps.is_empty() {
+        return Err(ApiError::ValidationError("err_no_musc_grp".into()));
     }
 
-    let mut tx = db.begin().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let is_owner = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM dict_exs WHERE id = $1 AND created_by = $2 AND is_custom = true)",
+        id,
+        user.0
+    )
+    .fetch_one(&db)
+    .await
+    .map_err(ApiError::DatabaseError)?;
+
+    if !is_owner.unwrap_or(false) {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let mut tx = db.begin().await.map_err(ApiError::DatabaseError)?;
 
     sqlx::query!(
-        "UPDATE dict_exs SET name = $1, type = $2::text::ex_type_t, met_val = $3::float8, weight_type = $4::text::ex_weight_type_t, bw_pct = $5::float8 WHERE id = $6",
+        "UPDATE dict_exs SET name = $2, type = $3::text::ex_type_t, met_val = $4::numeric WHERE id = $1",
+        id,
         payload.name,
-        payload.ex_type,
-        payload.met_val,
-        payload.weight_type,
-        payload.bw_pct,
-        id
+        payload.type_,
+        payload.met_val as f64
     )
     .execute(&mut *tx)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(ApiError::DatabaseError)?;
 
-    sqlx::query!("DELETE FROM dict_ex_muscles WHERE ex_id = $1", id)
+    sqlx::query!("DELETE FROM ex_musc_grps WHERE ex_id = $1", id)
         .execute(&mut *tx)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ApiError::DatabaseError)?;
 
-    for m in &payload.muscles {
+    for mg in &payload.musc_grps {
+        let grp_str = serde_json::to_string(&mg.grp).unwrap().replace("\"", "");
         sqlx::query!(
-            "INSERT INTO dict_ex_muscles (ex_id, muscle, pct) VALUES ($1, $2::text::muscle_grp_t, $3::float8)",
+            "INSERT INTO ex_musc_grps (ex_id, grp, pct) VALUES ($1, $2::text::musc_grp_t, $3::numeric)",
             id,
-            m.muscle,
-            m.pct
+            grp_str,
+            mg.pct as f64
         )
         .execute(&mut *tx)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ApiError::DatabaseError)?;
     }
 
-    tx.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    tx.commit().await.map_err(ApiError::DatabaseError)?;
 
-    let mut updated = payload.clone();
-    updated.id = id;
-
-    Ok(Json(updated))
+    get_ex_by_id(&db, id).await
 }
 
 pub async fn delete_ex(
     State(db): State<PgPool>,
     Path(id): Path<Uuid>,
-) -> Result<StatusCode, StatusCode> {
+    user: AuthenticatedUser,
+) -> Result<StatusCode, ApiError> {
+    let is_owner = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM dict_exs WHERE id = $1 AND created_by = $2 AND is_custom = true)",
+        id,
+        user.0
+    )
+    .fetch_one(&db)
+    .await
+    .map_err(ApiError::DatabaseError)?;
+
+    if !is_owner.unwrap_or(false) {
+        return Err(ApiError::Unauthorized);
+    }
+
     sqlx::query!("DELETE FROM dict_exs WHERE id = $1", id)
         .execute(&db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ApiError::DatabaseError)?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_ex_by_id(db: &PgPool, id: Uuid) -> Result<Json<DictExDto>, ApiError> {
+    let ex_data = sqlx::query!(
+        r#"SELECT id, name, type::text as "type_!", met_val::float8 as "met_val!", is_custom FROM dict_exs WHERE id = $1"#,
+        id
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(ApiError::DatabaseError)?
+    .ok_or(ApiError::NotFound)?;
+
+    let grp_data = sqlx::query!(
+        r#"SELECT grp::text as "grp!", pct::float8 as "pct!" FROM ex_musc_grps WHERE ex_id = $1"#,
+        id
+    )
+    .fetch_all(db)
+    .await
+    .map_err(ApiError::DatabaseError)?;
+
+    let musc_grps = grp_data.into_iter().map(|g| ExMuscGrpDto {
+        grp: serde_json::from_str(&format!("\"{}\"", g.grp)).unwrap(),
+        pct: g.pct,
+    }).collect();
+
+    Ok(Json(DictExDto {
+        id: ex_data.id,
+        name: ex_data.name,
+        type_: ex_data.type_,
+        met_val: ex_data.met_val,
+        is_custom: ex_data.is_custom,
+        musc_grps,
+    }))
 }

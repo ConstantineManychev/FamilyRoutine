@@ -1,30 +1,31 @@
-mod api;
-mod domain;
-mod infrastructure;
-mod services;
+pub mod api;
+pub mod domain;
+pub mod infrastructure;
+pub mod services;
 
 use crate::api::router::configure_application_router;
-use crate::infrastructure::database::{establish_connection_pool, run_migrations};
-use std::net::SocketAddr;
+use dotenvy::dotenv;
+use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
-
-async fn init_env() {
-    dotenvy::dotenv().ok();
-    tracing_subscriber::fmt::init();
-}
 
 #[tokio::main]
 async fn main() {
-    init_env().await;
+    dotenv().ok();
 
-    let db_pool = establish_connection_pool().await;
-    run_migrations(&db_pool).await;
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not found in .env");
+
+    let db_pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await
+        .expect("Failed to connect to Postgres");
 
     let app_router = configure_application_router(db_pool);
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    
-    tracing::info!("SERVER_INITIALIZED_AT_{}", addr);
 
-    let listener = TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app_router).await.unwrap();
+    let addr = "0.0.0.0:3000";
+    let listener = TcpListener::bind(addr).await.expect("Failed to bind TCP listener");
+    
+    axum::serve(listener, app_router)
+        .await
+        .expect("Failed to serve application");
 }

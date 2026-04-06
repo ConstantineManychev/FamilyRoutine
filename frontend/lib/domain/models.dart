@@ -317,63 +317,67 @@ class FamBudgetDto {
       );
 }
 
-class ExMuscleDto {
-  final String muscle;
-  final double pct;
+enum MuscGrpType { chest, back, legs, shoulders, arms, core, cardio, full_body }
 
-  ExMuscleDto({required this.muscle, required this.pct});
+class ExMuscGrpDto {
+  MuscGrpType grp;
+  double pct;
 
-  factory ExMuscleDto.fromJson(Map<String, dynamic> json) => ExMuscleDto(
-        muscle: json['muscle'],
+  ExMuscGrpDto({required this.grp, required this.pct});
+
+  factory ExMuscGrpDto.fromJson(Map<String, dynamic> json) => ExMuscGrpDto(
+        grp: MuscGrpType.values.firstWhere((e) => e.name == json['grp']),
         pct: (json['pct'] as num).toDouble(),
       );
 
   Map<String, dynamic> toJson() => {
-        'muscle': muscle,
+        'grp': grp.name,
         'pct': pct,
       };
 }
 
-class ExDto {
+class DictExDto {
   final String id;
   final String name;
-  final String exType;
+  final String type;
   final double metVal;
   final bool isCustom;
   final String weightType;
   final double bwPct;
-  final List<ExMuscleDto> muscles;
+  final List<ExMuscGrpDto> muscGrps;
 
-  ExDto({
+  DictExDto({
     required this.id,
     required this.name,
-    required this.exType,
+    required this.type,
     required this.metVal,
     required this.isCustom,
     required this.weightType,
     required this.bwPct,
-    required this.muscles,
+    required this.muscGrps,
   });
 
-  factory ExDto.fromJson(Map<String, dynamic> json) => ExDto(
+  factory DictExDto.fromJson(Map<String, dynamic> json) => DictExDto(
         id: json['id'],
         name: json['name'],
-        exType: json['ex_type'],
+        type: json['type_'] ?? json['type'] ?? 'strength',
         metVal: (json['met_val'] as num).toDouble(),
-        isCustom: json['is_custom'] ?? false,
+        isCustom: json['is_custom'] ?? true,
         weightType: json['weight_type'] ?? 'external',
-        bwPct: (json['bw_pct'] as num).toDouble(),
-        muscles: (json['muscles'] as List?)?.map((e) => ExMuscleDto.fromJson(e)).toList() ?? [],
+        bwPct: (json['bw_pct'] as num?)?.toDouble() ?? 0.0,
+        muscGrps: (json['musc_grps'] as List?)
+            ?.map((e) => ExMuscGrpDto.fromJson(e))
+            .toList() ?? [],
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'ex_type': exType,
+        'type_': type,
         'met_val': metVal,
         'is_custom': isCustom,
         'weight_type': weightType,
         'bw_pct': bwPct,
-        'muscles': muscles.map((e) => e.toJson()).toList(),
+        'musc_grps': muscGrps.map((e) => e.toJson()).toList(),
       };
 }

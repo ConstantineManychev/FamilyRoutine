@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:uuid/uuid.dart';
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 
@@ -26,9 +25,8 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
   
   final List<String> _types = ['cardio', 'strength', 'flexibility', 'mixed'];
   final List<String> _weightTypes = ['external', 'hybrid', 'bodyweight'];
-  final List<String> _availMuscles = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body', 'cardio'];
   
-  List<ExMuscleDto> _muscles = [];
+  List<ExMuscGrpDto> _muscles = [];
   bool _isLoading = false;
 
   @override
@@ -45,10 +43,10 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
       final ex = await ref.read(apiProv).getExerciseDetail(widget.exId!);
       _nameCtrl.text = ex.name;
       _metCtrl.text = ex.metVal.toString();
-      _selType = ex.exType;
+      _selType = ex.type;
       _selWeightType = ex.weightType;
       _bwPctCtrl.text = ex.bwPct.toString();
-      _muscles = ex.muscles;
+      _muscles = List.from(ex.muscGrps);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -56,7 +54,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
 
   void _addMuscleRow() {
     setState(() {
-      _muscles.add(ExMuscleDto(muscle: _availMuscles.first, pct: 100));
+      _muscles.add(ExMuscGrpDto(grp: MuscGrpType.chest, pct: 100));
     });
   }
 
@@ -110,21 +108,19 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final dto = ExDto(
-        id: widget.exId ?? const Uuid().v4(),
-        name: _nameCtrl.text.trim(),
-        exType: _selType,
-        metVal: met,
-        isCustom: true,
-        weightType: _selWeightType,
-        bwPct: bwPct,
-        muscles: _muscles,
-      );
+      final payload = {
+        'name': _nameCtrl.text.trim(),
+        'type_': _selType,
+        'met_val': met,
+        'weight_type': _selWeightType,
+        'bw_pct': bwPct,
+        'musc_grps': _muscles.map((e) => e.toJson()).toList(),
+      };
 
       if (widget.exId == null) {
-        await ref.read(apiProv).createExercise(dto);
+        await ref.read(apiProv).createExercise(payload);
       } else {
-        await ref.read(apiProv).updateExercise(widget.exId!, dto);
+        await ref.read(apiProv).updateExercise(widget.exId!, payload);
       }
       widget.onSaved();
     } catch (_) {
@@ -206,6 +202,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
                     ]
                   ],
                 ),
+                
                 const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -228,11 +225,11 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
                       children: [
                         Expanded(
                           flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            value: m.muscle,
+                          child: DropdownButtonFormField<MuscGrpType>(
+                            value: m.grp,
                             decoration: const InputDecoration(border: OutlineInputBorder()),
-                            items: _availMuscles.map((t) => DropdownMenuItem(value: t, child: Text('exercises.muscle_grps.$t'.tr()))).toList(),
-                            onChanged: (v) => setState(() => _muscles[idx] = ExMuscleDto(muscle: v!, pct: m.pct)),
+                            items: MuscGrpType.values.map((t) => DropdownMenuItem(value: t, child: Text('exercises.muscle_grps.${t.name}'.tr()))).toList(),
+                            onChanged: (v) => setState(() => _muscles[idx] = ExMuscGrpDto(grp: v!, pct: m.pct)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -244,7 +241,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen> {
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (v) {
                               final p = double.tryParse(v) ?? m.pct;
-                              _muscles[idx] = ExMuscleDto(muscle: m.muscle, pct: p);
+                              _muscles[idx] = ExMuscGrpDto(grp: m.grp, pct: p);
                             },
                           ),
                         ),

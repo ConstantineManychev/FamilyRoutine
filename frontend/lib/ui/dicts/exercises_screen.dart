@@ -14,7 +14,7 @@ class ExercisesScreen extends ConsumerStatefulWidget {
 }
 
 class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
-  List<ExDto> _exs = [];
+  List<DictExDto> _exs = [];
   bool _isLoading = true;
 
   @override
@@ -59,7 +59,7 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
                       child: ListTile(
                         leading: const Icon(LucideIcons.activity, color: Colors.blue),
                         title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${'exercises.types.${ex.exType}'.tr()} | MET: ${ex.metVal}'),
+                        subtitle: Text('${'exercises.types.${ex.type}'.tr()} | MET: ${ex.metVal}'),
                         trailing: const Icon(LucideIcons.chevronRight),
                         onTap: () => context.go('/app/exercises/${ex.id}'),
                       ),

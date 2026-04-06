@@ -245,3 +245,43 @@ pub struct EnergyNodeDto {
 pub struct EnergyGraphReq {
     pub target_date: NaiveDate,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/MuscGrpType.ts")]
+#[serde(rename_all = "snake_case")]
+pub enum MuscGrpType {
+    Chest,
+    Back,
+    Legs,
+    Shoulders,
+    Arms,
+    Core,
+    Cardio,
+    FullBody,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/ExMuscGrpDto.ts")]
+pub struct ExMuscGrpDto {
+    pub grp: MuscGrpType,
+    pub pct: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, TS)]
+#[ts(export, export_to = "../bindings/DictExDto.ts")]
+pub struct DictExDto {
+    pub id: Uuid,
+    pub name: String,
+    pub type_: String,
+    pub met_val: f64,
+    pub is_custom: bool,
+    pub musc_grps: Vec<ExMuscGrpDto>,
+}
+
+#[derive(Deserialize)]
+pub struct MutateExDto {
+    pub name: String,
+    pub type_: String,
+    pub met_val: f64,
+    pub musc_grps: Vec<ExMuscGrpDto>,
+}

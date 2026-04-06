@@ -4,22 +4,40 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/api_svc.dart';
 import '../domain/models.dart';
 
-final storageProv = Provider((ref) => const FlutterSecureStorage());
+final Provider<FlutterSecureStorage> storageProv = Provider((ref) => const FlutterSecureStorage());
 
-final apiProv = Provider((ref) => ApiSvc(Dio(), ref.read(storageProv)));
+final StateProvider<bool> isAuthProv = StateProvider<bool>((ref) => true);
 
-final profProv = FutureProvider<UserProf>((ref) async {
+final Provider<ApiSvc> apiProv = Provider<ApiSvc>((ref) {
+  final storage = ref.read(storageProv);
+  final dio = Dio();
+
+  dio.interceptors.add(InterceptorsWrapper(
+    onError: (DioException e, handler) async {
+      if (e.response?.statusCode == 401) {
+        await storage.delete(key: 'auth_token');
+        ref.read(isAuthProv.notifier).state = false;
+        ref.invalidate(profProv);
+      }
+      return handler.next(e);
+    },
+  ));
+
+  return ApiSvc(dio, storage);
+});
+
+final FutureProvider<UserProf> profProv = FutureProvider<UserProf>((ref) async {
   final api = ref.read(apiProv);
   final res = await api.get('/api/user/me');
   return UserProf.fromJson(res.data);
 });
 
-final famsProv = FutureProvider<List<FamDto>>((ref) async {
+final FutureProvider<List<FamDto>> famsProv = FutureProvider<List<FamDto>>((ref) async {
   final api = ref.read(apiProv);
   final res = await api.get('/api/families');
   return (res.data as List).map((e) => FamDto.fromJson(e)).toList();
 });
 
-final walletsProv = FutureProvider.autoDispose<List<AccountDto>>((ref) async {
+final AutoDisposeFutureProvider<List<AccountDto>> walletsProv = FutureProvider.autoDispose<List<AccountDto>>((ref) async {
   return ref.watch(apiProv).getWallets();
 });
