@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, place_id, is_main, country_id, city_id, street_id, house_num, apt, zip, merchant_id\n        FROM place_addrs\n        WHERE place_id = ANY($1)\n        ORDER BY is_main DESC, id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "place_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_main",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "country_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "city_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "street_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "house_num",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "apt",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "zip",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "merchant_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "f202d2ebfd1d2b832adf4a1ff04d50a43a6ae98936df8ca9a563cc3a7e435f02"
+}

@@ -1,396 +1,421 @@
-use crate::api::auth_middleware::AuthenticatedUser;
-use crate::domain::errors::ApiError;
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    Json,
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Json;
+use chrono::{Duration, Utc};
+use shared_schema::{
+    AcceptInviteRequest, AcceptInviteResponse, CreateFamilyRequest, CreateInviteRequest, CreatedInviteDto,
+    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest, UpdateMemberRoleRequest,
 };
-use shared_schema::{CreateFamMemDto, CreateFamilyRequest, FamDetailDto, FamMemberDto, UpdateFamMemRoleDto, UpdateFamNameDto};
 use sqlx::PgPool;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
-pub async fn create_fam(
-    State(db): State<PgPool>,
-    user: AuthenticatedUser,
-    Json(payload): Json<CreateFamilyRequest>,
-) -> Result<Json<FamDetailDto>, ApiError> {
-    let mut tx = db.begin().await.map_err(ApiError::DatabaseError)?;
+use crate::api::extract::{ApiJson, ApiPath, AuthUser, ClientIp};
+use crate::domain::errors::ApiError;
+use crate::domain::validation::{clean_name, clean_optional_text, MAX_NAME_LEN};
+use crate::security::authz::{admin_count, lock_family, require_admin, require_member};
+use crate::security::invite_code;
+use crate::security::rate_limit::{INVITE_ACCEPT_PER_IP, INVITE_ACCEPT_PER_USER, INVITE_CREATE_PER_USER};
+use crate::state::AppState;
 
-    let fam_id = sqlx::query_scalar!(
-        "INSERT INTO families (name) VALUES ($1) RETURNING id",
-        payload.name
+const INVITE_TTL_DAYS: i64 = 7;
+const MAX_ACTIVE_INVITES: i64 = 20;
+
+pub async fn list_families(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+) -> Result<Json<Vec<FamListItemDto>>, ApiError>
+{
+    let fams = sqlx::query_as!(
+        FamListItemDto,
+        r#"
+        SELECT
+            f.id,
+            f.name,
+            fm.role AS "role: MemberRole",
+            (SELECT COUNT(*) FROM family_mems m WHERE m.family_id = f.id) AS "member_count!"
+        FROM families f
+        JOIN family_mems fm ON fm.family_id = f.id
+        WHERE fm.user_id = $1
+        ORDER BY f.name
+        "#,
+        a_user.user_id
     )
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .fetch_all(&a_state.db)
+    .await?;
+
+    Ok(Json(fams))
+}
+
+pub async fn create_family(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiJson(a_req): ApiJson<CreateFamilyRequest>,
+) -> Result<(StatusCode, Json<FamDetailDto>), ApiError>
+{
+    let name = clean_name(&a_req.name, "name")?;
+
+    let mut tx = a_state.db.begin().await?;
+
+    let fam_id = sqlx::query_scalar!("INSERT INTO families (name) VALUES ($1) RETURNING id", name)
+        .fetch_one(&mut *tx)
+        .await?;
 
     sqlx::query!(
         "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, 'admin')",
         fam_id,
-        user.0
+        a_user.user_id
     )
     .execute(&mut *tx)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .await?;
 
-    for mem in payload.members {
-        let target_user_id = sqlx::query_scalar!(
-            "SELECT id FROM users WHERE email = $1",
-            mem.email
-        )
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(ApiError::DatabaseError)?;
+    tx.commit().await?;
 
-        if let Some(uid) = target_user_id {
-            sqlx::query!(
-                "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, $3::text::mem_role_t) ON CONFLICT DO NOTHING",
-                fam_id,
-                uid,
-                mem.role
-            )
-            .execute(&mut *tx)
-            .await
-            .map_err(ApiError::DatabaseError)?;
-        }
-    }
-
-    tx.commit().await.map_err(ApiError::DatabaseError)?;
-    fetch_fam_aggregate(&db, fam_id).await
+    let detail = load_family_detail(&a_state.db, fam_id, MemberRole::Admin).await?;
+    Ok((StatusCode::CREATED, Json(detail)))
 }
 
-pub async fn get_fam_details(
-    State(db): State<PgPool>,
-    Path(fam_id): Path<Uuid>,
-    user: AuthenticatedUser,
-) -> Result<Json<FamDetailDto>, ApiError> {
-    let is_mem = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM family_mems WHERE family_id = $1 AND user_id = $2)",
-        fam_id,
-        user.0
-    )
-    .fetch_one(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
-
-    if !is_mem.unwrap_or(false) {
-        return Err(ApiError::Unauthorized);
-    }
-    fetch_fam_aggregate(&db, fam_id).await
+pub async fn get_family(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+) -> Result<Json<FamDetailDto>, ApiError>
+{
+    let my_role = require_member(&a_state.db, a_fam_id, a_user.user_id).await?;
+    Ok(Json(load_family_detail(&a_state.db, a_fam_id, my_role).await?))
 }
 
-pub async fn delete_fam(
-    State(db): State<PgPool>,
-    Path(fam_id): Path<Uuid>,
-    user: AuthenticatedUser,
-) -> Result<StatusCode, ApiError> {
-    let role = sqlx::query_scalar!(
-        "SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        user.0
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+pub async fn rename_family(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<RenameFamilyRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let name = clean_name(&a_req.name, "name")?;
+    require_admin(&a_state.db, a_fam_id, a_user.user_id).await?;
 
-    if role.flatten().as_deref() != Some("admin") {
-        return Err(ApiError::Unauthorized);
-    }
-
-    let mut tx = db.begin().await.map_err(ApiError::DatabaseError)?;
-    
-    sqlx::query!("DELETE FROM family_mems WHERE family_id = $1", fam_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(ApiError::DatabaseError)?;
-        
-    sqlx::query!("DELETE FROM families WHERE id = $1", fam_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(ApiError::DatabaseError)?;
-        
-    tx.commit().await.map_err(ApiError::DatabaseError)?;
+    sqlx::query!("UPDATE families SET name = $2 WHERE id = $1", a_fam_id, name)
+        .execute(&a_state.db)
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn leave_fam(
-    State(db): State<PgPool>,
-    Path(fam_id): Path<Uuid>,
-    user: AuthenticatedUser,
-) -> Result<StatusCode, ApiError> {
-    let mut tx = db.begin().await.map_err(ApiError::DatabaseError)?;
+pub async fn delete_family(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    let stats = sqlx::query!(
-        r#"
-        SELECT 
-            COUNT(*) as "total!", 
-            SUM(CASE WHEN role::text = 'admin' THEN 1 ELSE 0 END) as "admins!",
-            MAX(CASE WHEN user_id = $2 THEN role::text ELSE NULL END) as "user_role"
-        FROM family_mems 
-        WHERE family_id = $1
-        "#,
-        fam_id,
-        user.0
+    sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn leave_family(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    let my_role = require_member(&mut *tx, a_fam_id, a_user.user_id).await?;
+
+    let member_count = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!" FROM family_mems WHERE family_id = $1"#,
+        a_fam_id
     )
     .fetch_one(&mut *tx)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .await?;
 
-    let user_role = stats.user_role.ok_or(ApiError::Unauthorized)?;
-
-    if stats.total == 1 {
-        sqlx::query!("DELETE FROM family_mems WHERE family_id = $1", fam_id)
+    if member_count == 1
+    {
+        sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
             .execute(&mut *tx)
-            .await
-            .map_err(ApiError::DatabaseError)?;
-            
-        sqlx::query!("DELETE FROM families WHERE id = $1", fam_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(ApiError::DatabaseError)?;
-    } else {
-        if user_role == "admin" && stats.admins == 1 {
-            return Err(ApiError::CannotLeaveLastAdmin);
+            .await?;
+    }
+    else
+    {
+        if my_role == MemberRole::Admin && admin_count(&mut tx, a_fam_id).await? == 1
+        {
+            return Err(ApiError::LastAdmin);
         }
-        
+
         sqlx::query!(
             "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
-            fam_id,
-            user.0
+            a_fam_id,
+            a_user.user_id
         )
         .execute(&mut *tx)
-        .await
-        .map_err(ApiError::DatabaseError)?;
+        .await?;
     }
 
-    tx.commit().await.map_err(ApiError::DatabaseError)?;
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn update_fam_name(
-    State(db): State<PgPool>,
-    Path(fam_id): Path<Uuid>,
-    user: AuthenticatedUser,
-    Json(payload): Json<UpdateFamNameDto>,
-) -> Result<StatusCode, ApiError> {
-    let role = sqlx::query_scalar!(
-        "SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        user.0
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+pub async fn update_member_role(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_fam_id, a_target_id)): ApiPath<(Uuid, Uuid)>,
+    ApiJson(a_req): ApiJson<UpdateMemberRoleRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    if role.flatten().as_deref() != Some("admin") {
-        return Err(ApiError::Unauthorized);
-    }
+    let target_role = require_member(&mut *tx, a_fam_id, a_target_id).await?;
 
-    sqlx::query!("UPDATE families SET name = $2 WHERE id = $1", fam_id, payload.name)
-        .execute(&db)
-        .await
-        .map_err(ApiError::DatabaseError)?;
+    let is_last_admin_demoted = target_role == MemberRole::Admin
+        && a_req.role != MemberRole::Admin
+        && admin_count(&mut tx, a_fam_id).await? == 1;
 
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn add_fam_member(
-    State(db): State<PgPool>,
-    Path(fam_id): Path<Uuid>,
-    user: AuthenticatedUser,
-    Json(payload): Json<CreateFamMemDto>,
-) -> Result<StatusCode, ApiError> {
-    let role = sqlx::query_scalar!(
-        "SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        user.0
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
-
-    if role.flatten().as_deref() != Some("admin") {
-        return Err(ApiError::Unauthorized);
-    }
-
-    let target_uid = sqlx::query_scalar!(
-        "SELECT id FROM users WHERE email = $1",
-        payload.email
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?
-    .ok_or(ApiError::InvalidCredentials)?;
-
-    sqlx::query!(
-        "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, $3::text::mem_role_t) ON CONFLICT DO NOTHING",
-        fam_id,
-        target_uid,
-        payload.role
-    )
-    .execute(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
-
-    Ok(StatusCode::CREATED)
-}
-
-pub async fn update_fam_member(
-    State(db): State<PgPool>,
-    Path((fam_id, target_user_id)): Path<(Uuid, Uuid)>,
-    user: AuthenticatedUser,
-    Json(payload): Json<UpdateFamMemRoleDto>,
-) -> Result<StatusCode, ApiError> {
-    let role = sqlx::query_scalar!(
-        "SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        user.0
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
-
-    if role.flatten().as_deref() != Some("admin") {
-        return Err(ApiError::Unauthorized);
-    }
-
-    if payload.role != "admin" {
-        let stats = sqlx::query!(
-            r#"
-            SELECT 
-                SUM(CASE WHEN role::text = 'admin' THEN 1 ELSE 0 END) as "admins!",
-                (SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2) as "target_role"
-            FROM family_mems 
-            WHERE family_id = $1
-            "#,
-            fam_id,
-            target_user_id
-        )
-        .fetch_one(&db)
-        .await
-        .map_err(ApiError::DatabaseError)?;
-
-        if stats.target_role.as_deref() == Some("admin") && stats.admins == 1 {
-            return Err(ApiError::CannotLeaveLastAdmin);
-        }
+    if is_last_admin_demoted
+    {
+        return Err(ApiError::LastAdmin);
     }
 
     sqlx::query!(
-        "UPDATE family_mems SET role = $3::text::mem_role_t WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        target_user_id,
-        payload.role
+        "UPDATE family_mems SET role = $3 WHERE family_id = $1 AND user_id = $2",
+        a_fam_id,
+        a_target_id,
+        a_req.role as MemberRole
     )
-    .execute(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .execute(&mut *tx)
+    .await?;
 
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn remove_fam_member(
-    State(db): State<PgPool>,
-    Path((fam_id, target_user_id)): Path<(Uuid, Uuid)>,
-    user: AuthenticatedUser,
-) -> Result<StatusCode, ApiError> {
-    let role = sqlx::query_scalar!(
-        "SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        user.0
-    )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+pub async fn remove_member(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_fam_id, a_target_id)): ApiPath<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    if role.flatten().as_deref() != Some("admin") {
-        return Err(ApiError::Unauthorized);
-    }
+    let target_role = require_member(&mut *tx, a_fam_id, a_target_id).await?;
 
-    let stats = sqlx::query!(
-        r#"
-        SELECT 
-            SUM(CASE WHEN role::text = 'admin' THEN 1 ELSE 0 END) as "admins!",
-            (SELECT role::text FROM family_mems WHERE family_id = $1 AND user_id = $2) as "target_role"
-        FROM family_mems 
-        WHERE family_id = $1
-        "#,
-        fam_id,
-        target_user_id
-    )
-    .fetch_one(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
-
-    if stats.target_role.as_deref() == Some("admin") && stats.admins == 1 {
-        return Err(ApiError::CannotLeaveLastAdmin);
+    if target_role == MemberRole::Admin && admin_count(&mut tx, a_fam_id).await? == 1
+    {
+        return Err(ApiError::LastAdmin);
     }
 
     sqlx::query!(
         "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
-        fam_id,
-        target_user_id
+        a_fam_id,
+        a_target_id
     )
-    .execute(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn create_invite(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<CreateInviteRequest>,
+) -> Result<(StatusCode, Json<CreatedInviteDto>), ApiError>
+{
+    let label = clean_optional_text(a_req.label.as_deref(), MAX_NAME_LEN, "label")?;
+    a_state
+        .limiter
+        .hit(&format!("invite-create:{}", a_user.user_id), &INVITE_CREATE_PER_USER)?;
+
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+
+    sqlx::query!(
+        "DELETE FROM family_invites WHERE family_id = $1 AND expires_ts <= NOW()",
+        a_fam_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let active_count = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!" FROM family_invites WHERE family_id = $1"#,
+        a_fam_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if active_count >= MAX_ACTIVE_INVITES
+    {
+        return Err(ApiError::Conflict("TOO_MANY_INVITES"));
+    }
+
+    let code = invite_code::generate();
+    let normalized = invite_code::normalize(&code).ok_or_else(|| ApiError::internal("invite code generation"))?;
+    let expires_ts = Utc::now() + Duration::days(INVITE_TTL_DAYS);
+
+    let id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO family_invites (family_id, code_hash, role, label, invited_by, expires_ts)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+        "#,
+        a_fam_id,
+        invite_code::hash(&normalized),
+        a_req.role as MemberRole,
+        label,
+        a_user.user_id,
+        expires_ts
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    let created = CreatedInviteDto {
+        id,
+        code,
+        role: a_req.role,
+        label,
+        expires_ts,
+    };
+
+    Ok((StatusCode::CREATED, Json(created)))
+}
+
+pub async fn list_family_invites(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+) -> Result<Json<Vec<FamInviteDto>>, ApiError>
+{
+    require_admin(&a_state.db, a_fam_id, a_user.user_id).await?;
+
+    let invites = sqlx::query_as!(
+        FamInviteDto,
+        r#"
+        SELECT id, role AS "role: MemberRole", label, created_ts, expires_ts
+        FROM family_invites
+        WHERE family_id = $1 AND expires_ts > NOW()
+        ORDER BY created_ts
+        "#,
+        a_fam_id
+    )
+    .fetch_all(&a_state.db)
+    .await?;
+
+    Ok(Json(invites))
+}
+
+pub async fn revoke_family_invite(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_fam_id, a_invite_id)): ApiPath<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError>
+{
+    require_admin(&a_state.db, a_fam_id, a_user.user_id).await?;
+
+    let result = sqlx::query!(
+        "DELETE FROM family_invites WHERE id = $1 AND family_id = $2",
+        a_invite_id,
+        a_fam_id
+    )
+    .execute(&a_state.db)
+    .await?;
+
+    if result.rows_affected() == 0
+    {
+        return Err(ApiError::NotFound);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn fetch_fam_aggregate(db: &PgPool, fam_id: Uuid) -> Result<Json<FamDetailDto>, ApiError> {
-    let fam_name = sqlx::query_scalar!("SELECT name FROM families WHERE id = $1", fam_id)
-        .fetch_one(db)
-        .await
-        .map_err(ApiError::DatabaseError)?;
+pub async fn accept_invite(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ClientIp(a_ip): ClientIp,
+    ApiJson(a_req): ApiJson<AcceptInviteRequest>,
+) -> Result<Json<AcceptInviteResponse>, ApiError>
+{
+    a_state.limiter.hit(
+        &format!("invite-accept-user:{}", a_user.user_id),
+        &INVITE_ACCEPT_PER_USER,
+    )?;
+    a_state
+        .limiter
+        .hit(&format!("invite-accept-ip:{a_ip}"), &INVITE_ACCEPT_PER_IP)?;
 
-    let mems = sqlx::query_as!(
+    let normalized = invite_code::normalize(&a_req.code).ok_or(ApiError::NotFound)?;
+
+    let mut tx = a_state.db.begin().await?;
+
+    let invite = sqlx::query!(
+        r#"
+        DELETE FROM family_invites
+        WHERE code_hash = $1 AND expires_ts > NOW()
+        RETURNING family_id, role AS "role: MemberRole"
+        "#,
+        invite_code::hash(&normalized)
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+
+    lock_family(&mut tx, invite.family_id).await?;
+
+    sqlx::query!(
+        "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        invite.family_id,
+        a_user.user_id,
+        invite.role as MemberRole
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(Json(AcceptInviteResponse {
+        family_id: invite.family_id,
+    }))
+}
+
+async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_my_role: MemberRole) -> Result<FamDetailDto, ApiError>
+{
+    let name = sqlx::query_scalar!("SELECT name FROM families WHERE id = $1", a_fam_id)
+        .fetch_optional(a_db)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    let members = sqlx::query_as!(
         FamMemberDto,
         r#"
-        SELECT u.id, u.first_name, u.last_name, fm.role::text as "role!"
-        FROM users u
-        JOIN family_mems fm ON u.id = fm.user_id
+        SELECT u.id, u.first_name, u.last_name, fm.role AS "role: MemberRole"
+        FROM family_mems fm
+        JOIN users u ON u.id = fm.user_id
         WHERE fm.family_id = $1
+        ORDER BY fm.joined_ts
         "#,
-        fam_id
+        a_fam_id
     )
-    .fetch_all(db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .fetch_all(a_db)
+    .await?;
 
-    Ok(Json(FamDetailDto {
-        id: fam_id,
-        name: fam_name,
-        members: mems,
-    }))
-
-    
-}
-
-#[derive(Deserialize)]
-pub struct FamBudgetReq {
-    pub target_curr_code: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/FamBudgetDto.ts")]
-pub struct FamBudgetDto {
-    pub curr_code: String,
-    pub total_balance: f64,
-}
-
-pub async fn get_fam_budget(
-    State(_db): State<PgPool>,
-    Path(_fam_id): Path<Uuid>,
-) -> Result<Json<()>, ApiError> {
-    Ok(Json(()))
-}
-
-pub async fn get_fam_timeline(
-    State(_db): State<PgPool>,
-    Path(_fam_id): Path<Uuid>,
-) -> Result<Json<()>, ApiError> {
-    Ok(Json(()))
+    Ok(FamDetailDto {
+        id: a_fam_id,
+        name,
+        my_role: a_my_role,
+        members,
+    })
 }

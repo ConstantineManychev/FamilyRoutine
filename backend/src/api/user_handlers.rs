@@ -1,213 +1,187 @@
-use crate::api::auth_middleware::AuthenticatedUser;
+use axum::extract::State;
+use axum::Json;
+use chrono::{Datelike, NaiveDate, Utc};
+use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, UserDto};
+
+use crate::api::extract::{ApiQuery, AuthUser};
 use crate::domain::errors::ApiError;
-use axum::{
-    extract::{Path, Query, State},
-    Json,
-};
-use chrono::{Datelike, TimeZone, Utc};
-use serde::Serialize;
-use shared_schema::{EnergyEventType, EnergyGraphReq, EnergyNodeDto};
-use sqlx::PgPool;
-use uuid::Uuid;
+use crate::state::AppState;
 
-const DEF_WEIGHT: f64 = 75.0;
-const DEF_HEIGHT: f64 = 170.0;
-const M_BMR_CONST: f64 = 5.0;
-const F_BMR_CONST: f64 = -161.0;
+const DEF_WEIGHT_KG: f64 = 75.0;
+const DEF_HEIGHT_CM: f64 = 170.0;
+const MALE_BMR_CONST: f64 = 5.0;
+const FEMALE_BMR_CONST: f64 = -161.0;
 
-#[derive(Serialize)]
-pub struct DictMetaDto {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-pub struct ProfileDto {
-    pub first_name: String,
-    pub last_name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct FamListDto {
-    pub id: Uuid,
-    pub name: String,
-    pub role: String,
-    pub member_count: i64,
-}
-
-pub async fn get_curr_user(
-    State(db): State<PgPool>,
-    user: AuthenticatedUser,
-) -> Result<Json<ProfileDto>, ApiError> {
-    let profile = sqlx::query_as!(
-        ProfileDto,
-        "SELECT first_name, last_name FROM users WHERE id = $1",
-        user.0
+pub async fn get_me(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<UserDto>, ApiError>
+{
+    let user = sqlx::query_as!(
+        UserDto,
+        "SELECT id, email, first_name, last_name FROM users WHERE id = $1",
+        a_user.user_id
     )
-    .fetch_optional(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?
-    .ok_or(ApiError::Unauthorized)?;
+    .fetch_optional(&a_state.db)
+    .await?
+    .ok_or(ApiError::Unauthenticated)?;
 
-    Ok(Json(profile))
+    Ok(Json(user))
 }
 
-pub async fn get_user_fams(
-    State(db): State<PgPool>,
-    user: AuthenticatedUser,
-) -> Result<Json<Vec<FamListDto>>, ApiError> {
-    let fams = sqlx::query_as!(
-        FamListDto,
-        r#"
-        SELECT 
-            f.id, 
-            f.name, 
-            fm.role::text as "role!",
-            (SELECT COUNT(*) FROM family_mems WHERE family_id = f.id) as "member_count!"
-        FROM families f
-        JOIN family_mems fm ON f.id = fm.family_id
-        WHERE fm.user_id = $1
-        "#,
-        user.0
-    )
-    .fetch_all(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+pub async fn get_avail_dicts(_a_user: AuthUser) -> Json<Vec<DictMetaDto>>
+{
+    let dicts = [
+        ("events", "dicts.events"),
+        ("exercises", "dicts.exercises"),
+        ("items", "dicts.items"),
+    ]
+    .into_iter()
+    .map(|(id, name)| DictMetaDto {
+        id: id.into(),
+        name: name.into(),
+    })
+    .collect();
 
-    Ok(Json(fams))
+    Json(dicts)
 }
 
-pub async fn get_avail_dicts(
-    State(_db): State<PgPool>,
-    _user: AuthenticatedUser,
-) -> Result<Json<Vec<DictMetaDto>>, ApiError> {
-    let dicts = vec![
-        DictMetaDto {
-            id: "events".into(),
-            name: "dicts.events".into(),
-        },
-        DictMetaDto {
-            id: "exercises".into(),
-            name: "dicts.exercises".into(),
-        },
-        DictMetaDto {
-            id: "items".into(),
-            name: "dicts.items".into(),
-        },
-    ];
-
-    Ok(Json(dicts))
+pub fn age_on(a_birth_date: NaiveDate, a_date: NaiveDate) -> i32
+{
+    let mut age = a_date.year() - a_birth_date.year();
+    if (a_date.month(), a_date.day()) < (a_birth_date.month(), a_birth_date.day())
+    {
+        age -= 1;
+    }
+    age.max(0)
 }
 
-fn calc_bmr(w: f64, h: f64, age: f64, is_male: bool) -> f64 {
-    let base = (10.0 * w) + (6.25 * h) - (5.0 * age);
-    if is_male {
-        base + M_BMR_CONST
-    } else {
-        base + F_BMR_CONST
+fn calc_bmr(a_weight_kg: f64, a_height_cm: f64, a_age: f64, a_is_male: bool) -> f64
+{
+    let base = (10.0 * a_weight_kg) + (6.25 * a_height_cm) - (5.0 * a_age);
+    if a_is_male
+    {
+        base + MALE_BMR_CONST
+    }
+    else
+    {
+        base + FEMALE_BMR_CONST
     }
 }
 
 pub async fn get_energy_timeline(
-    State(db): State<PgPool>,
-    Path(uid): Path<Uuid>,
-    Query(req): Query<EnergyGraphReq>,
-) -> Result<Json<Vec<EnergyNodeDto>>, ApiError> {
-    let user_data = sqlx::query!(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<EnergyGraphQuery>,
+) -> Result<Json<Vec<EnergyNodeDto>>, ApiError>
+{
+    let profile = sqlx::query!(
         r#"
-        SELECT 
-            u.birth_date, 
-            u.gender, 
-            b.weight::float8 AS "weight_kg", 
-            b.height::float8 AS "height_cm"
+        SELECT
+            u.birth_date,
+            u.gender,
+            b.weight::float8 AS "weight_kg?",
+            b.height::float8 AS "height_cm?"
         FROM users u
-        LEFT JOIN body_snaps b ON u.id = b.user_id
+        LEFT JOIN LATERAL (
+            SELECT weight, height FROM body_snaps WHERE user_id = u.id ORDER BY rec_ts DESC LIMIT 1
+        ) b ON TRUE
         WHERE u.id = $1
-        ORDER BY b.rec_ts DESC
-        LIMIT 1
         "#,
-        uid
+        a_user.user_id
     )
-    .fetch_one(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .fetch_optional(&a_state.db)
+    .await?
+    .ok_or(ApiError::NotFound)?;
 
-    let age_yrs = (Utc::now().year() - user_data.birth_date.year()) as f64;
-    let w = user_data.weight_kg.unwrap_or(DEF_WEIGHT);
-    let h = user_data.height_cm.unwrap_or(DEF_HEIGHT);
-    let is_male = user_data.gender.as_deref() != Some("female");
+    let age = f64::from(age_on(profile.birth_date, Utc::now().date_naive()));
+    let is_male = profile.gender.as_deref() != Some("female");
+    let bmr_per_hour = calc_bmr(
+        profile.weight_kg.unwrap_or(DEF_WEIGHT_KG),
+        profile.height_cm.unwrap_or(DEF_HEIGHT_CM),
+        age,
+        is_male,
+    ) / 24.0;
 
-    let bmr = calc_bmr(w, h, age_yrs, is_male);
-    let bmr_per_hr = bmr / 24.0;
-
-    let day_start = req.target_date.and_hms_opt(0, 0, 0).unwrap_or_default().and_utc();
-    let day_end = req.target_date.and_hms_opt(23, 59, 59).unwrap_or_default().and_utc();
+    let day_start = a_query
+        .target_date
+        .and_hms_opt(0, 0, 0)
+        .ok_or(ApiError::Validation("target_date"))?
+        .and_utc();
+    let day_end = day_start + chrono::Duration::days(1);
 
     let meals = sqlx::query!(
         r#"
-        SELECT consumed_ts, total_kcal::float8 AS "kcal!" 
-        FROM user_meals 
-        WHERE user_id = $1 AND consumed_ts >= $2 AND consumed_ts <= $3
+        SELECT consumed_ts, total_kcal::float8 AS "kcal!"
+        FROM user_meals
+        WHERE user_id = $1 AND consumed_ts >= $2 AND consumed_ts < $3
         "#,
-        uid,
+        a_user.user_id,
         day_start,
         day_end
     )
-    .fetch_all(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .fetch_all(&a_state.db)
+    .await?;
 
     let workouts = sqlx::query!(
         r#"
-        SELECT start_ts, kcal_burned::float8 AS "kcal!" 
-        FROM user_workouts 
-        WHERE user_id = $1 AND start_ts >= $2 AND start_ts <= $3
+        SELECT start_ts, COALESCE(kcal_burned, 0)::float8 AS "kcal!"
+        FROM user_workouts
+        WHERE user_id = $1 AND start_ts >= $2 AND start_ts < $3
         "#,
-        uid,
+        a_user.user_id,
         day_start,
         day_end
     )
-    .fetch_all(&db)
-    .await
-    .map_err(ApiError::DatabaseError)?;
+    .fetch_all(&a_state.db)
+    .await?;
 
     let mut nodes = Vec::with_capacity(24 + meals.len() + workouts.len());
 
-    for hr in 0..=23 {
-        let hr_ts = req.target_date.and_hms_opt(hr, 0, 0).unwrap_or_default().and_utc();
+    for hour in 0..24
+    {
         nodes.push(EnergyNodeDto {
-            ts: hr_ts,
+            ts: day_start + chrono::Duration::hours(hour),
             event_type: EnergyEventType::BmrBase,
-            val: -bmr_per_hr,
+            val: -bmr_per_hour,
             cum_val: 0.0,
         });
     }
 
-    for m in meals {
-        nodes.push(EnergyNodeDto {
-            ts: m.consumed_ts,
-            event_type: EnergyEventType::Meal,
-            val: m.kcal,
-            cum_val: 0.0,
-        });
-    }
+    nodes.extend(meals.into_iter().map(|meal| EnergyNodeDto {
+        ts: meal.consumed_ts,
+        event_type: EnergyEventType::Meal,
+        val: meal.kcal,
+        cum_val: 0.0,
+    }));
 
-    for w in workouts {
-        nodes.push(EnergyNodeDto {
-            ts: w.start_ts,
-            event_type: EnergyEventType::Workout,
-            val: -w.kcal,
-            cum_val: 0.0,
-        });
-    }
+    nodes.extend(workouts.into_iter().map(|workout| EnergyNodeDto {
+        ts: workout.start_ts,
+        event_type: EnergyEventType::Workout,
+        val: -workout.kcal,
+        cum_val: 0.0,
+    }));
 
-    nodes.sort_unstable_by_key(|n| n.ts);
+    nodes.sort_by_key(|node| node.ts);
 
     let mut running_total = 0.0;
-    for node in nodes.iter_mut() {
+    for node in nodes.iter_mut()
+    {
         running_total += node.val;
         node.cum_val = running_total;
     }
 
     Ok(Json(nodes))
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+
+    #[test]
+    fn age_accounts_for_birthday_not_yet_reached()
+    {
+        let birth = NaiveDate::from_ymd_opt(1990, 12, 31).unwrap();
+
+        assert_eq!(age_on(birth, NaiveDate::from_ymd_opt(2026, 12, 30).unwrap()), 35);
+        assert_eq!(age_on(birth, NaiveDate::from_ymd_opt(2026, 12, 31).unwrap()), 36);
+    }
 }

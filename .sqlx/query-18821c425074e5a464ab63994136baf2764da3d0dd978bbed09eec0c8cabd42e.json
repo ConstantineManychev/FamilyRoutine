@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT consumed_ts, total_kcal::float8 AS \"kcal!\"\n        FROM user_meals\n        WHERE user_id = $1 AND consumed_ts >= $2 AND consumed_ts < $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "consumed_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "kcal!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "18821c425074e5a464ab63994136baf2764da3d0dd978bbed09eec0c8cabd42e"
+}

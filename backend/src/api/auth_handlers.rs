@@ -1,67 +1,79 @@
-use crate::api::auth_middleware::AuthClaims;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Json;
+use axum_extra::extract::CookieJar;
+use shared_schema::{LoginRequest, LoginResponse, RegisterRequest};
+
+use crate::api::extract::{ApiJson, AuthUser, ClientIp};
 use crate::domain::errors::ApiError;
-use crate::services::auth_service::{authenticate_user, register_new_user};
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
-use axum_extra::extract::{
-    cookie::{Cookie, SameSite},
-    CookieJar,
-};
-use chrono::{Duration as ChronoDuration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
-use serde_json::Value;
-use shared_schema::{CreateUserRequest, LoginRequest};
-use sqlx::PgPool;
-use time::Duration as TimeDuration;
+use crate::domain::validation::{check_login_password, MAX_EMAIL_LEN};
+use crate::security::rate_limit::{LOGIN_PER_EMAIL, LOGIN_PER_IP, REGISTER_PER_IP};
+use crate::security::session;
+use crate::services::auth_service;
+use crate::state::AppState;
 
-pub async fn handle_user_registration(
-    State(db): State<PgPool>,
-    Json(mut payload): Json<CreateUserRequest>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    payload.email = payload.email.to_lowercase();
-    let res = register_new_user(&db, payload).await?;
-    Ok((StatusCode::CREATED, Json(res)))
+pub async fn register(
+    State(a_state): State<AppState>,
+    ClientIp(a_ip): ClientIp,
+    ApiJson(a_req): ApiJson<RegisterRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    a_state.limiter.hit(&format!("register-ip:{a_ip}"), &REGISTER_PER_IP)?;
+    auth_service::register(&a_state, a_req).await?;
+    Ok(StatusCode::CREATED)
 }
 
-pub async fn handle_user_login(
-    State(db): State<PgPool>,
-    jar: CookieJar,
-    Json(mut payload): Json<LoginRequest>,
-) -> Result<impl IntoResponse, ApiError> {
-    payload.email = payload.email.to_lowercase();
-    let user = authenticate_user(&db, payload).await?;
-    
-    let now = Utc::now();
-    let expiration_chrono = now + ChronoDuration::days(7);
-    
-    let claims = AuthClaims { 
-        sub: user.id, 
-        exp: expiration_chrono.timestamp() as usize 
-    };
-    
-    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "very_secret_key_123".into());
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_ref())
-    ).map_err(|_| ApiError::InternalServerError)?;
+pub async fn login(
+    State(a_state): State<AppState>,
+    ClientIp(a_ip): ClientIp,
+    a_jar: CookieJar,
+    ApiJson(a_req): ApiJson<LoginRequest>,
+) -> Result<(CookieJar, Json<LoginResponse>), ApiError>
+{
+    a_state.limiter.hit(&format!("login-ip:{a_ip}"), &LOGIN_PER_IP)?;
 
-    let cookie = Cookie::build(("jwt_token", token.clone()))
-    .path("/")
-    .http_only(true)
-    .same_site(SameSite::Lax)
-    .max_age(TimeDuration::days(7))
-    .build();
+    let email_key: String = a_req.email.trim().to_lowercase().chars().take(MAX_EMAIL_LEN).collect();
+    let email_key = format!("login-email:{email_key}");
+    a_state.limiter.hit(&email_key, &LOGIN_PER_EMAIL)?;
 
-    let mut res = Json(user).into_response();
-    res.headers_mut().insert(
-        axum::http::header::SET_COOKIE,
-        cookie.to_string().parse().unwrap()
-    );
-    res.headers_mut().insert("X-Auth-Token", token.parse().unwrap());
+    check_login_password(&a_req.password)?;
 
-    Ok((jar, res))
+    let user = auth_service::authenticate(&a_state, &a_req.email, a_req.password).await?;
+    a_state.limiter.reset(&email_key);
+
+    let token = session::create(&a_state.db, user.id).await?;
+
+    if a_req.is_cookie_mode
+    {
+        let jar = a_jar.add(session::issue_cookie(token, &a_state.cfg));
+        return Ok((jar, Json(LoginResponse { user, token: None })));
+    }
+
+    Ok((
+        a_jar,
+        Json(LoginResponse {
+            user,
+            token: Some(token),
+        }),
+    ))
 }
 
-pub async fn handle_user_logout() -> StatusCode {
-    StatusCode::OK
+pub async fn logout(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    a_jar: CookieJar,
+) -> Result<(CookieJar, StatusCode), ApiError>
+{
+    session::revoke(&a_state.db, a_user.session_id).await?;
+    Ok((a_jar.add(session::removal_cookie(&a_state.cfg)), StatusCode::NO_CONTENT))
+}
+
+pub async fn logout_all(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    a_jar: CookieJar,
+) -> Result<(CookieJar, StatusCode), ApiError>
+{
+    session::revoke_all(&a_state.db, a_user.user_id).await?;
+    Ok((a_jar.add(session::removal_cookie(&a_state.cfg)), StatusCode::NO_CONTENT))
 }

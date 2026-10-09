@@ -1,53 +1,166 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../providers/api_prov.dart';
+import '../common/feedback.dart';
 import 'fam_groups_grid.dart';
 
-class FamGroupsScreen extends ConsumerWidget {
+class FamGroupsScreen extends ConsumerWidget
+{
   const FamGroupsScreen({super.key});
 
-  Future<void> _handleDelete(BuildContext context, WidgetRef ref, String id) async {
-    try {
-      await ref.read(apiProv).deleteFam(id);
-      ref.invalidate(famsProv);
-    } catch (_) {}
+  Future<void> _handleDelete(BuildContext aContext, WidgetRef aRef, String aFamId) async
+  {
+    try
+    {
+      await aRef.read(apiProv).deleteFam(aFamId);
+    }
+    catch (aError)
+    {
+      if (aContext.mounted)
+      {
+        showErrorSnack(aContext, aError);
+      }
+    }
+    aRef.invalidate(famsProv);
   }
 
-  Future<void> _handleLeave(BuildContext context, WidgetRef ref, String id) async {
-    try {
-      await ref.read(apiProv).leaveFam(id);
-      ref.invalidate(famsProv);
-    } catch (e) {
-      if (e is DioException && e.response?.data['error'] == 'CANNOT_LEAVE_LAST_ADMIN') {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('family.leave_last_admin_err'.tr()),
-              backgroundColor: Colors.red.shade800,
-            ),
-          );
-        }
+  Future<void> _handleLeave(BuildContext aContext, WidgetRef aRef, String aFamId) async
+  {
+    try
+    {
+      await aRef.read(apiProv).leaveFam(aFamId);
+    }
+    catch (aError)
+    {
+      if (aContext.mounted)
+      {
+        showErrorSnack(aContext, aError);
+      }
+    }
+    aRef.invalidate(famsProv);
+  }
+
+  Future<void> _joinByCode(BuildContext aContext, WidgetRef aRef) async
+  {
+    final code = await showDialog<String>(context: aContext, builder: (_) => const _JoinCodeDialog());
+
+    if (code == null || code.trim().isEmpty || !aContext.mounted)
+    {
+      return;
+    }
+
+    try
+    {
+      final famId = await aRef.read(apiProv).acceptInvite(code.trim());
+      aRef.invalidate(famsProv);
+      if (aContext.mounted)
+      {
+        showInfoSnack(aContext, 'family.joined'.tr());
+        aContext.go('/app/families/$famId');
+      }
+    }
+    catch (aError)
+    {
+      if (aContext.mounted)
+      {
+        showErrorSnack(aContext, aError);
       }
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final famsAsync = ref.watch(famsProv);
+  Widget build(BuildContext aContext, WidgetRef aRef)
+  {
+    aContext.locale;
+    final famsAsync = aRef.watch(famsProv);
 
-    return famsAsync.when(
-      data: (fams) => FamGroupsGrid(
-        fams: fams,
-        onCreateFam: () => context.go('/app/families/new'),
-        onSelectFam: (id) => context.go('/app/families/$id'),
-        onDeleteFam: (id) => _handleDelete(context, ref, id),
-        onLeaveFam: (id) => _handleLeave(context, ref, id),
+    return Padding(
+      padding: screenPadding(aContext),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenHeader(
+            title: 'sidebar.family_groups'.tr(),
+            actions: [
+              OutlinedButton.icon(
+                onPressed: () => _joinByCode(aContext, aRef),
+                icon: const Icon(LucideIcons.keyRound, size: 18),
+                label: Text('family.join_by_code'.tr()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: famsAsync.when(
+              data: (aFams) => FamGroupsGrid(
+                fams: aFams,
+                onCreateFam: () => aContext.go('/app/families/new'),
+                onSelectFam: (aId) => aContext.go('/app/families/$aId'),
+                onDeleteFam: (aId) => _handleDelete(aContext, aRef, aId),
+                onLeaveFam: (aId) => _handleLeave(aContext, aRef, aId),
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(famsProv)),
+            ),
+          ),
+        ],
       ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text(err.toString())),
+    );
+  }
+}
+
+class _JoinCodeDialog extends StatefulWidget
+{
+  const _JoinCodeDialog();
+
+  @override
+  State<_JoinCodeDialog> createState() => _JoinCodeDialogState();
+}
+
+class _JoinCodeDialogState extends State<_JoinCodeDialog>
+{
+  final _codeCtrl = TextEditingController();
+
+  @override
+  void dispose()
+  {
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    return AlertDialog(
+      title: Text('family.join_by_code'.tr()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('family.join_hint'.tr()),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _codeCtrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            inputFormatters: [LengthLimitingTextInputFormatter(20)],
+            decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'XXXX-XXXX-XXXX'),
+            onSubmitted: (aValue) => Navigator.of(aContext).pop(aValue),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
+        ElevatedButton(
+          onPressed: () => Navigator.of(aContext).pop(_codeCtrl.text),
+          child: Text('family.join'.tr()),
+        ),
+      ],
     );
   }
 }

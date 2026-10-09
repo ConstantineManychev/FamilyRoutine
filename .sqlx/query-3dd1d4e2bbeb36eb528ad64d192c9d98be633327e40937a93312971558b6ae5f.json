@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, role AS \"role: MemberRole\", label, created_ts, expires_ts\n        FROM family_invites\n        WHERE family_id = $1 AND expires_ts > NOW()\n        ORDER BY created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "mem_role_t",
+            "kind": {
+              "Enum": [
+                "admin",
+                "standard"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "expires_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "3dd1d4e2bbeb36eb528ad64d192c9d98be633327e40937a93312971558b6ae5f"
+}

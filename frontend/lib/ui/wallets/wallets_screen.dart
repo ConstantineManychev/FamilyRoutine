@@ -1,204 +1,282 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/feedback.dart';
 
-class WalletsScreen extends ConsumerStatefulWidget {
+class WalletsScreen extends ConsumerStatefulWidget
+{
   const WalletsScreen({super.key});
 
   @override
   ConsumerState<WalletsScreen> createState() => _WalletsScreenState();
 }
 
-class _WalletsScreenState extends ConsumerState<WalletsScreen> {
-  bool _showArchived = false;
+class _WalletsScreenState extends ConsumerState<WalletsScreen>
+{
+  bool _isArchivedVisible = false;
 
-  Future<void> _toggleArchive(String id, bool currentStatus) async {
-    try {
-      await ref.read(apiProv).archiveWallet(id, !currentStatus);
-      ref.invalidate(walletsProv);
-    } catch (_) {}
+  Future<void> _toggleArchive(AccountDto aWallet) async
+  {
+    try
+    {
+      await ref.read(apiProv).archiveWallet(aWallet.id, !aWallet.isActive);
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    ref.invalidate(walletsProv);
   }
 
-  Future<void> _handleDelete(String id) async {
-    final bool? confirmWarning = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('wallet.delete'.tr()),
-        content: Text('wallet.delete_warning'.tr()),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('common.no'.tr())),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('common.yes'.tr()),
-          ),
-        ],
-      ),
+  Future<void> _handleDelete(AccountDto aWallet) async
+  {
+    final isWarned = await confirmAction(
+      context,
+      aTitle: 'wallet.delete'.tr(),
+      aMessage: 'wallet.delete_warning'.tr(),
     );
 
-    if (confirmWarning != true) return;
+    if (!isWarned || !mounted)
+    {
+      return;
+    }
 
     final targetWord = 'wallet.delete_word'.tr();
-    final bool? confirmCaptcha = await showDialog<bool>(
+    final isConfirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) {
-        final ctrl = TextEditingController();
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('wallet.delete'.tr()),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('wallet.delete_captcha_desc'.tr(namedArgs: {'word': targetWord})),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: ctrl,
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('common.no'.tr())),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  onPressed: ctrl.text == targetWord ? () => Navigator.pop(ctx, true) : null,
-                  child: Text('wallet.delete'.tr()),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _DeleteCaptchaDialog(targetWord: targetWord),
     );
 
-    if (confirmCaptcha != true) return;
+    if (isConfirmed != true || !mounted)
+    {
+      return;
+    }
 
-    try {
-      await ref.read(apiProv).deleteWallet(id);
-      ref.invalidate(walletsProv); 
-    } catch (_) {}
+    try
+    {
+      await ref.read(apiProv).deleteWallet(aWallet.id);
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    ref.invalidate(walletsProv);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext aContext)
+  {
+    aContext.locale;
     final walletsAsync = ref.watch(walletsProv);
 
     return Padding(
-      padding: const EdgeInsets.all(32.0),
+      padding: screenPadding(aContext),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('wallet.title'.tr(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          ScreenHeader(
+            title: 'wallet.title'.tr(),
+            actions: [
               ElevatedButton.icon(
-                onPressed: () => context.go('/app/wallets/new'),
+                onPressed: () => aContext.go('/app/wallets/new'),
                 icon: const Icon(LucideIcons.plus, size: 18),
                 label: Text('wallet.add'.tr()),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           Expanded(
             child: walletsAsync.when(
-              data: (wallets) {
-                final activeWallets = wallets.where((w) => w.isActive).toList();
-                final archivedWallets = wallets.where((w) => !w.isActive).toList();
-                final hasArchived = archivedWallets.isNotEmpty;
-
-                return ListView(
-                  children: [
-                    ...activeWallets.map((w) => _WalletTile(
-                          wallet: w,
-                          onEdit: () => context.go('/app/wallets/${w.id}'),
-                          onToggleArchive: () => _toggleArchive(w.id, w.isActive),
-                          onDelete: () => _handleDelete(w.id),
-                        )),
-                    if (hasArchived) ...[
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => setState(() => _showArchived = !_showArchived),
-                          child: Text(_showArchived ? 'wallet.hide_archived'.tr() : 'wallet.show_archived'.tr()),
-                        ),
-                      ),
-                      if (_showArchived)
-                        ...archivedWallets.map((w) => _WalletTile(
-                              wallet: w,
-                              onEdit: () => context.go('/app/wallets/${w.id}'),
-                              onToggleArchive: () => _toggleArchive(w.id, w.isActive),
-                              onDelete: () => _handleDelete(w.id),
-                            )),
-                    ]
-                  ],
-                );
-              },
+              data: (aWallets) => _buildList(aContext, aWallets),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(walletsProv)),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildList(BuildContext aContext, List<AccountDto> aWallets)
+  {
+    final active = aWallets.where((aWallet) => aWallet.isActive).toList();
+    final archived = aWallets.where((aWallet) => !aWallet.isActive).toList();
+
+    if (aWallets.isEmpty)
+    {
+      return Center(child: Text('common.no_data'.tr()));
+    }
+
+    Widget tile(AccountDto aWallet) => _WalletTile(
+          wallet: aWallet,
+          onOpen: () => aContext.go('/app/wallets/${aWallet.id}'),
+          onToggleArchive: () => _toggleArchive(aWallet),
+          onDelete: () => _handleDelete(aWallet),
+        );
+
+    return ListView(
+      children: [
+        ...active.map(tile),
+        if (archived.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _isArchivedVisible = !_isArchivedVisible),
+              child: Text(_isArchivedVisible ? 'wallet.hide_archived'.tr() : 'wallet.show_archived'.tr()),
+            ),
+          ),
+          if (_isArchivedVisible) ...archived.map(tile),
+        ],
+      ],
+    );
+  }
 }
 
-class _WalletTile extends StatelessWidget {
+class _DeleteCaptchaDialog extends StatefulWidget
+{
+  final String targetWord;
+
+  const _DeleteCaptchaDialog({required this.targetWord});
+
+  @override
+  State<_DeleteCaptchaDialog> createState() => _DeleteCaptchaDialogState();
+}
+
+class _DeleteCaptchaDialogState extends State<_DeleteCaptchaDialog>
+{
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose()
+  {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final isMatch = _ctrl.text == widget.targetWord;
+
+    return AlertDialog(
+      title: Text('wallet.delete'.tr()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('wallet.delete_captcha_desc'.tr(namedArgs: {'word': widget.targetWord})),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(false), child: Text('common.no'.tr())),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          onPressed: isMatch ? () => Navigator.of(aContext).pop(true) : null,
+          child: Text('wallet.delete'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+class _WalletTile extends StatelessWidget
+{
   final AccountDto wallet;
-  final VoidCallback onEdit;
+  final VoidCallback onOpen;
   final VoidCallback onToggleArchive;
   final VoidCallback onDelete;
 
   const _WalletTile({
     required this.wallet,
-    required this.onEdit,
+    required this.onOpen,
     required this.onToggleArchive,
     required this.onDelete,
   });
 
-  IconData _getIcon() {
-    switch (wallet.accountType) {
-      case 'cash': return LucideIcons.banknote;
-      case 'card': return LucideIcons.creditCard;
-      default: return LucideIcons.landmark;
+  IconData get _icon
+  {
+    switch (wallet.accountType)
+    {
+      case 'cash':
+        return LucideIcons.banknote;
+      case 'card':
+        return LucideIcons.creditCard;
+      default:
+        return LucideIcons.landmark;
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext aContext)
+  {
+    final subtitle = [
+      if (wallet.mask != null) '•••• ${wallet.mask}' else 'wallet.type_${wallet.accountType}'.tr(),
+      if (!wallet.isPersonal) 'wallet.shared'.tr(),
+      if (wallet.isSyncTokenSet) 'wallet.sync_on'.tr(),
+    ].join(' · ');
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        onTap: onEdit,
+        onTap: onOpen,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: wallet.isActive ? Colors.blue.shade50 : Colors.grey.shade200,
-          child: Icon(_getIcon(), color: wallet.isActive ? Colors.blue.shade700 : Colors.grey),
+          child: Icon(_icon, color: wallet.isActive ? Colors.blue.shade700 : Colors.grey),
         ),
-        title: Text(wallet.name, style: TextStyle(fontWeight: FontWeight.w600, color: wallet.isActive ? Colors.black87 : Colors.grey)),
-        subtitle: Text(wallet.mask != null ? '**** ${wallet.mask}' : 'wallet.type_${wallet.accountType}'.tr()),
-        trailing: PopupMenuButton<String>(
-          onSelected: (val) {
-            if (val == 'edit') onEdit();
-            if (val == 'archive') onToggleArchive();
-            if (val == 'delete') onDelete();
-          },
-          itemBuilder: (ctx) => [
-            PopupMenuItem(value: 'edit', child: Text('wallet.edit'.tr())),
-            PopupMenuItem(value: 'archive', child: Text(wallet.isActive ? 'wallet.archive'.tr() : 'wallet.unarchive'.tr())),
-            PopupMenuItem(value: 'delete', child: Text('wallet.delete'.tr(), style: const TextStyle(color: Colors.red))),
-          ],
+        title: Text(
+          wallet.name,
+          style: TextStyle(fontWeight: FontWeight.w600, color: wallet.isActive ? Colors.black87 : Colors.grey),
         ),
+        subtitle: Text(subtitle),
+        trailing: wallet.isEditable
+            ? PopupMenuButton<String>(
+                tooltip: 'common.actions'.tr(),
+                onSelected: (aValue)
+                {
+                  switch (aValue)
+                  {
+                    case 'edit':
+                      onOpen();
+                    case 'archive':
+                      onToggleArchive();
+                    case 'delete':
+                      onDelete();
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'edit', child: Text('wallet.edit'.tr())),
+                  PopupMenuItem(
+                    value: 'archive',
+                    child: Text(wallet.isActive ? 'wallet.archive'.tr() : 'wallet.unarchive'.tr()),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('wallet.delete'.tr(), style: const TextStyle(color: Colors.red)),
+                  ),
+                ],
+              )
+            : const Icon(LucideIcons.eye, color: Colors.grey),
       ),
     );
   }

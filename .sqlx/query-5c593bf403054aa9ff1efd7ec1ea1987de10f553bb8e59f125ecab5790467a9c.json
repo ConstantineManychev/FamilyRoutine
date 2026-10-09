@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT start_ts, COALESCE(kcal_burned, 0)::float8 AS \"kcal!\"\n        FROM user_workouts\n        WHERE user_id = $1 AND start_ts >= $2 AND start_ts < $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "kcal!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "5c593bf403054aa9ff1efd7ec1ea1987de10f553bb8e59f125ecab5790467a9c"
+}

@@ -1,2 +1,2 @@
 pub mod auth_service;
-pub mod password_manager;
+pub mod workout_calc;

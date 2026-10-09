@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE place_addrs SET is_main = FALSE WHERE place_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ce75c0257ea1d96caacfc2d416dab32048a5ff03df993cd3ebd19cd5a7f52ed"
+}

@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+!.env.example
+**/target
+**/.dart_tool
+**/build
+frontend
+docs
+deploy

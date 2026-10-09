@@ -1,229 +1,135 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/feedback.dart';
+import 'geo_tree.dart';
 
-class CitiesDictScreen extends ConsumerStatefulWidget {
+class CitiesDictScreen extends ConsumerStatefulWidget
+{
   const CitiesDictScreen({super.key});
 
   @override
   ConsumerState<CitiesDictScreen> createState() => _CitiesDictScreenState();
 }
 
-class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> {
-  List<CountryDto> _countries = [];
-  Map<String, List<CityDto>> _citiesCache = {};
-  Map<String, List<StreetDto>> _streetsCache = {};
-  
-  String? _expandedCountryId;
-  String? _expandedCityId;
-  bool _isLoading = true;
+class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTreeState<CitiesDictScreen>
+{
+  Future<void> _addCity(CountryDto aCountry) async
+  {
+    final name = await askName(aTitle: 'geo.add_city'.tr(), aLabel: 'geo.city_name'.tr());
+    if (name == null)
+    {
+      return;
+    }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCountries();
-  }
-
-  Future<void> _loadCountries() async {
-    setState(() => _isLoading = true);
-    try {
-      _countries = await ref.read(apiProv).getCountries();
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (await runGeoAction(() => ref.read(apiProv).createCity(aCountry.id, name)))
+    {
+      await loadCities(aCountry.id);
     }
   }
 
-  Future<void> _loadCitiesForCountry(String countryId) async {
-    final cities = await ref.read(apiProv).getCities(countryId);
-    setState(() {
-      _citiesCache[countryId] = cities;
-      _expandedCountryId = countryId;
-      _expandedCityId = null;
-    });
-  }
+  Future<void> _editCity(CityDto aCity) async
+  {
+    final name = await askName(aTitle: 'geo.edit_city'.tr(), aLabel: 'geo.city_name'.tr(), aInitial: aCity.name);
+    if (name == null || name == aCity.name)
+    {
+      return;
+    }
 
-  Future<void> _loadStreetsForCity(String cityId) async {
-    final streets = await ref.read(apiProv).getStreets(cityId);
-    setState(() {
-      _streetsCache[cityId] = streets;
-      _expandedCityId = cityId;
-    });
-  }
-
-  void _handleCountryTap(String countryId) {
-    if (_expandedCountryId == countryId) {
-      setState(() {
-        _expandedCountryId = null;
-        _expandedCityId = null;
-      });
-    } else {
-      _loadCitiesForCountry(countryId);
+    if (await runGeoAction(() => ref.read(apiProv).updateCity(aCity.id, name)))
+    {
+      await loadCities(aCity.countryId);
     }
   }
 
-  void _handleCityTap(String cityId) {
-    if (_expandedCityId == cityId) {
-      setState(() => _expandedCityId = null);
-    } else {
-      _loadStreetsForCity(cityId);
+  Future<void> _deleteCity(CityDto aCity) async
+  {
+    final isConfirmed = await confirmAction(context, aTitle: aCity.name, aMessage: 'common.delete_confirm'.tr());
+    if (!isConfirmed)
+    {
+      return;
     }
-  }
 
-  Future<void> _showCityDialog({CityDto? city}) async {
-    CountryDto? selectedCountry = _expandedCountryId != null 
-        ? _countries.firstWhere((c) => c.id == _expandedCountryId)
-        : null;
-        
-    final nameCtrl = TextEditingController(text: city?.name);
-    final isEdit = city != null;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final isBtnDisabled = nameCtrl.text.trim().isEmpty || selectedCountry == null;
-          
-          return AlertDialog(
-            title: Text(isEdit ? 'geo.edit_city'.tr() : 'geo.add_city'.tr()),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<CountryDto>(
-                  value: selectedCountry,
-                  decoration: InputDecoration(labelText: 'geo.country'.tr(), border: const OutlineInputBorder()),
-                  items: _countries.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
-                  onChanged: isEdit ? null : (v) => setDialogState(() => selectedCountry = v),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(labelText: 'geo.city_name'.tr(), border: const OutlineInputBorder()),
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('common.cancel'.tr())),
-              ElevatedButton(
-                onPressed: isBtnDisabled ? null : () async {
-                  if (isEdit) {
-                    await ref.read(apiProv).updateCity(city.id, nameCtrl.text.trim());
-                  } else {
-                    await ref.read(apiProv).createCity(selectedCountry!.id, nameCtrl.text.trim());
-                  }
-                  Navigator.pop(ctx);
-                  _loadCitiesForCountry(selectedCountry!.id);
-                },
-                child: Text('common.save'.tr()),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _deleteCity(CityDto city) async {
-    await ref.read(apiProv).deleteCity(city.id);
-    _loadCitiesForCountry(city.countryId);
+    if (await runGeoAction(() => ref.read(apiProv).deleteCity(aCity.id)))
+    {
+      await loadCities(aCity.countryId);
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    context.locale;
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext aContext)
+  {
+    aContext.locale;
 
     return Padding(
-      padding: const EdgeInsets.all(32.0),
+      padding: screenPadding(aContext),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('geo.cities_dict'.tr(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              ElevatedButton.icon(
-                onPressed: () => _showCityDialog(),
-                icon: const Icon(LucideIcons.plus, size: 18),
-                label: Text('geo.add_city'.tr()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _countries.length,
-              itemBuilder: (context, index) {
-                final country = _countries[index];
-                final isCountryExpanded = _expandedCountryId == country.id;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        title: Text(country.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        trailing: Icon(isCountryExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown),
-                        onTap: () => _handleCountryTap(country.id),
-                        tileColor: isCountryExpanded ? Colors.blue.shade50 : null,
-                      ),
-                      if (isCountryExpanded)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          color: Colors.white,
-                          child: _buildCitiesList(country.id),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+          ScreenHeader(title: 'geo.cities_dict'.tr()),
+          const SizedBox(height: 24),
+          Expanded(child: buildTree(aCountryBody: _buildCities)),
         ],
       ),
     );
   }
 
-  Widget _buildCitiesList(String countryId) {
-    final cities = _citiesCache[countryId] ?? [];
-    if (cities.isEmpty) return Center(child: Text('geo.no_cities'.tr()));
+  Widget _buildCities(CountryDto aCountry)
+  {
+    final cities = citiesCache[aCountry.id] ?? const <CityDto>[];
 
     return Column(
-      children: cities.map((city) {
-        final isCityExpanded = _expandedCityId == city.id;
-        
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            children: [
-              ListTile(
-                title: Text(city.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(icon: const Icon(LucideIcons.edit, size: 18), onPressed: () => _showCityDialog(city: city)),
-                    IconButton(icon: const Icon(LucideIcons.trash, size: 18, color: Colors.red), onPressed: () => _deleteCity(city)),
-                    Icon(isCityExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown),
-                  ],
-                ),
-                onTap: () => _handleCityTap(city.id),
-              ),
-              if (isCityExpanded)
-                _buildStreetsTable(city.id)
-            ],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => _addCity(aCountry),
+            icon: const Icon(LucideIcons.plus, size: 18),
+            label: Text('geo.add_city'.tr()),
           ),
-        );
-      }).toList(),
+        ),
+        if (cities.isEmpty) Text('geo.no_cities'.tr(), style: const TextStyle(fontStyle: FontStyle.italic)),
+        for (final city in cities)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  title: Text(city.name),
+                  onTap: () => toggleCity(city.id),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      buildEditActions(
+                        aIsEditable: city.isEditable,
+                        aOnEdit: () => _editCity(city),
+                        aOnDelete: () => _deleteCity(city),
+                      ),
+                      Icon(expandedCityId == city.id ? LucideIcons.chevronUp : LucideIcons.chevronDown),
+                    ],
+                  ),
+                ),
+                if (expandedCityId == city.id) _buildStreets(city.id),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
-  Widget _buildStreetsTable(String cityId) {
-    final streets = _streetsCache[cityId] ?? [];
-    
+  Widget _buildStreets(String aCityId)
+  {
+    final streets = streetsCache[aCityId] ?? const <StreetDto>[];
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -236,17 +142,8 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> {
           if (streets.isEmpty)
             Text('geo.no_streets'.tr(), style: const TextStyle(fontStyle: FontStyle.italic))
           else
-            Table(
-              border: TableBorder.all(color: Colors.grey.shade300),
-              children: [
-                for (final street in streets)
-                  TableRow(
-                    children: [
-                      Padding(padding: const EdgeInsets.all(8.0), child: Text(street.name)),
-                    ]
-                  )
-              ],
-            )
+            for (final street in streets)
+              Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(street.name)),
         ],
       ),
     );

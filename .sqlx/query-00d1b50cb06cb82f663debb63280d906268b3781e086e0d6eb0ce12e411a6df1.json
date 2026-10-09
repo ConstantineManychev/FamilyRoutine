@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO cities (country_id, name, created_by)\n        VALUES ($1, $2, $3)\n        ON CONFLICT (country_id, name) DO UPDATE SET name = EXCLUDED.name\n        RETURNING id, country_id, name, COALESCE(created_by = $3, FALSE) AS \"is_editable!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "country_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "00d1b50cb06cb82f663debb63280d906268b3781e086e0d6eb0ce12e411a6df1"
+}

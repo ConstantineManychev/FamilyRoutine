@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO family_invites (family_id, code_hash, role, label, invited_by, expires_ts)\n        VALUES ($1, $2, $3, $4, $5, $6)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        {
+          "Custom": {
+            "name": "mem_role_t",
+            "kind": {
+              "Enum": [
+                "admin",
+                "standard"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2f0aedeed3d8b1da074611dcc62c5febe060c439737eae7070fbcc61309b3113"
+}
