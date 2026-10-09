@@ -22,9 +22,6 @@ pgdata/
 **/yarn-debug.log*
 **/yarn-error.log*
 
-frontend/shared/src/types/
-backend/bindings/
-
 **/build/
 **/.dart_tool/
 **/.packages
