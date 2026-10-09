@@ -1,43 +1,50 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../core/api_svc.dart';
+import '../core/token_store.dart';
 import '../domain/models.dart';
+import 'auth_provider.dart';
 
-final Provider<FlutterSecureStorage> storageProv = Provider((ref) => const FlutterSecureStorage());
+final Provider<TokenStore> tokenStoreProv = Provider<TokenStore>((aRef) => TokenStore(const FlutterSecureStorage()));
 
-final StateProvider<bool> isAuthProv = StateProvider<bool>((ref) => true);
-
-final Provider<ApiSvc> apiProv = Provider<ApiSvc>((ref) {
-  final storage = ref.read(storageProv);
-  final dio = Dio();
-
-  dio.interceptors.add(InterceptorsWrapper(
-    onError: (DioException e, handler) async {
-      if (e.response?.statusCode == 401) {
-        await storage.delete(key: 'auth_token');
-        ref.read(isAuthProv.notifier).state = false;
-        ref.invalidate(profProv);
-      }
-      return handler.next(e);
-    },
-  ));
-
-  return ApiSvc(dio, storage);
+final Provider<ApiSvc> apiProv = Provider<ApiSvc>((aRef)
+{
+  final api = ApiSvc(Dio(), aRef.watch(tokenStoreProv));
+  api.onUnauthorized = () => aRef.read(authProv.notifier).handleUnauthorized();
+  return api;
 });
 
-final FutureProvider<UserProf> profProv = FutureProvider<UserProf>((ref) async {
-  final api = ref.read(apiProv);
-  final res = await api.get('/api/user/me');
-  return UserProf.fromJson(res.data);
+final Provider<String?> sessionUserIdProv = Provider<String?>((aRef)
+{
+  return aRef.watch(authProv.select((aState) => aState.user?.id));
 });
 
-final FutureProvider<List<FamDto>> famsProv = FutureProvider<List<FamDto>>((ref) async {
-  final api = ref.read(apiProv);
-  final res = await api.get('/api/families');
-  return (res.data as List).map((e) => FamDto.fromJson(e)).toList();
+final AutoDisposeFutureProvider<List<FamDto>> famsProv = FutureProvider.autoDispose<List<FamDto>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getFams();
 });
 
-final AutoDisposeFutureProvider<List<AccountDto>> walletsProv = FutureProvider.autoDispose<List<AccountDto>>((ref) async {
-  return ref.watch(apiProv).getWallets();
+final AutoDisposeFutureProvider<List<AccountDto>> walletsProv = FutureProvider.autoDispose<List<AccountDto>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getWallets();
+});
+
+final AutoDisposeFutureProvider<List<DictMetaDto>> dictsMetaProv =
+    FutureProvider.autoDispose<List<DictMetaDto>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getDictsMeta();
 });

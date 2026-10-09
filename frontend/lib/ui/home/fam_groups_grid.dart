@@ -1,14 +1,17 @@
-import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../domain/models.dart';
 
-class FamGroupsGrid extends StatelessWidget {
+import '../../domain/models.dart';
+import '../common/feedback.dart';
+
+class FamGroupsGrid extends StatelessWidget
+{
   final List<FamDto> fams;
   final VoidCallback onCreateFam;
-  final Function(String) onSelectFam;
-  final Function(String) onDeleteFam;
-  final Function(String) onLeaveFam;
+  final ValueChanged<String> onSelectFam;
+  final ValueChanged<String> onDeleteFam;
+  final ValueChanged<String> onLeaveFam;
 
   const FamGroupsGrid({
     super.key,
@@ -20,9 +23,9 @@ class FamGroupsGrid extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext aContext)
+  {
     return GridView.builder(
-      padding: const EdgeInsets.all(32),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 300,
         crossAxisSpacing: 24,
@@ -30,158 +33,167 @@ class FamGroupsGrid extends StatelessWidget {
         childAspectRatio: 1.5,
       ),
       itemCount: fams.length + 1,
-      itemBuilder: (ctx, i) {
-        if (i == fams.length) {
-          return _FamActionCard(
-            title: 'family.create_action'.tr(),
-            icon: Icons.add,
-            onTap: onCreateFam,
-          );
+      itemBuilder: (_, aIndex)
+      {
+        if (aIndex == fams.length)
+        {
+          return _FamActionCard(title: 'family.create_action'.tr(), icon: Icons.add, onTap: onCreateFam);
         }
+
+        final fam = fams[aIndex];
         return _FamCard(
-          fam: fams[i],
-          onTap: () => onSelectFam(fams[i].id),
-          onDelete: () => onDeleteFam(fams[i].id),
-          onLeave: () => onLeaveFam(fams[i].id),
+          fam: fam,
+          onTap: () => onSelectFam(fam.id),
+          onDelete: () => onDeleteFam(fam.id),
+          onLeave: () => onLeaveFam(fam.id),
         );
       },
     );
   }
 }
 
-class _FamCard extends StatefulWidget {
+class _FamCard extends StatefulWidget
+{
   final FamDto fam;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onLeave;
 
-  const _FamCard({
-    required this.fam,
-    required this.onTap,
-    required this.onDelete,
-    required this.onLeave,
-  });
+  const _FamCard({required this.fam, required this.onTap, required this.onDelete, required this.onLeave});
 
   @override
   State<_FamCard> createState() => _FamCardState();
 }
 
-class _FamCardState extends State<_FamCard> {
+class _FamCardState extends State<_FamCard>
+{
   bool _isHovered = false;
 
-  void _confirmAction(String titleKey, String descKey, VoidCallback onConfirm) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(titleKey.tr()),
-        content: Text(descKey.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('common.no'.tr()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onConfirm();
-            },
-            child: Text('common.yes'.tr()),
-          ),
-        ],
-      ),
+  Future<void> _handleDelete() async
+  {
+    final isConfirmed = await confirmAction(
+      context,
+      aTitle: 'family.delete_confirm_title'.tr(),
+      aMessage: 'family.delete_confirm_desc'.tr(),
     );
+
+    if (isConfirmed)
+    {
+      widget.onDelete();
+    }
   }
 
-  void _handleDelete() {
-    _confirmAction('family.delete_confirm_title', 'family.delete_confirm_desc', widget.onDelete);
-  }
+  Future<void> _handleLeave() async
+  {
+    final descKey = widget.fam.memberCount == 1 ? 'family.leave_last_member_desc' : 'family.leave_confirm_desc';
+    final isConfirmed = await confirmAction(
+      context,
+      aTitle: 'family.leave_confirm_title'.tr(),
+      aMessage: descKey.tr(),
+    );
 
-  void _handleLeave() {
-    final desc = widget.fam.memberCount == 1 ? 'family.leave_last_member_desc' : 'family.leave_confirm_desc';
-    _confirmAction('family.leave_confirm_title', desc, widget.onLeave);
+    if (isConfirmed)
+    {
+      widget.onLeave();
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext aContext)
+  {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          InkWell(
-            onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Card(
-              elevation: _isHovered ? 6 : 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Center(
-                child: Text(
-                  widget.fam.name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      child: Card(
+        elevation: _isHovered ? 6 : 3,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    widget.fam.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
-            ),
-          ),
-          if (_isHovered)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Row(
-                children: [
-                  if (widget.fam.role == 'admin')
-                    IconButton(
-                      icon: const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 20),
-                      tooltip: 'Удалить',
-                      onPressed: _handleDelete,
+              Positioned(
+                top: 4,
+                right: 4,
+                child: PopupMenuButton<String>(
+                  tooltip: 'common.actions'.tr(),
+                  icon: const Icon(LucideIcons.moreVertical, size: 20),
+                  onSelected: (aValue)
+                  {
+                    if (aValue == 'delete')
+                    {
+                      _handleDelete();
+                    }
+                    else if (aValue == 'leave')
+                    {
+                      _handleLeave();
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'leave',
+                      child: ListTile(
+                        leading: const Icon(LucideIcons.doorOpen, color: Colors.redAccent),
+                        title: Text('family.leave'.tr()),
+                      ),
                     ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.doorOpen, color: Colors.redAccent, size: 20),
-                    tooltip: 'Покинуть',
-                    onPressed: _handleLeave,
-                  ),
-                ],
+                    if (widget.fam.isAdmin)
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: const Icon(LucideIcons.trash2, color: Colors.redAccent),
+                          title: Text('family.delete'.tr()),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _FamActionCard extends StatelessWidget {
+class _FamActionCard extends StatelessWidget
+{
   final String title;
   final IconData icon;
   final VoidCallback onTap;
 
-  const _FamActionCard({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
+  const _FamActionCard({required this.title, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Card(
-        elevation: 0,
-        color: Colors.blue.withOpacity(0.05),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.blue.shade200, width: 2, strokeAlign: BorderSide.strokeAlignInside),
-        ),
+  Widget build(BuildContext aContext)
+  {
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: const Color(0x0D2196F3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.blue.shade200, width: 2),
+      ),
+      child: InkWell(
+        onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 40, color: Colors.blue.shade700),
             const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(fontSize: 16, color: Colors.blue.shade700, fontWeight: FontWeight.w500),
-            ),
+            Text(title, style: TextStyle(fontSize: 16, color: Colors.blue.shade700, fontWeight: FontWeight.w500)),
           ],
         ),
       ),

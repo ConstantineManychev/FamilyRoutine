@@ -1,198 +1,377 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/feedback.dart';
 
-class WalletDetailScreen extends ConsumerStatefulWidget {
+const List<String> accountTypes = ['cash', 'card', 'bank_acc'];
+const List<String> bankTypes = ['monobank', 'aib', 'other'];
+const int minSyncTokenLength = 16;
+
+class WalletDetailScreen extends ConsumerStatefulWidget
+{
   final String? walletId;
-  final VoidCallback onSaved;
 
-  const WalletDetailScreen({super.key, this.walletId, required this.onSaved});
+  const WalletDetailScreen({super.key, this.walletId});
 
   @override
   ConsumerState<WalletDetailScreen> createState() => _WalletDetailScreenState();
 }
 
-class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen> {
+class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
+{
+  final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _maskCtrl = TextEditingController();
-  final _apiCtrl = TextEditingController();
+  final _tokenCtrl = TextEditingController();
 
+  AccountDto? _wallet;
+  List<CurrencyDto> _currs = const [];
+  List<FamDto> _fams = const [];
+  Object? _loadError;
   bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isTokenRemoved = false;
   String _accType = 'cash';
   String? _bankType;
   String? _currId;
-  List<CurrencyDto> _currs = [];
+  String? _familyId;
 
   bool get _isEdit => widget.walletId != null;
-  bool get _reqBank => _accType == 'card' || _accType == 'bank_acc';
-  bool get _isMono => _bankType == 'monobank';
+  bool get _isEditable => !_isEdit || (_wallet?.isEditable ?? false);
+  bool get _isBankRequired => _accType == 'card' || _accType == 'bank_acc';
+  bool get _isTokenSupported => _bankType == 'monobank' && _familyId == null;
 
   @override
-  void initState() {
+  void initState()
+  {
     super.initState();
-    _loadData();
+    _load();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      _currs = await ref.read(apiProv).getCurrencies();
-      if (_currs.isNotEmpty && _currId == null) _currId = _currs.first.id;
+  @override
+  void dispose()
+  {
+    _nameCtrl.dispose();
+    _maskCtrl.dispose();
+    _tokenCtrl.dispose();
+    super.dispose();
+  }
 
-      if (_isEdit) {
-        final data = await ref.read(apiProv).getWalletDetail(widget.walletId!);
-        _nameCtrl.text = data.name;
-        _maskCtrl.text = data.mask ?? '';
-        _accType = data.accountType;
-        _bankType = data.bankType;
-        _currId = data.currId;
-        
-        if (data.syncCredentials != null && data.syncCredentials!['x_token'] != null) {
-          _apiCtrl.text = data.syncCredentials!['x_token'];
+  Future<void> _load() async
+  {
+    setState(()
+    {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try
+    {
+      final api = ref.read(apiProv);
+      final currs = await api.getCurrencies();
+      final fams = _isEdit ? const <FamDto>[] : await api.getFams();
+      final wallet = _isEdit ? await api.getWallet(widget.walletId!) : null;
+
+      if (!mounted)
+      {
+        return;
+      }
+
+      setState(()
+      {
+        _currs = currs;
+        _fams = fams;
+        _wallet = wallet;
+        _currId = wallet?.currId ?? (currs.isNotEmpty ? currs.first.id : null);
+
+        if (wallet != null)
+        {
+          _nameCtrl.text = wallet.name;
+          _maskCtrl.text = wallet.mask ?? '';
+          _accType = wallet.accountType;
+          _bankType = wallet.bankType;
+          _familyId = wallet.familyId;
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('common.error'.tr())));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      });
     }
-  }
-
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    if (name.isEmpty || _currId == null) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final payload = {
-        'name': name,
-        'curr_id': _currId,
-        'account_type': _accType,
-        'bank_type': _reqBank ? _bankType : null,
-        'mask': _reqBank && _maskCtrl.text.isNotEmpty ? _maskCtrl.text.trim() : null,
-        'sync_credentials': _isMono && _apiCtrl.text.isNotEmpty ? {'x_token': _apiCtrl.text.trim()} : null,
-      };
-
-      if (_isEdit) {
-        await ref.read(apiProv).updateWallet(widget.walletId!, payload);
-      } else {
-        await ref.read(apiProv).createWallet(payload);
+    catch (aError)
+    {
+      if (mounted)
+      {
+        setState(() => _loadError = aError);
       }
-      ref.invalidate(walletsProv);
-      widget.onSaved();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('common.error'.tr())));
+    }
+    finally
+    {
+      if (mounted)
+      {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  String? _validateMask(String? aValue)
+  {
+    final value = aValue?.trim() ?? '';
+    return value.isEmpty || RegExp(r'^\d{4}$').hasMatch(value) ? null : 'validation.mask'.tr();
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 32),
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildTypeSel(),
-                  const SizedBox(height: 24),
-                  _buildCurrSel(),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(labelText: 'wallet.name'.tr(), border: const OutlineInputBorder(), prefixIcon: const Icon(LucideIcons.wallet)),
-                  ),
-                  if (_reqBank) ...[
-                    const SizedBox(height: 24),
-                    _buildBankSel(),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _maskCtrl,
-                      decoration: InputDecoration(labelText: 'wallet.mask'.tr(), border: const OutlineInputBorder(), prefixIcon: const Icon(LucideIcons.creditCard)),
-                    ),
-                  ],
-                  if (_isMono) ...[
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _apiCtrl,
-                      decoration: InputDecoration(labelText: 'wallet.api_key'.tr(), border: const OutlineInputBorder(), prefixIcon: const Icon(LucideIcons.key)),
-                    ),
-                  ]
-                ],
+  String? _validateToken(String? aValue)
+  {
+    final value = aValue?.trim() ?? '';
+    return value.isEmpty || value.length >= minSyncTokenLength ? null : 'validation.sync_token'.tr();
+  }
+
+  Future<void> _save() async
+  {
+    if (_isSaving || !(_formKey.currentState?.validate() ?? false) || _currId == null)
+    {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    final mask = _maskCtrl.text.trim();
+    final token = _tokenCtrl.text.trim();
+
+    try
+    {
+      final api = ref.read(apiProv);
+
+      if (_isEdit)
+      {
+        await api.updateWallet(widget.walletId!, {
+          'name': _nameCtrl.text.trim(),
+          'mask': _isBankRequired && mask.isNotEmpty ? mask : null,
+          'sync_token': _isTokenSupported && token.isNotEmpty && !_isTokenRemoved ? token : null,
+          'is_sync_token_removed': _isTokenRemoved,
+        });
+      }
+      else
+      {
+        await api.createWallet({
+          'name': _nameCtrl.text.trim(),
+          'curr_id': _currId,
+          'account_type': _accType,
+          'bank_type': _isBankRequired ? _bankType : null,
+          'mask': _isBankRequired && mask.isNotEmpty ? mask : null,
+          'sync_token': _isTokenSupported && token.isNotEmpty ? token : null,
+          'family_id': _familyId,
+        });
+      }
+
+      _tokenCtrl.clear();
+      ref.invalidate(walletsProv);
+
+      if (mounted)
+      {
+        context.go('/app/wallets');
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    finally
+    {
+      if (mounted)
+      {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    aContext.locale;
+
+    if (_isLoading)
+    {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_loadError != null)
+    {
+      return ErrorRetry(error: _loadError!, onRetry: _load);
+    }
+
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: screenPadding(aContext),
+        children: [
+          ScreenHeader(
+            title: _isEdit ? 'wallet.edit'.tr() : 'wallet.add'.tr(),
+            actions: [
+              if (_isEditable)
+                ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _save,
+                  icon: const Icon(LucideIcons.save, size: 18),
+                  label: Text('common.save'.tr()),
+                ),
+            ],
+          ),
+          if (_isEdit && !_isEditable) ...[
+            const SizedBox(height: 12),
+            Text('wallet.read_only'.tr(), style: const TextStyle(color: Colors.grey)),
+          ],
+          const SizedBox(height: 24),
+          if (!_isEdit && _fams.isNotEmpty) ...[
+            _buildOwnerSel(),
+            const SizedBox(height: 24),
+          ],
+          _buildTypeSel(),
+          const SizedBox(height: 24),
+          _buildCurrSel(),
+          const SizedBox(height: 24),
+          TextFormField(
+            controller: _nameCtrl,
+            enabled: _isEditable,
+            inputFormatters: [LengthLimitingTextInputFormatter(100)],
+            decoration: InputDecoration(
+              labelText: 'wallet.name'.tr(),
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(LucideIcons.wallet),
+            ),
+            validator: (aValue) => (aValue == null || aValue.trim().isEmpty) ? 'validation.required'.tr() : null,
+          ),
+          if (_isBankRequired) ...[
+            const SizedBox(height: 24),
+            _buildBankSel(),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _maskCtrl,
+              enabled: _isEditable,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
+              decoration: InputDecoration(
+                labelText: 'wallet.mask'.tr(),
+                helperText: 'wallet.mask_hint'.tr(),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(LucideIcons.creditCard),
               ),
+              validator: _validateMask,
             ),
           ],
-        ),
+          if (_isTokenSupported && _isEditable) ...[
+            const SizedBox(height: 24),
+            _buildTokenSection(),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildTokenSection()
+  {
+    final isTokenStored = _wallet?.isSyncTokenSet ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _isEdit ? 'wallet.edit'.tr() : 'wallet.add'.tr(),
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        ElevatedButton.icon(
-          onPressed: _save,
-          icon: const Icon(LucideIcons.save, size: 18),
-          label: Text('common.save'.tr()),
-        )
+        if (isTokenStored)
+          Row(
+            children: [
+              Icon(
+                _isTokenRemoved ? LucideIcons.shieldOff : LucideIcons.shieldCheck,
+                color: _isTokenRemoved ? Colors.red : Colors.green,
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(_isTokenRemoved ? 'wallet.token_will_remove'.tr() : 'wallet.token_stored'.tr())),
+              TextButton(
+                onPressed: () => setState(() => _isTokenRemoved = !_isTokenRemoved),
+                child: Text(_isTokenRemoved ? 'common.cancel'.tr() : 'wallet.token_remove'.tr()),
+              ),
+            ],
+          ),
+        if (!_isTokenRemoved) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _tokenCtrl,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            inputFormatters: [LengthLimitingTextInputFormatter(256)],
+            decoration: InputDecoration(
+              labelText: isTokenStored ? 'wallet.token_replace'.tr() : 'wallet.api_key'.tr(),
+              helperText: 'wallet.token_hint'.tr(),
+              helperMaxLines: 3,
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(LucideIcons.key),
+            ),
+            validator: _validateToken,
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildTypeSel() {
+  Widget _buildOwnerSel()
+  {
+    return DropdownButtonFormField<String?>(
+      initialValue: _familyId,
+      decoration: InputDecoration(labelText: 'wallet.owner'.tr(), border: const OutlineInputBorder()),
+      items: [
+        DropdownMenuItem<String?>(value: null, child: Text('wallet.owner_personal'.tr())),
+        ..._fams.map((aFam) => DropdownMenuItem<String?>(value: aFam.id, child: Text(aFam.name))),
+      ],
+      onChanged: (aValue) => setState(() => _familyId = aValue),
+    );
+  }
+
+  Widget _buildTypeSel()
+  {
     return DropdownButtonFormField<String>(
-      value: _accType,
+      initialValue: _accType,
       decoration: InputDecoration(labelText: 'wallet.type'.tr(), border: const OutlineInputBorder()),
-      items: ['cash', 'card', 'bank_acc'].map((t) => DropdownMenuItem(value: t, child: Text('wallet.type_$t'.tr()))).toList(),
-      onChanged: (val) {
-        if (val == null) return;
-        setState(() {
-          _accType = val;
-          if (!_reqBank) {
-            _bankType = null;
-          } else if (_bankType == null) {
-            _bankType = 'monobank';
-          }
-        });
-      },
+      items: accountTypes
+          .map((aType) => DropdownMenuItem(value: aType, child: Text('wallet.type_$aType'.tr())))
+          .toList(),
+      onChanged: _isEdit
+          ? null
+          : (aValue)
+          {
+            if (aValue == null)
+            {
+              return;
+            }
+            setState(()
+            {
+              _accType = aValue;
+              _bankType = _isBankRequired ? (_bankType ?? bankTypes.first) : null;
+            });
+          },
     );
   }
 
-  Widget _buildBankSel() {
+  Widget _buildBankSel()
+  {
     return DropdownButtonFormField<String>(
-      value: _bankType,
+      key: ValueKey('bank-$_accType'),
+      initialValue: _bankType,
       decoration: InputDecoration(labelText: 'wallet.bank'.tr(), border: const OutlineInputBorder()),
-      items: ['monobank', 'aib', 'other'].map((t) => DropdownMenuItem(value: t, child: Text('wallet.bank_$t'.tr()))).toList(),
-      onChanged: (val) => setState(() => _bankType = val),
+      items: bankTypes.map((aBank) => DropdownMenuItem(value: aBank, child: Text('wallet.bank_$aBank'.tr()))).toList(),
+      onChanged: _isEdit ? null : (aValue) => setState(() => _bankType = aValue),
     );
   }
 
-  Widget _buildCurrSel() {
+  Widget _buildCurrSel()
+  {
     return DropdownButtonFormField<String>(
-      value: _currId,
+      initialValue: _currId,
       decoration: InputDecoration(labelText: 'wallet.currency'.tr(), border: const OutlineInputBorder()),
-      items: _currs.map((c) => DropdownMenuItem(value: c.id, child: Text(c.code))).toList(),
-      onChanged: (val) => setState(() => _currId = val),
+      items: _currs.map((aCurr) => DropdownMenuItem(value: aCurr.id, child: Text(aCurr.code))).toList(),
+      onChanged: _isEdit ? null : (aValue) => setState(() => _currId = aValue),
     );
   }
 }

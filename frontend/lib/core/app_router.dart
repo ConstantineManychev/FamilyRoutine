@@ -1,121 +1,68 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
 import '../ui/auth/auth_screen.dart';
-import '../ui/home/main_screen.dart';
-import '../ui/home/dashboard_screen.dart';
-import '../ui/home/fam_groups_screen.dart';
-import '../ui/home/fam_detail_screen.dart';
-import '../ui/wallets/wallets_screen.dart';
-import '../ui/wallets/wallet_detail_screen.dart';
+import '../ui/auth/splash_screen.dart';
 import '../ui/dicts/cities_dict_screen.dart';
-import '../ui/dicts/streets_dict_screen.dart';
-import '../ui/places/places_screen.dart'; 
-import '../ui/places/place_detail_screen.dart';
-import '../ui/dicts/exercises_screen.dart';
 import '../ui/dicts/exercise_detail_screen.dart';
+import '../ui/dicts/exercises_screen.dart';
+import '../ui/dicts/streets_dict_screen.dart';
+import '../ui/home/dashboard_screen.dart';
+import '../ui/home/fam_detail_screen.dart';
+import '../ui/home/fam_groups_screen.dart';
+import '../ui/home/main_screen.dart';
+import '../ui/places/place_detail_screen.dart';
+import '../ui/places/places_screen.dart';
+import '../ui/wallets/wallet_detail_screen.dart';
+import '../ui/wallets/wallets_screen.dart';
+import 'route_guard.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final isAuth = ref.watch(authStateProvider);
+final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
+{
+  final authState = ValueNotifier<AuthState>(aRef.read(authProv));
+  aRef.listen<AuthState>(authProv, (_, aNext) => authState.value = aNext);
 
-  return GoRouter(
-    initialLocation: '/app',
-    redirect: (context, state) {
-      final loggingIn = state.matchedLocation == '/auth';
-
-      if (!isAuth && !loggingIn) return '/auth';
-      if (isAuth && loggingIn) return '/app';
-      
-      return null;
-    },
+  final router = GoRouter(
+    initialLocation: homePath,
+    refreshListenable: authState,
+    redirect: (_, aState) => resolveRedirect(authState.value, aState.uri),
     routes: [
-      GoRoute(
-        path: '/auth',
-        builder: (context, state) => const AuthScreen(),
-      ),
+      GoRoute(path: splashPath, builder: (_, __) => const SplashScreen()),
+      GoRoute(path: authPath, builder: (_, __) => const AuthScreen()),
       ShellRoute(
-        builder: (context, state, child) => MainScreen(child: child),
+        builder: (_, __, aChild) => MainScreen(child: aChild),
         routes: [
           GoRoute(
-            path: '/app',
-            builder: (context, state) => const DashboardScreen(),
+            path: homePath,
+            builder: (_, __) => const DashboardScreen(),
             routes: [
-              GoRoute(
-                path: 'families',
-                builder: (context, state) => const FamGroupsScreen(),
-              ),
-              GoRoute(
-                path: 'families/new',
-                builder: (context, state) => FamDetailScreen(
-                  onSaved: () => context.go('/app/families'),
-                ),
-              ),
+              GoRoute(path: 'families', builder: (_, __) => const FamGroupsScreen()),
+              GoRoute(path: 'families/new', builder: (_, __) => const FamDetailScreen()),
               GoRoute(
                 path: 'families/:id',
-                builder: (context, state) => FamDetailScreen(
-                  famId: state.pathParameters['id'],
-                  onSaved: () => context.go('/app/families'),
-                ),
+                builder: (_, aState) => FamDetailScreen(famId: aState.pathParameters['id']),
               ),
-              GoRoute(
-                path: 'wallets',
-                builder: (context, state) => const WalletsScreen(),
-              ),
-              GoRoute(
-                path: 'wallets/new',
-                builder: (context, state) => WalletDetailScreen(
-                  onSaved: () => context.go('/app/wallets'),
-                ),
-              ),
+              GoRoute(path: 'wallets', builder: (_, __) => const WalletsScreen()),
+              GoRoute(path: 'wallets/new', builder: (_, __) => const WalletDetailScreen()),
               GoRoute(
                 path: 'wallets/:id',
-                builder: (context, state) => WalletDetailScreen(
-                  walletId: state.pathParameters['id'],
-                  onSaved: () => context.go('/app/wallets'),
-                ),
+                builder: (_, aState) => WalletDetailScreen(walletId: aState.pathParameters['id']),
               ),
-              GoRoute(
-                path: 'cities',
-                builder: (context, state) => const CitiesDictScreen(),
-              ),
-              GoRoute(
-                path: 'streets',
-                builder: (context, state) => const StreetsDictScreen(),
-              ),
-              GoRoute(
-                path: 'places',
-                builder: (context, state) => const PlacesScreen(),
-              ),
-              GoRoute(
-                path: 'places/new',
-                builder: (context, state) => PlaceDetailScreen(
-                  onSaved: () => context.go('/app/places'),
-                ),
-              ),
+              GoRoute(path: 'cities', builder: (_, __) => const CitiesDictScreen()),
+              GoRoute(path: 'streets', builder: (_, __) => const StreetsDictScreen()),
+              GoRoute(path: 'places', builder: (_, __) => const PlacesScreen()),
+              GoRoute(path: 'places/new', builder: (_, __) => const PlaceDetailScreen()),
               GoRoute(
                 path: 'places/:id',
-                builder: (context, state) => PlaceDetailScreen(
-                  placeId: state.pathParameters['id'],
-                  onSaved: () => context.go('/app/places'),
-                ),
+                builder: (_, aState) => PlaceDetailScreen(placeId: aState.pathParameters['id']),
               ),
-              GoRoute(
-                path: 'exercises',
-                builder: (context, state) => const ExercisesScreen(),
-              ),
-              GoRoute(
-                path: 'exercises/new',
-                builder: (context, state) => ExerciseDetailScreen(
-                  onSaved: () => context.go('/app/exercises'),
-                ),
-              ),
+              GoRoute(path: 'exercises', builder: (_, __) => const ExercisesScreen()),
+              GoRoute(path: 'exercises/new', builder: (_, __) => const ExerciseDetailScreen()),
               GoRoute(
                 path: 'exercises/:id',
-                builder: (context, state) => ExerciseDetailScreen(
-                  exId: state.pathParameters['id'],
-                  onSaved: () => context.go('/app/exercises'),
-                ),
+                builder: (_, aState) => ExerciseDetailScreen(exId: aState.pathParameters['id']),
               ),
             ],
           ),
@@ -123,4 +70,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  aRef.onDispose(()
+  {
+    router.dispose();
+    authState.dispose();
+  });
+
+  return router;
 });

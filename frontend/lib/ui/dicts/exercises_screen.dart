@@ -1,74 +1,77 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/feedback.dart';
 
-class ExercisesScreen extends ConsumerStatefulWidget {
+final AutoDisposeFutureProvider<List<DictExDto>> exercisesProv = FutureProvider.autoDispose<List<DictExDto>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getExercises();
+});
+
+class ExercisesScreen extends ConsumerWidget
+{
   const ExercisesScreen({super.key});
 
   @override
-  ConsumerState<ExercisesScreen> createState() => _ExercisesScreenState();
-}
+  Widget build(BuildContext aContext, WidgetRef aRef)
+  {
+    aContext.locale;
+    final exercisesAsync = aRef.watch(exercisesProv);
 
-class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
-  List<DictExDto> _exs = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      final res = await ref.read(apiProv).getExercises();
-      if (mounted) setState(() => _exs = res);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('exercises.title'.tr()),
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.plus),
-            onPressed: () => context.go('/app/exercises/new'),
+    return Padding(
+      padding: screenPadding(aContext),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenHeader(
+            title: 'exercises.title'.tr(),
+            actions: [
+              ElevatedButton.icon(
+                onPressed: () => aContext.go('/app/exercises/new'),
+                icon: const Icon(LucideIcons.plus, size: 18),
+                label: Text('exercises.add'.tr()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: exercisesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(exercisesProv)),
+              data: (aExercises) => aExercises.isEmpty
+                  ? Center(child: Text('common.no_data'.tr()))
+                  : ListView.builder(
+                      itemCount: aExercises.length,
+                      itemBuilder: (_, aIndex)
+                      {
+                        final ex = aExercises[aIndex];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: Icon(
+                              ex.isCustom ? LucideIcons.user : LucideIcons.activity,
+                              color: Colors.blue,
+                            ),
+                            title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('${'exercises.types.${ex.exType}'.tr()} · MET ${ex.metVal}'),
+                            trailing: const Icon(LucideIcons.chevronRight),
+                            onTap: () => aContext.go('/app/exercises/${ex.id}'),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _exs.isEmpty
-              ? Center(child: Text('common.no_data'.tr()))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _exs.length,
-                  itemBuilder: (context, index) {
-                    final ex = _exs[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: const Icon(LucideIcons.activity, color: Colors.blue),
-                        title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${'exercises.types.${ex.type}'.tr()} | MET: ${ex.metVal}'),
-                        trailing: const Icon(LucideIcons.chevronRight),
-                        onTap: () => context.go('/app/exercises/${ex.id}'),
-                      ),
-                    );
-                  },
-                ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.go('/app/exercises/new'),
-        child: const Icon(LucideIcons.plus),
       ),
     );
   }

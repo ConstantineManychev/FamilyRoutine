@@ -1,12 +1,12 @@
 {
-    "name": "family_routine",
-    "short_name": "family_routine",
+    "name": "Family Routine",
+    "short_name": "Family Routine",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F9FAFB",
+    "theme_color": "#2563EB",
+    "description": "Family Routine",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
