@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COALESCE(s.created_by = $2, FALSE) AS \"is_owner!\",\n            EXISTS (\n                SELECT 1 FROM place_addrs pa JOIN places p ON p.id = pa.place_id\n                WHERE pa.street_id = s.id AND p.owner_id IS DISTINCT FROM $2\n            ) AS \"is_used_by_others!\"\n        FROM streets s\n        WHERE s.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_owner!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_used_by_others!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "41e35ba8538fc43d90ab7f7d6cb27a4954ff5a0928b20404db22f05b77962e0d"
+}

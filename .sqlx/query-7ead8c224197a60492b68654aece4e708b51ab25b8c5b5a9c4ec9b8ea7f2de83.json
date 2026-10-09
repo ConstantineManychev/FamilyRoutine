@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM family_invites WHERE id = $1 AND family_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ead8c224197a60492b68654aece4e708b51ab25b8c5b5a9c4ec9b8ea7f2de83"
+}

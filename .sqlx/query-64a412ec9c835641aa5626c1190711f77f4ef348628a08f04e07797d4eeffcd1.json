@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM family_invites\n        WHERE code_hash = $1 AND expires_ts > NOW()\n        RETURNING family_id, role AS \"role: MemberRole\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "mem_role_t",
+            "kind": {
+              "Enum": [
+                "admin",
+                "standard"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "64a412ec9c835641aa5626c1190711f77f4ef348628a08f04e07797d4eeffcd1"
+}

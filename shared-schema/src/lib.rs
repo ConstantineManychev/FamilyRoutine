@@ -1,131 +1,210 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../bindings/FamilyResponse.ts")]
-pub struct FamilyResponse {
-    pub id: Uuid,
-    pub name: String,
-    pub country: Option<String>,
-    pub region: Option<String>,
-    pub city: Option<String>,
-    pub street: Option<String>,
-    pub building: Option<String>,
-    pub apartment: Option<String>,
-    pub created_at: DateTime<Utc>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "mem_role_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum MemberRole
+{
+    Admin,
+    Standard,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../bindings/UserResponse.ts")]
-pub struct UserResponse {
-    pub id: Uuid,
-    pub username: String,
-    pub email: String,
-    pub first_name: String,
-    pub last_name: String,
-    pub birth_date: NaiveDate,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../bindings/CreateFamMemDto.ts")]
-pub struct CreateFamMemDto {
-    pub email: String,
-    pub role: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../bindings/CreateFamilyRequest.ts")]
-pub struct CreateFamilyRequest {
-    pub name: String,
-    pub country: Option<String>,
-    pub region: Option<String>,
-    pub city: Option<String>,
-    pub street: Option<String>,
-    pub building: Option<String>,
-    pub apartment: Option<String>,
-    pub members: Vec<CreateFamMemDto>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateFamNameDto {
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateFamMemRoleDto {
-    pub role: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/shared/src/types/CreateUserRequest.ts")]
-pub struct CreateUserRequest {
-    pub first_name: String,
-    pub last_name: String,
-    pub email: String,
-    pub password: String,
-    pub birth_date: NaiveDate,
-}
-
-#[derive(Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/shared/src/types/LoginRequest.ts")]
-pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "acc_type_t", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "../bindings/AccountType.ts")]
-pub enum AccountType {
+pub enum AccountType
+{
     Cash,
     Card,
     BankAcc,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "bank_type_t", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "../bindings/BankType.ts")]
-pub enum BankType {
+pub enum BankType
+{
     Monobank,
     Aib,
     Other,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, TS)]
-#[sqlx(type_name = "tx_type_t", rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "ex_type_t", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "../bindings/TxType.ts")]
-pub enum TxType {
-    Income,
-    Expense,
-    Transfer,
+pub enum ExType
+{
+    Cardio,
+    Strength,
+    Flexibility,
+    Mixed,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/CurrencyDto.ts")]
-pub struct CurrencyDto {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "weight_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum WeightType
+{
+    External,
+    Hybrid,
+    Bodyweight,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "musc_grp_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum MuscGrpType
+{
+    Chest,
+    Back,
+    Legs,
+    Shoulders,
+    Arms,
+    Core,
+    Cardio,
+    FullBody,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegisterRequest
+{
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+    pub password: String,
+    pub birth_date: NaiveDate,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoginRequest
+{
+    pub email: String,
+    pub password: String,
+    #[serde(default)]
+    pub is_cookie_mode: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserDto
+{
+    pub id: Uuid,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LoginResponse
+{
+    pub user: UserDto,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DictMetaDto
+{
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FamListItemDto
+{
+    pub id: Uuid,
+    pub name: String,
+    pub role: MemberRole,
+    pub member_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FamMemberDto
+{
+    pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: MemberRole,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FamDetailDto
+{
+    pub id: Uuid,
+    pub name: String,
+    pub my_role: MemberRole,
+    pub members: Vec<FamMemberDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateFamilyRequest
+{
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RenameFamilyRequest
+{
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateMemberRoleRequest
+{
+    pub role: MemberRole,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateInviteRequest
+{
+    pub role: MemberRole,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CreatedInviteDto
+{
+    pub id: Uuid,
+    pub code: String,
+    pub role: MemberRole,
+    pub label: Option<String>,
+    pub expires_ts: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FamInviteDto
+{
+    pub id: Uuid,
+    pub role: MemberRole,
+    pub label: Option<String>,
+    pub created_ts: DateTime<Utc>,
+    pub expires_ts: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcceptInviteRequest
+{
+    pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AcceptInviteResponse
+{
+    pub family_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CurrencyDto
+{
     pub id: Uuid,
     pub code: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/CurrencyRateDto.ts")]
-pub struct CurrencyRateDto {
-    pub id: Uuid,
-    pub base_curr_id: Uuid,
-    pub target_curr_id: Uuid,
-    pub rate: f64,
-    pub date: NaiveDate,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/AccountDto.ts")]
-pub struct AccountDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct AccountDto
+{
     pub id: Uuid,
     pub user_id: Option<Uuid>,
     pub family_id: Option<Uuid>,
@@ -134,65 +213,81 @@ pub struct AccountDto {
     pub bank_type: Option<BankType>,
     pub name: String,
     pub mask: Option<String>,
-    #[ts(type = "Record<string, any> | null")]
-    pub sync_credentials: Option<serde_json::Value>,
+    pub is_sync_token_set: bool,
+    pub is_active: bool,
+    pub is_editable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateWalletRequest
+{
+    pub name: String,
+    pub curr_id: Uuid,
+    pub account_type: AccountType,
+    #[serde(default)]
+    pub bank_type: Option<BankType>,
+    #[serde(default)]
+    pub mask: Option<String>,
+    #[serde(default)]
+    pub sync_token: Option<String>,
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateWalletRequest
+{
+    pub name: String,
+    #[serde(default)]
+    pub mask: Option<String>,
+    #[serde(default)]
+    pub sync_token: Option<String>,
+    #[serde(default)]
+    pub is_sync_token_removed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArchiveWalletRequest
+{
     pub is_active: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/TransactionDto.ts")]
-pub struct TransactionDto {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub account_id: Uuid,
-    pub curr_id: Uuid,
-    pub amount: f64,
-    pub tx_type: TxType,
-    pub date: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FamMemberDto {
-    pub id: Uuid,
-    pub first_name: String,
-    pub last_name: String,
-    pub role: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FamDetailDto {
-    pub id: Uuid,
-    pub name: String,
-    pub members: Vec<FamMemberDto>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/CountryDto.ts")]
-pub struct CountryDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct CountryDto
+{
     pub id: Uuid,
     pub code: String,
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/CityDto.ts")]
-pub struct CityDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct CityDto
+{
     pub id: Uuid,
     pub country_id: Uuid,
     pub name: String,
+    pub is_editable: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/StreetDto.ts")]
-pub struct StreetDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct StreetDto
+{
     pub id: Uuid,
     pub city_id: Uuid,
     pub name: String,
+    pub is_editable: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/PlaceAddrDto.ts")]
-pub struct PlaceAddrDto {
+#[derive(Debug, Clone, Deserialize)]
+pub struct GeoNameRequest
+{
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaceAddrDto
+{
+    #[serde(default)]
     pub id: Option<Uuid>,
     pub is_main: bool,
     pub country_id: Uuid,
@@ -206,82 +301,74 @@ pub struct PlaceAddrDto {
     pub merchant_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/PlaceDto.ts")]
-pub struct PlaceDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct PlaceDto
+{
     pub id: Uuid,
     pub name: String,
     pub addrs: Vec<PlaceAddrDto>,
 }
 
-#[derive(Deserialize)]
-pub struct CreateCityReq {
+#[derive(Debug, Clone, Deserialize)]
+pub struct SavePlaceRequest
+{
     pub name: String,
+    #[serde(default)]
+    pub addrs: Vec<PlaceAddrDto>,
 }
 
-#[derive(Deserialize)]
-pub struct CreateStreetReq {
-    pub name: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExMuscGrpDto
+{
+    pub grp: MuscGrpType,
+    pub pct: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/EnergyEventType.ts")]
-pub enum EnergyEventType {
+#[derive(Debug, Clone, Serialize)]
+pub struct DictExDto
+{
+    pub id: Uuid,
+    pub name: String,
+    pub ex_type: ExType,
+    pub met_val: f64,
+    pub weight_type: WeightType,
+    pub bw_pct: f64,
+    pub is_custom: bool,
+    pub musc_grps: Vec<ExMuscGrpDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveExRequest
+{
+    pub name: String,
+    pub ex_type: ExType,
+    pub met_val: f64,
+    pub weight_type: WeightType,
+    #[serde(default)]
+    pub bw_pct: f64,
+    pub musc_grps: Vec<ExMuscGrpDto>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnergyEventType
+{
     BmrBase,
     Meal,
     Workout,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/EnergyNodeDto.ts")]
-pub struct EnergyNodeDto {
+#[derive(Debug, Clone, Serialize)]
+pub struct EnergyNodeDto
+{
     pub ts: DateTime<Utc>,
     pub event_type: EnergyEventType,
     pub val: f64,
     pub cum_val: f64,
 }
 
-#[derive(Deserialize)]
-pub struct EnergyGraphReq {
+#[derive(Debug, Clone, Deserialize)]
+pub struct EnergyGraphQuery
+{
     pub target_date: NaiveDate,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/MuscGrpType.ts")]
-#[serde(rename_all = "snake_case")]
-pub enum MuscGrpType {
-    Chest,
-    Back,
-    Legs,
-    Shoulders,
-    Arms,
-    Core,
-    Cardio,
-    FullBody,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/ExMuscGrpDto.ts")]
-pub struct ExMuscGrpDto {
-    pub grp: MuscGrpType,
-    pub pct: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, TS)]
-#[ts(export, export_to = "../bindings/DictExDto.ts")]
-pub struct DictExDto {
-    pub id: Uuid,
-    pub name: String,
-    pub type_: String,
-    pub met_val: f64,
-    pub is_custom: bool,
-    pub musc_grps: Vec<ExMuscGrpDto>,
-}
-
-#[derive(Deserialize)]
-pub struct MutateExDto {
-    pub name: String,
-    pub type_: String,
-    pub met_val: f64,
-    pub musc_grps: Vec<ExMuscGrpDto>,
 }

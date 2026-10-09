@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT ex_id AS \"ex_id!\", grp AS \"grp: MuscGrpType\", pct::float8 AS \"pct!\"\n        FROM ex_musc_grps\n        WHERE ex_id = ANY($1)\n        ORDER BY pct DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ex_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "grp: MuscGrpType",
+        "type_info": {
+          "Custom": {
+            "name": "musc_grp_t",
+            "kind": {
+              "Enum": [
+                "chest",
+                "back",
+                "legs",
+                "shoulders",
+                "arms",
+                "core",
+                "cardio",
+                "full_body"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "pct!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "d1b5799a1c968c8f463ef74a3cc471267e18a91ce8204ec82dc968d9c1360d86"
+}

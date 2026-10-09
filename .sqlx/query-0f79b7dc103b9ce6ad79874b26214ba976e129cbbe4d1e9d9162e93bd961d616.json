@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ex_musc_grps (ex_id, grp, pct) VALUES ($1, $2, $3::float8::numeric)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "musc_grp_t",
+            "kind": {
+              "Enum": [
+                "chest",
+                "back",
+                "legs",
+                "shoulders",
+                "arms",
+                "core",
+                "cardio",
+                "full_body"
+              ]
+            }
+          }
+        },
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0f79b7dc103b9ce6ad79874b26214ba976e129cbbe4d1e9d9162e93bd961d616"
+}

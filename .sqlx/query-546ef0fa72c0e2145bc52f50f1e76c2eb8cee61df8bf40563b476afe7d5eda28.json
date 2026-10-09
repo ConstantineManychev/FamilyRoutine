@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM streets s JOIN cities c ON c.id = s.city_id\n            WHERE s.id = $3 AND c.id = $2 AND c.country_id = $1\n        ) AS \"is_consistent!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_consistent!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "546ef0fa72c0e2145bc52f50f1e76c2eb8cee61df8bf40563b476afe7d5eda28"
+}

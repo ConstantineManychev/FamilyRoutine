@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            f.id,\n            f.name,\n            fm.role AS \"role: MemberRole\",\n            (SELECT COUNT(*) FROM family_mems m WHERE m.family_id = f.id) AS \"member_count!\"\n        FROM families f\n        JOIN family_mems fm ON fm.family_id = f.id\n        WHERE fm.user_id = $1\n        ORDER BY f.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "mem_role_t",
+            "kind": {
+              "Enum": [
+                "admin",
+                "standard"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "member_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "0a196987bd80b4ea9db27437226e2f73fb153c2e1d1676a50255a09b21047ea2"
+}

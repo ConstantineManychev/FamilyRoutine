@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT u.id, u.first_name, u.last_name, fm.role AS \"role: MemberRole\"\n        FROM family_mems fm\n        JOIN users u ON u.id = fm.user_id\n        WHERE fm.family_id = $1\n        ORDER BY fm.joined_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "first_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "mem_role_t",
+            "kind": {
+              "Enum": [
+                "admin",
+                "standard"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7b0563604c70fc1e9c8fbad5802d785a197349d836d1a49829440daf5372361d"
+}

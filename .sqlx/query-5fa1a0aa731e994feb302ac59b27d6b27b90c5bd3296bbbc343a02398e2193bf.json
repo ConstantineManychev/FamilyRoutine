@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE dict_exs\n        SET name = $2, type = $3, met_val = $4::float8::numeric, weight_type = $5, bw_pct = $6::float8::numeric\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "ex_type_t",
+            "kind": {
+              "Enum": [
+                "cardio",
+                "strength",
+                "flexibility",
+                "mixed"
+              ]
+            }
+          }
+        },
+        "Float8",
+        {
+          "Custom": {
+            "name": "weight_t",
+            "kind": {
+              "Enum": [
+                "external",
+                "hybrid",
+                "bodyweight"
+              ]
+            }
+          }
+        },
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5fa1a0aa731e994feb302ac59b27d6b27b90c5bd3296bbbc343a02398e2193bf"
+}

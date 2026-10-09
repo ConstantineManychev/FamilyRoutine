@@ -1,88 +1,176 @@
-use crate::api::auth_handlers::{handle_user_login, handle_user_logout, handle_user_registration};
-use crate::api::fam_handlers::{
-    add_fam_member, create_fam, delete_fam, get_fam_budget, get_fam_details, get_fam_timeline,
-    leave_fam, remove_fam_member, update_fam_member, update_fam_name,
-};
-use crate::api::geo_handlers::{
-    create_city, create_street, delete_city, delete_street, get_cities, get_countries, get_streets,
-    update_city, update_street,
-};
-use crate::api::place_handlers::{
-    create_place, delete_place, get_place_detail, get_places, update_place,
-};
-use crate::api::user_handlers::{get_avail_dicts, get_curr_user, get_energy_timeline, get_user_fams};
-use crate::api::wallet_handlers::{
-    archive_wallet, create_wallet, delete_wallet, get_currencies, get_wallet_detail, get_wallets,
-    update_wallet,
-};
-use axum::{
-    http::{
-        header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
-        HeaderName, HeaderValue, Method,
-    },
-    routing::{delete, get, post, put},
-    Router,
-};
-use sqlx::PgPool;
+use std::time::Duration;
+
+use axum::extract::DefaultBodyLimit;
+use axum::http::header::{ACCEPT, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE};
+use axum::http::{HeaderName, HeaderValue, Method};
+use axum::routing::{get, post, put};
+use axum::Router;
 use tower_http::cors::CorsLayer;
-use crate::api::ex_handlers::{create_ex, delete_ex, get_ex_detail, get_exs, update_ex};
+use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::trace::TraceLayer;
 
+use crate::api::{
+    auth_handlers, ex_handlers, fam_handlers, geo_handlers, place_handlers, user_handlers, wallet_handlers,
+};
+use crate::domain::errors::ApiError;
+use crate::security::session::CSRF_HEADER;
+use crate::state::AppState;
 
-fn build_cors() -> CorsLayer {
-    let origin = std::env::var("FRONTEND_URL")
-        .unwrap_or_else(|_| "http://localhost:5173".into())
-        .parse::<HeaderValue>()
-        .expect("INVALID_ORIGIN");
+const MAX_BODY_BYTES: usize = 64 * 1024;
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
-    CorsLayer::new()
-        .allow_origin(origin)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
-        .expose_headers([HeaderName::from_static("x-auth-token")])
-        .allow_credentials(true)
+pub fn build_router(a_state: AppState) -> Router
+{
+    let api = Router::new()
+        .route("/auth/register", post(auth_handlers::register))
+        .route("/auth/login", post(auth_handlers::login))
+        .route("/auth/logout", post(auth_handlers::logout))
+        .route("/auth/logout-all", post(auth_handlers::logout_all))
+        .route("/user/me", get(user_handlers::get_me))
+        .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
+        .route("/dicts", get(user_handlers::get_avail_dicts))
+        .route(
+            "/dicts/exercises",
+            get(ex_handlers::list_exercises).post(ex_handlers::create_exercise),
+        )
+        .route(
+            "/dicts/exercises/:id",
+            get(ex_handlers::get_exercise)
+                .put(ex_handlers::update_exercise)
+                .delete(ex_handlers::delete_exercise),
+        )
+        .route(
+            "/families",
+            get(fam_handlers::list_families).post(fam_handlers::create_family),
+        )
+        .route(
+            "/families/:id",
+            get(fam_handlers::get_family)
+                .put(fam_handlers::rename_family)
+                .delete(fam_handlers::delete_family),
+        )
+        .route("/families/:id/leave", post(fam_handlers::leave_family))
+        .route(
+            "/families/:id/members/:user_id",
+            put(fam_handlers::update_member_role).delete(fam_handlers::remove_member),
+        )
+        .route(
+            "/families/:id/invites",
+            get(fam_handlers::list_family_invites).post(fam_handlers::create_invite),
+        )
+        .route(
+            "/families/:id/invites/:invite_id",
+            axum::routing::delete(fam_handlers::revoke_family_invite),
+        )
+        .route("/invites/accept", post(fam_handlers::accept_invite))
+        .route("/currencies", get(wallet_handlers::list_currencies))
+        .route(
+            "/wallets",
+            get(wallet_handlers::list_wallets).post(wallet_handlers::create_wallet),
+        )
+        .route(
+            "/wallets/:id",
+            get(wallet_handlers::get_wallet)
+                .put(wallet_handlers::update_wallet)
+                .delete(wallet_handlers::delete_wallet),
+        )
+        .route("/wallets/:id/archive", put(wallet_handlers::archive_wallet))
+        .route("/geo/countries", get(geo_handlers::list_countries))
+        .route(
+            "/geo/countries/:id/cities",
+            get(geo_handlers::list_cities).post(geo_handlers::create_city),
+        )
+        .route(
+            "/geo/cities/:id",
+            put(geo_handlers::update_city).delete(geo_handlers::delete_city),
+        )
+        .route(
+            "/geo/cities/:id/streets",
+            get(geo_handlers::list_streets).post(geo_handlers::create_street),
+        )
+        .route(
+            "/geo/streets/:id",
+            put(geo_handlers::update_street).delete(geo_handlers::delete_street),
+        )
+        .route(
+            "/places",
+            get(place_handlers::list_places).post(place_handlers::create_place),
+        )
+        .route(
+            "/places/:id",
+            get(place_handlers::get_place)
+                .put(place_handlers::update_place)
+                .delete(place_handlers::delete_place),
+        )
+        .fallback(|| async { ApiError::NotFound });
+
+    let router = Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .nest("/api", api)
+        .fallback(|| async { ApiError::NotFound })
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        .layer(TimeoutLayer::new(REQUEST_TIMEOUT))
+        .layer(SetResponseHeaderLayer::overriding(
+            CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-frame-options"),
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("no-referrer"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
+        ));
+
+    let router = if a_state.cfg.is_cookie_secure
+    {
+        router.layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("strict-transport-security"),
+            HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+        ))
+    }
+    else
+    {
+        router
+    };
+
+    let router = match build_cors(&a_state)
+    {
+        Some(cors) => router.layer(cors),
+        None => router,
+    };
+
+    router.layer(TraceLayer::new_for_http()).with_state(a_state)
 }
 
-async fn handle_health_check() -> &'static str {
-    "API_IS_RUNNING"
-}
+fn build_cors(a_state: &AppState) -> Option<CorsLayer>
+{
+    if a_state.cfg.allowed_origins.is_empty()
+    {
+        return None;
+    }
 
-pub fn configure_application_router(db: PgPool) -> Router {
-    Router::new()
-        .route("/", get(handle_health_check))
-        .route("/api/auth/register", post(handle_user_registration))
-        .route("/api/auth/login", post(handle_user_login))
-        .route("/api/auth/logout", post(handle_user_logout))
-        .route("/api/user/me", get(get_curr_user))
-        .route("/api/users/:id/energy-timeline", get(get_energy_timeline))
-        .route("/api/dicts", get(get_avail_dicts))
-        .route("/api/dicts/exercises", get(get_exs).post(create_ex))
-        .route("/api/dicts/exercises/:id", get(get_ex_detail).put(update_ex).delete(delete_ex))
-        .route("/api/families", get(get_user_fams).post(create_fam))
-        .route("/api/families/:id", get(get_fam_details).delete(delete_fam).put(update_fam_name))
-        .route("/api/families/:id/leave", delete(leave_fam))
-        .route("/api/families/:id/members", post(add_fam_member))
-        .route("/api/families/:id/members/:user_id", put(update_fam_member).delete(remove_fam_member))
-        .route("/api/families/:id/budget", get(get_fam_budget))
-        .route("/api/families/:id/timeline", get(get_fam_timeline))
-        .route("/api/currencies", get(get_currencies))
-        .route("/api/wallets", get(get_wallets).post(create_wallet))
-        .route("/api/wallets/:id", get(get_wallet_detail).put(update_wallet).delete(delete_wallet))
-        .route("/api/wallets/:id/archive", put(archive_wallet))
-        .route("/api/geo/countries", get(get_countries))
-        .route("/api/geo/countries/:id/cities", get(get_cities).post(create_city))
-        .route("/api/geo/cities/:id", put(update_city).delete(delete_city))
-        .route("/api/geo/cities/:id/streets", get(get_streets).post(create_street))
-        .route("/api/geo/streets/:id", put(update_street).delete(delete_street))
-        .route("/api/places", get(get_places).post(create_place))
-        .route("/api/exercises", get(get_exs).post(create_ex))
-        .route("/api/exercises/:id", get(get_ex_detail).put(update_ex).delete(delete_ex))
-        .route("/api/places/:id", get(get_place_detail).put(update_place).delete(delete_place))
-        .layer(build_cors())
-        .with_state(db)
+    Some(
+        CorsLayer::new()
+            .allow_origin(a_state.cfg.allowed_origins.clone())
+            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+            .allow_headers([
+                AUTHORIZATION,
+                ACCEPT,
+                CONTENT_TYPE,
+                HeaderName::from_static(CSRF_HEADER),
+            ])
+            .allow_credentials(true)
+            .max_age(Duration::from_secs(600)),
+    )
 }
