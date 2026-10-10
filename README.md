@@ -99,6 +99,7 @@ flutter analyze
 flutter test
 ```
 
+- Версия Flutter — 3.47.7, как `FLUTTER_VERSION` в `frontend/Dockerfile`. От неё зависит `pubspec.lock`: Flutter фиксирует версии части пакетов (например, `intl`), поэтому на другой версии `flutter pub get` переписывает lock-файл. При обновлении Flutter закоммитьте новый `pubspec.lock` и поменяйте `FLUTTER_VERSION`.
 - `web_dev_config.yaml` поднимает dev-сервер на порту 5173 и проксирует `/api/` на бэкенд `localhost:3000`. Клиент и API работают с одного origin, поэтому cookie-сессия работает без CORS и без `ALLOWED_ORIGINS`. В Codespaces достаточно открыть только порт 5173.
 - `flutter run` — отладочный режим: приложение собирается из сотен отдельных модулей (DDC), и через туннель Codespaces первая загрузка может занимать минуты. Скорость так оценивать нельзя — для этого нужна release-сборка.
 - В web-сборке сессия хранится в HttpOnly-cookie (недоступна JavaScript), на мобильных и desktop — токен в защищённом хранилище ОС (Keychain / Keystore).
