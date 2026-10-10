@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE receipts\n                SET receipt_ts = $2, merchant_id = $3, merchant_name = $4, place_id = $5, curr_id = $6,\n                    cash_account_id = $7, note = $8\n                WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5c92aaa8819823f071da0d22102307f6cfee26f0db26717ff282b49a2229baa2"
+}

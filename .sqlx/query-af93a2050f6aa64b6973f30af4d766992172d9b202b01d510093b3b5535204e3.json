@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO bank_conns (id, owner_id, provider, aspsp_name, secret, status, last_call_ts, next_sync_ts)\n        VALUES ($1, $2, 'monobank', 'Monobank', $3, 'active', NOW(), NOW())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "af93a2050f6aa64b6973f30af4d766992172d9b202b01d510093b3b5535204e3"
+}

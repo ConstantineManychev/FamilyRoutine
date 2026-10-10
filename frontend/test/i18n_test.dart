@@ -9,7 +9,16 @@ const Map<String, List<String>> dynamicKeys = {
   'errors': [
     'VALIDATION', 'UNAUTHENTICATED', 'INVALID_CREDENTIALS', 'FORBIDDEN', 'NOT_FOUND', 'ALREADY_EXISTS',
     'EMAIL_TAKEN', 'IN_USE', 'OWNER_PROTECTED', 'OWNER_MUST_TRANSFER', 'TOO_MANY_INVITES', 'TOO_MANY_REQUESTS',
-    'INTERNAL', 'NETWORK', 'UNKNOWN',
+    'INTERNAL', 'NETWORK', 'UNKNOWN', 'BANK_NOT_CONFIGURED', 'ALREADY_CONNECTED', 'BANK_UNAVAILABLE', 'BANK_LINKED',
+  ],
+  'bank': [
+    'provider_monobank', 'provider_enable_banking', 'status_pending', 'status_active', 'status_error', 'status_expired',
+    'error_UNAUTHORIZED', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',
+  ],
+  'finance': ['period_day', 'period_week', 'period_month', 'period_quarter'],
+  'finance.cat': [
+    'groceries', 'restaurants', 'transport', 'fuel', 'shopping', 'health', 'utilities', 'entertainment', 'travel',
+    'education', 'home', 'cash', 'transfer', 'fees', 'income', 'other', 'none',
   ],
   'family.roles': ['owner', 'admin', 'standard'],
   'wallet': ['type_cash', 'type_card', 'type_bank_acc', 'bank_monobank', 'bank_aib', 'bank_other'],

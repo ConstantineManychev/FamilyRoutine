@@ -1,0 +1,139 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            a.id,\n            a.user_id,\n            a.family_id,\n            a.curr_id,\n            c.code AS curr_code,\n            a.account_type AS \"account_type: AccountType\",\n            a.bank_type AS \"bank_type: BankType\",\n            a.name,\n            a.mask,\n            a.conn_id,\n            bc.provider AS \"provider?: BankProvider\",\n            a.balance,\n            a.balance_ts,\n            a.is_active,\n            v.is_editor AS \"is_editable!\"\n        FROM accounts a\n        JOIN account_viewers v ON v.account_id = a.id AND v.viewer_id = $2\n        JOIN currencies c ON c.id = a.curr_id\n        LEFT JOIN bank_conns bc ON bc.id = a.conn_id\n        WHERE a.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "curr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "account_type: AccountType",
+        "type_info": {
+          "Custom": {
+            "name": "acc_type_t",
+            "kind": {
+              "Enum": [
+                "cash",
+                "card",
+                "bank_acc"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "bank_type: BankType",
+        "type_info": {
+          "Custom": {
+            "name": "bank_type_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "aib",
+                "other"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "mask",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "conn_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "provider?: BankProvider",
+        "type_info": {
+          "Custom": {
+            "name": "bank_provider_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "enable_banking"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "balance",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "balance_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "b8e0a626457f376d65a67f2fbc680406e1e5126f351b20a2e04bc350e813d343"
+}

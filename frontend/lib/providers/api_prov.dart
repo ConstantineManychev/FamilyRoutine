@@ -48,3 +48,23 @@ final AutoDisposeFutureProvider<List<DictMetaDto>> dictsMetaProv =
   }
   return aRef.read(apiProv).getDictsMeta();
 });
+
+final AutoDisposeFutureProvider<List<BankConnDto>> bankConnsProv =
+    FutureProvider.autoDispose<List<BankConnDto>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getBankConns();
+});
+
+final AutoDisposeFutureProvider<List<ReceiptListItem>> receiptsProv =
+    FutureProvider.autoDispose<List<ReceiptListItem>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  return aRef.read(apiProv).getReceipts();
+});

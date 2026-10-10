@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO bank_conns (owner_id, provider, aspsp_name, aspsp_country, state_hash, status)\n        VALUES ($1, 'enable_banking', $2, $3, $4, 'pending')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Bpchar",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5f7edb6ad5388de3e0b4b9fb53e44770011fb8c9b2c666de1f859db54be1360c"
+}

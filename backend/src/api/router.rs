@@ -11,7 +11,8 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    auth_handlers, ex_handlers, fam_handlers, geo_handlers, place_handlers, user_handlers, wallet_handlers,
+    auth_handlers, bank_handlers, ex_handlers, fam_handlers, geo_handlers, place_handlers, receipt_handlers,
+    stats_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -66,6 +67,41 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/invites/accept", post(fam_handlers::accept_invite))
         .route("/currencies", get(wallet_handlers::list_currencies))
+        .route("/banks/connections", get(bank_handlers::list_connections))
+        .route(
+            "/banks/connections/:id",
+            axum::routing::delete(bank_handlers::delete_connection),
+        )
+        .route("/banks/connections/:id/sync", post(bank_handlers::request_sync))
+        .route("/banks/monobank", post(bank_handlers::connect_monobank))
+        .route("/banks/enable-banking/aspsps", get(bank_handlers::list_aspsps))
+        .route("/banks/enable-banking/start", post(bank_handlers::start_bank_auth))
+        .route(
+            "/banks/enable-banking/complete",
+            post(bank_handlers::complete_bank_auth),
+        )
+        .route(
+            "/transactions",
+            get(tx_handlers::list_transactions).post(tx_handlers::create_transaction),
+        )
+        .route(
+            "/transactions/:id",
+            put(tx_handlers::update_transaction).delete(tx_handlers::delete_transaction),
+        )
+        .route("/transfers", post(tx_handlers::create_transfer))
+        .route("/transfers/:id", axum::routing::delete(tx_handlers::delete_transfer))
+        .route("/merchants", get(tx_handlers::list_merchants))
+        .route(
+            "/receipts",
+            get(receipt_handlers::list_receipts).post(receipt_handlers::create_receipt),
+        )
+        .route(
+            "/receipts/:id",
+            get(receipt_handlers::get_receipt)
+                .put(receipt_handlers::update_receipt)
+                .delete(receipt_handlers::delete_receipt),
+        )
+        .route("/stats/cashflow", get(stats_handlers::cashflow))
         .route(
             "/wallets",
             get(wallet_handlers::list_wallets).post(wallet_handlers::create_wallet),

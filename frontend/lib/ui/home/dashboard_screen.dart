@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/api_prov.dart';
 import '../../providers/auth_provider.dart';
 import '../common/feedback.dart';
+import '../finance/cashflow_card.dart';
 
 class DashboardScreen extends ConsumerWidget
 {
@@ -26,7 +27,9 @@ class DashboardScreen extends ConsumerWidget
             '${'dashboard.welcome'.tr()}, ${user?.fName ?? ''}!',
             style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
+          const CashflowCard(),
+          const SizedBox(height: 24),
           Container(
             constraints: const BoxConstraints(maxWidth: 300),
             padding: const EdgeInsets.all(24),

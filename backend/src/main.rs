@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use backend::banking;
 use backend::config::AppConfig;
 use backend::infrastructure::database;
 use backend::security::session;
@@ -46,9 +47,18 @@ async fn main()
     }
 
     let bind_addr = cfg.bind_addr;
-    let state = AppState::new(db, cfg);
+    let state = match AppState::new(db, cfg)
+    {
+        Ok(state) => state,
+        Err(err) =>
+        {
+            tracing::error!("startup failed: {err}");
+            std::process::exit(1);
+        }
+    };
 
     spawn_maintenance(state.clone());
+    banking::sync::spawn(state.clone());
 
     let listener = match TcpListener::bind(bind_addr).await
     {

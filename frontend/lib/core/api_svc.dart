@@ -297,4 +297,150 @@ class ApiSvc
   }
 
   Future<void> deleteExercise(String aId) => _dio.delete('/api/dicts/exercises/$aId');
+
+  Future<List<BankConnDto>> getBankConns() async
+  {
+    final res = await _dio.get('/api/banks/connections');
+    return _list(res.data, BankConnDto.fromJson);
+  }
+
+  Future<BankConnDto> connectMonobank(String aToken) async
+  {
+    final res = await _dio.post('/api/banks/monobank', data: {'token': aToken});
+    return BankConnDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<AspspDto>> getAspsps(String aCountry) async
+  {
+    final res = await _dio.get('/api/banks/enable-banking/aspsps', queryParameters: {'country': aCountry});
+    return _list(res.data, AspspDto.fromJson);
+  }
+
+  Future<String> startBankAuth(String aAspspName, String aCountry) async
+  {
+    final res = await _dio.post('/api/banks/enable-banking/start', data: {
+      'aspsp_name': aAspspName,
+      'aspsp_country': aCountry,
+    });
+    return res.data['url'] as String;
+  }
+
+  Future<BankConnDto> completeBankAuth(String aCode, String aState) async
+  {
+    final res = await _dio.post('/api/banks/enable-banking/complete', data: {'code': aCode, 'state': aState});
+    return BankConnDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> requestBankSync(String aConnId) => _dio.post('/api/banks/connections/$aConnId/sync');
+
+  Future<void> deleteBankConn(String aConnId) => _dio.delete('/api/banks/connections/$aConnId');
+
+  Future<TxPage> getTransactions({
+    String? aAccountId,
+    DateTime? aFrom,
+    DateTime? aTo,
+    String? aCursor,
+    int aLimit = 50,
+    bool aIsUnlinked = false,
+    String? aQuery,
+  }) async
+  {
+    final res = await _dio.get('/api/transactions', queryParameters: {
+      if (aAccountId != null) 'account_id': aAccountId,
+      if (aFrom != null) 'from': aFrom.toUtc().toIso8601String(),
+      if (aTo != null) 'to': aTo.toUtc().toIso8601String(),
+      if (aCursor != null) 'cursor': aCursor,
+      'limit': aLimit,
+      if (aIsUnlinked) 'is_unlinked': true,
+      if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
+    });
+    return TxPage.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TxDto> createTransaction(String aAccountId, double aAmount, DateTime aTs, String? aNote) async
+  {
+    final res = await _dio.post('/api/transactions', data: {
+      'account_id': aAccountId,
+      'amount': moneyWire(aAmount),
+      'tx_ts': aTs.toUtc().toIso8601String(),
+      'note': aNote,
+    });
+    return TxDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TxDto> updateTransaction(String aId, String? aNote, TxCategory? aCategory) async
+  {
+    final res = await _dio.put('/api/transactions/$aId', data: {'note': aNote, 'category': aCategory?.name});
+    return TxDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteTransaction(String aId) => _dio.delete('/api/transactions/$aId');
+
+  Future<void> createTransfer({
+    required String aFromAccountId,
+    required String aToAccountId,
+    required DateTime aTs,
+    double? aAmount,
+    double? aToAmount,
+    String? aFromTxId,
+    String? aNote,
+  }) async
+  {
+    await _dio.post('/api/transfers', data: {
+      'from_account_id': aFromAccountId,
+      'to_account_id': aToAccountId,
+      'tx_ts': aTs.toUtc().toIso8601String(),
+      'amount': aAmount == null ? null : moneyWire(aAmount),
+      'to_amount': aToAmount == null ? null : moneyWire(aToAmount),
+      'from_tx_id': aFromTxId,
+      'note': aNote,
+    });
+  }
+
+  Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
+
+  Future<List<MerchantDto>> getMerchants(String aQuery) async
+  {
+    final res = await _dio.get('/api/merchants', queryParameters: {'q': aQuery});
+    return _list(res.data, MerchantDto.fromJson);
+  }
+
+  Future<List<ReceiptListItem>> getReceipts() async
+  {
+    final res = await _dio.get('/api/receipts');
+    return _list(res.data, ReceiptListItem.fromJson);
+  }
+
+  Future<ReceiptDto> getReceipt(String aId) async
+  {
+    final res = await _dio.get('/api/receipts/$aId');
+    return ReceiptDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<ReceiptDto> saveReceipt(String? aId, Map<String, dynamic> aPayload) async
+  {
+    final res = aId == null
+        ? await _dio.post('/api/receipts', data: aPayload)
+        : await _dio.put('/api/receipts/$aId', data: aPayload);
+    return ReceiptDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteReceipt(String aId) => _dio.delete('/api/receipts/$aId');
+
+  Future<List<CashflowSeries>> getCashflow({
+    required DateTime aFrom,
+    required DateTime aTo,
+    required StatsBucket aBucket,
+    String? aAccountId,
+  }) async
+  {
+    final res = await _dio.get('/api/stats/cashflow', queryParameters: {
+      'from': aFrom.toUtc().toIso8601String(),
+      'to': aTo.toUtc().toIso8601String(),
+      'bucket': aBucket.name,
+      'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+      if (aAccountId != null) 'account_id': aAccountId,
+    });
+    return _list(res.data['series'], CashflowSeries.fromJson);
+  }
 }

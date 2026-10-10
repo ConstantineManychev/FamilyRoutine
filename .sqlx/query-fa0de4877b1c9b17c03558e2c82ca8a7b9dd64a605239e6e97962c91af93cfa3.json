@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, aspsp_name FROM bank_conns\n        WHERE owner_id = $1 AND status = 'pending' AND state_hash = $2\n          AND created_ts > NOW() - make_interval(mins => $3::int)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "aspsp_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "fa0de4877b1c9b17c03558e2c82ca8a7b9dd64a605239e6e97962c91af93cfa3"
+}

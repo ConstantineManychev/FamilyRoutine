@@ -43,25 +43,65 @@ void main()
 
   group('models', ()
   {
-    test('wallet exposes only the token flag', ()
+    test('bank wallet carries connection and decimal balance', ()
     {
       final wallet = AccountDto.fromJson({
         'id': 'w1',
         'user_id': 'u1',
         'family_id': null,
         'curr_id': 'c1',
+        'curr_code': 'UAH',
         'account_type': 'card',
         'bank_type': 'monobank',
         'name': 'Mono',
         'mask': '1234',
-        'is_sync_token_set': true,
+        'conn_id': 'conn1',
+        'provider': 'monobank',
+        'balance': '1500.50',
+        'balance_ts': '2026-10-10T10:00:00Z',
         'is_active': true,
         'is_editable': true,
       });
 
-      expect(wallet.isSyncTokenSet, isTrue);
+      expect(wallet.isLinked, isTrue);
+      expect(wallet.balance, 1500.5);
       expect(wallet.isPersonal, isTrue);
-      expect(wallet.isEditable, isTrue);
+      expect(wallet.isCash, isFalse);
+    });
+
+    test('transaction parses decimals, category and links', ()
+    {
+      final tx = TxDto.fromJson({
+        'id': 't1',
+        'account_id': 'a1',
+        'account_name': 'Mono',
+        'curr_code': 'UAH',
+        'amount': '-125.50',
+        'op_amount': '-3.00',
+        'op_curr_code': 'USD',
+        'tx_ts': '2026-10-10T10:00:00Z',
+        'tx_type': 'expense',
+        'source': 'bank',
+        'description': 'Silpo',
+        'category': 'groceries',
+        'merchant_name': 'Сільпо',
+        'is_pending': false,
+        'receipt_id': 'r1',
+        'is_editable': true,
+      });
+
+      expect(tx.amount, -125.5);
+      expect(tx.opAmount, -3.0);
+      expect(tx.category, TxCategory.groceries);
+      expect(tx.title, 'Сільпо');
+      expect(tx.isOutflow, isTrue);
+      expect(tx.isTransfer, isFalse);
+    });
+
+    test('receipt item serializes money with two decimals', ()
+    {
+      const item = ReceiptItem(name: 'Хліб', qty: 2.5, unitPrice: 40, amount: 100);
+      expect(item.toJson(), {'name': 'Хліб', 'kind': 'product', 'qty': '2.500', 'unit_price': '40.00', 'amount': '100.00'});
     });
 
     test('family detail carries my role', ()

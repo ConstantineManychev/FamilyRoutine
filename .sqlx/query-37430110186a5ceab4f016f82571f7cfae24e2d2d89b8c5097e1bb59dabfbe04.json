@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT provider AS \"provider: BankProvider\", last_sync_ts\n        FROM bank_conns\n        WHERE id = $1 AND owner_id = $2 AND status = 'active'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider: BankProvider",
+        "type_info": {
+          "Custom": {
+            "name": "bank_provider_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "enable_banking"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "last_sync_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "37430110186a5ceab4f016f82571f7cfae24e2d2d89b8c5097e1bb59dabfbe04"
+}

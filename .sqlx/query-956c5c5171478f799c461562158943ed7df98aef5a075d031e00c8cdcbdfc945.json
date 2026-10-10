@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE transactions SET transfer_id = $2, tx_type = 'transfer' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "956c5c5171478f799c461562158943ed7df98aef5a075d031e00c8cdcbdfc945"
+}

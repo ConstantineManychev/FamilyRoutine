@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            a.id,\n            a.ext_acc_id AS \"ext_id!\",\n            a.curr_id,\n            c.code AS curr_code,\n            a.history_from_ts,\n            a.is_history_done,\n            (SELECT MAX(t.tx_ts) FROM transactions t WHERE t.account_id = a.id AND t.source = 'bank') AS latest_tx_ts\n        FROM accounts a\n        JOIN currencies c ON c.id = a.curr_id\n        WHERE a.conn_id = $1 AND a.is_active AND a.ext_acc_id IS NOT NULL\n        ORDER BY a.created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ext_id!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "curr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "history_from_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_history_done",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "latest_tx_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "0c48e250853dfc1a29e93647fc85bda53e8cd14ab76d3f888ad69b22b1c25788"
+}

@@ -83,6 +83,9 @@ class _SidebarState extends ConsumerState<Sidebar>
       children: [
         _buildNavItem(AppIcons.home, 'sidebar.routine'.tr(), () => _go('/app')),
         _buildFamMenu(),
+        _buildNavItem(AppIcons.listChecks, 'sidebar.transactions'.tr(), () => _go('/app/transactions')),
+        _buildNavItem(AppIcons.receipt, 'sidebar.receipts'.tr(), () => _go('/app/receipts')),
+        _buildNavItem(AppIcons.wallet, 'sidebar.wallets'.tr(), () => _go('/app/wallets')),
         if (widget.isExpanded) ...[
           const SizedBox(height: 24.0),
           _buildSectionTitle('sidebar.references'.tr()),
@@ -152,7 +155,6 @@ class _SidebarState extends ConsumerState<Sidebar>
                   padding: const EdgeInsets.only(left: 16.0, top: 8.0),
                   child: Column(
                     children: [
-                      _buildSubItem('sidebar.wallets'.tr(), () => _go('/app/wallets'), aIcon: AppIcons.wallet),
                       _buildSubItem('sidebar.places'.tr(), () => _go('/app/places'), aIcon: AppIcons.mapPin),
                       _buildSubItem('sidebar.cities'.tr(), () => _go('/app/cities'), aIcon: AppIcons.building2),
                       _buildSubItem('sidebar.streets'.tr(), () => _go('/app/streets'), aIcon: AppIcons.navigation),

@@ -7,6 +7,8 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/money.dart';
+import 'bank_conns_section.dart';
 
 class WalletsScreen extends ConsumerStatefulWidget
 {
@@ -113,11 +115,6 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
     final active = aWallets.where((aWallet) => aWallet.isActive).toList();
     final archived = aWallets.where((aWallet) => !aWallet.isActive).toList();
 
-    if (aWallets.isEmpty)
-    {
-      return Center(child: Text('common.no_data'.tr()));
-    }
-
     Widget tile(AccountDto aWallet) => _WalletTile(
           wallet: aWallet,
           onOpen: () => aContext.go('/app/wallets/${aWallet.id}'),
@@ -127,6 +124,8 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
 
     return ListView(
       children: [
+        const BankConnsSection(),
+        const SizedBox(height: 24),
         ...active.map(tile),
         if (archived.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -229,8 +228,9 @@ class _WalletTile extends StatelessWidget
   {
     final subtitle = [
       if (wallet.mask != null) '•••• ${wallet.mask}' else 'wallet.type_${wallet.accountType}'.tr(),
+      wallet.currCode,
       if (!wallet.isPersonal) 'wallet.shared'.tr(),
-      if (wallet.isSyncTokenSet) 'wallet.sync_on'.tr(),
+      if (wallet.isLinked) 'wallet.bank_synced'.tr(),
     ].join(' · ');
 
     return Card(
@@ -248,7 +248,9 @@ class _WalletTile extends StatelessWidget
           wallet.name,
           style: TextStyle(fontWeight: FontWeight.w600, color: wallet.isActive ? Colors.black87 : Colors.grey),
         ),
-        subtitle: Text(subtitle),
+        subtitle: Text(
+          wallet.balance == null ? subtitle : '$subtitle · ${formatMoney(aContext, wallet.balance!, wallet.currCode)}',
+        ),
         trailing: wallet.isEditable
             ? PopupMenuButton<String>(
                 tooltip: 'common.actions'.tr(),
@@ -270,10 +272,11 @@ class _WalletTile extends StatelessWidget
                     value: 'archive',
                     child: Text(wallet.isActive ? 'wallet.archive'.tr() : 'wallet.unarchive'.tr()),
                   ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('wallet.delete'.tr(), style: const TextStyle(color: Colors.red)),
-                  ),
+                  if (!wallet.isLinked)
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('wallet.delete'.tr(), style: const TextStyle(color: Colors.red)),
+                    ),
                 ],
               )
             : const Icon(AppIcons.eye, color: Colors.grey),

@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            p.name AS \"place_name?\",\n            c.code AS curr_code,\n            COALESCE((SELECT SUM(i.amount) FROM receipt_items i WHERE i.receipt_id = r.id), 0) AS \"items_total!\",\n            (SELECT COUNT(*) FROM receipt_items i WHERE i.receipt_id = r.id) AS \"item_count!\",\n            (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id AND t.source <> 'receipt_cash') AS \"tx_count!\"\n        FROM receipts r\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        WHERE r.owner_id = $1\n          AND ($2::timestamptz IS NULL OR r.receipt_ts >= $2)\n          AND ($3::timestamptz IS NULL OR r.receipt_ts < $3)\n        ORDER BY r.receipt_ts DESC\n        LIMIT 500\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "receipt_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "merchant_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "place_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "items_total!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "item_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "tx_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "861e2424a0515413db93703549ad85977e609824337d5ca59622a8c892e75544"
+}

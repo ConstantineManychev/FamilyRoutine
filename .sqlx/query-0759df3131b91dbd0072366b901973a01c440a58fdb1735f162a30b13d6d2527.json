@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO receipt_items (receipt_id, pos, name, kind, qty, unit_price, amount)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int2",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0759df3131b91dbd0072366b901973a01c440a58fdb1735f162a30b13d6d2527"
+}

@@ -1,11 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO accounts (id, user_id, family_id, curr_id, account_type, bank_type, name, mask, sync_secret, created_by)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        ",
+  "query": "\n        INSERT INTO accounts (user_id, family_id, curr_id, account_type, bank_type, name, mask, created_by)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n        RETURNING id\n        ",
   "describe": {
-    "columns": [],
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid",
         "Uuid",
         "Uuid",
@@ -35,11 +40,12 @@
         },
         "Varchar",
         "Varchar",
-        "Bytea",
         "Uuid"
       ]
     },
-    "nullable": []
+    "nullable": [
+      false
+    ]
   },
-  "hash": "f56b8ad8f9665776e10997bd97fdf5275e23594fa89da45955b2be1c8e722faf"
+  "hash": "95061234ffbe48e05ba5aa1b593b5d89ce157f1677b2f26413f6da16ac19f3dd"
 }

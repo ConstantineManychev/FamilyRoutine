@@ -63,10 +63,10 @@ impl SecretBox
     }
 }
 
-pub fn account_token_aad(a_account_id: Uuid) -> Vec<u8>
+pub fn bank_conn_aad(a_conn_id: Uuid) -> Vec<u8>
 {
-    let mut aad = b"family-routine/account-sync-token/v1/".to_vec();
-    aad.extend_from_slice(a_account_id.as_bytes());
+    let mut aad = b"family-routine/bank-connection/v1/".to_vec();
+    aad.extend_from_slice(a_conn_id.as_bytes());
     aad
 }
 
@@ -79,7 +79,7 @@ mod tests
     fn sealed_secret_round_trips_and_hides_plaintext()
     {
         let secret_box = SecretBox::new(&[7u8; 32]);
-        let aad = account_token_aad(Uuid::new_v4());
+        let aad = bank_conn_aad(Uuid::new_v4());
         let sealed = secret_box.seal(b"monobank-token-value", &aad).unwrap();
 
         assert!(!sealed.windows(8).any(|window| window == b"monobank"));
@@ -90,15 +90,15 @@ mod tests
     fn sealed_secret_is_bound_to_its_account()
     {
         let secret_box = SecretBox::new(&[7u8; 32]);
-        let sealed = secret_box.seal(b"token", &account_token_aad(Uuid::new_v4())).unwrap();
+        let sealed = secret_box.seal(b"token", &bank_conn_aad(Uuid::new_v4())).unwrap();
 
-        assert!(secret_box.open(&sealed, &account_token_aad(Uuid::new_v4())).is_err());
+        assert!(secret_box.open(&sealed, &bank_conn_aad(Uuid::new_v4())).is_err());
     }
 
     #[test]
     fn sealed_secret_requires_the_same_key()
     {
-        let aad = account_token_aad(Uuid::new_v4());
+        let aad = bank_conn_aad(Uuid::new_v4());
         let sealed = SecretBox::new(&[7u8; 32]).seal(b"token", &aad).unwrap();
 
         assert!(SecretBox::new(&[8u8; 32]).open(&sealed, &aad).is_err());
@@ -108,7 +108,7 @@ mod tests
     fn every_seal_uses_a_fresh_nonce()
     {
         let secret_box = SecretBox::new(&[7u8; 32]);
-        let aad = account_token_aad(Uuid::new_v4());
+        let aad = bank_conn_aad(Uuid::new_v4());
 
         assert_ne!(
             secret_box.seal(b"token", &aad).unwrap(),

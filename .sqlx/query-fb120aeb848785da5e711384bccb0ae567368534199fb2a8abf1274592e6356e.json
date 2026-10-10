@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE transactions SET receipt_id = NULL\n        WHERE receipt_id = $1 AND source <> 'receipt_cash' AND NOT (id = ANY($2))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fb120aeb848785da5e711384bccb0ae567368534199fb2a8abf1274592e6356e"
+}

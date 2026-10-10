@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            c.id,\n            c.provider AS \"provider: BankProvider\",\n            c.aspsp_name,\n            c.status AS \"status: BankConnStatus\",\n            c.valid_until,\n            c.last_sync_ts,\n            c.next_sync_ts,\n            c.last_error,\n            (SELECT COUNT(*) FROM accounts a WHERE a.conn_id = c.id) AS \"account_count!\"\n        FROM bank_conns c\n        WHERE c.owner_id = $1 AND c.status <> 'pending'\n        ORDER BY c.created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "provider: BankProvider",
+        "type_info": {
+          "Custom": {
+            "name": "bank_provider_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "enable_banking"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "aspsp_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status: BankConnStatus",
+        "type_info": {
+          "Custom": {
+            "name": "bank_conn_status_t",
+            "kind": {
+              "Enum": [
+                "pending",
+                "active",
+                "error",
+                "expired"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "valid_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_sync_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "next_sync_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_error",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "account_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "bcd49bfdd7f714f37c696104f644e8d99dd7a68535d5c34e81742caf9afd3604"
+}

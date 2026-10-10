@@ -29,6 +29,15 @@ services:
       COOKIE_SAMESITE: strict
       TRUST_PROXY: "true"
       RUST_LOG: info
+      MONOBANK_POLL_INTERVAL_MIN: ${MONOBANK_POLL_INTERVAL_MIN:-60}
+      MONOBANK_HISTORY_MONTHS: ${MONOBANK_HISTORY_MONTHS:-24}
+      BANK_SYNC_TIMEZONE: ${BANK_SYNC_TIMEZONE:-Europe/Dublin}
+      ENABLE_BANKING_SYNC_HOURS: ${ENABLE_BANKING_SYNC_HOURS:-0,6,12,18}
+      ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-}
+      ENABLE_BANKING_KEY_PATH: ${ENABLE_BANKING_APP_ID:+/run/secrets/enable_banking_key}
+      ENABLE_BANKING_REDIRECT_URL: https://${APP_DOMAIN:-localhost}/app/bank-callback
+    secrets:
+      - enable_banking_key
     depends_on:
       db:
         condition: service_healthy
@@ -72,3 +81,7 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+
+secrets:
+  enable_banking_key:
+    file: ${ENABLE_BANKING_KEY_FILE:-/dev/null}

@@ -2,13 +2,10 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{header, Method, Request, StatusCode};
-use backend::security::crypto::account_token_aad;
 use common::{TestApp, TestUser, PASSWORD};
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-
-const MONO_TOKEN: &str = "uMonoBankPersonalToken0123456789abcdef";
 
 #[sqlx::test(migrations = "./migrations")]
 async fn protected_endpoints_require_a_session(a_db: PgPool)
@@ -170,81 +167,6 @@ async fn registration_validates_input_and_rejects_duplicates(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn wallet_sync_token_is_encrypted_and_never_returned(a_db: PgPool)
-{
-    let app = TestApp::new(a_db.clone());
-    let alice = app.user("alice@example.com").await;
-    let curr_id = app.currency_id(&alice.token).await;
-
-    let created = app
-        .call(
-            Method::POST,
-            "/api/wallets",
-            Some(&alice.token),
-            Some(json!({
-                "name": "Mono", "curr_id": curr_id, "account_type": "card",
-                "bank_type": "monobank", "mask": "1234", "sync_token": MONO_TOKEN
-            })),
-        )
-        .await;
-    assert_eq!(created.status, StatusCode::CREATED);
-    assert_eq!(created.body["is_sync_token_set"], true);
-    assert!(!created.body.to_string().contains(MONO_TOKEN));
-
-    let wallet_id: Uuid = created.body["id"].as_str().unwrap().parse().unwrap();
-
-    let listed = app.call(Method::GET, "/api/wallets", Some(&alice.token), None).await;
-    assert!(!listed.body.to_string().contains(MONO_TOKEN));
-
-    let sealed: Vec<u8> = sqlx::query_scalar("SELECT sync_secret FROM accounts WHERE id = $1")
-        .bind(wallet_id)
-        .fetch_one(&a_db)
-        .await
-        .unwrap();
-    assert!(!sealed
-        .windows(MONO_TOKEN.len())
-        .any(|window| window == MONO_TOKEN.as_bytes()));
-
-    let opened = app
-        .state
-        .secret_box
-        .open(&sealed, &account_token_aad(wallet_id))
-        .unwrap();
-    assert_eq!(opened, MONO_TOKEN.as_bytes());
-
-    let renamed = app
-        .call(
-            Method::PUT,
-            &format!("/api/wallets/{wallet_id}"),
-            Some(&alice.token),
-            Some(json!({ "name": "Renamed" })),
-        )
-        .await;
-    assert_eq!(renamed.status, StatusCode::OK);
-    assert_eq!(renamed.body["is_sync_token_set"], true);
-
-    let cleared = app
-        .call(
-            Method::PUT,
-            &format!("/api/wallets/{wallet_id}"),
-            Some(&alice.token),
-            Some(json!({ "name": "Renamed", "is_sync_token_removed": true })),
-        )
-        .await;
-    assert_eq!(cleared.body["is_sync_token_set"], false);
-
-    let full_pan = app
-        .call(
-            Method::PUT,
-            &format!("/api/wallets/{wallet_id}"),
-            Some(&alice.token),
-            Some(json!({ "name": "Renamed", "mask": "4111111111111111" })),
-        )
-        .await;
-    assert_eq!(full_pan.status, StatusCode::BAD_REQUEST);
-}
-
-#[sqlx::test(migrations = "./migrations")]
 async fn personal_wallets_are_invisible_to_other_users(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
@@ -302,19 +224,6 @@ async fn family_wallets_follow_membership_and_roles(a_db: PgPool)
         )
         .await;
     assert_eq!(intrusion.status, StatusCode::NOT_FOUND);
-
-    let family_token = app
-        .call(
-            Method::POST,
-            "/api/wallets",
-            Some(&alice.token),
-            Some(json!({
-                "name": "Shared", "curr_id": curr_id, "account_type": "card",
-                "bank_type": "monobank", "family_id": fam_id, "sync_token": MONO_TOKEN
-            })),
-        )
-        .await;
-    assert_eq!(family_token.status, StatusCode::BAD_REQUEST);
 
     let created = app
         .call(

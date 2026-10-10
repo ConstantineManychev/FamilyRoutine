@@ -1,9 +1,13 @@
 pub mod auth_handlers;
+pub mod bank_handlers;
 pub mod ex_handlers;
 pub mod extract;
 pub mod fam_handlers;
 pub mod geo_handlers;
 pub mod place_handlers;
+pub mod receipt_handlers;
 pub mod router;
+pub mod stats_handlers;
+pub mod tx_handlers;
 pub mod user_handlers;
 pub mod wallet_handlers;

@@ -1,8 +1,14 @@
+#![allow(dead_code)]
+
+pub mod bank_mocks;
+
 use axum::body::Body;
 use axum::http::{header, HeaderMap, Method, Request, StatusCode};
 use axum::Router;
 use axum_extra::extract::cookie::SameSite;
-use backend::config::AppConfig;
+use std::time::Duration;
+
+use backend::config::{AppConfig, BankConfig};
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -11,6 +17,19 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 pub const PASSWORD: &str = "correct-horse-battery";
+
+pub fn bank_config(a_mono_url: &str) -> BankConfig
+{
+    BankConfig {
+        mono_api_url: a_mono_url.to_string(),
+        mono_poll_interval: Duration::from_secs(3600),
+        mono_call_gap: Duration::ZERO,
+        mono_history_months: 3,
+        enable_banking: None,
+        sync_timezone: "Europe/Dublin".parse().unwrap(),
+        eb_sync_hours: vec![0, 6, 12, 18],
+    }
+}
 
 pub struct TestApp
 {
@@ -35,6 +54,11 @@ impl TestApp
 {
     pub fn new(a_db: PgPool) -> Self
     {
+        Self::with_banks(a_db, bank_config("http://127.0.0.1:9"))
+    }
+
+    pub fn with_banks(a_db: PgPool, a_banks: BankConfig) -> Self
+    {
         let cfg = AppConfig {
             database_url: String::new(),
             bind_addr: "127.0.0.1:0".parse().unwrap(),
@@ -44,9 +68,10 @@ impl TestApp
             is_proxy_trusted: false,
             data_key: [9u8; 32],
             password_pepper: vec![3u8; 32],
+            banks: a_banks,
         };
 
-        let state = AppState::new(a_db, cfg);
+        let state = AppState::new(a_db, cfg).unwrap();
 
         Self {
             router: build_router(state.clone()),
@@ -168,5 +193,20 @@ impl TestApp
     {
         let reply = self.call(Method::GET, "/api/currencies", Some(a_token), None).await;
         reply.body.as_array().unwrap()[0]["id"].as_str().unwrap().to_string()
+    }
+
+    pub async fn currency_by_code(&self, a_token: &str, a_code: &str) -> String
+    {
+        let reply = self.call(Method::GET, "/api/currencies", Some(a_token), None).await;
+        reply
+            .body
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|currency| currency["code"] == a_code)
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 }

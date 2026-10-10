@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider AS \"provider: BankProvider\", secret FROM bank_conns WHERE id = $1 AND owner_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider: BankProvider",
+        "type_info": {
+          "Custom": {
+            "name": "bank_provider_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "enable_banking"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "secret",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "1553b0043650c72e257f538b4198bf8fed60002464a565d3015ef91883d407ac"
+}

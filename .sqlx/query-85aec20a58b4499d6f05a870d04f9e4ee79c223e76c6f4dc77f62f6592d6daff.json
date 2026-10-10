@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE bank_conns\n        SET status = 'active', secret = $2, state_hash = NULL, valid_until = $3, next_sync_ts = NOW()\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "85aec20a58b4499d6f05a870d04f9e4ee79c223e76c6f4dc77f62f6592d6daff"
+}

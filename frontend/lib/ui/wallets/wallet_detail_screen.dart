@@ -11,7 +11,6 @@ import '../common/feedback.dart';
 
 const List<String> accountTypes = ['cash', 'card', 'bank_acc'];
 const List<String> bankTypes = ['monobank', 'aib', 'other'];
-const int minSyncTokenLength = 16;
 
 class WalletDetailScreen extends ConsumerStatefulWidget
 {
@@ -28,7 +27,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _maskCtrl = TextEditingController();
-  final _tokenCtrl = TextEditingController();
 
   AccountDto? _wallet;
   List<CurrencyDto> _currs = const [];
@@ -36,7 +34,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
   Object? _loadError;
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _isTokenRemoved = false;
   String _accType = 'cash';
   String? _bankType;
   String? _currId;
@@ -45,7 +42,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
   bool get _isEdit => widget.walletId != null;
   bool get _isEditable => !_isEdit || (_wallet?.isEditable ?? false);
   bool get _isBankRequired => _accType == 'card' || _accType == 'bank_acc';
-  bool get _isTokenSupported => _bankType == 'monobank' && _familyId == null;
 
   @override
   void initState()
@@ -59,7 +55,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
   {
     _nameCtrl.dispose();
     _maskCtrl.dispose();
-    _tokenCtrl.dispose();
     super.dispose();
   }
 
@@ -122,12 +117,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
     return value.isEmpty || RegExp(r'^\d{4}$').hasMatch(value) ? null : 'validation.mask'.tr();
   }
 
-  String? _validateToken(String? aValue)
-  {
-    final value = aValue?.trim() ?? '';
-    return value.isEmpty || value.length >= minSyncTokenLength ? null : 'validation.sync_token'.tr();
-  }
-
   Future<void> _save() async
   {
     if (_isSaving || !(_formKey.currentState?.validate() ?? false) || _currId == null)
@@ -138,7 +127,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
     setState(() => _isSaving = true);
 
     final mask = _maskCtrl.text.trim();
-    final token = _tokenCtrl.text.trim();
 
     try
     {
@@ -149,8 +137,6 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
         await api.updateWallet(widget.walletId!, {
           'name': _nameCtrl.text.trim(),
           'mask': _isBankRequired && mask.isNotEmpty ? mask : null,
-          'sync_token': _isTokenSupported && token.isNotEmpty && !_isTokenRemoved ? token : null,
-          'is_sync_token_removed': _isTokenRemoved,
         });
       }
       else
@@ -161,12 +147,10 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
           'account_type': _accType,
           'bank_type': _isBankRequired ? _bankType : null,
           'mask': _isBankRequired && mask.isNotEmpty ? mask : null,
-          'sync_token': _isTokenSupported && token.isNotEmpty ? token : null,
           'family_id': _familyId,
         });
       }
 
-      _tokenCtrl.clear();
       ref.invalidate(walletsProv);
 
       if (mounted)
@@ -263,56 +247,18 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
               validator: _validateMask,
             ),
           ],
-          if (_isTokenSupported && _isEditable) ...[
+          if (_wallet?.isLinked ?? false) ...[
             const SizedBox(height: 24),
-            _buildTokenSection(),
+            Row(
+              children: [
+                const Icon(AppIcons.refreshCw, color: Colors.green),
+                const SizedBox(width: 8),
+                Expanded(child: Text('wallet.linked_hint'.tr())),
+              ],
+            ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildTokenSection()
-  {
-    final isTokenStored = _wallet?.isSyncTokenSet ?? false;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (isTokenStored)
-          Row(
-            children: [
-              Icon(
-                _isTokenRemoved ? AppIcons.shieldOff : AppIcons.shieldCheck,
-                color: _isTokenRemoved ? Colors.red : Colors.green,
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(_isTokenRemoved ? 'wallet.token_will_remove'.tr() : 'wallet.token_stored'.tr())),
-              TextButton(
-                onPressed: () => setState(() => _isTokenRemoved = !_isTokenRemoved),
-                child: Text(_isTokenRemoved ? 'common.cancel'.tr() : 'wallet.token_remove'.tr()),
-              ),
-            ],
-          ),
-        if (!_isTokenRemoved) ...[
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _tokenCtrl,
-            obscureText: true,
-            enableSuggestions: false,
-            autocorrect: false,
-            inputFormatters: [LengthLimitingTextInputFormatter(256)],
-            decoration: InputDecoration(
-              labelText: isTokenStored ? 'wallet.token_replace'.tr() : 'wallet.api_key'.tr(),
-              helperText: 'wallet.token_hint'.tr(),
-              helperMaxLines: 3,
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(AppIcons.key),
-            ),
-            validator: _validateToken,
-          ),
-        ],
-      ],
     );
   }
 

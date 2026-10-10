@@ -1,3 +1,7 @@
+import 'finance_models.dart';
+
+export 'finance_models.dart';
+
 enum MemberRole
 {
   admin,
@@ -192,11 +196,15 @@ class AccountDto
   final String? userId;
   final String? familyId;
   final String currId;
+  final String currCode;
   final String accountType;
   final String? bankType;
   final String name;
   final String? mask;
-  final bool isSyncTokenSet;
+  final String? connId;
+  final String? provider;
+  final double? balance;
+  final DateTime? balanceTs;
   final bool isActive;
   final bool isEditable;
 
@@ -205,27 +213,37 @@ class AccountDto
     this.userId,
     this.familyId,
     required this.currId,
+    required this.currCode,
     required this.accountType,
     this.bankType,
     required this.name,
     this.mask,
-    required this.isSyncTokenSet,
+    this.connId,
+    this.provider,
+    this.balance,
+    this.balanceTs,
     required this.isActive,
     required this.isEditable,
   });
 
   bool get isPersonal => familyId == null;
+  bool get isLinked => connId != null;
+  bool get isCash => accountType == 'cash';
 
   factory AccountDto.fromJson(Map<String, dynamic> aJson) => AccountDto(
         id: aJson['id'] as String,
         userId: aJson['user_id'] as String?,
         familyId: aJson['family_id'] as String?,
         currId: aJson['curr_id'] as String,
+        currCode: aJson['curr_code'] as String? ?? '',
         accountType: aJson['account_type'] as String? ?? 'cash',
         bankType: aJson['bank_type'] as String?,
         name: aJson['name'] as String? ?? '',
         mask: aJson['mask'] as String?,
-        isSyncTokenSet: aJson['is_sync_token_set'] as bool? ?? false,
+        connId: aJson['conn_id'] as String?,
+        provider: aJson['provider'] as String?,
+        balance: parseDecimalOrNull(aJson['balance']),
+        balanceTs: parseTsOrNull(aJson['balance_ts']),
         isActive: aJson['is_active'] as bool? ?? true,
         isEditable: aJson['is_editable'] as bool? ?? false,
       );

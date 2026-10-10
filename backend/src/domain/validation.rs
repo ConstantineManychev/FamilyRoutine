@@ -1,4 +1,5 @@
 use chrono::{NaiveDate, Utc};
+use rust_decimal::Decimal;
 
 use crate::domain::errors::ApiError;
 
@@ -8,6 +9,67 @@ pub const MIN_PASSWORD_LEN: usize = 1;
 pub const MAX_PASSWORD_LEN: usize = 128;
 pub const MIN_SYNC_TOKEN_LEN: usize = 16;
 pub const MAX_SYNC_TOKEN_LEN: usize = 256;
+pub const MAX_NOTE_LEN: usize = 500;
+
+const MONEY_SCALE: u32 = 2;
+const QTY_SCALE: u32 = 3;
+const MAX_MONEY: i64 = 1_000_000_000_000;
+const MAX_QTY: i64 = 1_000_000;
+
+pub fn check_money(a_value: Decimal, a_field: &'static str) -> Result<Decimal, ApiError>
+{
+    let value = a_value.normalize();
+
+    if value.scale() > MONEY_SCALE || value.abs() >= Decimal::from(MAX_MONEY)
+    {
+        return Err(ApiError::Validation(a_field));
+    }
+
+    Ok(value)
+}
+
+pub fn money(a_value: Decimal) -> Decimal
+{
+    let mut value = a_value.round_dp(MONEY_SCALE);
+    value.rescale(MONEY_SCALE);
+    value
+}
+
+pub fn check_nonzero_money(a_value: Decimal, a_field: &'static str) -> Result<Decimal, ApiError>
+{
+    let value = check_money(a_value, a_field)?;
+
+    if value.is_zero()
+    {
+        return Err(ApiError::Validation(a_field));
+    }
+
+    Ok(value)
+}
+
+pub fn check_positive_money(a_value: Decimal, a_field: &'static str) -> Result<Decimal, ApiError>
+{
+    let value = check_money(a_value, a_field)?;
+
+    if value <= Decimal::ZERO
+    {
+        return Err(ApiError::Validation(a_field));
+    }
+
+    Ok(value)
+}
+
+pub fn check_qty(a_value: Decimal) -> Result<Decimal, ApiError>
+{
+    let value = a_value.normalize();
+
+    if value.scale() > QTY_SCALE || value <= Decimal::ZERO || value > Decimal::from(MAX_QTY)
+    {
+        return Err(ApiError::Validation("qty"));
+    }
+
+    Ok(value)
+}
 
 pub fn clean_name(a_value: &str, a_field: &'static str) -> Result<String, ApiError>
 {
@@ -121,7 +183,7 @@ pub fn clean_sync_token(a_value: &str) -> Result<String, ApiError>
 
     if !is_valid
     {
-        return Err(ApiError::Validation("sync_token"));
+        return Err(ApiError::Validation("token"));
     }
 
     Ok(token.to_string())
@@ -154,6 +216,25 @@ mod tests
         assert_eq!(clean_mask(None).unwrap(), None);
         assert!(clean_mask(Some("4111111111111111")).is_err());
         assert!(clean_mask(Some("12a4")).is_err());
+    }
+
+    #[test]
+    fn money_respects_scale_and_bounds()
+    {
+        use std::str::FromStr;
+
+        assert!(check_money(Decimal::from_str("12.345").unwrap(), "amount").is_err());
+        assert_eq!(
+            check_money(Decimal::from_str("12.50").unwrap(), "amount")
+                .unwrap()
+                .to_string(),
+            "12.5"
+        );
+        assert!(check_nonzero_money(Decimal::ZERO, "amount").is_err());
+        assert!(check_positive_money(Decimal::NEGATIVE_ONE, "amount").is_err());
+        assert!(check_money(Decimal::from(MAX_MONEY), "amount").is_err());
+        assert!(check_qty(Decimal::from_str("0.001").unwrap()).is_ok());
+        assert!(check_qty(Decimal::ZERO).is_err());
     }
 
     #[test]

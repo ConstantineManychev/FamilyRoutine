@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE bank_conns SET lease_until = NOW() + make_interval(mins => $2::int)\n        WHERE id IN (\n            SELECT id FROM bank_conns\n            WHERE status = 'active' AND next_sync_ts <= NOW() AND (lease_until IS NULL OR lease_until < NOW())\n            ORDER BY next_sync_ts\n            LIMIT $1\n            FOR UPDATE SKIP LOCKED\n        )\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d2e562e14528adf85cec7083191e2b19749ff2d651feb017a92479dfc959d2df"
+}

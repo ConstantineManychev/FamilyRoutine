@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, owner_id, provider AS \"provider: BankProvider\", aspsp_name, secret, valid_until, last_call_ts\n        FROM bank_conns\n        WHERE id = $1 AND status = 'active'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "provider: BankProvider",
+        "type_info": {
+          "Custom": {
+            "name": "bank_provider_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "enable_banking"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "aspsp_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "secret",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "valid_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "last_call_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "24078e4aa9789c60f3c3ea6a7322ba6b27ccfb047e2464b95da75d2a935a0fdc"
+}

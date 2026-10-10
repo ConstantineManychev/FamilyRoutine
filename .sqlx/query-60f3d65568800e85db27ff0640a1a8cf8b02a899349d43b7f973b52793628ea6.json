@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE bank_conns\n        SET status = $2,\n            next_sync_ts = $3,\n            last_error = $4::varchar,\n            last_sync_ts = CASE WHEN $4::varchar IS NULL THEN NOW() ELSE last_sync_ts END,\n            lease_until = NULL\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "bank_conn_status_t",
+            "kind": {
+              "Enum": [
+                "pending",
+                "active",
+                "error",
+                "expired"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60f3d65568800e85db27ff0640a1a8cf8b02a899349d43b7f973b52793628ea6"
+}

@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO accounts (\n                user_id, curr_id, account_type, bank_type, name, mask, conn_id, ext_acc_id, balance, balance_ts,\n                created_by\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $9::numeric IS NULL THEN NULL ELSE NOW() END, $1)\n            ON CONFLICT (conn_id, ext_acc_id) WHERE conn_id IS NOT NULL DO UPDATE SET\n                balance = COALESCE(EXCLUDED.balance, accounts.balance),\n                balance_ts = COALESCE(EXCLUDED.balance_ts, accounts.balance_ts),\n                mask = COALESCE(accounts.mask, EXCLUDED.mask)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "acc_type_t",
+            "kind": {
+              "Enum": [
+                "cash",
+                "card",
+                "bank_acc"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "bank_type_t",
+            "kind": {
+              "Enum": [
+                "monobank",
+                "aib",
+                "other"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9fca43bb62367ee34e1e132709bf67ccb0ceed6b73c8616a719b8b18aa72a905"
+}

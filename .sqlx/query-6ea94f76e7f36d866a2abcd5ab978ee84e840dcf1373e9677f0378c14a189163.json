@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO merchants (name, name_key, mcc) VALUES ($1, $2, $3)\n        ON CONFLICT (name_key) DO UPDATE SET mcc = COALESCE(merchants.mcc, EXCLUDED.mcc)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6ea94f76e7f36d866a2abcd5ab978ee84e840dcf1373e9677f0378c14a189163"
+}

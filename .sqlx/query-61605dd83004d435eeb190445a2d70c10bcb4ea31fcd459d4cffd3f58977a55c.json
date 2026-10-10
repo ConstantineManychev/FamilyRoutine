@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM bank_conns\n        WHERE owner_id = $1 AND status = 'pending'\n          AND created_ts < NOW() - make_interval(mins => $2::int)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "61605dd83004d435eeb190445a2d70c10bcb4ea31fcd459d4cffd3f58977a55c"
+}

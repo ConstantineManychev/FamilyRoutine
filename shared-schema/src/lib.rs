@@ -1,4 +1,8 @@
+mod finance;
+
 use chrono::{DateTime, NaiveDate, Utc};
+pub use finance::*;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -218,11 +222,15 @@ pub struct AccountDto
     pub user_id: Option<Uuid>,
     pub family_id: Option<Uuid>,
     pub curr_id: Uuid,
+    pub curr_code: String,
     pub account_type: AccountType,
     pub bank_type: Option<BankType>,
     pub name: String,
     pub mask: Option<String>,
-    pub is_sync_token_set: bool,
+    pub conn_id: Option<Uuid>,
+    pub provider: Option<BankProvider>,
+    pub balance: Option<Decimal>,
+    pub balance_ts: Option<DateTime<Utc>>,
     pub is_active: bool,
     pub is_editable: bool,
 }
@@ -238,8 +246,6 @@ pub struct CreateWalletRequest
     #[serde(default)]
     pub mask: Option<String>,
     #[serde(default)]
-    pub sync_token: Option<String>,
-    #[serde(default)]
     pub family_id: Option<Uuid>,
 }
 
@@ -249,10 +255,6 @@ pub struct UpdateWalletRequest
     pub name: String,
     #[serde(default)]
     pub mask: Option<String>,
-    #[serde(default)]
-    pub sync_token: Option<String>,
-    #[serde(default)]
-    pub is_sync_token_removed: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

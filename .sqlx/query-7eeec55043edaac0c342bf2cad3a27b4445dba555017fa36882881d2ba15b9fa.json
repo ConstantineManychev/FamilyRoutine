@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE accounts\n        SET history_from_ts = COALESCE($2, history_from_ts), is_history_done = $3, last_sync_ts = NOW()\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7eeec55043edaac0c342bf2cad3a27b4445dba555017fa36882881d2ba15b9fa"
+}

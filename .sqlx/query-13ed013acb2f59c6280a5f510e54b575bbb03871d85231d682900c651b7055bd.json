@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS(\n            SELECT 1 FROM accounts a\n            JOIN bank_conns c ON c.id = a.conn_id\n            WHERE c.owner_id = $1 AND c.provider = 'monobank' AND a.ext_acc_id = ANY($2)\n        ) AS \"exists!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "13ed013acb2f59c6280a5f510e54b575bbb03871d85231d682900c651b7055bd"
+}

@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            a.id,\n            a.curr_id,\n            a.account_type AS \"account_type: AccountType\",\n            a.conn_id,\n            BOOL_OR(v.is_editor) AS \"is_editor!\"\n        FROM accounts a\n        JOIN account_viewers v ON v.account_id = a.id\n        WHERE a.id = $1 AND v.viewer_id = $2\n        GROUP BY a.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "curr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_type: AccountType",
+        "type_info": {
+          "Custom": {
+            "name": "acc_type_t",
+            "kind": {
+              "Enum": [
+                "cash",
+                "card",
+                "bank_acc"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "conn_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_editor!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "d62cc00dd22b8aeddfb8f46e404ed216a0feedea196dc2ad52bc420e4aee227b"
+}
