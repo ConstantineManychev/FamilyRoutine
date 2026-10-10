@@ -13,6 +13,7 @@ use sqlx::{PgConnection, PgExecutor};
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
+use crate::banking::matching;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::{require_account_editor, AccountAccess};
 use crate::domain::validation::{
@@ -68,13 +69,27 @@ pub async fn list_transactions(
             t.is_pending,
             t.transfer_id,
             t.receipt_id,
-            v.is_editor AS "is_editable!"
+            v.is_editor AS "is_editable!",
+            t.is_auto_transfer,
+            peer.account_name AS "peer_account_name?",
+            peer.amount AS "peer_amount?",
+            peer.curr_code AS "peer_curr_code?",
+            NULLIF(t.rule_key, '') AS similar_key
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
         JOIN accounts a ON a.id = t.account_id
         JOIN currencies c ON c.id = t.curr_id
         LEFT JOIN currencies oc ON oc.id = t.op_curr_id
         LEFT JOIN merchants m ON m.id = t.merchant_id
+        LEFT JOIN LATERAL (
+            SELECT pa.name AS account_name, p.amount, pc.code AS curr_code
+            FROM transactions p
+            JOIN account_viewers pv ON pv.account_id = p.account_id AND pv.viewer_id = $1
+            JOIN accounts pa ON pa.id = p.account_id
+            JOIN currencies pc ON pc.id = p.curr_id
+            WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id
+            LIMIT 1
+        ) peer ON TRUE
         WHERE ($2::uuid IS NULL OR t.account_id = $2)
           AND ($3::timestamptz IS NULL OR t.tx_ts >= $3)
           AND ($4::timestamptz IS NULL OR t.tx_ts < $4)
@@ -82,6 +97,8 @@ pub async fn list_transactions(
           AND ($6::text IS NULL
                OR t.description ILIKE $6 OR t.counterparty ILIKE $6 OR t.note ILIKE $6 OR m.name ILIKE $6)
           AND ($7::timestamptz IS NULL OR (t.tx_ts, t.id) < ($7, $8::uuid))
+          AND ($10::tx_cat_t IS NULL OR t.category = $10)
+          AND (NOT $11 OR t.category IS NULL)
         ORDER BY t.tx_ts DESC, t.id DESC
         LIMIT $9
         "#,
@@ -93,7 +110,9 @@ pub async fn list_transactions(
         pattern,
         cursor.map(|(ts, _)| ts),
         cursor.map(|(_, id)| id),
-        limit + 1
+        limit + 1,
+        a_query.category as Option<TxCategory>,
+        a_query.is_uncategorized.unwrap_or(false)
     )
     .fetch_all(&a_state.db)
     .await?;
@@ -152,6 +171,11 @@ pub async fn create_transaction(
 
     tx.commit().await?;
 
+    if let Err(err) = matching::match_transfers(&a_state.db, a_user.user_id).await
+    {
+        tracing::warn!("transfer matching failed: {err:?}");
+    }
+
     let created = load_tx(&a_state.db, id, a_user.user_id).await?;
     Ok((StatusCode::CREATED, Json(created)))
 }
@@ -171,16 +195,81 @@ pub async fn update_transaction(
         return Err(ApiError::Forbidden);
     }
 
+    let mut tx = a_state.db.begin().await?;
+
+    let previous = sqlx::query!(
+        r#"SELECT category AS "category: TxCategory", rule_key FROM transactions WHERE id = $1 FOR UPDATE"#,
+        a_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    let is_category_changed = previous.category != a_req.category;
+
     sqlx::query!(
-        "UPDATE transactions SET note = $2, category = $3 WHERE id = $1",
+        r#"
+        UPDATE transactions
+        SET note = $2, category = $3, is_category_locked = is_category_locked OR $4
+        WHERE id = $1
+        "#,
         a_id,
         note,
-        a_req.category as Option<TxCategory>
+        a_req.category as Option<TxCategory>,
+        is_category_changed
     )
-    .execute(&a_state.db)
+    .execute(&mut *tx)
     .await?;
 
+    if a_req.is_apply_to_similar
+    {
+        let similar_key = previous.rule_key.filter(|key| !key.is_empty());
+        let (Some(category), Some(key)) = (a_req.category, similar_key)
+        else
+        {
+            return Err(ApiError::Validation("is_apply_to_similar"));
+        };
+        apply_category_rule(&mut tx, a_user.user_id, &key, category).await?;
+    }
+
+    tx.commit().await?;
+
     load_tx(&a_state.db, a_id, a_user.user_id).await.map(Json)
+}
+
+async fn apply_category_rule(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_key: &str,
+    a_category: TxCategory,
+) -> Result<(), ApiError>
+{
+    sqlx::query!(
+        r#"
+        INSERT INTO category_rules (user_id, rule_key, category) VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, rule_key) DO UPDATE SET category = EXCLUDED.category
+        "#,
+        a_user_id,
+        a_key,
+        a_category as TxCategory
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    sqlx::query!(
+        r#"
+        UPDATE transactions t
+        SET category = $3
+        FROM account_viewers v
+        WHERE v.account_id = t.account_id AND v.viewer_id = $1 AND v.is_editor
+          AND t.rule_key = $2 AND NOT t.is_category_locked
+        "#,
+        a_user_id,
+        a_key,
+        a_category as TxCategory
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    Ok(())
 }
 
 pub async fn delete_transaction(
@@ -205,7 +294,7 @@ pub async fn delete_transaction(
 
     match ownership.transfer_id
     {
-        Some(transfer_id) => dissolve_transfer(&mut tx, transfer_id, a_user.user_id).await?,
+        Some(transfer_id) => dissolve_transfer(&mut tx, transfer_id, a_user.user_id, false).await?,
         None =>
         {
             sqlx::query!("DELETE FROM transactions WHERE id = $1", a_id)
@@ -321,7 +410,7 @@ pub async fn delete_transfer(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    dissolve_transfer(&mut tx, a_transfer_id, a_user.user_id).await?;
+    dissolve_transfer(&mut tx, a_transfer_id, a_user.user_id, true).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -447,13 +536,27 @@ where
             t.is_pending,
             t.transfer_id,
             t.receipt_id,
-            v.is_editor AS "is_editable!"
+            v.is_editor AS "is_editable!",
+            t.is_auto_transfer,
+            peer.account_name AS "peer_account_name?",
+            peer.amount AS "peer_amount?",
+            peer.curr_code AS "peer_curr_code?",
+            NULLIF(t.rule_key, '') AS similar_key
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
         JOIN accounts a ON a.id = t.account_id
         JOIN currencies c ON c.id = t.curr_id
         LEFT JOIN currencies oc ON oc.id = t.op_curr_id
         LEFT JOIN merchants m ON m.id = t.merchant_id
+        LEFT JOIN LATERAL (
+            SELECT pa.name AS account_name, p.amount, pc.code AS curr_code
+            FROM transactions p
+            JOIN account_viewers pv ON pv.account_id = p.account_id AND pv.viewer_id = $2
+            JOIN accounts pa ON pa.id = p.account_id
+            JOIN currencies pc ON pc.id = p.curr_id
+            WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id
+            LIMIT 1
+        ) peer ON TRUE
         WHERE t.id = ANY($1)
         ORDER BY t.tx_ts DESC, t.id DESC
         "#,
@@ -539,7 +642,12 @@ async fn link_leg(a_conn: &mut PgConnection, a_tx_id: Uuid, a_transfer_id: Uuid)
     Ok(a_tx_id)
 }
 
-async fn dissolve_transfer(a_conn: &mut PgConnection, a_transfer_id: Uuid, a_user_id: Uuid) -> Result<(), ApiError>
+async fn dissolve_transfer(
+    a_conn: &mut PgConnection,
+    a_transfer_id: Uuid,
+    a_user_id: Uuid,
+    a_is_rematch_blocked: bool,
+) -> Result<(), ApiError>
 {
     let legs = sqlx::query!(
         r#"
@@ -566,7 +674,7 @@ async fn dissolve_transfer(a_conn: &mut PgConnection, a_transfer_id: Uuid, a_use
     }
 
     sqlx::query!(
-        "DELETE FROM transactions WHERE transfer_id = $1 AND source = 'manual'",
+        "DELETE FROM transactions WHERE transfer_id = $1 AND source = 'manual' AND NOT is_auto_transfer",
         a_transfer_id
     )
     .execute(&mut *a_conn)
@@ -576,10 +684,13 @@ async fn dissolve_transfer(a_conn: &mut PgConnection, a_transfer_id: Uuid, a_use
         r#"
         UPDATE transactions
         SET transfer_id = NULL,
+            is_auto_transfer = FALSE,
+            is_match_blocked = is_match_blocked OR $2,
             tx_type = CASE WHEN amount > 0 THEN 'income'::tx_type_t ELSE 'expense'::tx_type_t END
         WHERE transfer_id = $1
         "#,
-        a_transfer_id
+        a_transfer_id,
+        a_is_rematch_blocked
     )
     .execute(&mut *a_conn)
     .await?;

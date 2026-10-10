@@ -1,0 +1,252 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            t.id,\n            t.account_id,\n            a.name AS account_name,\n            c.code AS curr_code,\n            t.amount,\n            t.op_amount,\n            oc.code AS \"op_curr_code?\",\n            t.tx_ts,\n            t.tx_type AS \"tx_type: TxType\",\n            t.source AS \"source: TxSource\",\n            t.description,\n            t.counterparty,\n            t.category AS \"category: TxCategory\",\n            t.merchant_id,\n            m.name AS \"merchant_name?\",\n            t.mcc,\n            t.note,\n            t.is_pending,\n            t.transfer_id,\n            t.receipt_id,\n            v.is_editor AS \"is_editable!\",\n            t.is_auto_transfer,\n            peer.account_name AS \"peer_account_name?\",\n            peer.amount AS \"peer_amount?\",\n            peer.curr_code AS \"peer_curr_code?\",\n            NULLIF(t.rule_key, '') AS similar_key\n        FROM transactions t\n        JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1\n        JOIN accounts a ON a.id = t.account_id\n        JOIN currencies c ON c.id = t.curr_id\n        LEFT JOIN currencies oc ON oc.id = t.op_curr_id\n        LEFT JOIN merchants m ON m.id = t.merchant_id\n        LEFT JOIN LATERAL (\n            SELECT pa.name AS account_name, p.amount, pc.code AS curr_code\n            FROM transactions p\n            JOIN account_viewers pv ON pv.account_id = p.account_id AND pv.viewer_id = $1\n            JOIN accounts pa ON pa.id = p.account_id\n            JOIN currencies pc ON pc.id = p.curr_id\n            WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id\n            LIMIT 1\n        ) peer ON TRUE\n        WHERE ($2::uuid IS NULL OR t.account_id = $2)\n          AND ($3::timestamptz IS NULL OR t.tx_ts >= $3)\n          AND ($4::timestamptz IS NULL OR t.tx_ts < $4)\n          AND (NOT $5 OR (t.receipt_id IS NULL AND t.source <> 'receipt_cash' AND t.amount < 0))\n          AND ($6::text IS NULL\n               OR t.description ILIKE $6 OR t.counterparty ILIKE $6 OR t.note ILIKE $6 OR m.name ILIKE $6)\n          AND ($7::timestamptz IS NULL OR (t.tx_ts, t.id) < ($7, $8::uuid))\n          AND ($10::tx_cat_t IS NULL OR t.category = $10)\n          AND (NOT $11 OR t.category IS NULL)\n        ORDER BY t.tx_ts DESC, t.id DESC\n        LIMIT $9\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "amount",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "op_amount",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "op_curr_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "tx_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "tx_type: TxType",
+        "type_info": {
+          "Custom": {
+            "name": "tx_type_t",
+            "kind": {
+              "Enum": [
+                "income",
+                "expense",
+                "transfer"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "source: TxSource",
+        "type_info": {
+          "Custom": {
+            "name": "tx_source_t",
+            "kind": {
+              "Enum": [
+                "manual",
+                "bank",
+                "receipt_cash"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "description",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "counterparty",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "category: TxCategory",
+        "type_info": {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "merchant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 14,
+        "name": "merchant_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 15,
+        "name": "mcc",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 16,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 17,
+        "name": "is_pending",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 18,
+        "name": "transfer_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 19,
+        "name": "receipt_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 21,
+        "name": "is_auto_transfer",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 22,
+        "name": "peer_account_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 23,
+        "name": "peer_amount?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 24,
+        "name": "peer_curr_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 25,
+        "name": "similar_key",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Bool",
+        "Text",
+        "Timestamptz",
+        "Uuid",
+        "Int8",
+        {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "f745e4b03cf733de93dab9d1fe031ce900de26ea45523bb659677817469652d5"
+}

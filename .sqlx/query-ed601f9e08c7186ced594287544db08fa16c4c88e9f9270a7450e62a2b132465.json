@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE transactions SET note = $2, category = $3 WHERE id = $1",
+  "query": "\n        INSERT INTO category_rules (user_id, rule_key, category) VALUES ($1, $2, $3)\n        ON CONFLICT (user_id, rule_key) DO UPDATE SET category = EXCLUDED.category\n        ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -36,5 +36,5 @@
     },
     "nullable": []
   },
-  "hash": "d0d77ceafc196a8d45d89320081e963b03d9e3b7bc46012e5e6d05e5a88cf69b"
+  "hash": "ed601f9e08c7186ced594287544db08fa16c4c88e9f9270a7450e62a2b132465"
 }

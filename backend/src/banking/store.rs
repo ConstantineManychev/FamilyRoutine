@@ -1,6 +1,9 @@
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use shared_schema::{AccountType, BankType, TxType};
+use shared_schema::{AccountType, BankType, TxCategory, TxType};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -8,6 +11,8 @@ use crate::banking::{categories, clean_text, BankAccount, BankTx};
 use crate::domain::errors::ApiError;
 
 const MERCHANT_PREFIXES: &[&str] = &["VDP-", "VDC-", "VDA-", "POS ", "POS-", "D/D ", "BOI-"];
+const RECATEGORIZE_BATCH: i64 = 500;
+const NO_RULE_KEY: &str = "";
 
 pub struct LinkedAccount
 {
@@ -163,6 +168,7 @@ pub async fn store_transactions(
     }
 
     let mut tx = a_db.begin().await?;
+    let rules = category_rules(&mut tx, a_owner_id).await?;
 
     for bank_tx in a_txs
     {
@@ -172,7 +178,14 @@ pub async fn store_transactions(
             None => None,
         };
 
-        let merchant_id = if categories::is_merchant_payment(bank_tx.mcc, bank_tx.amount)
+        let text = tx_text(bank_tx.description.as_deref(), bank_tx.counterparty.as_deref());
+        let key = rule_key(bank_tx.counterparty.as_deref(), bank_tx.description.as_deref());
+        let category = rules
+            .get(&key)
+            .copied()
+            .unwrap_or_else(|| categories::detect(bank_tx.mcc, bank_tx.amount, &text));
+
+        let merchant_id = if categories::is_merchant_payment(bank_tx.mcc, bank_tx.amount, &text)
         {
             let raw_name = bank_tx.counterparty.as_deref().or(bank_tx.description.as_deref());
             match raw_name.and_then(merchant_name)
@@ -194,15 +207,14 @@ pub async fn store_transactions(
         {
             TxType::Expense
         };
-        let category = categories::detect(bank_tx.mcc, bank_tx.amount);
 
         sqlx::query!(
             r#"
             INSERT INTO transactions (
                 user_id, account_id, curr_id, amount, tx_type, tx_ts, ext_id, source, description, counterparty, mcc,
-                category, merchant_id, op_amount, op_curr_id, balance_after, is_pending
+                category, merchant_id, op_amount, op_curr_id, balance_after, is_pending, rule_key
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'bank', $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'bank', $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (account_id, ext_id) WHERE ext_id IS NOT NULL DO UPDATE SET
                 amount = EXCLUDED.amount,
                 tx_ts = EXCLUDED.tx_ts,
@@ -214,6 +226,8 @@ pub async fn store_transactions(
                 balance_after = EXCLUDED.balance_after,
                 is_pending = EXCLUDED.is_pending,
                 merchant_id = COALESCE(transactions.merchant_id, EXCLUDED.merchant_id),
+                rule_key = EXCLUDED.rule_key,
+                category = CASE WHEN transactions.is_category_locked THEN transactions.category ELSE EXCLUDED.category END,
                 tx_type = CASE WHEN transactions.transfer_id IS NULL THEN EXCLUDED.tx_type ELSE transactions.tx_type END
             "#,
             a_owner_id,
@@ -231,7 +245,8 @@ pub async fn store_transactions(
             bank_tx.op_amount,
             op_curr_id,
             bank_tx.balance_after,
-            bank_tx.is_pending
+            bank_tx.is_pending,
+            key
         )
         .execute(&mut *tx)
         .await?;
@@ -239,6 +254,104 @@ pub async fn store_transactions(
 
     tx.commit().await?;
     Ok(())
+}
+
+pub async fn recategorize_pending(a_db: &PgPool) -> Result<u64, ApiError>
+{
+    let mut rules_by_owner: HashMap<Uuid, HashMap<String, TxCategory>> = HashMap::new();
+    let mut processed = 0;
+
+    loop
+    {
+        let rows = sqlx::query!(
+            r#"
+            SELECT t.id, t.amount, t.mcc, t.description, t.counterparty, t.is_category_locked,
+                   COALESCE(a.user_id, t.user_id) AS "owner_id!"
+            FROM transactions t
+            JOIN accounts a ON a.id = t.account_id
+            WHERE t.source = 'bank' AND t.rule_key IS NULL
+            ORDER BY t.id
+            LIMIT $1
+            "#,
+            RECATEGORIZE_BATCH
+        )
+        .fetch_all(a_db)
+        .await?;
+
+        if rows.is_empty()
+        {
+            return Ok(processed);
+        }
+
+        let mut tx = a_db.begin().await?;
+        for row in &rows
+        {
+            if let Entry::Vacant(slot) = rules_by_owner.entry(row.owner_id)
+            {
+                slot.insert(category_rules(&mut tx, row.owner_id).await?);
+            }
+
+            let key = rule_key(row.counterparty.as_deref(), row.description.as_deref());
+            let text = tx_text(row.description.as_deref(), row.counterparty.as_deref());
+            let category = rules_by_owner
+                .get(&row.owner_id)
+                .and_then(|rules| rules.get(&key).copied())
+                .unwrap_or_else(|| categories::detect(row.mcc, row.amount, &text));
+
+            sqlx::query!(
+                r#"
+                UPDATE transactions
+                SET rule_key = $2,
+                    category = CASE WHEN is_category_locked THEN category ELSE $3 END
+                WHERE id = $1
+                "#,
+                row.id,
+                key,
+                category as TxCategory
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        processed += rows.len() as u64;
+    }
+}
+
+pub fn rule_key(a_counterparty: Option<&str>, a_description: Option<&str>) -> String
+{
+    a_counterparty
+        .or(a_description)
+        .and_then(merchant_name)
+        .map(|name| {
+            merchant_key(&name)
+                .split(' ')
+                .filter(|word| !word.chars().all(|ch| ch.is_ascii_digit()))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_else(|| NO_RULE_KEY.to_string())
+}
+
+fn tx_text(a_description: Option<&str>, a_counterparty: Option<&str>) -> String
+{
+    [a_description, a_counterparty]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+async fn category_rules(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<HashMap<String, TxCategory>, ApiError>
+{
+    let rows = sqlx::query!(
+        r#"SELECT rule_key, category AS "category: TxCategory" FROM category_rules WHERE user_id = $1"#,
+        a_user_id
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+
+    Ok(rows.into_iter().map(|row| (row.rule_key, row.category)).collect())
 }
 
 pub fn merchant_name(a_raw: &str) -> Option<String>
@@ -316,5 +429,14 @@ mod tests
         assert_eq!(merchant_key("Tesco  Stores-3092"), "tesco stores 3092");
         assert_eq!(merchant_key("СІЛЬПО"), "сільпо");
         assert_eq!(merchant_name("boı-shop").as_deref(), Some("boı-shop"));
+    }
+
+    #[test]
+    fn rule_keys_ignore_branch_numbers()
+    {
+        assert_eq!(rule_key(None, Some("VDP-TESCO STORES 3092")), "tesco stores");
+        assert_eq!(rule_key(None, Some("VDP-TESCO STORES 1001")), "tesco stores");
+        assert_eq!(rule_key(Some("Сільпо"), Some("ignored")), "сільпо");
+        assert_eq!(rule_key(None, None), "");
     }
 }

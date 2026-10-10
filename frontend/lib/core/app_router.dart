@@ -66,7 +66,13 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   error: aState.uri.queryParameters['error'],
                 ),
               ),
-              GoRoute(path: 'transactions', builder: (_, __) => const TransactionsScreen()),
+              GoRoute(
+                path: 'transactions',
+                builder: (_, aState) => TransactionsScreen.fromQuery(
+                  aState.uri.queryParameters,
+                  aKey: ValueKey(aState.uri.query),
+                ),
+              ),
               GoRoute(path: 'receipts', builder: (_, __) => const ReceiptsScreen()),
               GoRoute(
                 path: 'receipts/new',

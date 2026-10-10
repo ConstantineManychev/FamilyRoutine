@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            t.id,\n            t.account_id,\n            a.name AS account_name,\n            c.code AS curr_code,\n            t.amount,\n            t.op_amount,\n            oc.code AS \"op_curr_code?\",\n            t.tx_ts,\n            t.tx_type AS \"tx_type: TxType\",\n            t.source AS \"source: TxSource\",\n            t.description,\n            t.counterparty,\n            t.category AS \"category: TxCategory\",\n            t.merchant_id,\n            m.name AS \"merchant_name?\",\n            t.mcc,\n            t.note,\n            t.is_pending,\n            t.transfer_id,\n            t.receipt_id,\n            v.is_editor AS \"is_editable!\"\n        FROM transactions t\n        JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2\n        JOIN accounts a ON a.id = t.account_id\n        JOIN currencies c ON c.id = t.curr_id\n        LEFT JOIN currencies oc ON oc.id = t.op_curr_id\n        LEFT JOIN merchants m ON m.id = t.merchant_id\n        WHERE t.id = ANY($1)\n        ORDER BY t.tx_ts DESC, t.id DESC\n        ",
+  "query": "\n        SELECT\n            t.id,\n            t.account_id,\n            a.name AS account_name,\n            c.code AS curr_code,\n            t.amount,\n            t.op_amount,\n            oc.code AS \"op_curr_code?\",\n            t.tx_ts,\n            t.tx_type AS \"tx_type: TxType\",\n            t.source AS \"source: TxSource\",\n            t.description,\n            t.counterparty,\n            t.category AS \"category: TxCategory\",\n            t.merchant_id,\n            m.name AS \"merchant_name?\",\n            t.mcc,\n            t.note,\n            t.is_pending,\n            t.transfer_id,\n            t.receipt_id,\n            v.is_editor AS \"is_editable!\",\n            t.is_auto_transfer,\n            peer.account_name AS \"peer_account_name?\",\n            peer.amount AS \"peer_amount?\",\n            peer.curr_code AS \"peer_curr_code?\",\n            NULLIF(t.rule_key, '') AS similar_key\n        FROM transactions t\n        JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2\n        JOIN accounts a ON a.id = t.account_id\n        JOIN currencies c ON c.id = t.curr_id\n        LEFT JOIN currencies oc ON oc.id = t.op_curr_id\n        LEFT JOIN merchants m ON m.id = t.merchant_id\n        LEFT JOIN LATERAL (\n            SELECT pa.name AS account_name, p.amount, pc.code AS curr_code\n            FROM transactions p\n            JOIN account_viewers pv ON pv.account_id = p.account_id AND pv.viewer_id = $2\n            JOIN accounts pa ON pa.id = p.account_id\n            JOIN currencies pc ON pc.id = p.curr_id\n            WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id\n            LIMIT 1\n        ) peer ON TRUE\n        WHERE t.id = ANY($1)\n        ORDER BY t.tx_ts DESC, t.id DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -153,6 +153,31 @@
         "ordinal": 20,
         "name": "is_editable!",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 21,
+        "name": "is_auto_transfer",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 22,
+        "name": "peer_account_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 23,
+        "name": "peer_amount?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 24,
+        "name": "peer_curr_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 25,
+        "name": "similar_key",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -182,8 +207,13 @@
       false,
       true,
       true,
-      true
+      true,
+      false,
+      false,
+      false,
+      false,
+      null
     ]
   },
-  "hash": "827559cb5dfc14e8c7ba64404b368d5ae27345da593f50cb42694944e1350a8d"
+  "hash": "2c84e5684111f77d1099b8de69aa9925d69b69f0a5c8f083922a73cfc50da55e"
 }

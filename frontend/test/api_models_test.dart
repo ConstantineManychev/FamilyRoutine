@@ -113,6 +113,48 @@ void main()
       expect(item.toJson(), {'item_id': 'i1', 'qty': '2.500', 'unit_price': '40.00', 'amount': '100.00'});
     });
 
+    test('transfer peer and category stats parse', ()
+    {
+      final tx = TxDto.fromJson({
+        'id': 't1',
+        'account_id': 'a1',
+        'account_name': 'Mono EUR',
+        'curr_code': 'EUR',
+        'amount': '-100.00',
+        'tx_ts': '2026-10-09T10:00:00Z',
+        'tx_type': 'transfer',
+        'source': 'bank',
+        'transfer_id': 'tr1',
+        'is_editable': true,
+        'is_auto_transfer': true,
+        'peer_account_name': 'Mono UAH',
+        'peer_amount': '4550.00',
+        'peer_curr_code': 'UAH',
+        'similar_key': null,
+      });
+      expect(tx.isTransfer, isTrue);
+      expect(tx.isAutoTransfer, isTrue);
+      expect(tx.peerAmount, 4550);
+
+      final stats = CategoryStats.fromJson({
+        'series': [
+          {
+            'curr_code': 'EUR',
+            'income_total': '0.00',
+            'expense_total': '30.00',
+            'items': [
+              {'category': 'groceries', 'income': '0.00', 'expense': '20.00', 'tx_count': 2},
+              {'category': null, 'income': '0.00', 'expense': '10.00', 'tx_count': 1},
+            ],
+          },
+        ],
+        'missing_rates': ['UAH'],
+      });
+      expect(stats.series.single.items.first.category, TxCategory.groceries);
+      expect(stats.series.single.items.last.category, isNull);
+      expect(stats.missingRates, ['UAH']);
+    });
+
     test('dictionary item and price stats parse', ()
     {
       final item = DictItemDto.fromJson({'id': 'i1', 'name': 'Плитка', 'kind': 'product', 'unit': 'square_meter', 'is_custom': true});

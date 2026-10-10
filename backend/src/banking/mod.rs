@@ -1,6 +1,8 @@
 pub mod categories;
 pub mod currency;
 pub mod enable_banking;
+pub mod fx;
+pub mod matching;
 pub mod monobank;
 pub mod store;
 pub mod sync;
@@ -71,6 +73,7 @@ pub struct BankClients
 {
     pub monobank: monobank::MonobankClient,
     pub enable_banking: Option<enable_banking::EnableBankingClient>,
+    pub fx: Option<fx::FxClient>,
 }
 
 impl BankClients
@@ -89,7 +92,8 @@ impl BankClients
             enable_banking: a_cfg
                 .enable_banking
                 .as_ref()
-                .map(|eb_cfg| enable_banking::EnableBankingClient::new(http, eb_cfg)),
+                .map(|eb_cfg| enable_banking::EnableBankingClient::new(http.clone(), eb_cfg)),
+            fx: a_cfg.fx_api_url.as_deref().map(|url| fx::FxClient::new(http, url)),
         })
     }
 }
@@ -133,6 +137,25 @@ pub fn spawn_self_check(a_state: AppState)
         if let Some(client) = a_state.banks.enable_banking.as_ref()
         {
             client.log_application_status().await;
+        }
+    });
+}
+
+pub fn spawn_backfill(a_state: AppState)
+{
+    tokio::spawn(async move {
+        match store::recategorize_pending(&a_state.db).await
+        {
+            Ok(0) => (),
+            Ok(count) => tracing::info!("categorized {count} bank transactions"),
+            Err(err) => tracing::warn!("transaction categorization failed: {err:?}"),
+        }
+
+        match matching::match_all(&a_state.db).await
+        {
+            Ok(0) => (),
+            Ok(count) => tracing::info!("linked {count} transfers between own accounts"),
+            Err(err) => tracing::warn!("transfer matching failed: {err:?}"),
         }
     });
 }

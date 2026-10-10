@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH cand AS MATERIALIZED (\n            SELECT t.id, t.account_id, t.amount, t.curr_id, t.op_amount, t.op_curr_id, t.tx_ts,\n                   t.category IN ('transfer', 'cash') OR t.source = 'manual' AS is_transfer_like,\n                   t.category IS NULL OR t.category IN ('transfer', 'cash', 'income', 'other') AS is_neutral\n            FROM transactions t\n            JOIN accounts a ON a.id = t.account_id\n            WHERE a.user_id = $1\n              AND t.transfer_id IS NULL\n              AND t.receipt_id IS NULL\n              AND NOT t.is_match_blocked\n              AND NOT t.is_pending\n              AND t.source <> 'receipt_cash'\n        ),\n        pairs AS (\n            SELECT\n                o.id AS out_id,\n                i.id AS in_id,\n                CASE\n                    WHEN i.curr_id <> o.curr_id\n                     AND ((o.op_curr_id = i.curr_id AND o.op_amount = -i.amount)\n                       OR (i.op_curr_id = o.curr_id AND i.op_amount = -o.amount))\n                        THEN 1\n                    WHEN i.curr_id = o.curr_id AND i.amount = -o.amount AND o.is_transfer_like AND i.is_transfer_like\n                        THEN 2\n                    WHEN i.curr_id = o.curr_id AND i.amount = -o.amount AND (o.is_transfer_like OR i.is_transfer_like)\n                        THEN 3\n                    WHEN i.curr_id <> o.curr_id\n                     AND o.is_transfer_like AND i.is_transfer_like\n                     AND i.tx_ts <= o.tx_ts + INTERVAL '2 days'\n                     AND ABS(-o.amount * uah_rate(o.curr_id, o.tx_ts::date) - i.amount * uah_rate(i.curr_id, o.tx_ts::date))\n                         <= $2::float8::numeric * i.amount * uah_rate(i.curr_id, o.tx_ts::date)\n                        THEN 4\n                END AS tier\n            FROM cand o\n            JOIN cand i\n              ON i.account_id <> o.account_id\n             AND o.amount < 0\n             AND i.amount > 0\n             AND o.is_neutral\n             AND i.is_neutral\n             AND i.tx_ts BETWEEN o.tx_ts - INTERVAL '1 day' AND o.tx_ts + INTERVAL '5 days'\n        )\n        SELECT out_id AS \"out_id!\", in_id AS \"in_id!\", tier AS \"tier!\"\n        FROM pairs\n        WHERE tier IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "out_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "in_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "tier!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "562fc63a41d48c44ddf5ea8f953723403707509c3821a0dff5906e9daa3f91ee"
+}

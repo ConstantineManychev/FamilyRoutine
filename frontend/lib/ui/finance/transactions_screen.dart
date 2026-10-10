@@ -13,7 +13,29 @@ import 'finance_dialogs.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget
 {
-  const TransactionsScreen({super.key});
+  final TxCategory? initialCategory;
+  final bool isUncategorized;
+  final DateTime? initialFrom;
+  final DateTime? initialTo;
+  final String? initialAccountId;
+
+  const TransactionsScreen({
+    super.key,
+    this.initialCategory,
+    this.isUncategorized = false,
+    this.initialFrom,
+    this.initialTo,
+    this.initialAccountId,
+  });
+
+  factory TransactionsScreen.fromQuery(Map<String, String> aQuery, {Key? aKey}) => TransactionsScreen(
+        key: aKey,
+        initialCategory: TxCategory.parse(aQuery['category']),
+        isUncategorized: aQuery['uncategorized'] == 'true',
+        initialFrom: DateTime.tryParse(aQuery['from'] ?? '')?.toLocal(),
+        initialTo: DateTime.tryParse(aQuery['to'] ?? '')?.toLocal(),
+        initialAccountId: aQuery['account_id'],
+      );
 
   @override
   ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -25,9 +47,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   Timer? _debounce;
   List<TxDto> _items = const [];
   String? _cursor;
-  String? _accountId;
+  late String? _accountId = widget.initialAccountId;
+  late TxCategory? _category = widget.initialCategory;
+  late bool _isUncategorized = widget.isUncategorized && widget.initialCategory == null;
+  late DateTime? _from = widget.initialFrom;
+  late DateTime? _to = widget.initialTo;
   Object? _loadError;
   bool _isLoading = false;
+
+  static const String _uncategorizedValue = 'none';
 
   @override
   void initState()
@@ -60,6 +88,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             aAccountId: _accountId,
             aCursor: aIsReset ? null : _cursor,
             aQuery: _searchCtrl.text,
+            aCategory: _category,
+            aIsUncategorized: _isUncategorized,
+            aFrom: _from,
+            aTo: _to,
           );
 
       if (!mounted)
@@ -158,6 +190,53 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
                 ),
               ),
               SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<String?>(
+                  initialValue: _isUncategorized ? _uncategorizedValue : _category?.name,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'finance.category'.tr(),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: [
+                    DropdownMenuItem<String?>(value: null, child: Text('finance.all_categories'.tr())),
+                    ...TxCategory.values.map((aCategory) => DropdownMenuItem<String?>(
+                          value: aCategory.name,
+                          child: Row(children: [
+                            Icon(categoryIcon(aCategory), size: 16),
+                            const SizedBox(width: 8),
+                            Flexible(child: Text(categoryLabel(aCategory), overflow: TextOverflow.ellipsis)),
+                          ]),
+                        )),
+                    DropdownMenuItem<String?>(value: _uncategorizedValue, child: Text(categoryLabel(null))),
+                  ],
+                  onChanged: (aValue)
+                  {
+                    setState(()
+                    {
+                      _isUncategorized = aValue == _uncategorizedValue;
+                      _category = TxCategory.parse(aValue);
+                    });
+                    _reload();
+                  },
+                ),
+              ),
+              if (_from != null || _to != null)
+                InputChip(
+                  avatar: const Icon(AppIcons.calendar, size: 16),
+                  label: Text(_periodLabel(aContext)),
+                  onDeleted: ()
+                  {
+                    setState(()
+                    {
+                      _from = null;
+                      _to = null;
+                    });
+                    _reload();
+                  },
+                ),
+              SizedBox(
                 width: 260,
                 child: TextField(
                   controller: _searchCtrl,
@@ -177,6 +256,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
         ],
       ),
     );
+  }
+
+  String _periodLabel(BuildContext aContext)
+  {
+    final from = _from;
+    final to = _to;
+    final first = from == null ? '…' : formatDate(aContext, from);
+    final last = to == null ? '…' : formatDate(aContext, to.subtract(const Duration(minutes: 1)));
+    return '$first — $last';
   }
 
   Widget _buildList(BuildContext aContext)
@@ -244,7 +332,10 @@ class TxTile extends StatelessWidget
     final subtitle = [
       tx.accountName,
       DateFormat.Hm(aContext.locale.toLanguageTag()).format(tx.txTs),
-      if (tx.isTransfer) 'finance.transfer'.tr() else categoryLabel(tx.category),
+      if (tx.isTransfer)
+        tx.peerAccountName == null ? 'finance.transfer'.tr() : 'finance.transfer_with'.tr(args: [tx.peerAccountName!])
+      else
+        categoryLabel(tx.category),
       if (tx.isPending) 'finance.pending'.tr(),
     ].join(' · ');
 

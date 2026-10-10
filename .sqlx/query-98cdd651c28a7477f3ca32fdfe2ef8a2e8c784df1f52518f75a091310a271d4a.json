@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT category AS \"category: TxCategory\", rule_key FROM transactions WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "category: TxCategory",
+        "type_info": {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "rule_key",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "98cdd651c28a7477f3ca32fdfe2ef8a2e8c784df1f52518f75a091310a271d4a"
+}

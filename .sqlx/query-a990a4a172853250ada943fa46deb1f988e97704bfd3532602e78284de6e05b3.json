@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rule_key, category AS \"category: TxCategory\" FROM category_rules WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "category: TxCategory",
+        "type_info": {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a990a4a172853250ada943fa46deb1f988e97704bfd3532602e78284de6e05b3"
+}

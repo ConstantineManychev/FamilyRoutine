@@ -340,6 +340,24 @@ async fn eb_transactions(
     .into_response()
 }
 
+pub const NBU_EUR_RATE: &str = "45.5";
+pub const NBU_USD_RATE: &str = "41.2";
+
+pub async fn spawn_nbu() -> String
+{
+    let router = Router::new().route(
+        "/NBUStatService/v1/statdirectory/exchange",
+        get(|| async {
+            Json(json!([
+                { "r030": 978, "txt": "Євро", "rate": 45.5, "cc": "EUR", "exchangedate": "10.10.2026" },
+                { "r030": 840, "txt": "Долар США", "rate": 41.2, "cc": "USD", "exchangedate": "10.10.2026" },
+                { "r030": 999, "txt": "Невідома", "rate": 1.0, "cc": "XXX", "exchangedate": "10.10.2026" }
+            ]))
+        }),
+    );
+    serve(router).await
+}
+
 async fn serve(a_router: Router) -> String
 {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -113,6 +113,7 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(receipt_handlers::delete_receipt),
         )
         .route("/stats/cashflow", get(stats_handlers::cashflow))
+        .route("/stats/categories", get(stats_handlers::categories))
         .route(
             "/wallets",
             get(wallet_handlers::list_wallets).post(wallet_handlers::create_wallet),

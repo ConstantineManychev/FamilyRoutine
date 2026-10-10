@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM transactions WHERE transfer_id = $1 AND source = 'manual' AND NOT is_auto_transfer",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "32eefdca29ce9fb3e88ab28861cfe53cbc3fafa2b8c34cc19012013d8808b832"
+}

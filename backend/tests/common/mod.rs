@@ -28,6 +28,7 @@ pub fn bank_config(a_mono_url: &str) -> BankConfig
         enable_banking: None,
         sync_timezone: "Europe/Dublin".parse().unwrap(),
         eb_sync_hours: vec![0, 6, 12, 18],
+        fx_api_url: None,
     }
 }
 

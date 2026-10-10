@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::banking::enable_banking::assign_fingerprint_indices;
 use crate::banking::monobank::{MAX_STATEMENT_SPAN_SECS, STATEMENT_PAGE_LIMIT};
 use crate::banking::store::{self, LinkedAccount};
-use crate::banking::{BankTx, ProviderError};
+use crate::banking::{matching, BankTx, ProviderError};
 use crate::domain::errors::ApiError;
 use crate::security::crypto::bank_conn_aad;
 use crate::state::AppState;
@@ -185,9 +185,18 @@ pub async fn sync_connection(a_state: &AppState, a_conn_id: Uuid)
     };
 
     let outcome = run(a_state, &conn).await;
+    let is_synced = outcome.is_ok();
     if let Err(err) = finish(a_state, &conn, outcome).await
     {
         tracing::warn!("bank sync finalize failed: {err:?}");
+    }
+
+    if is_synced
+    {
+        if let Err(err) = matching::match_transfers(&a_state.db, conn.owner_id).await
+        {
+            tracing::warn!("transfer matching failed: {err:?}");
+        }
     }
 }
 

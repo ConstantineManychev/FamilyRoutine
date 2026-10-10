@@ -9,6 +9,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import 'transactions_screen.dart';
 
 final List<TextInputFormatter> amountFormatters = [
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\s]')),
@@ -450,6 +451,7 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
 {
   late final _noteCtrl = TextEditingController(text: widget.tx.note ?? '');
   late TxCategory? _category = widget.tx.category;
+  bool _isApplyToSimilar = false;
   bool _isBusy = false;
 
   @override
@@ -497,12 +499,23 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
     }
   }
 
+  Future<void> _linkTransfer() async
+  {
+    final isDone = await showDialog<bool>(context: context, builder: (_) => LinkTransferDialog(tx: widget.tx));
+    if (isDone == true && mounted)
+    {
+      Navigator.of(context).pop(true);
+    }
+  }
+
   @override
   Widget build(BuildContext aContext)
   {
     final tx = widget.tx;
     final api = ref.read(apiProv);
     final canLinkCash = tx.isEditable && tx.isOutflow && !tx.isTransfer && tx.receiptId == null && !tx.isReceiptCash;
+    final canLinkTransfer = tx.isEditable && !tx.isTransfer && tx.receiptId == null && !tx.isReceiptCash;
+    final canApplyToSimilar = tx.similarKey != null && _category != null && _category != tx.category;
     final details = [
       if (tx.description != null && tx.description != tx.title) tx.description!,
       if (tx.counterparty != null && tx.counterparty != tx.title) tx.counterparty!,
@@ -534,8 +547,8 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                 Text(details.join(' · '), style: const TextStyle(color: inkMuted)),
               ],
               if (tx.isTransfer) ...[
-                const SizedBox(height: 8),
-                Chip(avatar: const Icon(AppIcons.arrowLeftRight, size: 16), label: Text('finance.transfer'.tr())),
+                const SizedBox(height: 12),
+                _TransferInfo(tx: tx),
               ],
               const SizedBox(height: 16),
               DropdownButtonFormField<TxCategory?>(
@@ -554,6 +567,15 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                 ],
                 onChanged: tx.isEditable ? (aValue) => setState(() => _category = aValue) : null,
               ),
+              if (canApplyToSimilar)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: _isApplyToSimilar,
+                  onChanged: (aValue) => setState(() => _isApplyToSimilar = aValue ?? false),
+                  title: Text('finance.apply_similar'.tr(args: [tx.similarKey!])),
+                  subtitle: Text('finance.apply_similar_hint'.tr()),
+                ),
               const SizedBox(height: 16),
               TextField(
                 controller: _noteCtrl,
@@ -571,6 +593,12 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                       onPressed: _isBusy ? null : _toCash,
                       icon: const Icon(AppIcons.banknote, size: 18),
                       label: Text('finance.to_cash'.tr()),
+                    ),
+                  if (canLinkTransfer)
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : _linkTransfer,
+                      icon: const Icon(AppIcons.arrowLeftRight, size: 18),
+                      label: Text('finance.link_transfer'.tr()),
                     ),
                   if (tx.receiptId != null)
                     OutlinedButton.icon(
@@ -612,10 +640,191 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                 : () => _run(() async
                     {
                       final note = _noteCtrl.text.trim();
-                      await api.updateTransaction(tx.id, note.isEmpty ? null : note, _category);
+                      await api.updateTransaction(
+                        tx.id,
+                        note.isEmpty ? null : note,
+                        _category,
+                        aIsApplyToSimilar: canApplyToSimilar && _isApplyToSimilar,
+                      );
                     }),
             child: Text('common.save'.tr()),
           ),
+      ],
+    );
+  }
+}
+
+class _TransferInfo extends StatelessWidget
+{
+  final TxDto tx;
+
+  const _TransferInfo({required this.tx});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final peerName = tx.peerAccountName;
+    final peerAmount = tx.peerAmount;
+    final peer = peerName == null
+        ? 'finance.transfer_hidden_peer'.tr()
+        : peerAmount == null || tx.peerCurrCode == null
+            ? peerName
+            : '$peerName · ${formatMoney(aContext, peerAmount, tx.peerCurrCode!, aIsSigned: true)}';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(AppIcons.arrowLeftRight, size: 16, color: inkSecondary),
+              const SizedBox(width: 8),
+              Expanded(child: Text('finance.transfer_between'.tr(), style: const TextStyle(fontWeight: FontWeight.w600))),
+              if (tx.isAutoTransfer)
+                Text('finance.transfer_auto'.tr(), style: const TextStyle(fontSize: 12, color: inkMuted)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(peer, style: const TextStyle(color: inkSecondary)),
+          const SizedBox(height: 4),
+          Text('finance.transfer_excluded'.tr(), style: const TextStyle(fontSize: 12, color: inkMuted)),
+        ],
+      ),
+    );
+  }
+}
+
+class LinkTransferDialog extends ConsumerStatefulWidget
+{
+  final TxDto tx;
+
+  const LinkTransferDialog({super.key, required this.tx});
+
+  @override
+  ConsumerState<LinkTransferDialog> createState() => _LinkTransferDialogState();
+}
+
+class _LinkTransferDialogState extends ConsumerState<LinkTransferDialog>
+{
+  static const Duration _window = Duration(days: 7);
+
+  List<TxDto>? _candidates;
+  Object? _error;
+  bool _isSaving = false;
+
+  @override
+  void initState()
+  {
+    super.initState();
+    _load();
+  }
+
+  double _score(TxDto aCandidate)
+  {
+    final isSameAmount = aCandidate.currCode == widget.tx.currCode && aCandidate.amount == -widget.tx.amount;
+    final hours = aCandidate.txTs.difference(widget.tx.txTs).inMinutes.abs() / 60;
+    return (isSameAmount ? 0 : 1000) + hours;
+  }
+
+  Future<void> _load() async
+  {
+    try
+    {
+      final tx = widget.tx;
+      final page = await ref.read(apiProv).getTransactions(
+            aFrom: tx.txTs.subtract(_window),
+            aTo: tx.txTs.add(_window),
+            aLimit: 200,
+          );
+      final candidates = page.items
+          .where((aItem) => aItem.accountId != tx.accountId)
+          .where((aItem) => aItem.isOutflow != tx.isOutflow)
+          .where((aItem) => !aItem.isTransfer && aItem.isEditable && aItem.receiptId == null && !aItem.isReceiptCash)
+          .toList()
+        ..sort((aLeft, aRight) => _score(aLeft).compareTo(_score(aRight)));
+      if (mounted)
+      {
+        setState(() => _candidates = candidates);
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        setState(() => _error = aError);
+      }
+    }
+  }
+
+  Future<void> _link(TxDto aPeer) async
+  {
+    final outflow = widget.tx.isOutflow ? widget.tx : aPeer;
+    final inflow = widget.tx.isOutflow ? aPeer : widget.tx;
+    setState(() => _isSaving = true);
+
+    try
+    {
+      await ref.read(apiProv).createTransfer(
+            aFromAccountId: outflow.accountId,
+            aToAccountId: inflow.accountId,
+            aTs: outflow.txTs,
+            aFromTxId: outflow.id,
+            aToTxId: inflow.id,
+          );
+      if (mounted)
+      {
+        Navigator.of(context).pop(true);
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final candidates = _candidates;
+
+    return AlertDialog(
+      title: Text('finance.link_transfer'.tr()),
+      content: SizedBox(
+        width: 520,
+        height: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('finance.link_transfer_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _error != null
+                  ? Center(child: Text(errorText(_error!)))
+                  : candidates == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : candidates.isEmpty
+                          ? Center(child: Text('finance.no_candidates'.tr(), style: const TextStyle(color: inkMuted)))
+                          : ListView(
+                              children: candidates
+                                  .map((aItem) => TxTile(tx: aItem, onTap: _isSaving ? null : () => _link(aItem)))
+                                  .toList(),
+                            ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(false), child: Text('common.cancel'.tr())),
       ],
     );
   }

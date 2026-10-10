@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT a.user_id AS \"user_id!\"\n        FROM accounts a\n        WHERE a.user_id IS NOT NULL\n        GROUP BY a.user_id\n        HAVING COUNT(*) > 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "6db7ab9e0bc2f4155e26976063f15b5aa1e0f29b412ef459b0f3ee75582f05fe"
+}

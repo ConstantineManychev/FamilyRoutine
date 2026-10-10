@@ -343,9 +343,13 @@ class ApiSvc
     int aLimit = 50,
     bool aIsUnlinked = false,
     String? aQuery,
+    TxCategory? aCategory,
+    bool aIsUncategorized = false,
   }) async
   {
     final res = await _dio.get('/api/transactions', queryParameters: {
+      if (aCategory != null) 'category': aCategory.name,
+      if (aIsUncategorized) 'is_uncategorized': true,
       if (aAccountId != null) 'account_id': aAccountId,
       if (aFrom != null) 'from': aFrom.toUtc().toIso8601String(),
       if (aTo != null) 'to': aTo.toUtc().toIso8601String(),
@@ -368,9 +372,13 @@ class ApiSvc
     return TxDto.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<TxDto> updateTransaction(String aId, String? aNote, TxCategory? aCategory) async
+  Future<TxDto> updateTransaction(String aId, String? aNote, TxCategory? aCategory, {bool aIsApplyToSimilar = false}) async
   {
-    final res = await _dio.put('/api/transactions/$aId', data: {'note': aNote, 'category': aCategory?.name});
+    final res = await _dio.put('/api/transactions/$aId', data: {
+      'note': aNote,
+      'category': aCategory?.name,
+      'is_apply_to_similar': aIsApplyToSimilar,
+    });
     return TxDto.fromJson(res.data as Map<String, dynamic>);
   }
 
@@ -383,6 +391,7 @@ class ApiSvc
     double? aAmount,
     double? aToAmount,
     String? aFromTxId,
+    String? aToTxId,
     String? aNote,
   }) async
   {
@@ -393,6 +402,7 @@ class ApiSvc
       'amount': aAmount == null ? null : moneyWire(aAmount),
       'to_amount': aToAmount == null ? null : moneyWire(aToAmount),
       'from_tx_id': aFromTxId,
+      'to_tx_id': aToTxId,
       'note': aNote,
     });
   }
@@ -458,11 +468,13 @@ class ApiSvc
 
   Future<void> deleteReceipt(String aId) => _dio.delete('/api/receipts/$aId');
 
-  Future<List<CashflowSeries>> getCashflow({
+  Future<CashflowData> getCashflow({
     required DateTime aFrom,
     required DateTime aTo,
     required StatsBucket aBucket,
     String? aAccountId,
+    FlowMode aMode = FlowMode.net,
+    String? aConvertTo,
   }) async
   {
     final res = await _dio.get('/api/stats/cashflow', queryParameters: {
@@ -470,8 +482,29 @@ class ApiSvc
       'to': aTo.toUtc().toIso8601String(),
       'bucket': aBucket.name,
       'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+      'mode': aMode.name,
       if (aAccountId != null) 'account_id': aAccountId,
+      if (aConvertTo != null) 'convert_to': aConvertTo,
     });
-    return _list(res.data['series'], CashflowSeries.fromJson);
+    return CashflowData.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<CategoryStats> getCategoryStats({
+    required DateTime aFrom,
+    required DateTime aTo,
+    String? aAccountId,
+    FlowMode aMode = FlowMode.net,
+    String? aConvertTo,
+  }) async
+  {
+    final res = await _dio.get('/api/stats/categories', queryParameters: {
+      'from': aFrom.toUtc().toIso8601String(),
+      'to': aTo.toUtc().toIso8601String(),
+      'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+      'mode': aMode.name,
+      if (aAccountId != null) 'account_id': aAccountId,
+      if (aConvertTo != null) 'convert_to': aConvertTo,
+    });
+    return CategoryStats.fromJson(res.data as Map<String, dynamic>);
   }
 }

@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE transactions\n        SET note = $2, category = $3, is_category_locked = is_category_locked OR $4\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "87f659be6fd1a0d5b01bca73ff9bb95dcdd9f16afcb7cc0af6fcc7bdbdc402e1"
+}

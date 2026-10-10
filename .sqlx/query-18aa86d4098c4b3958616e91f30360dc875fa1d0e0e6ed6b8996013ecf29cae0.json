@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH chosen AS MATERIALIZED (\n            SELECT out_id, in_id, uuid_generate_v4() AS transfer_id\n            FROM UNNEST($1::uuid[], $2::uuid[]) AS c(out_id, in_id)\n        ),\n        legs AS (\n            SELECT out_id AS id, transfer_id FROM chosen\n            UNION ALL\n            SELECT in_id AS id, transfer_id FROM chosen\n        )\n        UPDATE transactions t\n        SET transfer_id = legs.transfer_id, tx_type = 'transfer', is_auto_transfer = TRUE\n        FROM legs\n        WHERE t.id = legs.id\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "18aa86d4098c4b3958616e91f30360dc875fa1d0e0e6ed6b8996013ecf29cae0"
+}

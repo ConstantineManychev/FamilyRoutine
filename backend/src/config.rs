@@ -14,6 +14,7 @@ pub const MIN_PEPPER_LEN: usize = 32;
 
 const DEFAULT_MONO_API: &str = "https://api.monobank.ua";
 const DEFAULT_EB_API: &str = "https://api.enablebanking.com";
+const DEFAULT_FX_API: &str = "https://bank.gov.ua";
 
 pub struct BankConfig
 {
@@ -24,6 +25,7 @@ pub struct BankConfig
     pub enable_banking: Option<EnableBankingConfig>,
     pub sync_timezone: Tz,
     pub eb_sync_hours: Vec<u32>,
+    pub fx_api_url: Option<String>,
 }
 
 pub struct EnableBankingConfig
@@ -56,6 +58,8 @@ impl BankConfig
             enable_banking: EnableBankingConfig::from_env(a_env_dir)?,
             sync_timezone,
             eb_sync_hours: parse_hours(&optional("ENABLE_BANKING_SYNC_HOURS").unwrap_or_else(|| "0,6,12,18".into()))?,
+            fx_api_url: parse_bool("FX_SYNC_ENABLED", true)?
+                .then(|| optional("FX_RATES_URL").unwrap_or_else(|| DEFAULT_FX_API.into())),
         })
     }
 }

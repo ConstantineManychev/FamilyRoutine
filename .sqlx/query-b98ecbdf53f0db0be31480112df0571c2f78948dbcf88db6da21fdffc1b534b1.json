@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH bounds AS (\n            SELECT GREATEST(\n                COALESCE((SELECT MIN(tx_ts)::date FROM transactions), $1::date),\n                $1::date - $2::int\n            ) AS first_day\n        )\n        SELECT day::date AS \"day!\"\n        FROM bounds, generate_series(bounds.first_day, $1::date, INTERVAL '1 day') AS day\n        WHERE NOT EXISTS (SELECT 1 FROM fx_rate_days d WHERE d.rate_date = day::date)\n        ORDER BY 1 DESC\n        LIMIT $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day!",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b98ecbdf53f0db0be31480112df0571c2f78948dbcf88db6da21fdffc1b534b1"
+}

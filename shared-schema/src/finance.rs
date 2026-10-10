@@ -89,6 +89,15 @@ pub enum ItemUnit
     Hour,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FlowMode
+{
+    #[default]
+    Net,
+    Turnover,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatsBucket
@@ -174,6 +183,11 @@ pub struct TxDto
     pub transfer_id: Option<Uuid>,
     pub receipt_id: Option<Uuid>,
     pub is_editable: bool,
+    pub is_auto_transfer: bool,
+    pub peer_account_name: Option<String>,
+    pub peer_amount: Option<Decimal>,
+    pub peer_curr_code: Option<String>,
+    pub similar_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -200,6 +214,10 @@ pub struct TxQuery
     pub is_unlinked: Option<bool>,
     #[serde(default)]
     pub q: Option<String>,
+    #[serde(default)]
+    pub category: Option<TxCategory>,
+    #[serde(default)]
+    pub is_uncategorized: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -221,6 +239,8 @@ pub struct UpdateTxRequest
     pub note: Option<String>,
     #[serde(default)]
     pub category: Option<TxCategory>,
+    #[serde(default)]
+    pub is_apply_to_similar: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -350,6 +370,10 @@ pub struct CashflowQuery
     pub tz_offset_min: i32,
     #[serde(default)]
     pub account_id: Option<Uuid>,
+    #[serde(default)]
+    pub mode: FlowMode,
+    #[serde(default)]
+    pub convert_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -374,6 +398,47 @@ pub struct CashflowDto
 {
     pub bucket: StatsBucket,
     pub series: Vec<CashflowSeriesDto>,
+    pub missing_rates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CategoryQuery
+{
+    pub from: DateTime<Utc>,
+    pub to: DateTime<Utc>,
+    #[serde(default)]
+    pub tz_offset_min: i32,
+    #[serde(default)]
+    pub account_id: Option<Uuid>,
+    #[serde(default)]
+    pub mode: FlowMode,
+    #[serde(default)]
+    pub convert_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategoryAmountDto
+{
+    pub category: Option<TxCategory>,
+    pub income: Decimal,
+    pub expense: Decimal,
+    pub tx_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategorySeriesDto
+{
+    pub curr_code: String,
+    pub income_total: Decimal,
+    pub expense_total: Decimal,
+    pub items: Vec<CategoryAmountDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CategoryStatsDto
+{
+    pub series: Vec<CategorySeriesDto>,
+    pub missing_rates: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

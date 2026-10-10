@@ -232,6 +232,11 @@ class TxDto
   final String? transferId;
   final String? receiptId;
   final bool isEditable;
+  final bool isAutoTransfer;
+  final String? peerAccountName;
+  final double? peerAmount;
+  final String? peerCurrCode;
+  final String? similarKey;
 
   const TxDto({
     required this.id,
@@ -255,6 +260,11 @@ class TxDto
     this.transferId,
     this.receiptId,
     required this.isEditable,
+    this.isAutoTransfer = false,
+    this.peerAccountName,
+    this.peerAmount,
+    this.peerCurrCode,
+    this.similarKey,
   });
 
   bool get isTransfer => transferId != null;
@@ -286,6 +296,11 @@ class TxDto
         transferId: aJson['transfer_id'] as String?,
         receiptId: aJson['receipt_id'] as String?,
         isEditable: aJson['is_editable'] as bool? ?? false,
+        isAutoTransfer: aJson['is_auto_transfer'] as bool? ?? false,
+        peerAccountName: aJson['peer_account_name'] as String?,
+        peerAmount: parseDecimalOrNull(aJson['peer_amount']),
+        peerCurrCode: aJson['peer_curr_code'] as String?,
+        similarKey: aJson['similar_key'] as String?,
       );
 }
 
@@ -474,6 +489,79 @@ class CashflowSeries
         points: (aJson['points'] as List? ?? const [])
             .map((aItem) => CashflowPoint.fromJson(aItem as Map<String, dynamic>))
             .toList(),
+      );
+}
+
+class CashflowData
+{
+  final List<CashflowSeries> series;
+  final List<String> missingRates;
+
+  const CashflowData({required this.series, required this.missingRates});
+
+  factory CashflowData.fromJson(Map<String, dynamic> aJson) => CashflowData(
+        series: (aJson['series'] as List? ?? const [])
+            .map((aItem) => CashflowSeries.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+        missingRates: (aJson['missing_rates'] as List? ?? const []).cast<String>(),
+      );
+}
+
+enum FlowMode { net, turnover }
+
+class CategoryAmount
+{
+  final TxCategory? category;
+  final double income;
+  final double expense;
+  final int txCount;
+
+  const CategoryAmount({this.category, required this.income, required this.expense, required this.txCount});
+
+  factory CategoryAmount.fromJson(Map<String, dynamic> aJson) => CategoryAmount(
+        category: TxCategory.parse(aJson['category']),
+        income: parseDecimal(aJson['income']),
+        expense: parseDecimal(aJson['expense']),
+        txCount: (aJson['tx_count'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class CategorySeries
+{
+  final String currCode;
+  final double incomeTotal;
+  final double expenseTotal;
+  final List<CategoryAmount> items;
+
+  const CategorySeries({
+    required this.currCode,
+    required this.incomeTotal,
+    required this.expenseTotal,
+    required this.items,
+  });
+
+  factory CategorySeries.fromJson(Map<String, dynamic> aJson) => CategorySeries(
+        currCode: aJson['curr_code'] as String? ?? '',
+        incomeTotal: parseDecimal(aJson['income_total']),
+        expenseTotal: parseDecimal(aJson['expense_total']),
+        items: (aJson['items'] as List? ?? const [])
+            .map((aItem) => CategoryAmount.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class CategoryStats
+{
+  final List<CategorySeries> series;
+  final List<String> missingRates;
+
+  const CategoryStats({required this.series, required this.missingRates});
+
+  factory CategoryStats.fromJson(Map<String, dynamic> aJson) => CategoryStats(
+        series: (aJson['series'] as List? ?? const [])
+            .map((aItem) => CategorySeries.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+        missingRates: (aJson['missing_rates'] as List? ?? const []).cast<String>(),
       );
 }
 
