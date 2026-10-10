@@ -111,7 +111,16 @@ flutter test
 
 - Версия Flutter — 3.47.7, как `FLUTTER_VERSION` в `frontend/Dockerfile`. От неё зависит `pubspec.lock`: Flutter фиксирует версии части пакетов (например, `intl`), поэтому на другой версии `flutter pub get` переписывает lock-файл. При обновлении Flutter закоммитьте новый `pubspec.lock` и поменяйте `FLUTTER_VERSION`.
 - `web_dev_config.yaml` поднимает dev-сервер на порту 5173 и проксирует `/api/` на бэкенд `localhost:3000`. Клиент и API работают с одного origin, поэтому cookie-сессия работает без CORS и без `ALLOWED_ORIGINS`. В Codespaces достаточно открыть только порт 5173.
-- `flutter run` — отладочный режим: приложение собирается из сотен отдельных модулей (DDC), и через туннель Codespaces первая загрузка может занимать минуты. Скорость так оценивать нельзя — для этого нужна release-сборка.
+- `flutter run` — отладочный режим: приложение собирается из сотен отдельных модулей (DDC), и через туннель Codespaces первая загрузка может занимать минуты. Скорость так оценивать нельзя — для этого нужна release-сборка. Если в Codespaces не проходит WebSocket отладчика (`$dwdsSseHandler … failed`, затем `Library not defined`), отладочная сборка не запустится — используйте release-сборку ниже.
+- Release-сборка локально и в Codespaces, так же как в продакшене за nginx:
+
+  ```bash
+  cd frontend
+  flutter build web --release --wasm --csp --no-web-resources-cdn
+  python3 tool/serve_web.py
+  ```
+
+  Сервер слушает порт 5173, отдаёт `index.html` для путей приложения (`/app/...`, `/auth`), проксирует `/api/` на `http://localhost:3000` (`--api` меняет адрес) и ставит те же заголовки безопасности и CSP, что `nginx.conf`. Сборку с движком Flutter из CDN (без `--no-web-resources-cdn`) он отклоняет: продакшен-CSP её блокирует. Простой `python3 -m http.server` не подходит — он не проксирует `/api` и не знает про пути приложения. После изменений кода повторите `flutter build web` и обновите страницу.
 - В web-сборке сессия хранится в HttpOnly-cookie (недоступна JavaScript), на мобильных и desktop — токен в защищённом хранилище ОС (Keychain / Keystore).
 - Без `API_URL` web-клиент обращается к тому же origin, с которого загружен (`/api` проксирует nginx или dev-сервер).
 - Продакшен-сборка: `flutter build web --release --wasm --csp --no-web-resources-cdn`. Браузеры с WasmGC (Chrome/Edge 119+, Firefox 120+, Safari 18.2+) получают WebAssembly, остальные — JS. Сборка обходится без динамической генерации кода и внешних CDN, что позволяет строгую Content-Security-Policy.
