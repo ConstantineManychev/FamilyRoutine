@@ -10,11 +10,11 @@ const Map<String, List<String>> dynamicKeys = {
     'VALIDATION', 'UNAUTHENTICATED', 'INVALID_CREDENTIALS', 'FORBIDDEN', 'NOT_FOUND', 'ALREADY_EXISTS',
     'EMAIL_TAKEN', 'IN_USE', 'OWNER_PROTECTED', 'OWNER_MUST_TRANSFER', 'TOO_MANY_INVITES', 'TOO_MANY_REQUESTS',
     'INTERNAL', 'NETWORK', 'UNKNOWN', 'BANK_NOT_CONFIGURED', 'ALREADY_CONNECTED', 'BANK_UNAVAILABLE', 'BANK_LINKED',
-    'BANK_APP_REJECTED', 'BANK_REJECTED',
+    'BANK_APP_REJECTED', 'BANK_APP_INACTIVE', 'BANK_REJECTED',
   ],
   'bank': [
     'provider_monobank', 'provider_enable_banking', 'status_pending', 'status_active', 'status_error', 'status_expired',
-    'error_UNAUTHORIZED', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',
+    'error_UNAUTHORIZED', 'error_APP_INACTIVE', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',
   ],
   'finance': ['period_day', 'period_week', 'period_month', 'period_quarter'],
   'finance.cat': [

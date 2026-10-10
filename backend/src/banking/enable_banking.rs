@@ -228,7 +228,15 @@ impl EnableBankingClient
             Err(ProviderError::Unauthorized) =>
             {
                 tracing::warn!(
-                    "enable banking rejected application {}: check that the key belongs to it and that it is active",
+                    "enable banking rejected application {}: check that the key belongs to it",
+                    self.app_id
+                );
+                return;
+            }
+            Err(ProviderError::AppInactive) =>
+            {
+                tracing::warn!(
+                    "enable banking application {} is not active, activate it in the Enable Banking control panel",
                     self.app_id
                 );
                 return;
@@ -459,7 +467,17 @@ async fn failure(a_response: reqwest::Response) -> ProviderError
     let body = a_response.text().await.unwrap_or_default();
     let detail: String = body.chars().take(MAX_ERROR_DETAIL_CHARS).collect();
     tracing::warn!("enable banking {status} on {path}: {detail}");
+
+    if status == StatusCode::FORBIDDEN && is_inactive_application(&body)
+    {
+        return ProviderError::AppInactive;
+    }
     map_status(status)
+}
+
+fn is_inactive_application(a_body: &str) -> bool
+{
+    a_body.to_ascii_lowercase().contains("not active")
 }
 
 fn map_status(a_status: StatusCode) -> ProviderError

@@ -364,6 +364,7 @@ fn enable_banking_error(a_err: ProviderError, a_rejected_field: Option<&'static 
     match (a_err, a_rejected_field)
     {
         (ProviderError::Unauthorized, _) => ApiError::Upstream("BANK_APP_REJECTED"),
+        (ProviderError::AppInactive, _) => ApiError::Upstream("BANK_APP_INACTIVE"),
         (ProviderError::Rejected(_), Some(field)) => ApiError::Validation(field),
         (ProviderError::Rejected(_), None) => ApiError::Upstream("BANK_REJECTED"),
         (other, _) => provider_error(other, "bank"),
@@ -375,6 +376,7 @@ fn provider_error(a_err: ProviderError, a_field: &'static str) -> ApiError
     match a_err
     {
         ProviderError::Unauthorized => ApiError::Validation(a_field),
+        ProviderError::AppInactive => ApiError::Upstream("BANK_APP_INACTIVE"),
         ProviderError::RateLimited => ApiError::TooManyRequests(60),
         ProviderError::Rejected(reason) =>
         {

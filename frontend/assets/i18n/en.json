@@ -38,7 +38,8 @@
     "BANK_UNAVAILABLE": "The bank is temporarily unavailable, try again later",
     "BANK_LINKED": "The wallet is linked to a bank: disconnect the bank or archive the wallet first",
     "BANK_APP_REJECTED": "Enable Banking did not accept the application key. Check ENABLE_BANKING_APP_ID and the PEM file; details are in the server log.",
-    "BANK_REJECTED": "Enable Banking rejected the request. A common cause is a redirect URL that is not registered in the Enable Banking control panel. Details are in the server log."
+    "BANK_REJECTED": "Enable Banking rejected the request. A common cause is a redirect URL that is not registered in the Enable Banking control panel. Details are in the server log.",
+    "BANK_APP_INACTIVE": "The Enable Banking application is not active. Activate it in the Enable Banking control panel with “Activate by linking accounts”."
   },
   "sidebar": {
     "routine": "Routine",
@@ -266,7 +267,8 @@
     "completing": "Finishing the bank connection…",
     "declined": "The connection was cancelled or the bank denied access.",
     "choose_bank": "Bank",
-    "no_aspsps": "Enable Banking returned no banks. Make sure the application runs in production, not sandbox, in the Enable Banking control panel."
+    "no_aspsps": "Enable Banking returned no banks. Make sure the application runs in production, not sandbox, in the Enable Banking control panel.",
+    "error_APP_INACTIVE": "Enable Banking application is not active"
   },
   "finance": {
     "transactions": "Transactions",

@@ -38,7 +38,8 @@
     "BANK_UNAVAILABLE": "Банк временно недоступен, попробуйте позже",
     "BANK_LINKED": "Кошелёк связан с банком: сначала отключите банк или переместите кошелёк в архив",
     "BANK_APP_REJECTED": "Enable Banking не принял ключ приложения. Проверьте ENABLE_BANKING_APP_ID и PEM-файл, подробности — в журнале сервера.",
-    "BANK_REJECTED": "Enable Banking отклонил запрос. Частая причина — адрес возврата не зарегистрирован в панели Enable Banking. Подробности — в журнале сервера."
+    "BANK_REJECTED": "Enable Banking отклонил запрос. Частая причина — адрес возврата не зарегистрирован в панели Enable Banking. Подробности — в журнале сервера.",
+    "BANK_APP_INACTIVE": "Приложение в Enable Banking не активно. Активируйте его в панели Enable Banking кнопкой «Activate by linking accounts»."
   },
   "sidebar": {
     "routine": "Рутина",
@@ -266,7 +267,8 @@
     "completing": "Завершаем подключение банка…",
     "declined": "Подключение отменено или банк отказал в доступе.",
     "choose_bank": "Банк",
-    "no_aspsps": "Enable Banking не вернул ни одного банка. Проверьте, что приложение в панели Enable Banking работает в production, а не в sandbox."
+    "no_aspsps": "Enable Banking не вернул ни одного банка. Проверьте, что приложение в панели Enable Banking работает в production, а не в sandbox.",
+    "error_APP_INACTIVE": "приложение Enable Banking не активно"
   },
   "finance": {
     "transactions": "Транзакции",

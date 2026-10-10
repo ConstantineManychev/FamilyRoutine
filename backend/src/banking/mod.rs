@@ -46,6 +46,7 @@ pub struct BankTx
 pub enum ProviderError
 {
     Unauthorized,
+    AppInactive,
     RateLimited,
     Rejected(String),
     Transient(String),
@@ -58,6 +59,7 @@ impl ProviderError
         match self
         {
             Self::Unauthorized => "UNAUTHORIZED",
+            Self::AppInactive => "APP_INACTIVE",
             Self::RateLimited => "RATE_LIMITED",
             Self::Rejected(_) => "REJECTED",
             Self::Transient(_) => "UNAVAILABLE",

@@ -38,7 +38,8 @@
     "BANK_UNAVAILABLE": "銀行に一時的に接続できません。後でもう一度お試しください",
     "BANK_LINKED": "このウォレットは銀行に連携されています。先に銀行の接続を解除するか、ウォレットをアーカイブしてください",
     "BANK_APP_REJECTED": "Enable Banking がアプリケーションキーを受け付けませんでした。ENABLE_BANKING_APP_ID と PEM ファイルを確認してください。詳細はサーバーログにあります。",
-    "BANK_REJECTED": "Enable Banking がリクエストを拒否しました。よくある原因は、リダイレクト URL が Enable Banking の管理画面に登録されていないことです。詳細はサーバーログにあります。"
+    "BANK_REJECTED": "Enable Banking がリクエストを拒否しました。よくある原因は、リダイレクト URL が Enable Banking の管理画面に登録されていないことです。詳細はサーバーログにあります。",
+    "BANK_APP_INACTIVE": "Enable Banking のアプリケーションが有効になっていません。管理画面の「Activate by linking accounts」で有効化してください。"
   },
   "sidebar": {
     "routine": "ルーティン",
@@ -266,7 +267,8 @@
     "completing": "銀行の接続を完了しています…",
     "declined": "接続がキャンセルされたか、銀行がアクセスを拒否しました。",
     "choose_bank": "銀行",
-    "no_aspsps": "Enable Banking から銀行が返されませんでした。管理画面でアプリケーションが sandbox ではなく production で動作しているか確認してください。"
+    "no_aspsps": "Enable Banking から銀行が返されませんでした。管理画面でアプリケーションが sandbox ではなく production で動作しているか確認してください。",
+    "error_APP_INACTIVE": "Enable Banking アプリケーションが無効です"
   },
   "finance": {
     "transactions": "取引",

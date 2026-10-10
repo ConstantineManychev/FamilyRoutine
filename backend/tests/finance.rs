@@ -4,7 +4,9 @@ use axum::http::{Method, StatusCode};
 use backend::banking::sync::sync_connection;
 use backend::security::crypto::bank_conn_aad;
 use chrono::{Duration, Utc};
-use common::bank_mocks::{mono_item, spawn_enable_banking, spawn_mono, EB_CODE, EB_SESSION, MONO_TOKEN};
+use common::bank_mocks::{
+    mono_item, spawn_enable_banking, spawn_mono, EB_CODE, EB_INACTIVE_APP_ID, EB_SESSION, MONO_TOKEN,
+};
 use common::{bank_config, TestApp, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -812,4 +814,22 @@ async fn enable_banking_refusals_have_distinct_codes(a_db: PgPool)
         .await;
     assert_eq!(refused.status, StatusCode::BAD_GATEWAY);
     assert_eq!(refused.body["code"], "BANK_APP_REJECTED");
+
+    let (mut inactive_app, _inactive_mock) = spawn_enable_banking().await;
+    inactive_app.app_id = EB_INACTIVE_APP_ID.to_string();
+    let mut banks = bank_config("http://127.0.0.1:9");
+    banks.enable_banking = Some(inactive_app);
+    let app = TestApp::with_banks(app.state.db.clone(), banks);
+    let carol = app.user("carol@example.com").await;
+
+    let inactive = app
+        .call(
+            Method::GET,
+            "/api/banks/enable-banking/aspsps?country=IE",
+            Some(&carol.token),
+            None,
+        )
+        .await;
+    assert_eq!(inactive.status, StatusCode::BAD_GATEWAY);
+    assert_eq!(inactive.body["code"], "BANK_APP_INACTIVE");
 }

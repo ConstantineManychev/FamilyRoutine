@@ -21,6 +21,7 @@ pub const EB_CODE: &str = "good-code";
 pub const EB_SESSION: &str = "session-secret-1";
 pub const EB_ACCOUNT: &str = "uid-1";
 pub const EB_REDIRECT_URL: &str = "https://app.example/app/bank-callback";
+pub const EB_INACTIVE_APP_ID: &str = "99999999-0000-0000-0000-000000000000";
 
 #[derive(Clone)]
 pub struct MonoMock
@@ -168,6 +169,15 @@ pub async fn spawn_enable_banking() -> (EnableBankingConfig, EbMock)
     (cfg, mock)
 }
 
+fn token_kid(a_headers: &HeaderMap) -> Option<String>
+{
+    let token = a_headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))?;
+    jsonwebtoken::decode_header(token).ok().and_then(|header| header.kid)
+}
+
 fn is_authorized(a_mock: &EbMock, a_headers: &HeaderMap) -> bool
 {
     let Some(token) = a_headers
@@ -190,6 +200,15 @@ fn is_authorized(a_mock: &EbMock, a_headers: &HeaderMap) -> bool
 
 async fn eb_aspsps(State(a_mock): State<EbMock>, a_headers: HeaderMap) -> Response
 {
+    if token_kid(&a_headers).as_deref() == Some(EB_INACTIVE_APP_ID)
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "message": "Application is not active" })),
+        )
+            .into_response();
+    }
+
     if !is_authorized(&a_mock, &a_headers)
     {
         return StatusCode::UNAUTHORIZED.into_response();

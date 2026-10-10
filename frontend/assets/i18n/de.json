@@ -38,7 +38,8 @@
     "BANK_UNAVAILABLE": "Die Bank ist vorübergehend nicht erreichbar, bitte später erneut versuchen",
     "BANK_LINKED": "Das Konto ist mit einer Bank verbunden: Trennen Sie zuerst die Bank oder archivieren Sie das Konto",
     "BANK_APP_REJECTED": "Enable Banking hat den Anwendungsschlüssel nicht akzeptiert. Prüfen Sie ENABLE_BANKING_APP_ID und die PEM-Datei; Details stehen im Serverprotokoll.",
-    "BANK_REJECTED": "Enable Banking hat die Anfrage abgelehnt. Häufige Ursache: Die Weiterleitungs-URL ist im Enable-Banking-Kontrollzentrum nicht registriert. Details stehen im Serverprotokoll."
+    "BANK_REJECTED": "Enable Banking hat die Anfrage abgelehnt. Häufige Ursache: Die Weiterleitungs-URL ist im Enable-Banking-Kontrollzentrum nicht registriert. Details stehen im Serverprotokoll.",
+    "BANK_APP_INACTIVE": "Die Enable-Banking-Anwendung ist nicht aktiv. Aktivieren Sie sie im Enable-Banking-Kontrollzentrum über „Activate by linking accounts“."
   },
   "sidebar": {
     "routine": "Routine",
@@ -266,7 +267,8 @@
     "completing": "Bankverbindung wird abgeschlossen…",
     "declined": "Die Verbindung wurde abgebrochen oder die Bank hat den Zugriff verweigert.",
     "choose_bank": "Bank",
-    "no_aspsps": "Enable Banking hat keine Banken geliefert. Prüfen Sie, dass die Anwendung im Enable-Banking-Kontrollzentrum im Produktions- und nicht im Sandbox-Modus läuft."
+    "no_aspsps": "Enable Banking hat keine Banken geliefert. Prüfen Sie, dass die Anwendung im Enable-Banking-Kontrollzentrum im Produktions- und nicht im Sandbox-Modus läuft.",
+    "error_APP_INACTIVE": "Enable-Banking-Anwendung ist nicht aktiv"
   },
   "finance": {
     "transactions": "Buchungen",
