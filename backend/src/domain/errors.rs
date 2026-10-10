@@ -13,7 +13,6 @@ pub enum ApiError
     Forbidden,
     NotFound,
     Conflict(&'static str),
-    LastAdmin,
     TooManyRequests(u64),
     Internal(String),
 }
@@ -35,7 +34,6 @@ impl ApiError
             Self::Forbidden => (StatusCode::FORBIDDEN, "FORBIDDEN"),
             Self::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             Self::Conflict(code) => (StatusCode::CONFLICT, code),
-            Self::LastAdmin => (StatusCode::CONFLICT, "LAST_ADMIN"),
             Self::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS"),
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL"),
         }

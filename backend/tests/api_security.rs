@@ -3,7 +3,7 @@ mod common;
 use axum::body::Body;
 use axum::http::{header, Method, Request, StatusCode};
 use backend::security::crypto::account_token_aad;
-use common::{TestApp, PASSWORD};
+use common::{TestApp, TestUser, PASSWORD};
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -148,12 +148,25 @@ async fn registration_validates_input_and_rejects_duplicates(a_db: PgPool)
             None,
             Some(json!({
                 "first_name": "Bob", "last_name": "B", "email": "bob@example.com",
-                "password": "short", "birth_date": "1990-01-01"
+                "password": "", "birth_date": "1990-01-01"
             })),
         )
         .await;
     assert_eq!(weak.status, StatusCode::BAD_REQUEST);
     assert_eq!(weak.body["field"], "password");
+
+    let single_char = app
+        .call(
+            Method::POST,
+            "/api/auth/register",
+            None,
+            Some(json!({
+                "first_name": "Bob", "last_name": "B", "email": "bob@example.com",
+                "password": "1", "birth_date": "1990-01-01"
+            })),
+        )
+        .await;
+    assert_eq!(single_char.status, StatusCode::CREATED);
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -410,74 +423,208 @@ async fn invites_are_single_use_codes_managed_by_admins(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn last_admin_is_protected(a_db: PgPool)
+async fn only_owner_manages_admins(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
+    let carol = app.user("carol@example.com").await;
+    let dave = app.user("dave@example.com").await;
     let fam_id = app.family(&alice, "Home").await;
-    app.join(&alice, &bob, &fam_id, "standard").await;
+    app.join(&alice, &bob, &fam_id, "admin").await;
+    app.join(&bob, &carol, &fam_id, "standard").await;
+    app.join(&alice, &dave, &fam_id, "admin").await;
 
-    let leave = app
+    let fam_uri = format!("/api/families/{fam_id}");
+    let member_uri = |a_user: &TestUser| format!("{fam_uri}/members/{}", a_user.id);
+    let as_admin = json!({ "role": "admin" });
+    let as_standard = json!({ "role": "standard" });
+
+    let detail = app.call(Method::GET, &fam_uri, Some(&alice.token), None).await;
+    assert_eq!(detail.body["is_owner"], true);
+    assert_eq!(detail.body["members"][0]["id"], alice.id.to_string());
+    assert_eq!(detail.body["members"][0]["is_owner"], true);
+
+    let admin_invite_by_admin = app
         .call(
             Method::POST,
-            &format!("/api/families/{fam_id}/leave"),
-            Some(&alice.token),
-            None,
+            &format!("{fam_uri}/invites"),
+            Some(&bob.token),
+            Some(as_admin.clone()),
         )
         .await;
-    assert_eq!(leave.status, StatusCode::CONFLICT);
-    assert_eq!(leave.body["code"], "LAST_ADMIN");
+    assert_eq!(admin_invite_by_admin.status, StatusCode::FORBIDDEN);
 
-    let demote = app
+    for (target, body) in [(&carol, &as_admin), (&dave, &as_standard), (&alice, &as_standard)]
+    {
+        let reply = app
+            .call(Method::PUT, &member_uri(target), Some(&bob.token), Some(body.clone()))
+            .await;
+        assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    }
+
+    let demote_owner = app
         .call(
             Method::PUT,
-            &format!("/api/families/{fam_id}/members/{}", alice.id),
+            &member_uri(&alice),
             Some(&alice.token),
-            Some(json!({ "role": "standard" })),
+            Some(as_standard.clone()),
         )
         .await;
-    assert_eq!(demote.body["code"], "LAST_ADMIN");
+    assert_eq!(demote_owner.status, StatusCode::CONFLICT);
+    assert_eq!(demote_owner.body["code"], "OWNER_PROTECTED");
+
+    let remove_owner = app
+        .call(Method::DELETE, &member_uri(&alice), Some(&bob.token), None)
+        .await;
+    assert_eq!(remove_owner.body["code"], "OWNER_PROTECTED");
+
+    let remove_admin_by_admin = app
+        .call(Method::DELETE, &member_uri(&dave), Some(&bob.token), None)
+        .await;
+    assert_eq!(remove_admin_by_admin.status, StatusCode::FORBIDDEN);
 
     let bad_role = app
         .call(
             Method::PUT,
-            &format!("/api/families/{fam_id}/members/{}", bob.id),
+            &member_uri(&bob),
             Some(&alice.token),
             Some(json!({ "role": "owner" })),
         )
         .await;
     assert_eq!(bad_role.status, StatusCode::BAD_REQUEST);
 
-    let by_member = app
-        .call(
-            Method::PUT,
-            &format!("/api/families/{fam_id}/members/{}", alice.id),
-            Some(&bob.token),
-            Some(json!({ "role": "standard" })),
-        )
-        .await;
-    assert_eq!(by_member.status, StatusCode::FORBIDDEN);
+    let delete_by_admin = app.call(Method::DELETE, &fam_uri, Some(&bob.token), None).await;
+    assert_eq!(delete_by_admin.status, StatusCode::FORBIDDEN);
 
-    let promote = app
-        .call(
-            Method::PUT,
-            &format!("/api/families/{fam_id}/members/{}", bob.id),
-            Some(&alice.token),
-            Some(json!({ "role": "admin" })),
-        )
+    let owner_leave = app
+        .call(Method::POST, &format!("{fam_uri}/leave"), Some(&alice.token), None)
         .await;
-    assert_eq!(promote.status, StatusCode::NO_CONTENT);
+    assert_eq!(owner_leave.status, StatusCode::CONFLICT);
+    assert_eq!(owner_leave.body["code"], "OWNER_MUST_TRANSFER");
 
-    let leave_again = app
+    let remove_standard_by_admin = app
+        .call(Method::DELETE, &member_uri(&carol), Some(&bob.token), None)
+        .await;
+    assert_eq!(remove_standard_by_admin.status, StatusCode::NO_CONTENT);
+
+    let dave_invite = app
         .call(
             Method::POST,
-            &format!("/api/families/{fam_id}/leave"),
-            Some(&alice.token),
-            None,
+            &format!("{fam_uri}/invites"),
+            Some(&dave.token),
+            Some(as_standard.clone()),
         )
         .await;
-    assert_eq!(leave_again.status, StatusCode::NO_CONTENT);
+    assert_eq!(dave_invite.status, StatusCode::CREATED);
+
+    let pending_admin_invite = app
+        .call(
+            Method::POST,
+            &format!("{fam_uri}/invites"),
+            Some(&alice.token),
+            Some(as_admin.clone()),
+        )
+        .await;
+    assert_eq!(pending_admin_invite.status, StatusCode::CREATED);
+
+    let demote_admin = app
+        .call(
+            Method::PUT,
+            &member_uri(&dave),
+            Some(&alice.token),
+            Some(as_standard.clone()),
+        )
+        .await;
+    assert_eq!(demote_admin.status, StatusCode::NO_CONTENT);
+
+    let accept_revoked = app
+        .call(
+            Method::POST,
+            "/api/invites/accept",
+            Some(&carol.token),
+            Some(json!({ "code": dave_invite.body["code"] })),
+        )
+        .await;
+    assert_eq!(accept_revoked.status, StatusCode::NOT_FOUND);
+
+    let transfer_uri = format!("{fam_uri}/transfer");
+    let transfer_by_admin = app
+        .call(
+            Method::POST,
+            &transfer_uri,
+            Some(&bob.token),
+            Some(json!({ "user_id": bob.id })),
+        )
+        .await;
+    assert_eq!(transfer_by_admin.status, StatusCode::FORBIDDEN);
+
+    let transfer_to_stranger = app
+        .call(
+            Method::POST,
+            &transfer_uri,
+            Some(&alice.token),
+            Some(json!({ "user_id": carol.id })),
+        )
+        .await;
+    assert_eq!(transfer_to_stranger.status, StatusCode::BAD_REQUEST);
+
+    let transfer = app
+        .call(
+            Method::POST,
+            &transfer_uri,
+            Some(&alice.token),
+            Some(json!({ "user_id": dave.id })),
+        )
+        .await;
+    assert_eq!(transfer.status, StatusCode::NO_CONTENT);
+
+    let accept_old_admin_invite = app
+        .call(
+            Method::POST,
+            "/api/invites/accept",
+            Some(&carol.token),
+            Some(json!({ "code": pending_admin_invite.body["code"] })),
+        )
+        .await;
+    assert_eq!(accept_old_admin_invite.status, StatusCode::NOT_FOUND);
+
+    let dave_view = app.call(Method::GET, &fam_uri, Some(&dave.token), None).await;
+    assert_eq!(dave_view.body["is_owner"], true);
+    assert_eq!(dave_view.body["my_role"], "admin");
+
+    let alice_view = app.call(Method::GET, &fam_uri, Some(&alice.token), None).await;
+    assert_eq!(alice_view.body["is_owner"], false);
+    assert_eq!(alice_view.body["my_role"], "admin");
+
+    let old_owner_demotes = app
+        .call(
+            Method::PUT,
+            &member_uri(&bob),
+            Some(&alice.token),
+            Some(as_standard.clone()),
+        )
+        .await;
+    assert_eq!(old_owner_demotes.status, StatusCode::FORBIDDEN);
+
+    let new_owner_removes_admin = app
+        .call(Method::DELETE, &member_uri(&alice), Some(&dave.token), None)
+        .await;
+    assert_eq!(new_owner_removes_admin.status, StatusCode::NO_CONTENT);
+
+    let bob_leaves = app
+        .call(Method::POST, &format!("{fam_uri}/leave"), Some(&bob.token), None)
+        .await;
+    assert_eq!(bob_leaves.status, StatusCode::NO_CONTENT);
+
+    let last_owner_leaves = app
+        .call(Method::POST, &format!("{fam_uri}/leave"), Some(&dave.token), None)
+        .await;
+    assert_eq!(last_owner_leaves.status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        app.call(Method::GET, &fam_uri, Some(&dave.token), None).await.status,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
