@@ -14,7 +14,6 @@
   "validation": {
     "required": "必填项",
     "email": "请输入有效的电子邮箱",
-    "password_len": "至少 {min} 个字符",
     "mask": "必须为 4 位数字",
     "sync_token": "令牌似乎太短"
   },
@@ -27,7 +26,8 @@
     "ALREADY_EXISTS": "该条目已存在",
     "EMAIL_TAKEN": "该邮箱已被注册",
     "IN_USE": "该条目正在使用，无法删除",
-    "LAST_ADMIN": "群组必须至少保留一名管理员",
+    "OWNER_PROTECTED": "不能降级或移除群组所有者",
+    "OWNER_MUST_TRANSFER": "群组中还有其他成员时，所有者不能退出。请转让所有权或删除群组",
     "TOO_MANY_INVITES": "有效邀请过多，请撤销未使用的邀请。",
     "TOO_MANY_REQUESTS": "尝试次数过多，请稍后再试。",
     "INTERNAL": "服务器错误，请稍后再试。",
@@ -69,12 +69,16 @@
     "role": "角色",
     "roles": {
       "admin": "管理员",
-      "standard": "成员"
+      "standard": "成员",
+      "owner": "所有者"
     },
     "make_admin": "设为管理员",
     "make_standard": "设为成员",
     "remove_member": "移出群组",
     "remove_member_confirm": "确定将 {name} 移出群组吗？",
+    "transfer_owner": "转让所有权",
+    "transfer_owner_confirm": "将群组所有权转让给 {name}？您仍是管理员，但只有新所有者才能任命和撤销管理员。",
+    "transfer_owner_done": "所有权已转让",
     "create_action": "创建",
     "delete": "删除群组",
     "leave": "退出群组",

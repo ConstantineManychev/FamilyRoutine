@@ -2,11 +2,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../../providers/auth_provider.dart';
+import '../common/app_icons.dart';
 
 const Map<String, String> _dictRoutes = {'exercises': '/app/exercises'};
 
@@ -81,7 +81,7 @@ class _SidebarState extends ConsumerState<Sidebar>
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
       children: [
-        _buildNavItem(LucideIcons.home, 'sidebar.routine'.tr(), () => _go('/app')),
+        _buildNavItem(AppIcons.home, 'sidebar.routine'.tr(), () => _go('/app')),
         _buildFamMenu(),
         if (widget.isExpanded) ...[
           const SizedBox(height: 24.0),
@@ -89,7 +89,7 @@ class _SidebarState extends ConsumerState<Sidebar>
           _buildDictMenu(),
         ],
         const SizedBox(height: 24.0),
-        _buildNavItem(LucideIcons.settings, 'sidebar.settings'.tr(), null),
+        _buildNavItem(AppIcons.settings, 'sidebar.settings'.tr(), null),
       ],
     );
   }
@@ -105,20 +105,20 @@ class _SidebarState extends ConsumerState<Sidebar>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildNavItem(
-            LucideIcons.users,
+            AppIcons.users,
             'sidebar.family_groups'.tr(),
             () => _go('/app/families'),
             aTrailing: widget.isExpanded
                 ? IconButton(
                     tooltip: 'sidebar.toggle_list'.tr(),
-                    icon: Icon(_isFamOpen ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18),
+                    icon: Icon(_isFamOpen ? AppIcons.chevronUp : AppIcons.chevronDown, size: 18),
                     onPressed: () => setState(() => _isFamOpen = !_isFamOpen),
                   )
                 : null,
           ),
           if (isListVisible) ...[
             ...widget.families.map((aFam) => _buildSubItem(aFam.name, () => _go('/app/families/${aFam.id}'))),
-            _buildSubItem('sidebar.create'.tr(), () => _go('/app/families/new'), aIcon: LucideIcons.plusCircle),
+            _buildSubItem('sidebar.create'.tr(), () => _go('/app/families/new'), aIcon: AppIcons.plusCircle),
           ],
         ],
       ),
@@ -140,7 +140,7 @@ class _SidebarState extends ConsumerState<Sidebar>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('sidebar.dictionaries'.tr()),
-                Icon(_isDictExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18.0),
+                Icon(_isDictExpanded ? AppIcons.chevronUp : AppIcons.chevronDown, size: 18.0),
               ],
             ),
           ),
@@ -152,17 +152,17 @@ class _SidebarState extends ConsumerState<Sidebar>
                   padding: const EdgeInsets.only(left: 16.0, top: 8.0),
                   child: Column(
                     children: [
-                      _buildSubItem('sidebar.wallets'.tr(), () => _go('/app/wallets'), aIcon: LucideIcons.wallet),
-                      _buildSubItem('sidebar.places'.tr(), () => _go('/app/places'), aIcon: LucideIcons.mapPin),
-                      _buildSubItem('sidebar.cities'.tr(), () => _go('/app/cities'), aIcon: LucideIcons.building2),
-                      _buildSubItem('sidebar.streets'.tr(), () => _go('/app/streets'), aIcon: LucideIcons.navigation),
+                      _buildSubItem('sidebar.wallets'.tr(), () => _go('/app/wallets'), aIcon: AppIcons.wallet),
+                      _buildSubItem('sidebar.places'.tr(), () => _go('/app/places'), aIcon: AppIcons.mapPin),
+                      _buildSubItem('sidebar.cities'.tr(), () => _go('/app/cities'), aIcon: AppIcons.building2),
+                      _buildSubItem('sidebar.streets'.tr(), () => _go('/app/streets'), aIcon: AppIcons.navigation),
                       ...serverDicts.map((aDict)
                       {
                         final route = _dictRoutes[aDict.id];
                         return _buildSubItem(
                           aDict.name.tr(),
                           route == null ? null : () => _go(route),
-                          aIcon: LucideIcons.bookOpen,
+                          aIcon: AppIcons.bookOpen,
                         );
                       }),
                     ],
@@ -312,7 +312,7 @@ class _SidebarState extends ConsumerState<Sidebar>
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))),
-      child: _buildNavItem(LucideIcons.logOut, 'profile.sign_out'.tr(), ()
+      child: _buildNavItem(AppIcons.logOut, 'profile.sign_out'.tr(), ()
       {
         widget.onNavigated?.call();
         ref.read(authProv.notifier).logout();

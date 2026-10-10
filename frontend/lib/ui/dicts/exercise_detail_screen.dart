@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'exercises_screen.dart';
 
@@ -302,13 +302,13 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
             if (_isEdit && _isEditable)
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : _delete,
-                icon: const Icon(LucideIcons.trash, color: Colors.red, size: 18),
+                icon: const Icon(AppIcons.trash, color: Colors.red, size: 18),
                 label: Text('common.delete'.tr()),
               ),
             if (_isEditable)
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _save,
-                icon: const Icon(LucideIcons.save, size: 18),
+                icon: const Icon(AppIcons.save, size: 18),
                 label: Text('common.save'.tr()),
               ),
           ],
@@ -400,7 +400,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
             if (_isEditable)
               TextButton.icon(
                 onPressed: _muscles.length < MuscGrpType.values.length ? _addMuscleRow : null,
-                icon: const Icon(LucideIcons.plus),
+                icon: const Icon(AppIcons.plus),
                 label: Text('exercises.add_muscle'.tr()),
               ),
           ],
@@ -444,7 +444,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
           if (_isEditable)
             IconButton(
               tooltip: 'common.delete'.tr(),
-              icon: const Icon(LucideIcons.trash, color: Colors.red),
+              icon: const Icon(AppIcons.trash, color: Colors.red),
               onPressed: () => _removeMuscleRow(aRow),
             ),
         ],

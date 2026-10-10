@@ -9,7 +9,6 @@ import '../../providers/auth_provider.dart';
 import '../common/feedback.dart';
 import '../widgets/lang_selector.dart';
 
-const int minPasswordLength = 10;
 const int maxPasswordLength = 128;
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -144,19 +143,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   String? _validatePassword(String? aValue)
   {
-    final value = aValue ?? '';
-
-    if (_isLogin)
-    {
-      return value.isEmpty ? 'validation.required'.tr() : null;
-    }
-
-    if (value.length < minPasswordLength || value.length > maxPasswordLength)
-    {
-      return 'validation.password_len'.tr(namedArgs: {'min': '$minPasswordLength'});
-    }
-
-    return null;
+    return (aValue ?? '').isEmpty ? 'validation.required'.tr() : null;
   }
 
   @override
@@ -205,12 +192,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       obscureText: true,
                       autofillHints: [_isLogin ? AutofillHints.password : AutofillHints.newPassword],
                       inputFormatters: [LengthLimitingTextInputFormatter(maxPasswordLength)],
-                      decoration: InputDecoration(
-                        labelText: 'auth.pwd'.tr(),
-                        helperText: _isLogin
-                            ? null
-                            : 'validation.password_len'.tr(namedArgs: {'min': '$minPasswordLength'}),
-                      ),
+                      decoration: InputDecoration(labelText: 'auth.pwd'.tr()),
                       validator: _validatePassword,
                       onFieldSubmitted: (_) => _submit(),
                     ),

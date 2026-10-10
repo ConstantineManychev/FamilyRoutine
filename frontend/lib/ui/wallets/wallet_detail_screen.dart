@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 const List<String> accountTypes = ['cash', 'card', 'bank_acc'];
@@ -216,7 +216,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
               if (_isEditable)
                 ElevatedButton.icon(
                   onPressed: _isSaving ? null : _save,
-                  icon: const Icon(LucideIcons.save, size: 18),
+                  icon: const Icon(AppIcons.save, size: 18),
                   label: Text('common.save'.tr()),
                 ),
             ],
@@ -241,7 +241,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
             decoration: InputDecoration(
               labelText: 'wallet.name'.tr(),
               border: const OutlineInputBorder(),
-              prefixIcon: const Icon(LucideIcons.wallet),
+              prefixIcon: const Icon(AppIcons.wallet),
             ),
             validator: (aValue) => (aValue == null || aValue.trim().isEmpty) ? 'validation.required'.tr() : null,
           ),
@@ -258,7 +258,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
                 labelText: 'wallet.mask'.tr(),
                 helperText: 'wallet.mask_hint'.tr(),
                 border: const OutlineInputBorder(),
-                prefixIcon: const Icon(LucideIcons.creditCard),
+                prefixIcon: const Icon(AppIcons.creditCard),
               ),
               validator: _validateMask,
             ),
@@ -283,7 +283,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
           Row(
             children: [
               Icon(
-                _isTokenRemoved ? LucideIcons.shieldOff : LucideIcons.shieldCheck,
+                _isTokenRemoved ? AppIcons.shieldOff : AppIcons.shieldCheck,
                 color: _isTokenRemoved ? Colors.red : Colors.green,
               ),
               const SizedBox(width: 8),
@@ -307,7 +307,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
               helperText: 'wallet.token_hint'.tr(),
               helperMaxLines: 3,
               border: const OutlineInputBorder(),
-              prefixIcon: const Icon(LucideIcons.key),
+              prefixIcon: const Icon(AppIcons.key),
             ),
             validator: _validateToken,
           ),

@@ -1,10 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'geo_tree.dart';
 
@@ -104,7 +104,7 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
               children: [
                 ListTile(
                   title: Text(city.name),
-                  trailing: Icon(expandedCityId == city.id ? LucideIcons.chevronUp : LucideIcons.chevronDown),
+                  trailing: Icon(expandedCityId == city.id ? AppIcons.chevronUp : AppIcons.chevronDown),
                   onTap: () => toggleCity(city.id),
                   tileColor: expandedCityId == city.id ? Colors.grey.shade100 : null,
                 ),
@@ -131,7 +131,7 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: () => _addStreet(aCity),
-              icon: const Icon(LucideIcons.plus, size: 18),
+              icon: const Icon(AppIcons.plus, size: 18),
               label: Text('geo.add_street'.tr()),
             ),
           ),

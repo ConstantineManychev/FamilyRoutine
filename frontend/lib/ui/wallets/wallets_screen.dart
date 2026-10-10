@@ -2,10 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 class WalletsScreen extends ConsumerStatefulWidget
@@ -90,7 +90,7 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
             actions: [
               ElevatedButton.icon(
                 onPressed: () => aContext.go('/app/wallets/new'),
-                icon: const Icon(LucideIcons.plus, size: 18),
+                icon: const Icon(AppIcons.plus, size: 18),
                 label: Text('wallet.add'.tr()),
               ),
             ],
@@ -216,11 +216,11 @@ class _WalletTile extends StatelessWidget
     switch (wallet.accountType)
     {
       case 'cash':
-        return LucideIcons.banknote;
+        return AppIcons.banknote;
       case 'card':
-        return LucideIcons.creditCard;
+        return AppIcons.creditCard;
       default:
-        return LucideIcons.landmark;
+        return AppIcons.landmark;
     }
   }
 
@@ -276,7 +276,7 @@ class _WalletTile extends StatelessWidget
                   ),
                 ],
               )
-            : const Icon(LucideIcons.eye, color: Colors.grey),
+            : const Icon(AppIcons.eye, color: Colors.grey),
       ),
     );
   }

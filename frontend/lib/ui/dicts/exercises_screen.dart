@@ -2,10 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 final AutoDisposeFutureProvider<List<DictExDto>> exercisesProv = FutureProvider.autoDispose<List<DictExDto>>((aRef) async
@@ -37,7 +37,7 @@ class ExercisesScreen extends ConsumerWidget
             actions: [
               ElevatedButton.icon(
                 onPressed: () => aContext.go('/app/exercises/new'),
-                icon: const Icon(LucideIcons.plus, size: 18),
+                icon: const Icon(AppIcons.plus, size: 18),
                 label: Text('exercises.add'.tr()),
               ),
             ],
@@ -58,12 +58,12 @@ class ExercisesScreen extends ConsumerWidget
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: Icon(
-                              ex.isCustom ? LucideIcons.user : LucideIcons.activity,
+                              ex.isCustom ? AppIcons.user : AppIcons.activity,
                               color: Colors.blue,
                             ),
                             title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text('${'exercises.types.${ex.exType}'.tr()} · MET ${ex.metVal}'),
-                            trailing: const Icon(LucideIcons.chevronRight),
+                            trailing: const Icon(AppIcons.chevronRight),
                             onTap: () => aContext.go('/app/exercises/${ex.id}'),
                           ),
                         );

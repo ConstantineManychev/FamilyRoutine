@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 class FamDetailScreen extends ConsumerStatefulWidget
@@ -182,9 +182,37 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
     }
   }
 
+  Future<void> _transferOwnership(FamMemberDto aMember) async
+  {
+    final isConfirmed = await confirmAction(
+      context,
+      aTitle: 'family.transfer_owner'.tr(),
+      aMessage: 'family.transfer_owner_confirm'.tr(namedArgs: {'name': '${aMember.fName} ${aMember.lName}'}),
+    );
+
+    if (!isConfirmed)
+    {
+      return;
+    }
+
+    await _runAction(() async
+    {
+      await ref.read(apiProv).transferOwnership(widget.famId!, aMember.id);
+      ref.invalidate(famsProv);
+      if (mounted)
+      {
+        showInfoSnack(context, 'family.transfer_owner_done'.tr());
+      }
+    });
+  }
+
   Future<void> _createInvite() async
   {
-    final draft = await showDialog<_InviteDraft>(context: context, builder: (_) => const _InviteDialog());
+    final isOwner = _famData?.isOwner ?? false;
+    final draft = await showDialog<_InviteDraft>(
+      context: context,
+      builder: (_) => _InviteDialog(isRoleSelectable: isOwner),
+    );
     if (draft == null || !mounted)
     {
       return;
@@ -233,7 +261,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
                 onPressed: _isSaving ? null : _save,
                 icon: _isSaving
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(LucideIcons.save, size: 18),
+                    : const Icon(AppIcons.save, size: 18),
                 label: Text(_isEdit ? 'common.save'.tr() : 'family.create_action'.tr()),
               ),
           ],
@@ -266,7 +294,8 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
 
   Widget _buildMembers(String? aCurrUserId)
   {
-    final members = _famData?.members ?? const <FamMemberDto>[];
+    final fam = _famData;
+    final members = fam?.members ?? const <FamMemberDto>[];
 
     return Card(
       margin: EdgeInsets.zero,
@@ -276,19 +305,35 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
             ListTile(
               leading: CircleAvatar(child: Text(member.fName.isNotEmpty ? member.fName[0] : '?')),
               title: Text('${member.fName} ${member.lName}'),
-              subtitle: Text(
-                'family.roles.${member.role.name}'.tr(),
-                style: TextStyle(color: member.role == MemberRole.admin ? Colors.blue : Colors.grey),
+              subtitle: Row(
+                children: [
+                  if (member.isOwner) ...[
+                    const Icon(AppIcons.crown, size: 14, color: Colors.amber),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    member.isOwner ? 'family.roles.owner'.tr() : 'family.roles.${member.role.name}'.tr(),
+                    style: TextStyle(color: member.isAdmin ? Colors.blue : Colors.grey),
+                  ),
+                ],
               ),
-              trailing: _isAdmin && member.id != aCurrUserId ? _buildMemberMenu(member) : null,
+              trailing: fam != null && member.id != aCurrUserId ? _buildMemberMenu(fam, member) : null,
             ),
         ],
       ),
     );
   }
 
-  Widget _buildMemberMenu(FamMemberDto aMember)
+  Widget? _buildMemberMenu(FamDetailDto aFam, FamMemberDto aMember)
   {
+    final isRoleEditable = aFam.isOwner && !aMember.isOwner;
+    final isRemovable = aFam.canRemove(aMember);
+
+    if (!isRoleEditable && !isRemovable)
+    {
+      return null;
+    }
+
     return PopupMenuButton<String>(
       tooltip: 'common.actions'.tr(),
       enabled: !_isSaving,
@@ -300,19 +345,24 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
             _updateRole(aMember, MemberRole.admin);
           case 'standard':
             _updateRole(aMember, MemberRole.standard);
+          case 'transfer':
+            _transferOwnership(aMember);
           case 'remove':
             _removeMember(aMember);
         }
       },
       itemBuilder: (_) => [
-        if (aMember.role != MemberRole.admin)
+        if (isRoleEditable && aMember.role != MemberRole.admin)
           PopupMenuItem(value: 'admin', child: Text('family.make_admin'.tr())),
-        if (aMember.role != MemberRole.standard)
+        if (isRoleEditable && aMember.role != MemberRole.standard)
           PopupMenuItem(value: 'standard', child: Text('family.make_standard'.tr())),
-        PopupMenuItem(
-          value: 'remove',
-          child: Text('family.remove_member'.tr(), style: const TextStyle(color: Colors.red)),
-        ),
+        if (isRoleEditable)
+          PopupMenuItem(value: 'transfer', child: Text('family.transfer_owner'.tr())),
+        if (isRemovable)
+          PopupMenuItem(
+            value: 'remove',
+            child: Text('family.remove_member'.tr(), style: const TextStyle(color: Colors.red)),
+          ),
       ],
     );
   }
@@ -329,7 +379,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
           actions: [
             OutlinedButton.icon(
               onPressed: _isSaving ? null : _createInvite,
-              icon: const Icon(LucideIcons.userPlus, size: 18),
+              icon: const Icon(AppIcons.userPlus, size: 18),
               label: Text('family.invite_create'.tr()),
             ),
           ],
@@ -346,7 +396,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
               children: [
                 for (final invite in _invites)
                   ListTile(
-                    leading: const Icon(LucideIcons.ticket),
+                    leading: const Icon(AppIcons.ticket),
                     title: Text(invite.label?.isNotEmpty == true ? invite.label! : 'family.invite_unnamed'.tr()),
                     subtitle: Text(
                       '${'family.roles.${invite.role.name}'.tr()} · '
@@ -354,7 +404,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
                     ),
                     trailing: IconButton(
                       tooltip: 'family.invite_revoke'.tr(),
-                      icon: const Icon(LucideIcons.x, color: Colors.red),
+                      icon: const Icon(AppIcons.x, color: Colors.red),
                       onPressed: _isSaving ? null : () => _revokeInvite(invite),
                     ),
                   ),
@@ -376,7 +426,9 @@ class _InviteDraft
 
 class _InviteDialog extends StatefulWidget
 {
-  const _InviteDialog();
+  final bool isRoleSelectable;
+
+  const _InviteDialog({required this.isRoleSelectable});
 
   @override
   State<_InviteDialog> createState() => _InviteDialogState();
@@ -410,15 +462,17 @@ class _InviteDialogState extends State<_InviteDialog>
               border: const OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<MemberRole>(
+          if (widget.isRoleSelectable) ...[
+            const SizedBox(height: 16),
+            DropdownButtonFormField<MemberRole>(
             initialValue: _role,
             decoration: InputDecoration(labelText: 'family.role'.tr(), border: const OutlineInputBorder()),
             items: MemberRole.values
                 .map((aRole) => DropdownMenuItem(value: aRole, child: Text('family.roles.${aRole.name}'.tr())))
                 .toList(),
             onChanged: (aRole) => setState(() => _role = aRole ?? MemberRole.standard),
-          ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -473,7 +527,7 @@ class _InviteCodeDialog extends StatelessWidget
               showInfoSnack(aContext, 'common.copied'.tr());
             }
           },
-          icon: const Icon(LucideIcons.copy, size: 18),
+          icon: const Icon(AppIcons.copy, size: 18),
           label: Text('common.copy'.tr()),
         ),
         ElevatedButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.ok'.tr())),

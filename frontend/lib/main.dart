@@ -1,5 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
@@ -19,7 +21,9 @@ const Color brandColor = Color(0xFF2563EB);
 Future<void> main() async
 {
   usePathUrlStrategy();
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(_lucideLicense);
+  Intl.systemLocale = Intl.canonicalizedLocale(binding.platformDispatcher.locale.toLanguageTag());
   await EasyLocalization.ensureInitialized();
 
   runApp(
@@ -33,6 +37,12 @@ Future<void> main() async
       ),
     ),
   );
+}
+
+Stream<LicenseEntry> _lucideLicense() async*
+{
+  final text = await rootBundle.loadString('assets/fonts/LICENSE-lucide.txt');
+  yield LicenseEntryWithLineBreaks(const ['Lucide'], text);
 }
 
 class AppRoot extends ConsumerWidget

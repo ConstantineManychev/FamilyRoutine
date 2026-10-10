@@ -1,10 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
@@ -180,7 +180,7 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
             children: [
               ListTile(
                 title: Text(country.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                trailing: Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown),
+                trailing: Icon(isExpanded ? AppIcons.chevronUp : AppIcons.chevronDown),
                 onTap: () => toggleCountry(country.id),
                 tileColor: isExpanded ? Colors.blue.shade50 : null,
               ),
@@ -202,7 +202,7 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
     {
       return Tooltip(
         message: 'geo.read_only'.tr(),
-        child: const Icon(LucideIcons.lock, size: 16, color: Colors.grey),
+        child: const Icon(AppIcons.lock, size: 16, color: Colors.grey),
       );
     }
 
@@ -211,12 +211,12 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
       children: [
         IconButton(
           tooltip: 'common.edit'.tr(),
-          icon: const Icon(LucideIcons.edit, size: 18),
+          icon: const Icon(AppIcons.edit, size: 18),
           onPressed: aOnEdit,
         ),
         IconButton(
           tooltip: 'common.delete'.tr(),
-          icon: const Icon(LucideIcons.trash, size: 18, color: Colors.red),
+          icon: const Icon(AppIcons.trash, size: 18, color: Colors.red),
           onPressed: aOnDelete,
         ),
       ],

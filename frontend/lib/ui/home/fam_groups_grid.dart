@@ -1,8 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 
 class FamGroupsGrid extends StatelessWidget
@@ -85,6 +85,12 @@ class _FamCardState extends State<_FamCard>
 
   Future<void> _handleLeave() async
   {
+    if (widget.fam.isOwner && widget.fam.memberCount > 1)
+    {
+      showInfoSnack(context, 'errors.OWNER_MUST_TRANSFER'.tr());
+      return;
+    }
+
     final descKey = widget.fam.memberCount == 1 ? 'family.leave_last_member_desc' : 'family.leave_confirm_desc';
     final isConfirmed = await confirmAction(
       context,
@@ -123,12 +129,21 @@ class _FamCardState extends State<_FamCard>
                   ),
                 ),
               ),
+              if (widget.fam.isOwner)
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Tooltip(
+                    message: 'family.roles.owner'.tr(),
+                    child: const Icon(AppIcons.crown, size: 18, color: Colors.amber),
+                  ),
+                ),
               Positioned(
                 top: 4,
                 right: 4,
                 child: PopupMenuButton<String>(
                   tooltip: 'common.actions'.tr(),
-                  icon: const Icon(LucideIcons.moreVertical, size: 20),
+                  icon: const Icon(AppIcons.moreVertical, size: 20),
                   onSelected: (aValue)
                   {
                     if (aValue == 'delete')
@@ -144,15 +159,15 @@ class _FamCardState extends State<_FamCard>
                     PopupMenuItem(
                       value: 'leave',
                       child: ListTile(
-                        leading: const Icon(LucideIcons.doorOpen, color: Colors.redAccent),
+                        leading: const Icon(AppIcons.doorOpen, color: Colors.redAccent),
                         title: Text('family.leave'.tr()),
                       ),
                     ),
-                    if (widget.fam.isAdmin)
+                    if (widget.fam.isOwner)
                       PopupMenuItem(
                         value: 'delete',
                         child: ListTile(
-                          leading: const Icon(LucideIcons.trash2, color: Colors.redAccent),
+                          leading: const Icon(AppIcons.trash2, color: Colors.redAccent),
                           title: Text('family.delete'.tr()),
                         ),
                       ),

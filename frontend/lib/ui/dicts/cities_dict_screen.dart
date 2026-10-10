@@ -1,10 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'geo_tree.dart';
 
@@ -89,7 +89,7 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTre
           alignment: Alignment.centerRight,
           child: TextButton.icon(
             onPressed: () => _addCity(aCountry),
-            icon: const Icon(LucideIcons.plus, size: 18),
+            icon: const Icon(AppIcons.plus, size: 18),
             label: Text('geo.add_city'.tr()),
           ),
         ),
@@ -114,7 +114,7 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTre
                         aOnEdit: () => _editCity(city),
                         aOnDelete: () => _deleteCity(city),
                       ),
-                      Icon(expandedCityId == city.id ? LucideIcons.chevronUp : LucideIcons.chevronDown),
+                      Icon(expandedCityId == city.id ? AppIcons.chevronUp : AppIcons.chevronDown),
                     ],
                   ),
                 ),

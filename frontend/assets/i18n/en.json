@@ -14,7 +14,6 @@
   "validation": {
     "required": "This field is required",
     "email": "Enter a valid email",
-    "password_len": "At least {min} characters",
     "mask": "Exactly 4 digits",
     "sync_token": "The token looks too short"
   },
@@ -27,7 +26,8 @@
     "ALREADY_EXISTS": "Such an entry already exists",
     "EMAIL_TAKEN": "This email is already registered",
     "IN_USE": "The entry is in use and cannot be deleted",
-    "LAST_ADMIN": "The group must keep at least one administrator",
+    "OWNER_PROTECTED": "The group owner cannot be demoted or removed",
+    "OWNER_MUST_TRANSFER": "The owner cannot leave while other members remain. Transfer ownership or delete the group",
     "TOO_MANY_INVITES": "Too many active invitations. Revoke unused ones.",
     "TOO_MANY_REQUESTS": "Too many attempts. Please try again later.",
     "INTERNAL": "Server error. Please try again later.",
@@ -69,12 +69,16 @@
     "role": "Role",
     "roles": {
       "admin": "Administrator",
-      "standard": "Member"
+      "standard": "Member",
+      "owner": "Owner"
     },
     "make_admin": "Make administrator",
     "make_standard": "Make member",
     "remove_member": "Remove from group",
     "remove_member_confirm": "Remove {name} from the group?",
+    "transfer_owner": "Transfer ownership",
+    "transfer_owner_confirm": "Transfer group ownership to {name}? You will stay an administrator, but only the new owner will be able to grant and revoke admin rights.",
+    "transfer_owner_done": "Ownership transferred",
     "create_action": "Create",
     "delete": "Delete group",
     "leave": "Leave group",

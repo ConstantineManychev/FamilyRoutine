@@ -8,9 +8,10 @@ const List<String> locales = ['en', 'ru', 'de', 'fr', 'ja', 'zh'];
 const Map<String, List<String>> dynamicKeys = {
   'errors': [
     'VALIDATION', 'UNAUTHENTICATED', 'INVALID_CREDENTIALS', 'FORBIDDEN', 'NOT_FOUND', 'ALREADY_EXISTS',
-    'EMAIL_TAKEN', 'IN_USE', 'LAST_ADMIN', 'TOO_MANY_INVITES', 'TOO_MANY_REQUESTS', 'INTERNAL', 'NETWORK', 'UNKNOWN',
+    'EMAIL_TAKEN', 'IN_USE', 'OWNER_PROTECTED', 'OWNER_MUST_TRANSFER', 'TOO_MANY_INVITES', 'TOO_MANY_REQUESTS',
+    'INTERNAL', 'NETWORK', 'UNKNOWN',
   ],
-  'family.roles': ['admin', 'standard'],
+  'family.roles': ['owner', 'admin', 'standard'],
   'wallet': ['type_cash', 'type_card', 'type_bank_acc', 'bank_monobank', 'bank_aib', 'bank_other'],
   'exercises.types': ['cardio', 'strength', 'flexibility', 'mixed'],
   'exercises.w_types': ['external', 'hybrid', 'bodyweight'],

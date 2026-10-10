@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+
+import '../common/app_icons.dart';
 
 const Map<String, String> langNames = {
   'ru': 'Русский',
@@ -41,7 +42,7 @@ class LangSelector extends StatelessWidget
                   color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF374151),
                 ),
               ),
-              if (isSelected) const Icon(LucideIcons.check, size: 16, color: Color(0xFF2563EB)),
+              if (isSelected) const Icon(AppIcons.check, size: 16, color: Color(0xFF2563EB)),
             ],
           ),
         );
@@ -56,14 +57,14 @@ class LangSelector extends StatelessWidget
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(LucideIcons.globe, size: 18, color: Color(0xFF4B5563)),
+            const Icon(AppIcons.globe, size: 18, color: Color(0xFF4B5563)),
             const SizedBox(width: 8),
             Text(
               langNames[curLocale.languageCode] ?? curLocale.languageCode.toUpperCase(),
               style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
             ),
             const SizedBox(width: 6),
-            const Icon(LucideIcons.chevronDown, size: 16, color: Color(0xFF9CA3AF)),
+            const Icon(AppIcons.chevronDown, size: 16, color: Color(0xFF9CA3AF)),
           ],
         ),
       ),

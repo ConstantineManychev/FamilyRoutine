@@ -5,7 +5,8 @@ COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 
 COPY . .
-RUN flutter build web --release --csp --no-web-resources-cdn
+RUN flutter build web --release --wasm --csp --no-web-resources-cdn \
+ && find build/web -type f -regex '.*\.\(js\|mjs\|wasm\|json\|css\|html\|otf\|ttf\)' -exec gzip -9 -k {} +
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
