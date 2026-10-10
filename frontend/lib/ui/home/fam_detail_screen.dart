@@ -231,6 +231,11 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
     }
   }
 
+  Future<void> _setRoutineSharing(bool aIsShared) async
+  {
+    await _runAction(() => ref.read(apiProv).setRoutineSharing(widget.famId!, aIsShared));
+  }
+
   Future<void> _revokeInvite(FamInviteDto aInvite) async
   {
     await _runAction(() => ref.read(apiProv).revokeInvite(widget.famId!, aInvite.id));
@@ -278,6 +283,21 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
           Text('family.create_hint'.tr(), style: const TextStyle(color: Colors.grey)),
         ],
         if (_isEdit) ...[
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            child: SwitchListTile(
+              secondary: const Icon(AppIcons.calendarClock),
+              title: Text('routine.share_title'.tr()),
+              subtitle: Text('routine.share_hint'.tr()),
+              value: _famData?.isRoutineShared ?? true,
+              onChanged: _isSaving ? null : _setRoutineSharing,
+            ),
+          ),
           const SizedBox(height: 32),
           Text('family.members'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),

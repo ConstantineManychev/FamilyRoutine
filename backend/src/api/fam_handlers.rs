@@ -81,6 +81,7 @@ pub async fn create_family(
     let owner_access = FamAccess {
         role: MemberRole::Admin,
         is_owner: true,
+        is_routine_shared: true,
     };
 
     let detail = load_family_detail(&a_state.db, fam_id, owner_access).await?;
@@ -510,6 +511,7 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_access: FamAccess) 
         name,
         my_role: a_access.role,
         is_owner: a_access.is_owner,
+        is_routine_shared: a_access.is_routine_shared,
         members,
     })
 }

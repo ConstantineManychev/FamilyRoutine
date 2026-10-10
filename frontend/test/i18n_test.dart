@@ -34,6 +34,14 @@ const Map<String, List<String>> dynamicKeys = {
     'unit_short_hour',
   ],
   'family': ['leave_confirm_desc', 'leave_last_member_desc'],
+  'routine': [
+    'status_home', 'status_work', 'status_school', 'status_gym', 'status_transit', 'status_sleep', 'status_meal',
+    'status_leisure', 'status_other',
+  ],
+  'dashboard': [
+    'widget_my_status', 'widget_my_status_hint', 'widget_family_timeline', 'widget_family_timeline_hint',
+    'widget_cashflow', 'widget_cashflow_hint', 'widget_family_list', 'widget_family_list_hint',
+  ],
   'places': ['err_name_req', 'err_country_req', 'err_city_req', 'err_street_req', 'err_house_zip_req'],
 };
 

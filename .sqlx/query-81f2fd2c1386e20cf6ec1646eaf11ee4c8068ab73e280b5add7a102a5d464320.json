@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE status_marks SET status = $3, note = $4\n        WHERE id = $1 AND user_id = $2\n        RETURNING id, status AS \"status: RoutineStatus\", note, start_ts, end_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "status: RoutineStatus",
+        "type_info": {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "start_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "end_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        },
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "81f2fd2c1386e20cf6ec1646eaf11ee4c8068ab73e280b5add7a102a5d464320"
+}

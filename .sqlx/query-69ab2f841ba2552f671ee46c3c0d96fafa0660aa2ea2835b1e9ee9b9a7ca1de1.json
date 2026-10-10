@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT MIN(start_ts) FROM status_marks WHERE user_id = $1 AND start_ts > $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "min",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "69ab2f841ba2552f671ee46c3c0d96fafa0660aa2ea2835b1e9ee9b9a7ca1de1"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE family_mems SET is_routine_shared = $3 WHERE family_id = $1 AND user_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "869ee9ede646c0cc424a3e47aa3ac0e95d2c38f0552108b4f0d8ada8f0c74e93"
+}

@@ -155,6 +155,42 @@ void main()
       expect(stats.missingRates, ['UAH']);
     });
 
+    test('timeline marks resolve the current status and dashboards skip unknown widgets', ()
+    {
+      final timeline = TimelineDto.fromJson({
+        'family_id': 'f1',
+        'family_name': 'Семья',
+        'members': [
+          {
+            'user_id': 'u1',
+            'first_name': 'Анна',
+            'last_name': 'Тест',
+            'is_me': true,
+            'marks': [
+              {'id': 'm1', 'status': 'work', 'note': null, 'start_ts': '2026-10-10T06:00:00Z', 'end_ts': '2026-10-10T10:00:00Z'},
+              {'id': 'm2', 'status': 'meal', 'note': 'Обед', 'start_ts': '2026-10-10T10:00:00Z', 'end_ts': null},
+            ],
+          },
+        ],
+      });
+      final member = timeline.members.single;
+      expect(member.markAt(DateTime.utc(2026, 10, 10, 9, 59))?.status, RoutineStatus.work);
+      expect(member.markAt(DateTime.utc(2026, 10, 10, 10))?.status, RoutineStatus.meal);
+      expect(member.markAt(DateTime.utc(2026, 10, 10, 5)), isNull);
+      expect(RoutineStatus.fromJson('teleport'), RoutineStatus.other);
+
+      final dashboard = DashboardDto.fromJson({
+        'id': 'd1',
+        'name': 'Главная',
+        'widgets': [
+          {'id': 'w1', 'kind': 'family_timeline', 'family_id': 'f1', 'family_name': null, 'is_available': false},
+          {'id': 'w2', 'kind': 'weather', 'family_id': null, 'family_name': null, 'is_available': true},
+        ],
+      });
+      expect(dashboard.widgets.single.kind, WidgetKind.familyTimeline);
+      expect(dashboard.widgets.single.isAvailable, isFalse);
+    });
+
     test('dictionary item and price stats parse', ()
     {
       final item = DictItemDto.fromJson({'id': 'i1', 'name': 'Плитка', 'kind': 'product', 'unit': 'square_meter', 'is_custom': true});

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM dash_widgets w\n        USING dashboards d\n        WHERE w.id = $1 AND w.dashboard_id = $2 AND d.id = w.dashboard_id AND d.user_id = $3\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "51079818416ef4064c2a867f0e9035f094b9bc94c09e0cc18ce2d836d9070a51"
+}

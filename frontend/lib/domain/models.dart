@@ -1,6 +1,7 @@
 import 'finance_models.dart';
 
 export 'finance_models.dart';
+export 'routine_models.dart';
 
 enum MemberRole
 {
@@ -127,6 +128,7 @@ class FamDetailDto
   final String name;
   final MemberRole myRole;
   final bool isOwner;
+  final bool isRoutineShared;
   final List<FamMemberDto> members;
 
   const FamDetailDto({
@@ -134,6 +136,7 @@ class FamDetailDto
     required this.name,
     required this.myRole,
     required this.isOwner,
+    this.isRoutineShared = true,
     required this.members,
   });
 
@@ -146,6 +149,7 @@ class FamDetailDto
         name: aJson['name'] as String,
         myRole: MemberRole.fromJson(aJson['my_role']),
         isOwner: aJson['is_owner'] as bool? ?? false,
+        isRoutineShared: aJson['is_routine_shared'] as bool? ?? true,
         members: (aJson['members'] as List? ?? const [])
             .map((aItem) => FamMemberDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),

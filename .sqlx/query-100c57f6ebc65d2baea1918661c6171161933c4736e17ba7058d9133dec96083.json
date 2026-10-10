@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            w.id,\n            w.dashboard_id,\n            w.kind AS \"kind: WidgetKind\",\n            w.family_id,\n            f.name AS \"family_name?\",\n            (w.family_id IS NULL OR fm.user_id IS NOT NULL) AS \"is_available!\"\n        FROM dash_widgets w\n        LEFT JOIN family_mems fm ON fm.family_id = w.family_id AND fm.user_id = $2\n        LEFT JOIN families f ON f.id = w.family_id AND fm.user_id IS NOT NULL\n        WHERE w.dashboard_id = ANY($1)\n        ORDER BY w.sort_ord, w.created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "dashboard_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: WidgetKind",
+        "type_info": {
+          "Custom": {
+            "name": "widget_kind_t",
+            "kind": {
+              "Enum": [
+                "my_status",
+                "family_timeline",
+                "cashflow",
+                "family_list"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_available!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "100c57f6ebc65d2baea1918661c6171161933c4736e17ba7058d9133dec96083"
+}

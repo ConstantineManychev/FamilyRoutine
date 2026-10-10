@@ -1,7 +1,9 @@
 mod finance;
+mod routine;
 
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
+pub use routine::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -141,6 +143,7 @@ pub struct FamDetailDto
     pub name: String,
     pub my_role: MemberRole,
     pub is_owner: bool,
+    pub is_routine_shared: bool,
     pub members: Vec<FamMemberDto>,
 }
 

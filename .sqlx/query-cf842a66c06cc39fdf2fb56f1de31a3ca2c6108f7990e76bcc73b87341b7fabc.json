@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE dash_widgets w SET sort_ord = ordered.ord::int\n        FROM UNNEST($2::uuid[]) WITH ORDINALITY AS ordered(id, ord)\n        WHERE w.id = ordered.id AND w.dashboard_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cf842a66c06cc39fdf2fb56f1de31a3ca2c6108f7990e76bcc73b87341b7fabc"
+}

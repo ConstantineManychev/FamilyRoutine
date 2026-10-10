@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO dash_widgets (dashboard_id, kind, family_id, sort_ord)\n        SELECT $1, $2, $3, COALESCE(MAX(sort_ord), 0) + 1 FROM dash_widgets WHERE dashboard_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "widget_kind_t",
+            "kind": {
+              "Enum": [
+                "my_status",
+                "family_timeline",
+                "cashflow",
+                "family_list"
+              ]
+            }
+          }
+        },
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b0fdce7caf8be00e38dffe71e7c174b909bbb89eee52ba68a9c43324a210b426"
+}

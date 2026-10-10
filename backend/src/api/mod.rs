@@ -1,5 +1,6 @@
 pub mod auth_handlers;
 pub mod bank_handlers;
+pub mod dashboard_handlers;
 pub mod ex_handlers;
 pub mod extract;
 pub mod fam_handlers;
@@ -8,6 +9,7 @@ pub mod item_handlers;
 pub mod place_handlers;
 pub mod receipt_handlers;
 pub mod router;
+pub mod routine_handlers;
 pub mod stats_handlers;
 pub mod tx_handlers;
 pub mod user_handlers;

@@ -9,6 +9,7 @@ pub struct FamAccess
 {
     pub role: MemberRole,
     pub is_owner: bool,
+    pub is_routine_shared: bool,
 }
 
 impl FamAccess
@@ -25,7 +26,7 @@ where
 {
     let row = sqlx::query!(
         r#"
-        SELECT fm.role AS "role: MemberRole", (f.owner_id = fm.user_id) AS "is_owner!"
+        SELECT fm.role AS "role: MemberRole", (f.owner_id = fm.user_id) AS "is_owner!", fm.is_routine_shared
         FROM family_mems fm
         JOIN families f ON f.id = fm.family_id
         WHERE fm.family_id = $1 AND fm.user_id = $2
@@ -39,6 +40,7 @@ where
     Ok(row.map(|r| FamAccess {
         role: r.role,
         is_owner: r.is_owner,
+        is_routine_shared: r.is_routine_shared,
     }))
 }
 

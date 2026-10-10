@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO dash_widgets (dashboard_id, kind, family_id, sort_ord)\n            SELECT $1, kind, family_id, ord\n            FROM (\n                SELECT 'my_status'::widget_kind_t AS kind, NULL::uuid AS family_id, 0 AS ord\n                UNION ALL\n                SELECT 'family_timeline', fm.family_id, 1 + ROW_NUMBER() OVER (ORDER BY fm.joined_ts)::int\n                FROM family_mems fm WHERE fm.user_id = $2\n                UNION ALL\n                SELECT 'cashflow', NULL, 1000\n            ) defaults\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "328085cfb023386a5ec0953587ed52d4bb50ebcdcd688d3f41a24e92117c745f"
+}

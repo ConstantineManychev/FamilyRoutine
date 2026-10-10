@@ -34,7 +34,9 @@ enum FinanceView { chart, categories }
 
 class CashflowCard extends ConsumerStatefulWidget
 {
-  const CashflowCard({super.key});
+  final Widget? menu;
+
+  const CashflowCard({super.key, this.menu});
 
   @override
   ConsumerState<CashflowCard> createState() => _CashflowCardState();
@@ -212,21 +214,29 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('finance.cashflow'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: inkPrimary)),
-              SegmentedButton<FinanceView>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: FinanceView.chart, icon: const Icon(AppIcons.chartColumn, size: 16), label: Text('finance.view_chart'.tr())),
-                  ButtonSegment(value: FinanceView.categories, icon: const Icon(AppIcons.listChecks, size: 16), label: Text('finance.view_categories'.tr())),
-                ],
-                selected: {_view},
-                onSelectionChanged: (aValue) => _update(() => _view = aValue.first),
+              Expanded(
+                child: Wrap(
+                  spacing: 16,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('finance.cashflow'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: inkPrimary)),
+                    SegmentedButton<FinanceView>(
+                      showSelectedIcon: false,
+                      segments: [
+                        ButtonSegment(value: FinanceView.chart, icon: const Icon(AppIcons.chartColumn, size: 16), label: Text('finance.view_chart'.tr())),
+                        ButtonSegment(value: FinanceView.categories, icon: const Icon(AppIcons.listChecks, size: 16), label: Text('finance.view_categories'.tr())),
+                      ],
+                      selected: {_view},
+                      onSelectionChanged: (aValue) => _update(() => _view = aValue.first),
+                    ),
+                  ],
+                ),
               ),
+              if (widget.menu != null) widget.menu!,
             ],
           ),
           const SizedBox(height: 16),

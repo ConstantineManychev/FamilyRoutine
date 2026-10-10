@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT fm.role AS \"role: MemberRole\", (f.owner_id = fm.user_id) AS \"is_owner!\"\n        FROM family_mems fm\n        JOIN families f ON f.id = fm.family_id\n        WHERE fm.family_id = $1 AND fm.user_id = $2\n        ",
+  "query": "\n        SELECT fm.role AS \"role: MemberRole\", (f.owner_id = fm.user_id) AS \"is_owner!\", fm.is_routine_shared\n        FROM family_mems fm\n        JOIN families f ON f.id = fm.family_id\n        WHERE fm.family_id = $1 AND fm.user_id = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,11 @@
         "ordinal": 1,
         "name": "is_owner!",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_routine_shared",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -32,8 +37,9 @@
     },
     "nullable": [
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "e5a0e6d0aa7ab123e14cff4f1a9eaa2e5afe37b07af2ac7a2d7282d1a5535c48"
+  "hash": "838e788987b0aff1bfb854896be5a48fe3e3b75c9e60f313505e7e30ccede2d1"
 }

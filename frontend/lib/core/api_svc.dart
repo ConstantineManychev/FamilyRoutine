@@ -507,4 +507,76 @@ class ApiSvc
     });
     return CategoryStats.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs}) async
+  {
+    final res = await _dio.post('/api/routine/marks', data: {
+      'status': aStatus.toJson(),
+      if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+      if (aStartTs != null) 'start_ts': aStartTs.toUtc().toIso8601String(),
+    });
+    return StatusMarkDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StatusMarkDto> updateMark(String aId, RoutineStatus aStatus, String? aNote) async
+  {
+    final res = await _dio.put('/api/routine/marks/$aId', data: {
+      'status': aStatus.toJson(),
+      if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+    });
+    return StatusMarkDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMark(String aId) => _dio.delete('/api/routine/marks/$aId');
+
+  Future<TimelineDto> getTimeline({String? aFamilyId, required DateTime aFrom, required DateTime aTo}) async
+  {
+    final res = await _dio.get('/api/routine/timeline', queryParameters: {
+      'from': aFrom.toUtc().toIso8601String(),
+      'to': aTo.toUtc().toIso8601String(),
+      if (aFamilyId != null) 'family_id': aFamilyId,
+    });
+    return TimelineDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> setRoutineSharing(String aFamId, bool aIsShared) =>
+      _dio.put('/api/families/$aFamId/routine-sharing', data: {'is_shared': aIsShared});
+
+  Future<List<DashboardDto>> getDashboards() async
+  {
+    final res = await _dio.get('/api/dashboards');
+    return _list(res.data, DashboardDto.fromJson);
+  }
+
+  Future<DashboardDto> createDashboard(String aName, {bool aIsPrefilled = false}) async
+  {
+    final res = await _dio.post('/api/dashboards', data: {'name': aName, 'is_prefilled': aIsPrefilled});
+    return DashboardDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<DashboardDto> renameDashboard(String aId, String aName) async
+  {
+    final res = await _dio.put('/api/dashboards/$aId', data: {'name': aName});
+    return DashboardDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteDashboard(String aId) => _dio.delete('/api/dashboards/$aId');
+
+  Future<DashboardDto> addWidget(String aDashboardId, WidgetKind aKind, {String? aFamilyId}) async
+  {
+    final res = await _dio.post('/api/dashboards/$aDashboardId/widgets', data: {
+      'kind': aKind.wire,
+      if (aFamilyId != null) 'family_id': aFamilyId,
+    });
+    return DashboardDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWidget(String aDashboardId, String aWidgetId) =>
+      _dio.delete('/api/dashboards/$aDashboardId/widgets/$aWidgetId');
+
+  Future<DashboardDto> reorderWidgets(String aDashboardId, List<String> aWidgetIds) async
+  {
+    final res = await _dio.put('/api/dashboards/$aDashboardId/widgets/order', data: {'widget_ids': aWidgetIds});
+    return DashboardDto.fromJson(res.data as Map<String, dynamic>);
+  }
 }

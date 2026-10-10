@@ -11,8 +11,8 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    auth_handlers, bank_handlers, ex_handlers, fam_handlers, geo_handlers, item_handlers, place_handlers,
-    receipt_handlers, stats_handlers, tx_handlers, user_handlers, wallet_handlers,
+    auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers, item_handlers,
+    place_handlers, receipt_handlers, routine_handlers, stats_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -76,7 +76,34 @@ pub fn build_router(a_state: AppState) -> Router
             "/families/:id/invites/:invite_id",
             axum::routing::delete(fam_handlers::revoke_family_invite),
         )
+        .route(
+            "/families/:id/routine-sharing",
+            put(routine_handlers::set_routine_sharing),
+        )
         .route("/invites/accept", post(fam_handlers::accept_invite))
+        .route("/routine/marks", post(routine_handlers::create_mark))
+        .route(
+            "/routine/marks/:id",
+            put(routine_handlers::update_mark).delete(routine_handlers::delete_mark),
+        )
+        .route("/routine/timeline", get(routine_handlers::timeline))
+        .route(
+            "/dashboards",
+            get(dashboard_handlers::list_dashboards).post(dashboard_handlers::create_dashboard),
+        )
+        .route(
+            "/dashboards/:id",
+            put(dashboard_handlers::rename_dashboard).delete(dashboard_handlers::delete_dashboard),
+        )
+        .route("/dashboards/:id/widgets", post(dashboard_handlers::add_widget))
+        .route(
+            "/dashboards/:id/widgets/order",
+            put(dashboard_handlers::reorder_widgets),
+        )
+        .route(
+            "/dashboards/:id/widgets/:widget_id",
+            axum::routing::delete(dashboard_handlers::delete_widget),
+        )
         .route("/currencies", get(wallet_handlers::list_currencies))
         .route("/banks/connections", get(bank_handlers::list_connections))
         .route(

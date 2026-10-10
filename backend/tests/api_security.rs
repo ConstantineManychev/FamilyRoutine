@@ -28,6 +28,16 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
         (Method::DELETE, format!("/api/geo/cities/{nil}")),
         (Method::GET, "/api/dicts/exercises".to_string()),
         (Method::POST, "/api/invites/accept".to_string()),
+        (Method::POST, "/api/routine/marks".to_string()),
+        (Method::DELETE, format!("/api/routine/marks/{nil}")),
+        (
+            Method::GET,
+            "/api/routine/timeline?from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z".to_string(),
+        ),
+        (Method::PUT, format!("/api/families/{nil}/routine-sharing")),
+        (Method::GET, "/api/dashboards".to_string()),
+        (Method::DELETE, format!("/api/dashboards/{nil}")),
+        (Method::POST, format!("/api/dashboards/{nil}/widgets")),
     ];
 
     for (method, uri) in endpoints
