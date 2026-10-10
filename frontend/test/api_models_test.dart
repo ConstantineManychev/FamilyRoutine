@@ -79,6 +79,31 @@ void main()
       expect(fam.members.single.role, MemberRole.admin);
     });
 
+    test('only the owner may remove admins and nobody may remove the owner', ()
+    {
+      FamDetailDto detail(String aMyRole, bool aIsOwner) => FamDetailDto.fromJson({
+            'id': 'f1',
+            'name': 'Home',
+            'my_role': aMyRole,
+            'is_owner': aIsOwner,
+            'members': [
+              {'id': 'o', 'first_name': 'O', 'last_name': 'O', 'role': 'admin', 'is_owner': true},
+              {'id': 'a', 'first_name': 'A', 'last_name': 'A', 'role': 'admin', 'is_owner': false},
+              {'id': 's', 'first_name': 'S', 'last_name': 'S', 'role': 'standard', 'is_owner': false},
+            ],
+          });
+
+      final asOwner = detail('admin', true);
+      final asAdmin = detail('admin', false);
+      final asStandard = detail('standard', false);
+      final [owner, admin, standard] = asOwner.members;
+
+      expect(owner.isAdmin, isTrue);
+      expect([asOwner.canRemove(owner), asOwner.canRemove(admin), asOwner.canRemove(standard)], [false, true, true]);
+      expect([asAdmin.canRemove(owner), asAdmin.canRemove(admin), asAdmin.canRemove(standard)], [false, false, true]);
+      expect(asStandard.members.any(asStandard.canRemove), isFalse);
+    });
+
     test('muscle groups use backend wire names', ()
     {
       const group = ExMuscGrpDto(grp: MuscGrpType.fullBody, pct: 50);

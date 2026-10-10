@@ -51,6 +51,7 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(fam_handlers::delete_family),
         )
         .route("/families/:id/leave", post(fam_handlers::leave_family))
+        .route("/families/:id/transfer", post(fam_handlers::transfer_ownership))
         .route(
             "/families/:id/members/:user_id",
             put(fam_handlers::update_member_role).delete(fam_handlers::remove_member),
@@ -106,6 +107,7 @@ pub fn build_router(a_state: AppState) -> Router
         .fallback(|| async { ApiError::NotFound });
 
     let router = Router::new()
+        .route("/", get(|| async { "FamilyRoutine API" }))
         .route("/health", get(|| async { "ok" }))
         .nest("/api", api)
         .fallback(|| async { ApiError::NotFound })

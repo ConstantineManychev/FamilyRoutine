@@ -1,0 +1,45 @@
+import 'package:flutter/widgets.dart';
+
+abstract final class AppIcons
+{
+  static const String _family = 'Lucide';
+
+  static const IconData activity = IconData(0xe038, fontFamily: _family);
+  static const IconData banknote = IconData(0xe052, fontFamily: _family);
+  static const IconData bookOpen = IconData(0xe05f, fontFamily: _family);
+  static const IconData building2 = IconData(0xe290, fontFamily: _family);
+  static const IconData check = IconData(0xe06c, fontFamily: _family);
+  static const IconData chevronDown = IconData(0xe06d, fontFamily: _family);
+  static const IconData chevronRight = IconData(0xe06f, fontFamily: _family);
+  static const IconData chevronUp = IconData(0xe070, fontFamily: _family);
+  static const IconData copy = IconData(0xe09e, fontFamily: _family);
+  static const IconData creditCard = IconData(0xe0aa, fontFamily: _family);
+  static const IconData crown = IconData(0xe1d6, fontFamily: _family);
+  static const IconData doorOpen = IconData(0xe3d6, fontFamily: _family);
+  static const IconData edit = IconData(0xe172, fontFamily: _family);
+  static const IconData eye = IconData(0xe0ba, fontFamily: _family);
+  static const IconData globe = IconData(0xe0e8, fontFamily: _family);
+  static const IconData home = IconData(0xe0f5, fontFamily: _family);
+  static const IconData key = IconData(0xe0fd, fontFamily: _family);
+  static const IconData keyRound = IconData(0xe4a3, fontFamily: _family);
+  static const IconData landmark = IconData(0xe23a, fontFamily: _family);
+  static const IconData lock = IconData(0xe10b, fontFamily: _family);
+  static const IconData logOut = IconData(0xe10e, fontFamily: _family);
+  static const IconData mapPin = IconData(0xe111, fontFamily: _family);
+  static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
+  static const IconData navigation = IconData(0xe123, fontFamily: _family);
+  static const IconData plus = IconData(0xe13d, fontFamily: _family);
+  static const IconData plusCircle = IconData(0xe081, fontFamily: _family);
+  static const IconData save = IconData(0xe14d, fontFamily: _family);
+  static const IconData settings = IconData(0xe154, fontFamily: _family);
+  static const IconData shieldCheck = IconData(0xe1ff, fontFamily: _family);
+  static const IconData shieldOff = IconData(0xe15a, fontFamily: _family);
+  static const IconData ticket = IconData(0xe20f, fontFamily: _family);
+  static const IconData trash = IconData(0xe18d, fontFamily: _family);
+  static const IconData trash2 = IconData(0xe18e, fontFamily: _family);
+  static const IconData user = IconData(0xe19f, fontFamily: _family);
+  static const IconData userPlus = IconData(0xe1a2, fontFamily: _family);
+  static const IconData users = IconData(0xe1a4, fontFamily: _family);
+  static const IconData wallet = IconData(0xe204, fontFamily: _family);
+  static const IconData x = IconData(0xe1b2, fontFamily: _family);
+}

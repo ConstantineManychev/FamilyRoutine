@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            f.id,\n            f.name,\n            fm.role AS \"role: MemberRole\",\n            (SELECT COUNT(*) FROM family_mems m WHERE m.family_id = f.id) AS \"member_count!\"\n        FROM families f\n        JOIN family_mems fm ON fm.family_id = f.id\n        WHERE fm.user_id = $1\n        ORDER BY f.name\n        ",
+  "query": "\n        SELECT\n            f.id,\n            f.name,\n            fm.role AS \"role: MemberRole\",\n            (f.owner_id = fm.user_id) AS \"is_owner!\",\n            (SELECT COUNT(*) FROM family_mems m WHERE m.family_id = f.id) AS \"member_count!\"\n        FROM families f\n        JOIN family_mems fm ON fm.family_id = f.id\n        WHERE fm.user_id = $1\n        ORDER BY f.name\n        ",
   "describe": {
     "columns": [
       {
@@ -30,6 +30,11 @@
       },
       {
         "ordinal": 3,
+        "name": "is_owner!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
         "name": "member_count!",
         "type_info": "Int8"
       }
@@ -43,8 +48,9 @@
       false,
       false,
       false,
+      null,
       null
     ]
   },
-  "hash": "0a196987bd80b4ea9db27437226e2f73fb153c2e1d1676a50255a09b21047ea2"
+  "hash": "87ffb47d97d80d7d1d351b9dcc15ab35cd27090691a29d83b424a6c5632cc2be"
 }

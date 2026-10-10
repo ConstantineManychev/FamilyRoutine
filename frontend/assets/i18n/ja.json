@@ -14,7 +14,6 @@
   "validation": {
     "required": "必須項目です",
     "email": "正しいメールアドレスを入力してください",
-    "password_len": "{min}文字以上",
     "mask": "数字4桁ちょうど",
     "sync_token": "トークンが短すぎるようです"
   },
@@ -27,7 +26,8 @@
     "ALREADY_EXISTS": "同じ項目がすでに存在します",
     "EMAIL_TAKEN": "このメールアドレスはすでに登録されています",
     "IN_USE": "使用中のため削除できません",
-    "LAST_ADMIN": "グループには少なくとも1人の管理者が必要です",
+    "OWNER_PROTECTED": "グループのオーナーを降格または除外することはできません",
+    "OWNER_MUST_TRANSFER": "他のメンバーがいる間、オーナーはグループを退出できません。オーナー権限を譲渡するか、グループを削除してください",
     "TOO_MANY_INVITES": "有効な招待が多すぎます。未使用の招待を取り消してください。",
     "TOO_MANY_REQUESTS": "試行回数が多すぎます。しばらくしてから再試行してください。",
     "INTERNAL": "サーバーエラーです。しばらくしてから再試行してください。",
@@ -69,12 +69,16 @@
     "role": "役割",
     "roles": {
       "admin": "管理者",
-      "standard": "メンバー"
+      "standard": "メンバー",
+      "owner": "オーナー"
     },
     "make_admin": "管理者にする",
     "make_standard": "メンバーにする",
     "remove_member": "グループから外す",
     "remove_member_confirm": "{name} をグループから外しますか？",
+    "transfer_owner": "オーナー権限を譲渡",
+    "transfer_owner_confirm": "グループのオーナー権限を {name} に譲渡しますか？あなたは管理者のままですが、管理者の任命と解任は新しいオーナーのみが行えます。",
+    "transfer_owner_done": "オーナー権限を譲渡しました",
     "create_action": "作成",
     "delete": "グループを削除",
     "leave": "グループを退出",

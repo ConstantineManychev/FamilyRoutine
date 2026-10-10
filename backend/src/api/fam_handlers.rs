@@ -4,15 +4,16 @@ use axum::Json;
 use chrono::{Duration, Utc};
 use shared_schema::{
     AcceptInviteRequest, AcceptInviteResponse, CreateFamilyRequest, CreateInviteRequest, CreatedInviteDto,
-    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest, UpdateMemberRoleRequest,
+    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest,
+    TransferOwnershipRequest, UpdateMemberRoleRequest,
 };
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, AuthUser, ClientIp};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text, MAX_NAME_LEN};
-use crate::security::authz::{admin_count, lock_family, require_admin, require_member};
+use crate::security::authz::{lock_family, member_access, require_admin, require_member, require_owner, FamAccess};
 use crate::security::invite_code;
 use crate::security::rate_limit::{INVITE_ACCEPT_PER_IP, INVITE_ACCEPT_PER_USER, INVITE_CREATE_PER_USER};
 use crate::state::AppState;
@@ -32,6 +33,7 @@ pub async fn list_families(
             f.id,
             f.name,
             fm.role AS "role: MemberRole",
+            (f.owner_id = fm.user_id) AS "is_owner!",
             (SELECT COUNT(*) FROM family_mems m WHERE m.family_id = f.id) AS "member_count!"
         FROM families f
         JOIN family_mems fm ON fm.family_id = f.id
@@ -53,12 +55,18 @@ pub async fn create_family(
 ) -> Result<(StatusCode, Json<FamDetailDto>), ApiError>
 {
     let name = clean_name(&a_req.name, "name")?;
+    let fam_id = Uuid::new_v4();
 
     let mut tx = a_state.db.begin().await?;
 
-    let fam_id = sqlx::query_scalar!("INSERT INTO families (name) VALUES ($1) RETURNING id", name)
-        .fetch_one(&mut *tx)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO families (id, name, owner_id) VALUES ($1, $2, $3)",
+        fam_id,
+        name,
+        a_user.user_id
+    )
+    .execute(&mut *tx)
+    .await?;
 
     sqlx::query!(
         "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, 'admin')",
@@ -70,7 +78,12 @@ pub async fn create_family(
 
     tx.commit().await?;
 
-    let detail = load_family_detail(&a_state.db, fam_id, MemberRole::Admin).await?;
+    let owner_access = FamAccess {
+        role: MemberRole::Admin,
+        is_owner: true,
+    };
+
+    let detail = load_family_detail(&a_state.db, fam_id, owner_access).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -80,8 +93,8 @@ pub async fn get_family(
     ApiPath(a_fam_id): ApiPath<Uuid>,
 ) -> Result<Json<FamDetailDto>, ApiError>
 {
-    let my_role = require_member(&a_state.db, a_fam_id, a_user.user_id).await?;
-    Ok(Json(load_family_detail(&a_state.db, a_fam_id, my_role).await?))
+    let access = require_member(&a_state.db, a_fam_id, a_user.user_id).await?;
+    Ok(Json(load_family_detail(&a_state.db, a_fam_id, access).await?))
 }
 
 pub async fn rename_family(
@@ -109,7 +122,7 @@ pub async fn delete_family(
 {
     let mut tx = a_state.db.begin().await?;
     lock_family(&mut tx, a_fam_id).await?;
-    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+    require_owner(&mut *tx, a_fam_id, a_user.user_id).await?;
 
     sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
         .execute(&mut *tx)
@@ -127,35 +140,29 @@ pub async fn leave_family(
 {
     let mut tx = a_state.db.begin().await?;
     lock_family(&mut tx, a_fam_id).await?;
-    let my_role = require_member(&mut *tx, a_fam_id, a_user.user_id).await?;
+    let access = require_member(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    let member_count = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "count!" FROM family_mems WHERE family_id = $1"#,
-        a_fam_id
-    )
-    .fetch_one(&mut *tx)
-    .await?;
-
-    if member_count == 1
+    if access.is_owner
     {
+        let member_count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "count!" FROM family_mems WHERE family_id = $1"#,
+            a_fam_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if member_count > 1
+        {
+            return Err(ApiError::Conflict("OWNER_MUST_TRANSFER"));
+        }
+
         sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
             .execute(&mut *tx)
             .await?;
     }
     else
     {
-        if my_role == MemberRole::Admin && admin_count(&mut tx, a_fam_id).await? == 1
-        {
-            return Err(ApiError::LastAdmin);
-        }
-
-        sqlx::query!(
-            "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
-            a_fam_id,
-            a_user.user_id
-        )
-        .execute(&mut *tx)
-        .await?;
+        drop_membership(&mut tx, a_fam_id, a_user.user_id).await?;
     }
 
     tx.commit().await?;
@@ -171,17 +178,13 @@ pub async fn update_member_role(
 {
     let mut tx = a_state.db.begin().await?;
     lock_family(&mut tx, a_fam_id).await?;
-    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+    require_owner(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    let target_role = require_member(&mut *tx, a_fam_id, a_target_id).await?;
+    let target = require_member(&mut *tx, a_fam_id, a_target_id).await?;
 
-    let is_last_admin_demoted = target_role == MemberRole::Admin
-        && a_req.role != MemberRole::Admin
-        && admin_count(&mut tx, a_fam_id).await? == 1;
-
-    if is_last_admin_demoted
+    if target.is_owner
     {
-        return Err(ApiError::LastAdmin);
+        return Err(ApiError::Conflict("OWNER_PROTECTED"));
     }
 
     sqlx::query!(
@@ -192,6 +195,11 @@ pub async fn update_member_role(
     )
     .execute(&mut *tx)
     .await?;
+
+    if a_req.role == MemberRole::Standard
+    {
+        revoke_invites_by(&mut tx, a_fam_id, a_target_id).await?;
+    }
 
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -205,19 +213,65 @@ pub async fn remove_member(
 {
     let mut tx = a_state.db.begin().await?;
     lock_family(&mut tx, a_fam_id).await?;
-    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+    let actor = require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    let target_role = require_member(&mut *tx, a_fam_id, a_target_id).await?;
+    let target = require_member(&mut *tx, a_fam_id, a_target_id).await?;
 
-    if target_role == MemberRole::Admin && admin_count(&mut tx, a_fam_id).await? == 1
+    if target.is_owner
     {
-        return Err(ApiError::LastAdmin);
+        return Err(ApiError::Conflict("OWNER_PROTECTED"));
+    }
+
+    if target.is_admin() && !actor.is_owner
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    drop_membership(&mut tx, a_fam_id, a_target_id).await?;
+
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn transfer_ownership(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<TransferOwnershipRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    lock_family(&mut tx, a_fam_id).await?;
+    require_owner(&mut *tx, a_fam_id, a_user.user_id).await?;
+
+    let target = member_access(&mut *tx, a_fam_id, a_req.user_id)
+        .await?
+        .ok_or(ApiError::Validation("user_id"))?;
+
+    if target.is_owner
+    {
+        return Err(ApiError::Validation("user_id"));
     }
 
     sqlx::query!(
-        "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
+        "UPDATE family_mems SET role = 'admin' WHERE family_id = $1 AND user_id = $2",
         a_fam_id,
-        a_target_id
+        a_req.user_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "UPDATE families SET owner_id = $2 WHERE id = $1",
+        a_fam_id,
+        a_req.user_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM family_invites WHERE family_id = $1 AND role = 'admin'",
+        a_fam_id
     )
     .execute(&mut *tx)
     .await?;
@@ -240,7 +294,12 @@ pub async fn create_invite(
 
     let mut tx = a_state.db.begin().await?;
     lock_family(&mut tx, a_fam_id).await?;
-    require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+    let actor = require_admin(&mut *tx, a_fam_id, a_user.user_id).await?;
+
+    if a_req.role == MemberRole::Admin && !actor.is_owner
+    {
+        return Err(ApiError::Forbidden);
+    }
 
     sqlx::query!(
         "DELETE FROM family_invites WHERE family_id = $1 AND expires_ts <= NOW()",
@@ -391,7 +450,35 @@ pub async fn accept_invite(
     }))
 }
 
-async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_my_role: MemberRole) -> Result<FamDetailDto, ApiError>
+async fn drop_membership(a_conn: &mut PgConnection, a_fam_id: Uuid, a_user_id: Uuid) -> Result<(), ApiError>
+{
+    revoke_invites_by(a_conn, a_fam_id, a_user_id).await?;
+
+    sqlx::query!(
+        "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
+        a_fam_id,
+        a_user_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    Ok(())
+}
+
+async fn revoke_invites_by(a_conn: &mut PgConnection, a_fam_id: Uuid, a_user_id: Uuid) -> Result<(), ApiError>
+{
+    sqlx::query!(
+        "DELETE FROM family_invites WHERE family_id = $1 AND invited_by = $2",
+        a_fam_id,
+        a_user_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    Ok(())
+}
+
+async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_access: FamAccess) -> Result<FamDetailDto, ApiError>
 {
     let name = sqlx::query_scalar!("SELECT name FROM families WHERE id = $1", a_fam_id)
         .fetch_optional(a_db)
@@ -401,11 +488,17 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_my_role: MemberRole
     let members = sqlx::query_as!(
         FamMemberDto,
         r#"
-        SELECT u.id, u.first_name, u.last_name, fm.role AS "role: MemberRole"
+        SELECT
+            u.id,
+            u.first_name,
+            u.last_name,
+            fm.role AS "role: MemberRole",
+            (f.owner_id = fm.user_id) AS "is_owner!"
         FROM family_mems fm
+        JOIN families f ON f.id = fm.family_id
         JOIN users u ON u.id = fm.user_id
         WHERE fm.family_id = $1
-        ORDER BY fm.joined_ts
+        ORDER BY (f.owner_id = fm.user_id) DESC, fm.joined_ts
         "#,
         a_fam_id
     )
@@ -415,7 +508,8 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_my_role: MemberRole
     Ok(FamDetailDto {
         id: a_fam_id,
         name,
-        my_role: a_my_role,
+        my_role: a_access.role,
+        is_owner: a_access.is_owner,
         members,
     })
 }

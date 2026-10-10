@@ -4,7 +4,7 @@ use crate::domain::errors::ApiError;
 
 pub const MAX_NAME_LEN: usize = 100;
 pub const MAX_EMAIL_LEN: usize = 254;
-pub const MIN_PASSWORD_LEN: usize = 10;
+pub const MIN_PASSWORD_LEN: usize = 1;
 pub const MAX_PASSWORD_LEN: usize = 128;
 pub const MIN_SYNC_TOKEN_LEN: usize = 16;
 pub const MAX_SYNC_TOKEN_LEN: usize = 256;
@@ -159,8 +159,9 @@ mod tests
     #[test]
     fn password_length_is_enforced()
     {
-        assert!(check_password("short").is_err());
-        assert!(check_password("long-enough-password").is_ok());
+        assert!(check_password("").is_err());
+        assert!(check_password("1").is_ok());
+        assert!(check_password(&"x".repeat(MAX_PASSWORD_LEN)).is_ok());
         assert!(check_password(&"x".repeat(MAX_PASSWORD_LEN + 1)).is_err());
     }
 

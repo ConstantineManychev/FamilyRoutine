@@ -133,6 +133,9 @@ class ApiSvc
 
   Future<void> removeMember(String aFamId, String aUserId) => _dio.delete('/api/families/$aFamId/members/$aUserId');
 
+  Future<void> transferOwnership(String aFamId, String aUserId) =>
+      _dio.post('/api/families/$aFamId/transfer', data: {'user_id': aUserId});
+
   Future<CreatedInviteDto> createInvite(String aFamId, MemberRole aRole, String? aLabel) async
   {
     final res = await _dio.post('/api/families/$aFamId/invites', data: {

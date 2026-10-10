@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../providers/api_prov.dart';
+import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'fam_groups_grid.dart';
 
@@ -89,7 +89,7 @@ class FamGroupsScreen extends ConsumerWidget
             actions: [
               OutlinedButton.icon(
                 onPressed: () => _joinByCode(aContext, aRef),
-                icon: const Icon(LucideIcons.keyRound, size: 18),
+                icon: const Icon(AppIcons.keyRound, size: 18),
                 label: Text('family.join_by_code'.tr()),
               ),
             ],

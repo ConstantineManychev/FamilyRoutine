@@ -68,16 +68,24 @@ class FamDto
   final String id;
   final String name;
   final MemberRole role;
+  final bool isOwner;
   final int memberCount;
 
-  const FamDto({required this.id, required this.name, required this.role, required this.memberCount});
+  const FamDto({
+    required this.id,
+    required this.name,
+    required this.role,
+    required this.isOwner,
+    required this.memberCount,
+  });
 
-  bool get isAdmin => role == MemberRole.admin;
+  bool get isAdmin => isOwner || role == MemberRole.admin;
 
   factory FamDto.fromJson(Map<String, dynamic> aJson) => FamDto(
         id: aJson['id'] as String,
         name: aJson['name'] as String,
         role: MemberRole.fromJson(aJson['role']),
+        isOwner: aJson['is_owner'] as bool? ?? false,
         memberCount: (aJson['member_count'] as num?)?.toInt() ?? 1,
       );
 }
@@ -88,14 +96,24 @@ class FamMemberDto
   final String fName;
   final String lName;
   final MemberRole role;
+  final bool isOwner;
 
-  const FamMemberDto({required this.id, required this.fName, required this.lName, required this.role});
+  const FamMemberDto({
+    required this.id,
+    required this.fName,
+    required this.lName,
+    required this.role,
+    required this.isOwner,
+  });
+
+  bool get isAdmin => isOwner || role == MemberRole.admin;
 
   factory FamMemberDto.fromJson(Map<String, dynamic> aJson) => FamMemberDto(
         id: aJson['id'] as String,
         fName: aJson['first_name'] as String? ?? '',
         lName: aJson['last_name'] as String? ?? '',
         role: MemberRole.fromJson(aJson['role']),
+        isOwner: aJson['is_owner'] as bool? ?? false,
       );
 }
 
@@ -104,16 +122,26 @@ class FamDetailDto
   final String id;
   final String name;
   final MemberRole myRole;
+  final bool isOwner;
   final List<FamMemberDto> members;
 
-  const FamDetailDto({required this.id, required this.name, required this.myRole, required this.members});
+  const FamDetailDto({
+    required this.id,
+    required this.name,
+    required this.myRole,
+    required this.isOwner,
+    required this.members,
+  });
 
-  bool get isAdmin => myRole == MemberRole.admin;
+  bool get isAdmin => isOwner || myRole == MemberRole.admin;
+
+  bool canRemove(FamMemberDto aMember) => !aMember.isOwner && (isOwner || (isAdmin && !aMember.isAdmin));
 
   factory FamDetailDto.fromJson(Map<String, dynamic> aJson) => FamDetailDto(
         id: aJson['id'] as String,
         name: aJson['name'] as String,
         myRole: MemberRole.fromJson(aJson['my_role']),
+        isOwner: aJson['is_owner'] as bool? ?? false,
         members: (aJson['members'] as List? ?? const [])
             .map((aItem) => FamMemberDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),

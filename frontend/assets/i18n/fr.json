@@ -14,7 +14,6 @@
   "validation": {
     "required": "Champ obligatoire",
     "email": "Saisissez un e-mail valide",
-    "password_len": "Au moins {min} caractères",
     "mask": "Exactement 4 chiffres",
     "sync_token": "Le jeton semble trop court"
   },
@@ -27,7 +26,8 @@
     "ALREADY_EXISTS": "Cette entrée existe déjà",
     "EMAIL_TAKEN": "Cet e-mail est déjà enregistré",
     "IN_USE": "L'entrée est utilisée et ne peut pas être supprimée",
-    "LAST_ADMIN": "Le groupe doit conserver au moins un administrateur",
+    "OWNER_PROTECTED": "Le propriétaire du groupe ne peut pas être rétrogradé ni exclu",
+    "OWNER_MUST_TRANSFER": "Le propriétaire ne peut pas quitter le groupe tant qu’il reste d’autres membres. Transférez la propriété ou supprimez le groupe",
     "TOO_MANY_INVITES": "Trop d'invitations actives. Révoquez celles qui sont inutilisées.",
     "TOO_MANY_REQUESTS": "Trop de tentatives. Réessayez plus tard.",
     "INTERNAL": "Erreur du serveur. Réessayez plus tard.",
@@ -69,12 +69,16 @@
     "role": "Rôle",
     "roles": {
       "admin": "Administrateur",
-      "standard": "Membre"
+      "standard": "Membre",
+      "owner": "Propriétaire"
     },
     "make_admin": "Nommer administrateur",
     "make_standard": "Rendre membre",
     "remove_member": "Retirer du groupe",
     "remove_member_confirm": "Retirer {name} du groupe ?",
+    "transfer_owner": "Transférer la propriété",
+    "transfer_owner_confirm": "Transférer la propriété du groupe à {name} ? Vous resterez administrateur, mais seul le nouveau propriétaire pourra attribuer et retirer les droits d’administrateur.",
+    "transfer_owner_done": "Propriété transférée",
     "create_action": "Créer",
     "delete": "Supprimer le groupe",
     "leave": "Quitter le groupe",

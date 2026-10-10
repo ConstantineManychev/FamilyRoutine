@@ -14,7 +14,6 @@
   "validation": {
     "required": "Pflichtfeld",
     "email": "Bitte eine gültige E-Mail eingeben",
-    "password_len": "Mindestens {min} Zeichen",
     "mask": "Genau 4 Ziffern",
     "sync_token": "Das Token scheint zu kurz zu sein"
   },
@@ -27,7 +26,8 @@
     "ALREADY_EXISTS": "Dieser Eintrag existiert bereits",
     "EMAIL_TAKEN": "Diese E-Mail ist bereits registriert",
     "IN_USE": "Der Eintrag wird verwendet und kann nicht gelöscht werden",
-    "LAST_ADMIN": "Die Gruppe muss mindestens einen Administrator behalten",
+    "OWNER_PROTECTED": "Der Gruppeneigentümer kann nicht herabgestuft oder entfernt werden",
+    "OWNER_MUST_TRANSFER": "Der Eigentümer kann die Gruppe nicht verlassen, solange andere Mitglieder vorhanden sind. Übertragen Sie das Eigentum oder löschen Sie die Gruppe",
     "TOO_MANY_INVITES": "Zu viele aktive Einladungen. Widerrufen Sie ungenutzte.",
     "TOO_MANY_REQUESTS": "Zu viele Versuche. Bitte später erneut versuchen.",
     "INTERNAL": "Serverfehler. Bitte später erneut versuchen.",
@@ -69,12 +69,16 @@
     "role": "Rolle",
     "roles": {
       "admin": "Administrator",
-      "standard": "Mitglied"
+      "standard": "Mitglied",
+      "owner": "Eigentümer"
     },
     "make_admin": "Zum Administrator machen",
     "make_standard": "Zum Mitglied machen",
     "remove_member": "Aus der Gruppe entfernen",
     "remove_member_confirm": "{name} aus der Gruppe entfernen?",
+    "transfer_owner": "Eigentum übertragen",
+    "transfer_owner_confirm": "Gruppeneigentum an {name} übertragen? Sie bleiben Administrator, aber nur der neue Eigentümer kann Administratorrechte vergeben und entziehen.",
+    "transfer_owner_done": "Eigentum übertragen",
     "create_action": "Erstellen",
     "delete": "Gruppe löschen",
     "leave": "Gruppe verlassen",

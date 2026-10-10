@@ -116,6 +116,7 @@ pub struct FamListItemDto
     pub id: Uuid,
     pub name: String,
     pub role: MemberRole,
+    pub is_owner: bool,
     pub member_count: i64,
 }
 
@@ -126,6 +127,7 @@ pub struct FamMemberDto
     pub first_name: String,
     pub last_name: String,
     pub role: MemberRole,
+    pub is_owner: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -134,6 +136,7 @@ pub struct FamDetailDto
     pub id: Uuid,
     pub name: String,
     pub my_role: MemberRole,
+    pub is_owner: bool,
     pub members: Vec<FamMemberDto>,
 }
 
@@ -153,6 +156,12 @@ pub struct RenameFamilyRequest
 pub struct UpdateMemberRoleRequest
 {
     pub role: MemberRole,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TransferOwnershipRequest
+{
+    pub user_id: Uuid,
 }
 
 #[derive(Debug, Clone, Deserialize)]
