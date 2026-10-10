@@ -30,14 +30,26 @@
 
 ### Бэкенд
 
-Ключи создаются один раз и сохраняются в `.env.dev` (файл в `.gitignore`). Если генерировать их заново в каждом терминале, после перезапуска сервера пароли перестанут подходить (вход отвечает `401`), а сохранённые банковские токены — расшифровываться.
+При старте бэкенд сам читает `.env` из текущей папки или ближайшей родительской, поэтому `cargo run` работает и из корня, и из `backend/`. Переменные, уже заданные в окружении, важнее значений из файла. Для локального запуска в корневом `.env` нужны строки:
+
+```dotenv
+DATABASE_URL=postgres://family_routine:<пароль>@localhost:5432/family_routine
+DATA_ENC_KEY=<вывод openssl rand -base64 32>
+PASSWORD_PEPPER=<вывод openssl rand -base64 32>
+COOKIE_SECURE=false
+SQLX_OFFLINE=true
+```
+
+- `DB_USER`, `DB_PASSWORD` и `DB_NAME` читает только Docker Compose: из них он собирает `DATABASE_URL` для контейнера. `cargo run` их не использует, ему нужна готовая строка `DATABASE_URL`.
+- `DATA_ENC_KEY` и `PASSWORD_PEPPER` создаются один раз. Если их сменить, пароли перестанут подходить (вход отвечает `401`), а сохранённые банковские токены — расшифровываться.
+- `SQLX_OFFLINE=true` — компилятор проверяет SQL-запросы по файлам `.sqlx`, а не по живой базе, поэтому проект собирается даже со старой схемой. Схему обновят миграции при запуске сервера.
+- В `docker-compose.yml` PostgreSQL наружу не открыт. Для разработки нужен отдельный экземпляр, например:
+
+  ```bash
+  docker run -d --name fr-dev-db -p 5432:5432 -e POSTGRES_USER=family_routine -e POSTGRES_PASSWORD=<пароль> -e POSTGRES_DB=family_routine postgres:16-alpine
+  ```
 
 ```bash
-service postgresql start
-createdb family_routine
-[ -f .env.dev ] || printf 'export DATABASE_URL=%s\nexport DATA_ENC_KEY=%s\nexport PASSWORD_PEPPER=%s\nexport COOKIE_SECURE=false\n' \
-  postgres://user:pass@127.0.0.1/family_routine "$(openssl rand -base64 32)" "$(openssl rand -base64 32)" > .env.dev
-source .env.dev
 cargo run -p backend
 ```
 
