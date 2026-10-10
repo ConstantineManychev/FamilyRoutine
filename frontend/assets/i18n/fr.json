@@ -36,7 +36,9 @@
     "BANK_NOT_CONFIGURED": "La connexion à cette banque n'est pas configurée sur le serveur",
     "ALREADY_CONNECTED": "Cette banque est déjà connectée",
     "BANK_UNAVAILABLE": "La banque est momentanément indisponible, réessayez plus tard",
-    "BANK_LINKED": "Le portefeuille est lié à une banque : déconnectez d'abord la banque ou archivez le portefeuille"
+    "BANK_LINKED": "Le portefeuille est lié à une banque : déconnectez d'abord la banque ou archivez le portefeuille",
+    "BANK_APP_REJECTED": "Enable Banking n’a pas accepté la clé de l’application. Vérifiez ENABLE_BANKING_APP_ID et le fichier PEM ; les détails sont dans le journal du serveur.",
+    "BANK_REJECTED": "Enable Banking a refusé la requête. Cause fréquente : l’URL de retour n’est pas enregistrée dans le panneau Enable Banking. Les détails sont dans le journal du serveur."
   },
   "sidebar": {
     "routine": "Routine",
@@ -262,7 +264,9 @@
     "go_to_bank": "Aller à la banque",
     "connected": "Banque connectée, chargement des opérations",
     "completing": "Finalisation de la connexion bancaire…",
-    "declined": "La connexion a été annulée ou la banque a refusé l'accès."
+    "declined": "La connexion a été annulée ou la banque a refusé l'accès.",
+    "choose_bank": "Banque",
+    "no_aspsps": "Enable Banking n’a renvoyé aucune banque. Vérifiez que l’application fonctionne en production et non en sandbox dans le panneau Enable Banking."
   },
   "finance": {
     "transactions": "Opérations",

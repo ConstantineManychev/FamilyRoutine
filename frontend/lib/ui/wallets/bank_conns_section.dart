@@ -12,7 +12,20 @@ import '../common/money.dart';
 
 const String monobankTokenUrl = 'https://api.monobank.ua/';
 const String defaultAspspCountry = 'IE';
-const String defaultAspspName = 'AIB';
+const List<String> preferredAspspNames = ['AIB', 'ALLIED IRISH'];
+
+String? preferredAspsp(List<AspspDto> aAspsps)
+{
+  for (final preferred in preferredAspspNames)
+  {
+    final match = aAspsps.where((aAspsp) => aAspsp.name.toUpperCase().startsWith(preferred)).firstOrNull;
+    if (match != null)
+    {
+      return match.name;
+    }
+  }
+  return aAspsps.firstOrNull?.name;
+}
 
 class BankConnsSection extends ConsumerWidget
 {
@@ -169,6 +182,9 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
   final _tokenCtrl = TextEditingController();
   String _provider = 'monobank';
   bool _isBusy = false;
+  List<AspspDto>? _aspsps;
+  Object? _aspspError;
+  String? _aspspName;
 
   @override
   void dispose()
@@ -208,13 +224,53 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
     }
   }
 
+  void _selectProvider(String aProvider)
+  {
+    setState(() => _provider = aProvider);
+    if (aProvider == 'enable_banking' && _aspsps == null)
+    {
+      _loadAspsps();
+    }
+  }
+
+  Future<void> _loadAspsps() async
+  {
+    setState(() => _aspspError = null);
+
+    try
+    {
+      final aspsps = await ref.read(apiProv).getAspsps(defaultAspspCountry);
+      if (mounted)
+      {
+        setState(()
+        {
+          _aspsps = aspsps;
+          _aspspName = preferredAspsp(aspsps);
+        });
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        setState(() => _aspspError = aError);
+      }
+    }
+  }
+
   Future<void> _connectEnableBanking() async
   {
+    final aspspName = _aspspName;
+    if (aspspName == null)
+    {
+      return;
+    }
+
     setState(() => _isBusy = true);
 
     try
     {
-      final url = await ref.read(apiProv).startBankAuth(defaultAspspName, defaultAspspCountry);
+      final url = await ref.read(apiProv).startBankAuth(aspspName, defaultAspspCountry);
       await launchUrl(Uri.parse(url), webOnlyWindowName: '_self');
     }
     catch (aError)
@@ -244,7 +300,7 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
                 ButtonSegment(value: 'enable_banking', label: Text('bank.provider_aib'.tr())),
               ],
               selected: {_provider},
-              onSelectionChanged: (aValue) => setState(() => _provider = aValue.first),
+              onSelectionChanged: (aValue) => _selectProvider(aValue.first),
             ),
             const SizedBox(height: 16),
             if (_provider == 'monobank') ...[
@@ -268,18 +324,59 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
                 ),
               ),
             ]
-            else
+            else ...[
               Text('bank.eb_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+              const SizedBox(height: 16),
+              _buildAspspPicker(),
+            ],
           ],
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(aContext).pop(false), child: Text('common.cancel'.tr())),
         ElevatedButton(
-          onPressed: _isBusy ? null : (_provider == 'monobank' ? _connectMonobank : _connectEnableBanking),
+          onPressed: _isBusy || (_provider != 'monobank' && _aspspName == null)
+              ? null
+              : (_provider == 'monobank' ? _connectMonobank : _connectEnableBanking),
           child: Text(_provider == 'monobank' ? 'bank.connect'.tr() : 'bank.go_to_bank'.tr()),
         ),
       ],
+    );
+  }
+
+  Widget _buildAspspPicker()
+  {
+    final aspsps = _aspsps;
+    final error = _aspspError;
+
+    if (error != null)
+    {
+      return Row(
+        children: [
+          const Icon(AppIcons.alertCircle, size: 18, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text(errorText(error), style: TextStyle(color: Colors.red.shade800))),
+          TextButton(onPressed: _loadAspsps, child: Text('common.retry'.tr())),
+        ],
+      );
+    }
+
+    if (aspsps == null)
+    {
+      return const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()));
+    }
+
+    if (aspsps.isEmpty)
+    {
+      return Text('bank.no_aspsps'.tr(), style: TextStyle(color: Colors.red.shade800));
+    }
+
+    return DropdownButtonFormField<String>(
+      initialValue: _aspspName,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: 'bank.choose_bank'.tr(), border: const OutlineInputBorder()),
+      items: aspsps.map((aAspsp) => DropdownMenuItem(value: aAspsp.name, child: Text(aAspsp.name))).toList(),
+      onChanged: (aValue) => setState(() => _aspspName = aValue),
     );
   }
 }

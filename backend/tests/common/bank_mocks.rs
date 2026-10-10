@@ -20,6 +20,7 @@ pub const EB_APP_ID: &str = "11111111-2222-3333-4444-555555555555";
 pub const EB_CODE: &str = "good-code";
 pub const EB_SESSION: &str = "session-secret-1";
 pub const EB_ACCOUNT: &str = "uid-1";
+pub const EB_REDIRECT_URL: &str = "https://app.example/app/bank-callback";
 
 #[derive(Clone)]
 pub struct MonoMock
@@ -160,7 +161,7 @@ pub async fn spawn_enable_banking() -> (EnableBankingConfig, EbMock)
         api_url: url,
         app_id: EB_APP_ID.to_string(),
         key: EncodingKey::from_rsa_pem(private_pem.as_bytes()).unwrap(),
-        redirect_url: "https://app.example/app/bank-callback".to_string(),
+        redirect_url: EB_REDIRECT_URL.to_string(),
         consent_days: 180,
     };
 
@@ -208,6 +209,15 @@ async fn eb_auth(State(a_mock): State<EbMock>, a_headers: HeaderMap, Json(a_body
     if a_body["aspsp"]["name"] != "AIB" || a_body["psu_type"] != "personal" || a_body["access"]["valid_until"].is_null()
     {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
+    }
+
+    if a_body["redirect_url"] != EB_REDIRECT_URL
+    {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "message": "Redirect URI not allowed" })),
+        )
+            .into_response();
     }
 
     let state = a_body["state"].as_str().unwrap().to_string();

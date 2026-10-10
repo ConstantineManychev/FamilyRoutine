@@ -127,7 +127,7 @@ pub async fn list_aspsps(
     let aspsps = client
         .aspsps(&country)
         .await
-        .map_err(|err| provider_error(err, "country"))?;
+        .map_err(|err| enable_banking_error(err, None))?;
 
     Ok(Json(aspsps))
 }
@@ -144,6 +144,12 @@ pub async fn start_bank_auth(
     a_state
         .limiter
         .hit(&format!("bank-connect:{}", a_user.user_id), &BANK_CONNECT_PER_USER)?;
+
+    let aspsp = client
+        .find_aspsp(&aspsp_name, &country)
+        .await
+        .map_err(|err| enable_banking_error(err, None))?
+        .ok_or(ApiError::Validation("aspsp_name"))?;
 
     let mut state_bytes = [0u8; STATE_BYTES];
     rand::thread_rng().fill_bytes(&mut state_bytes);
@@ -175,9 +181,9 @@ pub async fn start_bank_auth(
     .await?;
 
     let url = client
-        .start_auth(&aspsp_name, &country, &state)
+        .start_auth(&aspsp, &state)
         .await
-        .map_err(|err| provider_error(err, "aspsp_name"))?;
+        .map_err(|err| enable_banking_error(err, None))?;
 
     Ok(Json(StartBankAuthResponse { url }))
 }
@@ -213,7 +219,7 @@ pub async fn complete_bank_auth(
     let session = client
         .create_session(code)
         .await
-        .map_err(|err| provider_error(err, "code"))?;
+        .map_err(|err| enable_banking_error(err, Some("code")))?;
 
     let secret = a_state
         .secret_box
@@ -351,6 +357,17 @@ fn enable_banking(a_state: &AppState) -> Result<&EnableBankingClient, ApiError>
         .enable_banking
         .as_ref()
         .ok_or(ApiError::Conflict("BANK_NOT_CONFIGURED"))
+}
+
+fn enable_banking_error(a_err: ProviderError, a_rejected_field: Option<&'static str>) -> ApiError
+{
+    match (a_err, a_rejected_field)
+    {
+        (ProviderError::Unauthorized, _) => ApiError::Upstream("BANK_APP_REJECTED"),
+        (ProviderError::Rejected(_), Some(field)) => ApiError::Validation(field),
+        (ProviderError::Rejected(_), None) => ApiError::Upstream("BANK_REJECTED"),
+        (other, _) => provider_error(other, "bank"),
+    }
 }
 
 fn provider_error(a_err: ProviderError, a_field: &'static str) -> ApiError

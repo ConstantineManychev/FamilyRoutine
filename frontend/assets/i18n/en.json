@@ -36,7 +36,9 @@
     "BANK_NOT_CONFIGURED": "This bank connection is not configured on the server",
     "ALREADY_CONNECTED": "This bank is already connected",
     "BANK_UNAVAILABLE": "The bank is temporarily unavailable, try again later",
-    "BANK_LINKED": "The wallet is linked to a bank: disconnect the bank or archive the wallet first"
+    "BANK_LINKED": "The wallet is linked to a bank: disconnect the bank or archive the wallet first",
+    "BANK_APP_REJECTED": "Enable Banking did not accept the application key. Check ENABLE_BANKING_APP_ID and the PEM file; details are in the server log.",
+    "BANK_REJECTED": "Enable Banking rejected the request. A common cause is a redirect URL that is not registered in the Enable Banking control panel. Details are in the server log."
   },
   "sidebar": {
     "routine": "Routine",
@@ -262,7 +264,9 @@
     "go_to_bank": "Go to the bank",
     "connected": "Bank connected, loading transactions",
     "completing": "Finishing the bank connection…",
-    "declined": "The connection was cancelled or the bank denied access."
+    "declined": "The connection was cancelled or the bank denied access.",
+    "choose_bank": "Bank",
+    "no_aspsps": "Enable Banking returned no banks. Make sure the application runs in production, not sandbox, in the Enable Banking control panel."
   },
   "finance": {
     "transactions": "Transactions",

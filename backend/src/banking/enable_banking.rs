@@ -17,6 +17,7 @@ use crate::config::EnableBankingConfig;
 const JWT_LIFETIME_SECS: i64 = 600;
 const BALANCE_PREFERENCE: &[&str] = &["ITBD", "CLBD", "ITAV", "CLAV", "XPCD"];
 const FINGERPRINT_PREFIX: &str = "fp:";
+const MAX_ERROR_DETAIL_CHARS: usize = 500;
 
 pub struct EnableBankingClient
 {
@@ -58,7 +59,7 @@ struct AspspList
 }
 
 #[derive(Deserialize)]
-struct AspspInfo
+pub struct AspspInfo
 {
     name: String,
     country: String,
@@ -217,25 +218,26 @@ impl EnableBankingClient
             .collect())
     }
 
-    pub async fn start_auth(&self, a_aspsp_name: &str, a_country: &str, a_state: &str)
-        -> Result<String, ProviderError>
+    pub async fn find_aspsp(&self, a_name: &str, a_country: &str) -> Result<Option<AspspInfo>, ProviderError>
     {
-        let aspsp = self
+        Ok(self
             .aspsp_infos(a_country)
             .await?
             .into_iter()
-            .find(|info| info.name.eq_ignore_ascii_case(a_aspsp_name))
-            .ok_or_else(|| ProviderError::Rejected("unknown aspsp".into()))?;
+            .find(|info| info.name.eq_ignore_ascii_case(a_name)))
+    }
 
+    pub async fn start_auth(&self, a_aspsp: &AspspInfo, a_state: &str) -> Result<String, ProviderError>
+    {
         let requested = Duration::days(self.consent_days);
-        let validity = aspsp
+        let validity = a_aspsp
             .maximum_consent_validity
             .map(Duration::seconds)
             .map_or(requested, |max| requested.min(max - Duration::minutes(5)));
 
         let body = json!({
             "access": { "valid_until": (Utc::now() + validity).to_rfc3339() },
-            "aspsp": { "name": aspsp.name, "country": aspsp.country },
+            "aspsp": { "name": a_aspsp.name, "country": a_aspsp.country },
             "state": a_state,
             "redirect_url": self.redirect_url,
             "psu_type": "personal",
@@ -323,7 +325,7 @@ impl EnableBankingClient
         match response.status()
         {
             status if status.is_success() || status == StatusCode::NOT_FOUND => Ok(()),
-            status => Err(map_status(status)),
+            _ => Err(failure(response).await),
         }
     }
 
@@ -346,10 +348,9 @@ impl EnableBankingClient
             .await
             .map_err(|err| ProviderError::Transient(err.without_url().to_string()))?;
 
-        let status = response.status();
-        if !status.is_success()
+        if !response.status().is_success()
         {
-            return Err(map_status(status));
+            return Err(failure(response).await);
         }
 
         response
@@ -392,6 +393,16 @@ pub fn assign_fingerprint_indices(a_txs: &mut [BankTx])
         tx.ext_id = format!("{}:{counter}", tx.ext_id);
         *counter += 1;
     }
+}
+
+async fn failure(a_response: reqwest::Response) -> ProviderError
+{
+    let status = a_response.status();
+    let path = a_response.url().path().to_string();
+    let body = a_response.text().await.unwrap_or_default();
+    let detail: String = body.chars().take(MAX_ERROR_DETAIL_CHARS).collect();
+    tracing::warn!("enable banking {status} on {path}: {detail}");
+    map_status(status)
 }
 
 fn map_status(a_status: StatusCode) -> ProviderError

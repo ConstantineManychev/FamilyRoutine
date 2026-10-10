@@ -233,6 +233,17 @@ async fn enable_banking_consent_flow_imports_full_history(a_db: PgPool)
         .await;
     assert_eq!(aspsps.body[0]["name"], "AIB");
 
+    let unknown_bank = app
+        .call(
+            Method::POST,
+            "/api/banks/enable-banking/start",
+            Some(&alice.token),
+            Some(json!({ "aspsp_name": "Unknown Bank", "aspsp_country": "IE" })),
+        )
+        .await;
+    assert_eq!(unknown_bank.status, StatusCode::BAD_REQUEST);
+    assert_eq!(unknown_bank.body["field"], "aspsp_name");
+
     let started = app
         .call(
             Method::POST,
@@ -761,4 +772,44 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         )
         .await;
     assert_eq!(removed.status, StatusCode::NO_CONTENT);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn enable_banking_refusals_have_distinct_codes(a_db: PgPool)
+{
+    let (mut wrong_redirect, _redirect_mock) = spawn_enable_banking().await;
+    wrong_redirect.redirect_url = "https://localhost/app/bank-callback".to_string();
+    let mut banks = bank_config("http://127.0.0.1:9");
+    banks.enable_banking = Some(wrong_redirect);
+    let app = TestApp::with_banks(a_db.clone(), banks);
+    let alice = app.user("alice@example.com").await;
+
+    let rejected = app
+        .call(
+            Method::POST,
+            "/api/banks/enable-banking/start",
+            Some(&alice.token),
+            Some(json!({ "aspsp_name": "AIB", "aspsp_country": "IE" })),
+        )
+        .await;
+    assert_eq!(rejected.status, StatusCode::BAD_GATEWAY);
+    assert_eq!(rejected.body["code"], "BANK_REJECTED");
+
+    let (mut wrong_app, _app_mock) = spawn_enable_banking().await;
+    wrong_app.app_id = "not-my-app".to_string();
+    let mut banks = bank_config("http://127.0.0.1:9");
+    banks.enable_banking = Some(wrong_app);
+    let app = TestApp::with_banks(a_db, banks);
+    let bob = app.user("bob@example.com").await;
+
+    let refused = app
+        .call(
+            Method::GET,
+            "/api/banks/enable-banking/aspsps?country=IE",
+            Some(&bob.token),
+            None,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::BAD_GATEWAY);
+    assert_eq!(refused.body["code"], "BANK_APP_REJECTED");
 }
