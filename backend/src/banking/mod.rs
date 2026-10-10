@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 
 use crate::config::BankConfig;
+use crate::state::AppState;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -122,6 +123,16 @@ pub fn last_four_digits(a_value: &str) -> Option<String>
 {
     let digits: Vec<char> = a_value.chars().filter(char::is_ascii_digit).collect();
     (digits.len() >= 4).then(|| digits[digits.len() - 4..].iter().collect())
+}
+
+pub fn spawn_self_check(a_state: AppState)
+{
+    tokio::spawn(async move {
+        if let Some(client) = a_state.banks.enable_banking.as_ref()
+        {
+            client.log_application_status().await;
+        }
+    });
 }
 
 #[cfg(test)]

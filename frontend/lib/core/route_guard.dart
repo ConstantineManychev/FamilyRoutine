@@ -4,10 +4,17 @@ const String splashPath = '/splash';
 const String authPath = '/auth';
 const String homePath = '/app';
 const String fromParam = 'from';
+const String bankCallbackPath = '$homePath/bank-callback';
+const String bankCallbackAlias = '/bank/callback';
 
 String? resolveRedirect(AuthState aAuth, Uri aUri)
 {
   final path = aUri.path;
+  if (path == bankCallbackAlias)
+  {
+    return aUri.replace(path: bankCallbackPath).toString();
+  }
+
   final isSplash = path == splashPath;
   final isAuth = path == authPath;
 

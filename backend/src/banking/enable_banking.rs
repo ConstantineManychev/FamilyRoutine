@@ -59,6 +59,19 @@ struct AspspList
 }
 
 #[derive(Deserialize)]
+struct ApplicationInfo
+{
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    environment: Option<String>,
+    #[serde(default)]
+    active: Option<bool>,
+    #[serde(default)]
+    redirect_urls: Vec<String>,
+}
+
+#[derive(Deserialize)]
 pub struct AspspInfo
 {
     name: String,
@@ -202,6 +215,50 @@ impl EnableBankingClient
             key: a_cfg.key.clone(),
             redirect_url: a_cfg.redirect_url.clone(),
             consent_days: a_cfg.consent_days,
+        }
+    }
+
+    pub async fn log_application_status(&self)
+    {
+        let app = match self
+            .send::<ApplicationInfo>(self.http.get(self.url("/application")))
+            .await
+        {
+            Ok(app) => app,
+            Err(ProviderError::Unauthorized) =>
+            {
+                tracing::warn!(
+                    "enable banking rejected application {}: check that the key belongs to it and that it is active",
+                    self.app_id
+                );
+                return;
+            }
+            Err(err) =>
+            {
+                tracing::warn!("enable banking self-check failed: {err:?}");
+                return;
+            }
+        };
+
+        tracing::info!(
+            "enable banking application \"{}\": environment {}, active {}",
+            app.name.unwrap_or_default(),
+            app.environment.unwrap_or_default(),
+            app.active.map_or_else(String::new, |is_active| is_active.to_string())
+        );
+
+        if app.active == Some(false)
+        {
+            tracing::warn!("enable banking application is not active, activate it in the Enable Banking control panel");
+        }
+
+        if !app.redirect_urls.contains(&self.redirect_url)
+        {
+            tracing::warn!(
+                "redirect url {} is not registered in Enable Banking, registered: {:?}",
+                self.redirect_url,
+                app.redirect_urls
+            );
         }
     }
 

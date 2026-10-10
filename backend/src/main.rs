@@ -62,6 +62,7 @@ async fn main()
 
     spawn_maintenance(state.clone());
     banking::sync::spawn(state.clone());
+    banking::spawn_self_check(state.clone());
 
     let listener = match TcpListener::bind(bind_addr).await
     {

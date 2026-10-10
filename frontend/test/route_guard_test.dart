@@ -15,6 +15,12 @@ void main()
       expect(target, '/splash?from=%2Fapp%2Fwallets%2F42');
     });
 
+    test('legacy bank callback path keeps the bank response', ()
+    {
+      final target = resolveRedirect(const AuthState.unknown(), Uri.parse('/bank/callback?code=c1&state=s1'));
+      expect(target, '/app/bank-callback?code=c1&state=s1');
+    });
+
     test('splash itself is not redirected while unknown', ()
     {
       expect(resolveRedirect(const AuthState.unknown(), Uri.parse('/splash')), isNull);
