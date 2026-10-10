@@ -5,6 +5,8 @@ abstract final class AppIcons
   static const String _family = 'Lucide';
 
   static const IconData activity = IconData(0xe038, fontFamily: _family);
+  static const IconData alertCircle = IconData(0xe077, fontFamily: _family);
+  static const IconData apple = IconData(0xe34e, fontFamily: _family);
   static const IconData arrowDownLeft = IconData(0xe043, fontFamily: _family);
   static const IconData arrowLeftRight = IconData(0xe24a, fontFamily: _family);
   static const IconData arrowUpRight = IconData(0xe04d, fontFamily: _family);
@@ -15,6 +17,7 @@ abstract final class AppIcons
   static const IconData calendar = IconData(0xe063, fontFamily: _family);
   static const IconData chartColumn = IconData(0xe2a3, fontFamily: _family);
   static const IconData check = IconData(0xe06c, fontFamily: _family);
+  static const IconData checkCircle = IconData(0xe226, fontFamily: _family);
   static const IconData chevronDown = IconData(0xe06d, fontFamily: _family);
   static const IconData chevronRight = IconData(0xe06f, fontFamily: _family);
   static const IconData chevronUp = IconData(0xe070, fontFamily: _family);
@@ -42,6 +45,7 @@ abstract final class AppIcons
   static const IconData mapPin = IconData(0xe111, fontFamily: _family);
   static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
   static const IconData navigation = IconData(0xe123, fontFamily: _family);
+  static const IconData package = IconData(0xe129, fontFamily: _family);
   static const IconData plane = IconData(0xe1de, fontFamily: _family);
   static const IconData plug = IconData(0xe37f, fontFamily: _family);
   static const IconData plus = IconData(0xe13d, fontFamily: _family);
@@ -55,6 +59,7 @@ abstract final class AppIcons
   static const IconData shieldOff = IconData(0xe15a, fontFamily: _family);
   static const IconData shoppingBag = IconData(0xe15b, fontFamily: _family);
   static const IconData shoppingCart = IconData(0xe15c, fontFamily: _family);
+  static const IconData store = IconData(0xe3e4, fontFamily: _family);
   static const IconData table = IconData(0xe17d, fontFamily: _family);
   static const IconData ticket = IconData(0xe20f, fontFamily: _family);
   static const IconData trash = IconData(0xe18d, fontFamily: _family);
@@ -66,6 +71,7 @@ abstract final class AppIcons
   static const IconData users = IconData(0xe1a4, fontFamily: _family);
   static const IconData utensils = IconData(0xe2f6, fontFamily: _family);
   static const IconData wallet = IconData(0xe204, fontFamily: _family);
+  static const IconData wrench = IconData(0xe1b1, fontFamily: _family);
   static const IconData x = IconData(0xe1b2, fontFamily: _family);
   static const IconData zap = IconData(0xe1b4, fontFamily: _family);
 }

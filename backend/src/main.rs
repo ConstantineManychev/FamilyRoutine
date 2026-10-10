@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::Path;
 use std::time::Duration;
 
 use backend::banking;
@@ -14,13 +15,15 @@ const MAINTENANCE_PERIOD: Duration = Duration::from_secs(600);
 #[tokio::main]
 async fn main()
 {
-    dotenvy::dotenv().ok();
+    let env_dir = dotenvy::dotenv()
+        .ok()
+        .and_then(|env_file| env_file.parent().map(Path::to_path_buf));
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn")))
         .init();
 
-    let cfg = match AppConfig::from_env()
+    let cfg = match AppConfig::from_env(env_dir.as_deref())
     {
         Ok(cfg) => cfg,
         Err(err) =>

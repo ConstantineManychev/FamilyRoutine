@@ -3,23 +3,22 @@ use axum::http::StatusCode;
 use axum::Json;
 use rust_decimal::Decimal;
 use shared_schema::{
-    AccountType, ItemKind, ReceiptDto, ReceiptItemDto, ReceiptListItemDto, ReceiptQuery, SaveReceiptRequest, TxSource,
+    AccountType, ItemKind, ItemUnit, ReceiptDto, ReceiptItemDto, ReceiptListItemDto, ReceiptQuery,
+    SaveReceiptItemRequest, SaveReceiptRequest, TxSource,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
+use crate::api::item_handlers::require_visible_items;
 use crate::api::tx_handlers::load_txs;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::require_account_editor;
-use crate::domain::validation::{
-    check_money, check_qty, clean_optional_text, clean_text, money, MAX_NAME_LEN, MAX_NOTE_LEN,
-};
+use crate::domain::validation::{check_money, check_qty, clean_optional_text, money, MAX_NAME_LEN, MAX_NOTE_LEN};
 use crate::state::AppState;
 
 const MAX_ITEMS: usize = 300;
 const MAX_LINKED_TXS: usize = 20;
-const MAX_ITEM_NAME_LEN: usize = 200;
 
 struct ReceiptHead
 {
@@ -161,6 +160,9 @@ async fn save_receipt(
 
     let mut tx = a_state.db.begin().await?;
 
+    let item_ids: Vec<Uuid> = items.iter().map(|item| item.item_id).collect();
+    require_visible_items(&mut tx, &item_ids, a_user_id).await?;
+
     let is_currency_known = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM currencies WHERE id = $1) AS "exists!""#,
         a_req.curr_id
@@ -264,13 +266,12 @@ async fn save_receipt(
     {
         sqlx::query!(
             r#"
-            INSERT INTO receipt_items (receipt_id, pos, name, kind, qty, unit_price, amount)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO receipt_items (receipt_id, pos, item_id, qty, unit_price, amount)
+            VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             receipt_id,
             pos as i16,
-            item.name,
-            item.kind as ItemKind,
+            item.item_id,
             item.qty,
             item.unit_price,
             item.amount
@@ -299,7 +300,7 @@ async fn save_receipt(
     Ok(receipt)
 }
 
-fn clean_items(a_items: &[ReceiptItemDto]) -> Result<Vec<ReceiptItemDto>, ApiError>
+fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<SaveReceiptItemRequest>, ApiError>
 {
     if a_items.len() > MAX_ITEMS
     {
@@ -321,9 +322,8 @@ fn clean_items(a_items: &[ReceiptItemDto]) -> Result<Vec<ReceiptItemDto>, ApiErr
                 .transpose()?
                 .filter(|price| *price >= Decimal::ZERO);
 
-            Ok(ReceiptItemDto {
-                name: clean_text(&item.name, 1, MAX_ITEM_NAME_LEN, "name")?,
-                kind: item.kind,
+            Ok(SaveReceiptItemRequest {
+                item_id: item.item_id,
                 qty: check_qty(item.qty)?,
                 unit_price,
                 amount,
@@ -524,10 +524,11 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
     let items = sqlx::query_as!(
         ReceiptItemDto,
         r#"
-        SELECT name, kind AS "kind: ItemKind", qty, unit_price, amount
-        FROM receipt_items
-        WHERE receipt_id = $1
-        ORDER BY pos
+        SELECT ri.item_id, i.name, i.type AS "kind: ItemKind", i.unit AS "unit: ItemUnit", ri.qty, ri.unit_price, ri.amount
+        FROM receipt_items ri
+        JOIN items i ON i.id = ri.item_id
+        WHERE ri.receipt_id = $1
+        ORDER BY ri.pos
         "#,
         a_id
     )

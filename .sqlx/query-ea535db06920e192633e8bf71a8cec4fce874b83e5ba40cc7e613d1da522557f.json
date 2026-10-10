@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, name, type AS \"kind: ItemKind\", unit AS \"unit: ItemUnit\", owner_id IS NOT NULL AS \"is_custom!\"\n        FROM items\n        WHERE id = $1 AND (owner_id IS NULL OR owner_id = $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_custom!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "ea535db06920e192633e8bf71a8cec4fce874b83e5ba40cc7e613d1da522557f"
+}

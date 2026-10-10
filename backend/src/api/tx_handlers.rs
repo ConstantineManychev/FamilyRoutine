@@ -15,12 +15,14 @@ use uuid::Uuid;
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::{require_account_editor, AccountAccess};
-use crate::domain::validation::{check_nonzero_money, check_positive_money, clean_optional_text, MAX_NOTE_LEN};
+use crate::domain::validation::{
+    check_nonzero_money, check_positive_money, clean_optional_text, contains_pattern, escape_like, MAX_NOTE_LEN,
+    MAX_QUERY_LEN,
+};
 use crate::state::AppState;
 
 const DEFAULT_PAGE: i64 = 50;
 const MAX_PAGE: i64 = 200;
-const MAX_QUERY_LEN: usize = 100;
 
 struct TxOwnership
 {
@@ -40,19 +42,7 @@ pub async fn list_transactions(
 {
     let limit = a_query.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
     let cursor = a_query.cursor.as_deref().map(decode_cursor).transpose()?;
-    let pattern = a_query
-        .q
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| {
-            if value.chars().count() > MAX_QUERY_LEN
-            {
-                return Err(ApiError::Validation("q"));
-            }
-            Ok(format!("%{}%", escape_like(value)))
-        })
-        .transpose()?;
+    let pattern = contains_pattern(a_query.q.as_deref())?;
 
     let mut items = sqlx::query_as!(
         TxDto,
@@ -621,11 +611,6 @@ fn decode_cursor(a_cursor: &str) -> Result<(DateTime<Utc>, Uuid), ApiError>
     Ok((ts, id))
 }
 
-pub fn escape_like(a_value: &str) -> String
-{
-    a_value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
-}
-
 #[cfg(test)]
 mod tests
 {
@@ -639,11 +624,5 @@ mod tests
 
         assert_eq!(decode_cursor(&encode_cursor(ts, id)).unwrap(), (ts, id));
         assert!(decode_cursor("not-a-cursor").is_err());
-    }
-
-    #[test]
-    fn like_wildcards_are_escaped()
-    {
-        assert_eq!(escape_like("50%_off\\"), "50\\%\\_off\\\\");
     }
 }

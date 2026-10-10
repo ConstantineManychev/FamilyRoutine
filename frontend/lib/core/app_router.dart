@@ -10,6 +10,8 @@ import '../ui/auth/splash_screen.dart';
 import '../ui/dicts/cities_dict_screen.dart';
 import '../ui/dicts/exercise_detail_screen.dart';
 import '../ui/dicts/exercises_screen.dart';
+import '../ui/dicts/item_detail_screen.dart';
+import '../ui/dicts/items_screen.dart';
 import '../ui/dicts/streets_dict_screen.dart';
 import '../ui/finance/receipt_detail_screen.dart';
 import '../ui/finance/receipts_screen.dart';
@@ -84,6 +86,15 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               GoRoute(
                 path: 'places/:id',
                 builder: (_, aState) => PlaceDetailScreen(placeId: aState.pathParameters['id']),
+              ),
+              GoRoute(path: 'items', builder: (_, __) => const ItemsScreen()),
+              GoRoute(path: 'items/new', builder: (_, __) => const ItemDetailScreen()),
+              GoRoute(
+                path: 'items/:id',
+                builder: (_, aState) => ItemDetailScreen(
+                  key: ValueKey(aState.pathParameters['id']),
+                  itemId: aState.pathParameters['id'],
+                ),
               ),
               GoRoute(path: 'exercises', builder: (_, __) => const ExercisesScreen()),
               GoRoute(path: 'exercises/new', builder: (_, __) => const ExerciseDetailScreen()),

@@ -26,6 +26,12 @@ const Map<String, List<String>> dynamicKeys = {
   'exercises.w_types': ['external', 'hybrid', 'bodyweight'],
   'exercises.muscle_grps': ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'cardio', 'full_body'],
   'dicts': ['events', 'exercises', 'items'],
+  'items': [
+    'kind_product', 'kind_service', 'kind_food',
+    'unit_piece', 'unit_kilogram', 'unit_liter', 'unit_meter', 'unit_square_meter', 'unit_hour',
+    'unit_short_piece', 'unit_short_kilogram', 'unit_short_liter', 'unit_short_meter', 'unit_short_square_meter',
+    'unit_short_hour',
+  ],
   'family': ['leave_confirm_desc', 'leave_last_member_desc'],
   'places': ['err_name_req', 'err_country_req', 'err_city_req', 'err_street_req', 'err_house_zip_req'],
 };

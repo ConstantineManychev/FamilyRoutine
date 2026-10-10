@@ -11,8 +11,8 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    auth_handlers, bank_handlers, ex_handlers, fam_handlers, geo_handlers, place_handlers, receipt_handlers,
-    stats_handlers, tx_handlers, user_handlers, wallet_handlers,
+    auth_handlers, bank_handlers, ex_handlers, fam_handlers, geo_handlers, item_handlers, place_handlers,
+    receipt_handlers, stats_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -41,6 +41,17 @@ pub fn build_router(a_state: AppState) -> Router
                 .put(ex_handlers::update_exercise)
                 .delete(ex_handlers::delete_exercise),
         )
+        .route(
+            "/dicts/items",
+            get(item_handlers::list_items).post(item_handlers::create_item),
+        )
+        .route(
+            "/dicts/items/:id",
+            get(item_handlers::get_item)
+                .put(item_handlers::update_item)
+                .delete(item_handlers::delete_item),
+        )
+        .route("/dicts/items/:id/prices", get(item_handlers::item_prices))
         .route(
             "/families",
             get(fam_handlers::list_families).post(fam_handlers::create_family),

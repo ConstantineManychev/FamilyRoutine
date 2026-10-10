@@ -399,6 +399,37 @@ class ApiSvc
 
   Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
 
+  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit}) async
+  {
+    final res = await _dio.get('/api/dicts/items', queryParameters: {
+      if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
+      if (aLimit != null) 'limit': aLimit,
+    });
+    return _list(res.data, DictItemDto.fromJson);
+  }
+
+  Future<DictItemDto> getItem(String aId) async
+  {
+    final res = await _dio.get('/api/dicts/items/$aId');
+    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<DictItemDto> saveItem(String? aId, Map<String, dynamic> aPayload) async
+  {
+    final res = aId == null
+        ? await _dio.post('/api/dicts/items', data: aPayload)
+        : await _dio.put('/api/dicts/items/$aId', data: aPayload);
+    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteItem(String aId) => _dio.delete('/api/dicts/items/$aId');
+
+  Future<List<ItemPriceDto>> getItemPrices(String aId) async
+  {
+    final res = await _dio.get('/api/dicts/items/$aId/prices');
+    return _list(res.data, ItemPriceDto.fromJson);
+  }
+
   Future<List<MerchantDto>> getMerchants(String aQuery) async
   {
     final res = await _dio.get('/api/merchants', queryParameters: {'q': aQuery});

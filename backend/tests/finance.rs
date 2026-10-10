@@ -38,6 +38,20 @@ async fn connect_mono(a_app: &TestApp, a_user: &TestUser) -> Uuid
     connected.body["id"].as_str().unwrap().parse().unwrap()
 }
 
+async fn create_item(a_app: &TestApp, a_user: &TestUser, a_name: &str, a_kind: &str, a_unit: &str) -> String
+{
+    let reply = a_app
+        .call(
+            Method::POST,
+            "/api/dicts/items",
+            Some(&a_user.token),
+            Some(json!({ "name": a_name, "kind": a_kind, "unit": a_unit })),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    reply.body["id"].as_str().unwrap().to_string()
+}
+
 async fn all_transactions(a_app: &TestApp, a_user: &TestUser, a_extra: &str) -> Vec<Value>
 {
     let mut items = Vec::new();
@@ -416,6 +430,10 @@ async fn cash_transfers_receipts_and_cashflow(a_db: PgPool)
     let grocery = unlinked.iter().find(|tx| tx["amount"] == "-10.00").unwrap().clone();
     let second = unlinked.iter().find(|tx| tx["amount"] == "-10.01").unwrap().clone();
 
+    let bread = create_item(&app, &alice, "Хліб", "product", "piece").await;
+    let apples = create_item(&app, &alice, "Яблоки", "product", "kilogram").await;
+    let honey = create_item(&app, &alice, "Мёд", "food", "piece").await;
+
     let receipt = app
         .call(
             Method::POST,
@@ -423,7 +441,7 @@ async fn cash_transfers_receipts_and_cashflow(a_db: PgPool)
             Some(&alice.token),
             Some(json!({
                 "receipt_ts": grocery["tx_ts"], "merchant_name": "Сільпо", "curr_id": uah,
-                "items": [{ "name": "Хліб", "qty": "1", "unit_price": "4", "amount": "4" }],
+                "items": [{ "item_id": bread, "qty": "1", "unit_price": "4", "amount": "4" }],
                 "tx_ids": [grocery["id"]]
             })),
         )
@@ -433,6 +451,8 @@ async fn cash_transfers_receipts_and_cashflow(a_db: PgPool)
     assert_eq!(receipt.body["paid_total"], "10.00");
     assert_eq!(receipt.body["rest_amount"], "6.00");
     assert_eq!(receipt.body["cash_amount"], "0.00");
+    assert_eq!(receipt.body["items"][0]["name"], "Хліб");
+    assert_eq!(receipt.body["items"][0]["unit"], "piece");
     let receipt_id = receipt.body["id"].as_str().unwrap().to_string();
 
     let double_link = app
@@ -474,8 +494,8 @@ async fn cash_transfers_receipts_and_cashflow(a_db: PgPool)
             Some(json!({
                 "receipt_ts": now, "merchant_name": "Рынок", "curr_id": uah, "cash_account_id": cash_id,
                 "items": [
-                    { "name": "Яблоки", "qty": "2.5", "unit_price": "40", "amount": "100" },
-                    { "name": "Мёд", "kind": "food", "amount": "200" }
+                    { "item_id": apples, "qty": "2.5", "unit_price": "40", "amount": "100" },
+                    { "item_id": honey, "amount": "200" }
                 ]
             })),
         )
@@ -506,7 +526,7 @@ async fn cash_transfers_receipts_and_cashflow(a_db: PgPool)
             Some(&alice.token),
             Some(json!({
                 "receipt_ts": now, "merchant_name": "Рынок", "curr_id": uah, "cash_account_id": cash_id,
-                "items": [{ "name": "Яблоки", "amount": "8" }],
+                "items": [{ "item_id": apples, "amount": "8" }],
                 "tx_ids": [second["id"]]
             })),
         )
@@ -558,4 +578,187 @@ impl Rfc3339Query for chrono::DateTime<Utc>
     {
         self.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
     }
+}
+
+async fn buy(
+    a_app: &TestApp,
+    a_user: &TestUser,
+    a_curr: &str,
+    a_merchant: &str,
+    a_days_ago: i64,
+    a_items: Value,
+) -> Value
+{
+    let reply = a_app
+        .call(
+            Method::POST,
+            "/api/receipts",
+            Some(&a_user.token),
+            Some(json!({
+                "receipt_ts": Utc::now() - Duration::days(a_days_ago),
+                "merchant_name": a_merchant,
+                "curr_id": a_curr,
+                "items": a_items
+            })),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    reply.body
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
+{
+    let app = TestApp::new(a_db.clone());
+    let alice = app.user("alice@example.com").await;
+    let bob = app.user("bob@example.com").await;
+    let uah = app.currency_by_code(&alice.token, "UAH").await;
+
+    let milk = create_item(&app, &alice, "Молоко 2.5%", "product", "piece").await;
+    let duplicate = app
+        .call(
+            Method::POST,
+            "/api/dicts/items",
+            Some(&alice.token),
+            Some(json!({ "name": "  молоко 2.5% ", "kind": "product", "unit": "piece" })),
+        )
+        .await;
+    assert_eq!(duplicate.status, StatusCode::CONFLICT);
+
+    let system_id: Uuid = sqlx::query_scalar("INSERT INTO items (name, type) VALUES ('Хліб', 'product') RETURNING id")
+        .fetch_one(&a_db)
+        .await
+        .unwrap();
+    let bob_milk = create_item(&app, &bob, "Молоко 2.5%", "product", "piece").await;
+
+    let bob_list = app.call(Method::GET, "/api/dicts/items", Some(&bob.token), None).await;
+    let bob_ids: Vec<&str> = bob_list
+        .body
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_str().unwrap())
+        .collect();
+    assert!(bob_ids.contains(&bob_milk.as_str()));
+    assert!(bob_ids.contains(&system_id.to_string().as_str()));
+    assert!(!bob_ids.contains(&milk.as_str()));
+
+    for (method, uri) in [
+        (Method::GET, format!("/api/dicts/items/{milk}")),
+        (Method::GET, format!("/api/dicts/items/{milk}/prices")),
+        (Method::DELETE, format!("/api/dicts/items/{milk}")),
+    ]
+    {
+        assert_eq!(
+            app.call(method, &uri, Some(&bob.token), None).await.status,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    let foreign_item = app
+        .call(
+            Method::POST,
+            "/api/receipts",
+            Some(&bob.token),
+            Some(json!({ "receipt_ts": Utc::now(), "curr_id": uah, "items": [{ "item_id": milk, "amount": "1" }] })),
+        )
+        .await;
+    assert_eq!(foreign_item.body["field"], "item_id");
+
+    let system_edit = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{system_id}"),
+            Some(&alice.token),
+            Some(json!({ "name": "Хлеб", "kind": "product", "unit": "piece" })),
+        )
+        .await;
+    assert_eq!(system_edit.status, StatusCode::FORBIDDEN);
+
+    buy(
+        &app,
+        &alice,
+        &uah,
+        "Сільпо",
+        9,
+        json!([{ "item_id": milk, "qty": "2", "amount": "60" }]),
+    )
+    .await;
+    buy(
+        &app,
+        &alice,
+        &uah,
+        "АТБ",
+        5,
+        json!([{ "item_id": milk, "amount": "28" }, { "item_id": system_id, "amount": "20" }]),
+    )
+    .await;
+    buy(
+        &app,
+        &alice,
+        &uah,
+        "сільпо",
+        1,
+        json!([{ "item_id": milk, "qty": "1", "unit_price": "32", "amount": "32" }]),
+    )
+    .await;
+    buy(
+        &app,
+        &bob,
+        &uah,
+        "Сільпо",
+        1,
+        json!([{ "item_id": bob_milk, "amount": "1" }]),
+    )
+    .await;
+
+    let prices = app
+        .call(
+            Method::GET,
+            &format!("/api/dicts/items/{milk}/prices"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(prices.status, StatusCode::OK, "{}", prices.body);
+    let rows = prices.body.as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{}", prices.body);
+    assert_eq!(rows[0]["merchant_name"], "АТБ");
+    assert_eq!(rows[0]["last_price"], "28.00");
+    assert_eq!(rows[1]["merchant_name"], "сільпо");
+    assert_eq!(rows[1]["last_price"], "32.00");
+    assert_eq!(rows[1]["min_price"], "30.00");
+    assert_eq!(rows[1]["avg_price"], "31.00");
+    assert_eq!(rows[1]["purchase_count"], 2);
+
+    let search = app
+        .call(
+            Method::GET,
+            "/api/dicts/items?q=%D0%BC%D0%BE%D0%BB",
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(search.body.as_array().unwrap().len(), 1);
+    assert_eq!(search.body[0]["id"], milk.as_str());
+
+    let in_use = app
+        .call(
+            Method::DELETE,
+            &format!("/api/dicts/items/{milk}"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(in_use.status, StatusCode::CONFLICT);
+    let unused = create_item(&app, &alice, "Пакет", "product", "piece").await;
+    let removed = app
+        .call(
+            Method::DELETE,
+            &format!("/api/dicts/items/{unused}"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
 }

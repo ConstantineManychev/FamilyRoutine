@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, name, type AS \"kind: ItemKind\", unit AS \"unit: ItemUnit\", owner_id IS NOT NULL AS \"is_custom!\"\n        FROM items\n        WHERE (owner_id IS NULL OR owner_id = $1)\n          AND ($2::text IS NULL OR name ILIKE $2)\n        ORDER BY ($3::text IS NOT NULL AND name ILIKE $3) DESC, LOWER(name)\n        LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_custom!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "8c6c7efb4c199413be9360299043e121674a7b55dd6407848166000556737f0f"
+}

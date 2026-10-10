@@ -10,11 +10,33 @@ pub const MAX_PASSWORD_LEN: usize = 128;
 pub const MIN_SYNC_TOKEN_LEN: usize = 16;
 pub const MAX_SYNC_TOKEN_LEN: usize = 256;
 pub const MAX_NOTE_LEN: usize = 500;
+pub const MAX_QUERY_LEN: usize = 100;
 
 const MONEY_SCALE: u32 = 2;
 const QTY_SCALE: u32 = 3;
 const MAX_MONEY: i64 = 1_000_000_000_000;
 const MAX_QTY: i64 = 1_000_000;
+
+pub fn escape_like(a_value: &str) -> String
+{
+    a_value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+}
+
+pub fn contains_pattern(a_query: Option<&str>) -> Result<Option<String>, ApiError>
+{
+    let Some(query) = a_query.map(str::trim).filter(|value| !value.is_empty())
+    else
+    {
+        return Ok(None);
+    };
+
+    if query.chars().count() > MAX_QUERY_LEN
+    {
+        return Err(ApiError::Validation("q"));
+    }
+
+    Ok(Some(format!("%{}%", escape_like(query))))
+}
 
 pub fn check_money(a_value: Decimal, a_field: &'static str) -> Result<Decimal, ApiError>
 {
@@ -193,6 +215,15 @@ pub fn clean_sync_token(a_value: &str) -> Result<String, ApiError>
 mod tests
 {
     use super::*;
+
+    #[test]
+    fn like_wildcards_are_escaped()
+    {
+        assert_eq!(escape_like("50%_off\\"), "50\\%\\_off\\\\");
+        assert_eq!(contains_pattern(Some("  ")).unwrap(), None);
+        assert_eq!(contains_pattern(Some(" мол ")).unwrap().as_deref(), Some("%мол%"));
+        assert!(contains_pattern(Some(&"x".repeat(MAX_QUERY_LEN + 1))).is_err());
+    }
 
     #[test]
     fn email_is_normalized_and_validated()

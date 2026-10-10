@@ -34,7 +34,7 @@ services:
       BANK_SYNC_TIMEZONE: ${BANK_SYNC_TIMEZONE:-Europe/Dublin}
       ENABLE_BANKING_SYNC_HOURS: ${ENABLE_BANKING_SYNC_HOURS:-0,6,12,18}
       ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-}
-      ENABLE_BANKING_KEY_PATH: ${ENABLE_BANKING_APP_ID:+/run/secrets/enable_banking_key}
+      ENABLE_BANKING_KEY_FILE: ${ENABLE_BANKING_APP_ID:+/run/secrets/enable_banking_key}
       ENABLE_BANKING_REDIRECT_URL: https://${APP_DOMAIN:-localhost}/app/bank-callback
     secrets:
       - enable_banking_key

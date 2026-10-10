@@ -48,6 +48,11 @@ String formatDateTime(BuildContext aContext, DateTime aTs)
   return DateFormat.yMMMd(aContext.locale.toLanguageTag()).add_Hm().format(aTs);
 }
 
+String formatDate(BuildContext aContext, DateTime aTs)
+{
+  return DateFormat.yMMMd(aContext.locale.toLanguageTag()).format(aTs);
+}
+
 String formatDay(BuildContext aContext, DateTime aTs)
 {
   return DateFormat.yMMMMEEEEd(aContext.locale.toLanguageTag()).format(aTs);

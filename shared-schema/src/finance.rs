@@ -76,6 +76,19 @@ pub enum ItemKind
     Food,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "item_unit_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum ItemUnit
+{
+    Piece,
+    Kilogram,
+    Liter,
+    Meter,
+    SquareMeter,
+    Hour,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatsBucket
@@ -235,22 +248,27 @@ pub struct TransferDto
     pub txs: Vec<TxDto>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ReceiptItemDto
 {
+    pub item_id: Uuid,
     pub name: String,
-    #[serde(default = "default_item_kind")]
     pub kind: ItemKind,
+    pub unit: ItemUnit,
+    pub qty: Decimal,
+    pub unit_price: Option<Decimal>,
+    pub amount: Decimal,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveReceiptItemRequest
+{
+    pub item_id: Uuid,
     #[serde(default = "default_qty")]
     pub qty: Decimal,
     #[serde(default)]
     pub unit_price: Option<Decimal>,
     pub amount: Decimal,
-}
-
-fn default_item_kind() -> ItemKind
-{
-    ItemKind::Product
 }
 
 fn default_qty() -> Decimal
@@ -274,7 +292,7 @@ pub struct SaveReceiptRequest
     #[serde(default)]
     pub note: Option<String>,
     #[serde(default)]
-    pub items: Vec<ReceiptItemDto>,
+    pub items: Vec<SaveReceiptItemRequest>,
     #[serde(default)]
     pub tx_ids: Vec<Uuid>,
 }
@@ -371,4 +389,43 @@ pub struct MerchantDto
     pub id: Uuid,
     pub name: String,
     pub mcc: Option<i16>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DictItemDto
+{
+    pub id: Uuid,
+    pub name: String,
+    pub kind: ItemKind,
+    pub unit: ItemUnit,
+    pub is_custom: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveItemRequest
+{
+    pub name: String,
+    pub kind: ItemKind,
+    pub unit: ItemUnit,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ItemQuery
+{
+    #[serde(default)]
+    pub q: Option<String>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ItemPriceDto
+{
+    pub merchant_name: Option<String>,
+    pub curr_code: String,
+    pub last_price: Decimal,
+    pub min_price: Decimal,
+    pub avg_price: Decimal,
+    pub purchase_count: i64,
+    pub last_ts: DateTime<Utc>,
 }

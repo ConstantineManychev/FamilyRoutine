@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE items SET name = $2, type = $3, unit = $4 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7fcfa158ce31a11de52c5b166e6a2d2b9cc04687f9c369e08a9086bf7651cf4"
+}

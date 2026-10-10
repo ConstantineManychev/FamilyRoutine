@@ -67,6 +67,94 @@ enum ItemKind
   }
 }
 
+enum ItemUnit
+{
+  piece('piece'),
+  kilogram('kilogram'),
+  liter('liter'),
+  meter('meter'),
+  squareMeter('square_meter'),
+  hour('hour');
+
+  final String wire;
+
+  const ItemUnit(this.wire);
+
+  static ItemUnit parse(Object? aValue)
+  {
+    for (final unit in ItemUnit.values)
+    {
+      if (unit.wire == aValue)
+      {
+        return unit;
+      }
+    }
+    return ItemUnit.piece;
+  }
+}
+
+class DictItemDto
+{
+  final String id;
+  final String name;
+  final ItemKind kind;
+  final ItemUnit unit;
+  final bool isCustom;
+
+  const DictItemDto({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.unit,
+    required this.isCustom,
+  });
+
+  factory DictItemDto.fromJson(Map<String, dynamic> aJson) => DictItemDto(
+        id: aJson['id'] as String,
+        name: aJson['name'] as String,
+        kind: ItemKind.parse(aJson['kind']),
+        unit: ItemUnit.parse(aJson['unit']),
+        isCustom: aJson['is_custom'] as bool? ?? false,
+      );
+
+  static Map<String, dynamic> payload(String aName, ItemKind aKind, ItemUnit aUnit) => {
+        'name': aName,
+        'kind': aKind.name,
+        'unit': aUnit.wire,
+      };
+}
+
+class ItemPriceDto
+{
+  final String? merchantName;
+  final String currCode;
+  final double lastPrice;
+  final double minPrice;
+  final double avgPrice;
+  final int purchaseCount;
+  final DateTime lastTs;
+
+  const ItemPriceDto({
+    this.merchantName,
+    required this.currCode,
+    required this.lastPrice,
+    required this.minPrice,
+    required this.avgPrice,
+    required this.purchaseCount,
+    required this.lastTs,
+  });
+
+  factory ItemPriceDto.fromJson(Map<String, dynamic> aJson) => ItemPriceDto(
+        merchantName: aJson['merchant_name'] as String?,
+        currCode: aJson['curr_code'] as String,
+        lastPrice: parseDecimal(aJson['last_price']),
+        minPrice: parseDecimal(aJson['min_price']),
+        avgPrice: parseDecimal(aJson['avg_price']),
+        purchaseCount: (aJson['purchase_count'] as num).toInt(),
+        lastTs: parseTs(aJson['last_ts']),
+      );
+}
+
 enum StatsBucket { hour, day }
 
 class BankConnDto
@@ -218,31 +306,36 @@ class TxPage
 
 class ReceiptItem
 {
+  final String itemId;
   final String name;
   final ItemKind kind;
+  final ItemUnit unit;
   final double qty;
   final double? unitPrice;
   final double amount;
 
   const ReceiptItem({
-    required this.name,
+    required this.itemId,
+    this.name = '',
     this.kind = ItemKind.product,
+    this.unit = ItemUnit.piece,
     this.qty = 1,
     this.unitPrice,
     required this.amount,
   });
 
   factory ReceiptItem.fromJson(Map<String, dynamic> aJson) => ReceiptItem(
+        itemId: aJson['item_id'] as String,
         name: aJson['name'] as String? ?? '',
         kind: ItemKind.parse(aJson['kind']),
+        unit: ItemUnit.parse(aJson['unit']),
         qty: parseDecimal(aJson['qty']),
         unitPrice: parseDecimalOrNull(aJson['unit_price']),
         amount: parseDecimal(aJson['amount']),
       );
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'kind': kind.name,
+        'item_id': itemId,
         'qty': qty.toStringAsFixed(3),
         'unit_price': unitPrice == null ? null : moneyWire(unitPrice!),
         'amount': moneyWire(amount),

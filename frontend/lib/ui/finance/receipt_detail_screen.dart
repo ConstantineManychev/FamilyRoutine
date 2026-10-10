@@ -9,6 +9,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import '../dicts/item_form.dart';
 import 'finance_dialogs.dart';
 import 'transactions_screen.dart';
 
@@ -23,18 +24,39 @@ class ReceiptDetailScreen extends ConsumerStatefulWidget
   ConsumerState<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
 }
 
+class _ItemChoice
+{
+  final DictItemDto? item;
+  final String newName;
+
+  const _ItemChoice.existing(DictItemDto this.item) : newName = '';
+
+  const _ItemChoice.create(this.newName) : item = null;
+
+  String get label => item?.name ?? newName;
+}
+
 class _ItemRow
 {
   final nameCtrl = TextEditingController();
+  final nameFocus = FocusNode();
   final qtyCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final amountCtrl = TextEditingController();
   final Key key = UniqueKey();
+  String? itemId;
+  String itemName = '';
+  ItemKind kind = ItemKind.product;
+  ItemUnit unit = ItemUnit.piece;
 
   _ItemRow();
 
   _ItemRow.from(ReceiptItem aItem)
   {
+    itemId = aItem.itemId;
+    itemName = aItem.name;
+    kind = aItem.kind;
+    unit = aItem.unit;
     nameCtrl.text = aItem.name;
     qtyCtrl.text = _trimZeros(aItem.qty);
     priceCtrl.text = aItem.unitPrice == null ? '' : aItem.unitPrice!.toStringAsFixed(2);
@@ -48,6 +70,30 @@ class _ItemRow
 
   double get qty => double.tryParse(qtyCtrl.text.replaceAll(',', '.')) ?? 1;
 
+  bool get isPicked => itemId != null;
+
+  bool get isBlank => nameCtrl.text.trim().isEmpty && (parseAmountInput(amountCtrl.text) ?? 0) == 0;
+
+  void select(DictItemDto aItem)
+  {
+    itemId = aItem.id;
+    itemName = aItem.name;
+    kind = aItem.kind;
+    unit = aItem.unit;
+    if (nameCtrl.text != aItem.name)
+    {
+      nameCtrl.text = aItem.name;
+    }
+  }
+
+  void onNameEdited(String aText)
+  {
+    if (aText.trim() != itemName)
+    {
+      itemId = null;
+    }
+  }
+
   void recalc()
   {
     final price = parseAmountInput(priceCtrl.text);
@@ -60,6 +106,7 @@ class _ItemRow
   void dispose()
   {
     nameCtrl.dispose();
+    nameFocus.dispose();
     qtyCtrl.dispose();
     priceCtrl.dispose();
     amountCtrl.dispose();
@@ -230,13 +277,14 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     final items = <Map<String, dynamic>>[];
     for (final row in _rows)
     {
-      final name = row.nameCtrl.text.trim();
-      final amount = parseAmountInput(row.amountCtrl.text);
-      if (name.isEmpty && (amount == null || amount == 0))
+      if (row.isBlank)
       {
         continue;
       }
-      if (name.isEmpty || amount == null || amount < 0)
+
+      final amount = parseAmountInput(row.amountCtrl.text);
+      final itemId = row.itemId;
+      if (itemId == null || amount == null || amount < 0)
       {
         showInfoSnack(context, 'finance.err_item'.tr());
         return;
@@ -244,7 +292,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
       final qty = row.qty;
       items.add(ReceiptItem(
-        name: name,
+        itemId: itemId,
         qty: qty <= 0 ? 1 : qty,
         unitPrice: parseAmountInput(row.priceCtrl.text),
         amount: amount,
@@ -547,6 +595,90 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     );
   }
 
+  Future<List<_ItemChoice>> _itemChoices(String aText) async
+  {
+    final query = aText.trim();
+    if (query.isEmpty)
+    {
+      return const [];
+    }
+
+    List<DictItemDto> items;
+    try
+    {
+      items = await ref.read(apiProv).getItems(aQuery: query, aLimit: 20);
+    }
+    catch (_)
+    {
+      items = const [];
+    }
+
+    final isKnown = items.any((aItem) => aItem.name.toLowerCase() == query.toLowerCase());
+    return [
+      ...items.map(_ItemChoice.existing),
+      if (!isKnown) _ItemChoice.create(query),
+    ];
+  }
+
+  Future<void> _choose(_ItemRow aRow, _ItemChoice aChoice) async
+  {
+    final item = aChoice.item ?? await showItemCreateDialog(context, aChoice.newName);
+    if (item != null && mounted)
+    {
+      setState(() => aRow.select(item));
+    }
+  }
+
+  Widget _buildItemPicker(_ItemRow aRow, InputDecoration aDecoration)
+  {
+    final hasText = aRow.nameCtrl.text.trim().isNotEmpty;
+    final Widget? status = aRow.isPicked
+        ? Icon(itemKindIcon(aRow.kind), size: 18, color: Colors.blue.shade700)
+        : hasText
+            ? Tooltip(
+                message: 'items.pick_hint'.tr(),
+                child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
+              )
+            : null;
+
+    return RawAutocomplete<_ItemChoice>(
+      textEditingController: aRow.nameCtrl,
+      focusNode: aRow.nameFocus,
+      displayStringForOption: (aChoice) => aChoice.label,
+      optionsBuilder: (aValue) => _itemChoices(aValue.text),
+      onSelected: (aChoice) => _choose(aRow, aChoice),
+      fieldViewBuilder: (aContext, aCtrl, aFocus, aOnSubmitted) => TextField(
+        controller: aCtrl,
+        focusNode: aFocus,
+        inputFormatters: [LengthLimitingTextInputFormatter(maxItemNameLen)],
+        onChanged: (aText) => setState(() => aRow.onNameEdited(aText)),
+        onSubmitted: (_) => aOnSubmitted(),
+        decoration: aDecoration.copyWith(hintText: 'items.pick_hint'.tr(), suffixIcon: status),
+      ),
+      optionsViewBuilder: (aContext, aOnSelected, aOptions) => Align(
+        alignment: Alignment.topLeft,
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 300, maxWidth: 420),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              children: aOptions.indexed
+                  .map((aEntry) => _ItemChoiceTile(
+                        choice: aEntry.$2,
+                        isHighlighted: AutocompleteHighlightedOption.of(aContext) == aEntry.$1,
+                        onTap: () => aOnSelected(aEntry.$2),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildItemRow(_ItemRow aRow)
   {
     InputDecoration decoration(String aLabel) => InputDecoration(labelText: aLabel, border: const OutlineInputBorder(), isDense: true);
@@ -558,11 +690,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         children: [
           Expanded(
             flex: 5,
-            child: TextField(
-              controller: aRow.nameCtrl,
-              inputFormatters: [LengthLimitingTextInputFormatter(200)],
-              decoration: decoration('finance.item_name'.tr()),
-            ),
+            child: _buildItemPicker(aRow, decoration('finance.item_name'.tr())),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -572,7 +700,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: amountFormatters,
               onChanged: (_) => setState(aRow.recalc),
-              decoration: decoration('finance.qty'.tr()).copyWith(hintText: '1'),
+              decoration: decoration('finance.qty'.tr()).copyWith(
+                hintText: '1',
+                suffixText: aRow.isPicked ? itemUnitShort(aRow.unit) : null,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -667,6 +798,30 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           line('finance.receipt_total'.tr(), total, aIsBold: true),
         ],
       ),
+    );
+  }
+}
+
+class _ItemChoiceTile extends StatelessWidget
+{
+  final _ItemChoice choice;
+  final bool isHighlighted;
+  final VoidCallback onTap;
+
+  const _ItemChoiceTile({required this.choice, required this.isHighlighted, required this.onTap});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final item = choice.item;
+
+    return ListTile(
+      dense: true,
+      tileColor: isHighlighted ? Colors.blue.shade50 : null,
+      leading: Icon(item == null ? AppIcons.plusCircle : itemKindIcon(item.kind), size: 18),
+      title: Text(item?.name ?? 'items.create_option'.tr(args: [choice.newName])),
+      subtitle: item == null ? null : Text('${itemKindLabel(item.kind)} · ${itemUnitShort(item.unit)}'),
+      onTap: onTap,
     );
   }
 }

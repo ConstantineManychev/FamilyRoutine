@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use axum::http::HeaderValue;
@@ -36,7 +37,7 @@ pub struct EnableBankingConfig
 
 impl BankConfig
 {
-    pub fn from_env() -> Result<Self, String>
+    pub fn from_env(a_env_dir: Option<&Path>) -> Result<Self, String>
     {
         let mono_poll_minutes = parse_u64("MONOBANK_POLL_INTERVAL_MIN", 60, 1, 24 * 60)?;
         let mono_call_gap = parse_u64("MONOBANK_CALL_GAP_SEC", 61, 0, 600)?;
@@ -52,7 +53,7 @@ impl BankConfig
             mono_poll_interval: Duration::from_secs(mono_poll_minutes * 60),
             mono_call_gap: Duration::from_secs(mono_call_gap),
             mono_history_months,
-            enable_banking: EnableBankingConfig::from_env()?,
+            enable_banking: EnableBankingConfig::from_env(a_env_dir)?,
             sync_timezone,
             eb_sync_hours: parse_hours(&optional("ENABLE_BANKING_SYNC_HOURS").unwrap_or_else(|| "0,6,12,18".into()))?,
         })
@@ -61,27 +62,33 @@ impl BankConfig
 
 impl EnableBankingConfig
 {
-    fn from_env() -> Result<Option<Self>, String>
+    fn from_env(a_env_dir: Option<&Path>) -> Result<Option<Self>, String>
     {
         let app_id = optional("ENABLE_BANKING_APP_ID");
-        let key_path = optional("ENABLE_BANKING_KEY_PATH");
+        let key_file = optional("ENABLE_BANKING_KEY_FILE");
 
-        let (app_id, key_path) = match (app_id, key_path)
+        let (app_id, key_file) = match (app_id, key_file)
         {
             (None, None) => return Ok(None),
-            (Some(app_id), Some(key_path)) => (app_id, key_path),
-            _ => return Err("ENABLE_BANKING_APP_ID and ENABLE_BANKING_KEY_PATH must be set together".into()),
+            (Some(app_id), Some(key_file)) => (app_id, key_file),
+            _ => return Err("ENABLE_BANKING_APP_ID and ENABLE_BANKING_KEY_FILE must be set together".into()),
         };
 
-        let pem = std::fs::read(&key_path).map_err(|_| format!("cannot read ENABLE_BANKING_KEY_PATH {key_path}"))?;
+        let key_path = resolve_path(a_env_dir, &key_file);
+        let pem = std::fs::read(&key_path)
+            .map_err(|err| format!("cannot read ENABLE_BANKING_KEY_FILE {}: {err}", key_path.display()))?;
         let key = EncodingKey::from_rsa_pem(&pem)
-            .map_err(|_| "ENABLE_BANKING_KEY_PATH must contain an RSA private key in PEM format".to_string())?;
+            .map_err(|_| "ENABLE_BANKING_KEY_FILE must contain an RSA private key in PEM format".to_string())?;
+
+        let redirect_url = optional("ENABLE_BANKING_REDIRECT_URL")
+            .or_else(|| optional("APP_DOMAIN").map(|domain| format!("https://{domain}/app/bank-callback")))
+            .ok_or_else(|| "ENABLE_BANKING_REDIRECT_URL or APP_DOMAIN must be set".to_string())?;
 
         Ok(Some(Self {
             api_url: optional("ENABLE_BANKING_API_URL").unwrap_or_else(|| DEFAULT_EB_API.into()),
             app_id,
             key,
-            redirect_url: required("ENABLE_BANKING_REDIRECT_URL")?,
+            redirect_url,
             consent_days: parse_u64("ENABLE_BANKING_CONSENT_DAYS", 180, 1, 730)? as i64,
         }))
     }
@@ -102,7 +109,7 @@ pub struct AppConfig
 
 impl AppConfig
 {
-    pub fn from_env() -> Result<Self, String>
+    pub fn from_env(a_env_dir: Option<&Path>) -> Result<Self, String>
     {
         let database_url = required("DATABASE_URL")?;
 
@@ -133,7 +140,7 @@ impl AppConfig
             is_proxy_trusted,
             data_key,
             password_pepper,
-            banks: BankConfig::from_env()?,
+            banks: BankConfig::from_env(a_env_dir)?,
         })
     }
 }
@@ -163,6 +170,15 @@ pub fn decode_pepper(a_encoded: &str) -> Result<Vec<u8>, String>
     }
 
     Ok(bytes)
+}
+
+fn resolve_path(a_base_dir: Option<&Path>, a_path: &str) -> PathBuf
+{
+    match a_base_dir
+    {
+        Some(base_dir) => base_dir.join(a_path),
+        None => PathBuf::from(a_path),
+    }
 }
 
 fn required(a_name: &str) -> Result<String, String>

@@ -8,7 +8,7 @@ import '../../providers/api_prov.dart';
 import '../../providers/auth_provider.dart';
 import '../common/app_icons.dart';
 
-const Map<String, String> _dictRoutes = {'exercises': '/app/exercises'};
+const Map<String, String> _dictRoutes = {'exercises': '/app/exercises', 'items': '/app/items'};
 
 class Sidebar extends ConsumerStatefulWidget
 {

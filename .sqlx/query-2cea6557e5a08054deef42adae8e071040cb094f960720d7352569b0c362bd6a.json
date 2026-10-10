@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT ri.item_id, i.name, i.type AS \"kind: ItemKind\", i.unit AS \"unit: ItemUnit\", ri.qty, ri.unit_price, ri.amount\n        FROM receipt_items ri\n        JOIN items i ON i.id = ri.item_id\n        WHERE ri.receipt_id = $1\n        ORDER BY ri.pos\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "unit_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "amount",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "2cea6557e5a08054deef42adae8e071040cb094f960720d7352569b0c362bd6a"
+}

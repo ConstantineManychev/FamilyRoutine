@@ -98,10 +98,39 @@ void main()
       expect(tx.isTransfer, isFalse);
     });
 
-    test('receipt item serializes money with two decimals', ()
+    test('receipt item references the dictionary and serializes money with two decimals', ()
     {
-      const item = ReceiptItem(name: 'Хліб', qty: 2.5, unitPrice: 40, amount: 100);
-      expect(item.toJson(), {'name': 'Хліб', 'kind': 'product', 'qty': '2.500', 'unit_price': '40.00', 'amount': '100.00'});
+      final item = ReceiptItem.fromJson({
+        'item_id': 'i1',
+        'name': 'Яблоки',
+        'kind': 'product',
+        'unit': 'kilogram',
+        'qty': '2.500',
+        'unit_price': '40.00',
+        'amount': '100.00',
+      });
+      expect(item.unit, ItemUnit.kilogram);
+      expect(item.toJson(), {'item_id': 'i1', 'qty': '2.500', 'unit_price': '40.00', 'amount': '100.00'});
+    });
+
+    test('dictionary item and price stats parse', ()
+    {
+      final item = DictItemDto.fromJson({'id': 'i1', 'name': 'Плитка', 'kind': 'product', 'unit': 'square_meter', 'is_custom': true});
+      expect(item.unit, ItemUnit.squareMeter);
+      expect(DictItemDto.payload('Плитка', ItemKind.service, ItemUnit.hour), {'name': 'Плитка', 'kind': 'service', 'unit': 'hour'});
+
+      final price = ItemPriceDto.fromJson({
+        'merchant_name': null,
+        'curr_code': 'UAH',
+        'last_price': '32.00',
+        'min_price': '30.00',
+        'avg_price': '31.00',
+        'purchase_count': 2,
+        'last_ts': '2026-10-09T10:00:00Z',
+      });
+      expect(price.merchantName, isNull);
+      expect(price.minPrice, 30);
+      expect(price.purchaseCount, 2);
     });
 
     test('family detail carries my role', ()

@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH purchases AS (\n            SELECT\n                COALESCE(m.name, r.merchant_name) AS merchant_name,\n                COALESCE(r.merchant_id::text, LOWER(r.merchant_name)) AS merchant_key,\n                c.code AS curr_code,\n                ROUND(ri.amount / ri.qty, 2) AS unit_price,\n                r.receipt_ts\n            FROM receipt_items ri\n            JOIN receipts r ON r.id = ri.receipt_id\n            JOIN currencies c ON c.id = r.curr_id\n            LEFT JOIN merchants m ON m.id = r.merchant_id\n            WHERE ri.item_id = $1 AND r.owner_id = $2\n        )\n        SELECT\n            (ARRAY_AGG(merchant_name ORDER BY receipt_ts DESC))[1] AS merchant_name,\n            curr_code AS \"curr_code!\",\n            (ARRAY_AGG(unit_price ORDER BY receipt_ts DESC))[1] AS \"last_price!\",\n            MIN(unit_price) AS \"min_price!\",\n            ROUND(AVG(unit_price), 2) AS \"avg_price!\",\n            COUNT(*) AS \"purchase_count!\",\n            MAX(receipt_ts) AS \"last_ts!\"\n        FROM purchases\n        GROUP BY merchant_key, curr_code\n        ORDER BY curr_code, 3, 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "merchant_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "curr_code!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_price!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "min_price!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "avg_price!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "purchase_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "last_ts!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "bd3be872d7dd042f685281eda22bf389db632355940b53fcf44c73d162f91b92"
+}
