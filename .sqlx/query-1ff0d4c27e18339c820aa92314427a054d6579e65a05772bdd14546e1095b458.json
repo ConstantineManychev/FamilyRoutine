@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO body_values (entry_id, metric, value)\n        SELECT $1, metric, value FROM UNNEST($2::body_metric_t[], $3::NUMERIC[]) AS input(metric, value)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "body_metric_t[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "body_metric_t",
+                  "kind": {
+                    "Enum": [
+                      "height",
+                      "weight",
+                      "body_fat",
+                      "muscle_mass",
+                      "skeletal_muscle",
+                      "bone_mass",
+                      "body_water",
+                      "protein",
+                      "visceral_fat",
+                      "neck",
+                      "chest",
+                      "waist",
+                      "hips",
+                      "biceps_left",
+                      "biceps_right",
+                      "forearm_left",
+                      "forearm_right",
+                      "thigh_left",
+                      "thigh_right",
+                      "calf_left",
+                      "calf_right"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "NumericArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1ff0d4c27e18339c820aa92314427a054d6579e65a05772bdd14546e1095b458"
+}

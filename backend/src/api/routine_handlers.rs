@@ -201,7 +201,7 @@ pub async fn timeline(
                 SELECT u.id AS user_id, u.first_name, u.last_name
                 FROM family_mems fm
                 JOIN users u ON u.id = fm.user_id
-                WHERE fm.family_id = $1 AND (fm.user_id = $2 OR fm.is_routine_shared)
+                WHERE fm.family_id = $1 AND (fm.user_id = $2 OR fm.is_routine_shared) AND NOT u.is_managed
                 ORDER BY (fm.user_id = $2) DESC, u.first_name, u.last_name
                 "#,
                 family_id,

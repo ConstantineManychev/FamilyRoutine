@@ -56,6 +56,16 @@ class AuthNotifier extends Notifier<AuthState>
     }
   }
 
+  Future<void> refreshUser() async
+  {
+    if (!state.isAuthenticated)
+    {
+      return;
+    }
+    final user = await ref.read(apiProv).getMe();
+    state = AuthState(AuthStatus.authenticated, user: user);
+  }
+
   Future<void> login(String aEmail, String aPassword) async
   {
     final user = await ref.read(apiProv).login(aEmail, aPassword);

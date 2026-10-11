@@ -1,7 +1,7 @@
 use axum::extract::State;
 use axum::Json;
 use chrono::{Datelike, NaiveDate, Utc};
-use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, UserDto};
+use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, Sex, UserDto};
 
 use crate::api::extract::{ApiQuery, AuthUser};
 use crate::domain::errors::ApiError;
@@ -16,7 +16,7 @@ pub async fn get_me(State(a_state): State<AppState>, a_user: AuthUser) -> Result
 {
     let user = sqlx::query_as!(
         UserDto,
-        "SELECT id, email, first_name, last_name FROM users WHERE id = $1",
+        r#"SELECT id, email AS "email!", first_name, last_name FROM users WHERE id = $1"#,
         a_user.user_id
     )
     .fetch_optional(&a_state.db)
@@ -76,13 +76,16 @@ pub async fn get_energy_timeline(
         r#"
         SELECT
             u.birth_date,
-            u.gender,
-            b.weight::float8 AS "weight_kg?",
-            b.height::float8 AS "height_cm?"
+            u.sex AS "sex: Sex",
+            (
+                SELECT v.value::float8 FROM body_values v JOIN body_entries e ON e.id = v.entry_id
+                WHERE e.user_id = u.id AND v.metric = 'weight' ORDER BY e.measured_ts DESC LIMIT 1
+            ) AS "weight_kg?",
+            (
+                SELECT v.value::float8 FROM body_values v JOIN body_entries e ON e.id = v.entry_id
+                WHERE e.user_id = u.id AND v.metric = 'height' ORDER BY e.measured_ts DESC LIMIT 1
+            ) AS "height_cm?"
         FROM users u
-        LEFT JOIN LATERAL (
-            SELECT weight, height FROM body_snaps WHERE user_id = u.id ORDER BY rec_ts DESC LIMIT 1
-        ) b ON TRUE
         WHERE u.id = $1
         "#,
         a_user.user_id
@@ -92,7 +95,7 @@ pub async fn get_energy_timeline(
     .ok_or(ApiError::NotFound)?;
 
     let age = f64::from(age_on(profile.birth_date, Utc::now().date_naive()));
-    let is_male = profile.gender.as_deref() != Some("female");
+    let is_male = profile.sex != Some(Sex::Female);
     let bmr_per_hour = calc_bmr(
         profile.weight_kg.unwrap_or(DEF_WEIGHT_KG),
         profile.height_cm.unwrap_or(DEF_HEIGHT_CM),

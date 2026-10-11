@@ -52,7 +52,9 @@
     "AI_KEY_MISSING": "Ajoutez d'abord une clé pour ce fournisseur.",
     "AI_OWN_KEYS_DISABLED": "L'administrateur du serveur a désactivé les clés personnelles.",
     "AI_NO_MODELS": "Aucun modèle adapté n'est disponible pour cette clé.",
-    "AI_PROVIDER_UNAVAILABLE": "Le fournisseur est temporairement indisponible, réessayez plus tard."
+    "AI_PROVIDER_UNAVAILABLE": "Le fournisseur est temporairement indisponible, réessayez plus tard.",
+    "WRONG_PASSWORD": "Le mot de passe actuel est incorrect",
+    "CHILD_PROFILE": "Cette action n'est pas disponible pour un profil enfant"
   },
   "sidebar": {
     "routine": "Routine",
@@ -68,7 +70,8 @@
     "toggle_list": "Afficher la liste",
     "toggle_menu": "Réduire ou développer le menu",
     "transactions": "Opérations",
-    "receipts": "Tickets"
+    "receipts": "Tickets",
+    "profile": "Mon profil"
   },
   "dicts": {
     "events": "Événements",
@@ -76,7 +79,45 @@
     "items": "Produits et services"
   },
   "profile": {
-    "sign_out": "Se déconnecter"
+    "sign_out": "Se déconnecter",
+    "saved": "Enregistré",
+    "years": {
+      "zero": "{} an",
+      "one": "{} an",
+      "two": "{} ans",
+      "few": "{} ans",
+      "many": "{} ans",
+      "other": "{} ans"
+    },
+    "sex": "Sexe",
+    "sex_male": "Masculin",
+    "sex_female": "Féminin",
+    "sex_hint": "Nécessaire pour estimer le métabolisme et les besoins nutritionnels.",
+    "child_badge": "Profil enfant",
+    "personal": "Informations personnelles",
+    "first_name": "Prénom",
+    "last_name": "Nom",
+    "birth_date": "Date de naissance",
+    "activity": "Activité quotidienne",
+    "activity_unset": "Non renseignée",
+    "activity_sedentary": "Sédentaire (moins de 5 000 pas par jour)",
+    "activity_light": "Peu actif (5 000–7 500 pas)",
+    "activity_moderate": "Marche beaucoup ou travail debout (7 500–10 000 pas)",
+    "activity_active": "Travail physique ou plus de 10 000 pas",
+    "activity_very_active": "Travail physique intense",
+    "activity_hint": "Hors entraînements : leur dépense sera comptée à part.",
+    "sharing_title": "Qui voit mes données",
+    "sharing_hint": "Les membres de chaque groupe voient les sections activées ici : d'abord les valeurs actuelles, puis l'historique.",
+    "sharing_hint_child": "Les membres des groupes voient les sections activées ici.",
+    "password": "Mot de passe",
+    "pwd_hint": "Changer le mot de passe déconnecte tous vos autres appareils.",
+    "pwd_current": "Mot de passe actuel",
+    "pwd_new": "Nouveau mot de passe",
+    "pwd_repeat": "Répétez le nouveau mot de passe",
+    "pwd_change": "Changer le mot de passe",
+    "pwd_required": "Remplissez tous les champs du mot de passe",
+    "pwd_mismatch": "Les nouveaux mots de passe ne correspondent pas",
+    "pwd_changed": "Mot de passe modifié"
   },
   "dashboard": {
     "welcome": "Bienvenue",
@@ -151,7 +192,13 @@
     "join_by_code": "Rejoindre avec un code",
     "join_hint": "Saisissez le code reçu de l'administrateur du groupe.",
     "join": "Rejoindre",
-    "joined": "Vous avez rejoint le groupe"
+    "joined": "Vous avez rejoint le groupe",
+    "add_child": "Ajouter un enfant",
+    "add_child_action": "Ajouter",
+    "add_child_hint": "Un profil sans connexion : le créateur du profil et les administrateurs du groupe saisissent les mesures et les données de l'enfant. Les membres du groupe les voient comme celles des autres membres.",
+    "add_child_required": "Renseignez le prénom, le nom, la date de naissance et le sexe",
+    "child_profile": "Profil enfant",
+    "remove_child_confirm": "Retirer {} du groupe ? Si l'enfant n'appartient à aucun autre groupe, son profil et toutes ses mesures seront supprimés."
   },
   "common": {
     "save": "Enregistrer",
@@ -168,7 +215,8 @@
     "actions": "Actions",
     "soon": "Bientôt",
     "no_data": "Aucune donnée pour l'instant",
-    "delete_confirm": "Voulez-vous vraiment supprimer ?"
+    "delete_confirm": "Voulez-vous vraiment supprimer ?",
+    "back": "Retour"
   },
   "wallet": {
     "title": "Portefeuilles",
@@ -608,5 +656,58 @@
     "usage": "Reconnus aujourd'hui : {} sur {} ; ce mois-ci : {} sur {}.",
     "tokens": "Jetons ce mois-ci : {} en entrée, {} en sortie.",
     "saved": "Paramètres enregistrés"
+  },
+  "metrics": {
+    "height": "Taille",
+    "weight": "Poids",
+    "body_fat": "Masse grasse",
+    "muscle_mass": "Masse musculaire",
+    "skeletal_muscle": "Muscles squelettiques",
+    "bone_mass": "Masse osseuse",
+    "body_water": "Eau corporelle",
+    "protein": "Protéines",
+    "visceral_fat": "Graisse viscérale",
+    "neck": "Cou",
+    "chest": "Poitrine",
+    "waist": "Taille (tour)",
+    "hips": "Hanches",
+    "biceps_left": "Biceps gauche",
+    "biceps_right": "Biceps droit",
+    "forearm_left": "Avant-bras gauche",
+    "forearm_right": "Avant-bras droit",
+    "thigh_left": "Cuisse gauche",
+    "thigh_right": "Cuisse droite",
+    "calf_left": "Mollet gauche",
+    "calf_right": "Mollet droit",
+    "group_body": "Taille et poids",
+    "group_composition": "Composition corporelle",
+    "group_measures": "Tours de mesure",
+    "unit_cm": "cm",
+    "unit_kg": "kg",
+    "add_entry": "Ajouter une mesure",
+    "new_entry": "Nouvelle mesure",
+    "edit_entry": "Modifier la mesure",
+    "delete_entry": "Supprimer la mesure",
+    "delete_confirm": "Supprimer toute la mesure du {} avec toutes ses valeurs ?",
+    "note": "Note",
+    "entry_hint": "Ne remplissez que ce que vous avez mesuré. Pesez-vous à la même heure, de préférence le matin avant de manger.",
+    "was": "avant : {}",
+    "err_range": "de {} à {}",
+    "err_fix_fields": "Corrigez les champs signalés",
+    "err_empty": "Renseignez au moins une valeur",
+    "saved": "Mesure enregistrée",
+    "hidden": "Cette personne n'a pas partagé ses mesures avec vos groupes.",
+    "empty": "Aucune mesure pour l'instant.",
+    "group_empty": "Aucune mesure pour l'instant",
+    "delta_since": "{} depuis le {}",
+    "series_measured": "Mesures",
+    "series_trend": "Tendance",
+    "trend_hint": "La tendance lisse les variations de poids dues à l'eau et aux repas et montre l'évolution réelle.",
+    "history_list": "Toutes les mesures",
+    "no_history": "Aucune mesure de cette valeur pour l'instant.",
+    "current": "Actuel",
+    "change_since": "Évolution depuis le {}",
+    "min": "Minimum",
+    "max": "Maximum"
   }
 }

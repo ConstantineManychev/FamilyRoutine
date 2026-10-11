@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT password_hash AS \"password_hash!\", is_pwd_peppered FROM users WHERE id = $1 AND NOT is_managed",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "password_hash!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_pwd_peppered",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "5de86e58dc7c8e0a283a0a50828bf71120b88189f5de1aeef6bca6d534033db4"
+}

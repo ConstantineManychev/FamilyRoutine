@@ -52,7 +52,9 @@
     "AI_KEY_MISSING": "请先添加该服务商的密钥。",
     "AI_OWN_KEYS_DISABLED": "服务器管理员已禁用个人密钥。",
     "AI_NO_MODELS": "此密钥没有可用的合适模型。",
-    "AI_PROVIDER_UNAVAILABLE": "服务商暂时不可用，请稍后重试。"
+    "AI_PROVIDER_UNAVAILABLE": "服务商暂时不可用，请稍后重试。",
+    "WRONG_PASSWORD": "当前密码不正确",
+    "CHILD_PROFILE": "儿童资料不能执行此操作"
   },
   "sidebar": {
     "routine": "日常",
@@ -68,7 +70,8 @@
     "toggle_list": "显示列表",
     "toggle_menu": "折叠或展开菜单",
     "transactions": "交易",
-    "receipts": "小票"
+    "receipts": "小票",
+    "profile": "我的资料"
   },
   "dicts": {
     "events": "事件",
@@ -76,7 +79,45 @@
     "items": "商品与服务"
   },
   "profile": {
-    "sign_out": "退出登录"
+    "sign_out": "退出登录",
+    "saved": "已保存",
+    "years": {
+      "zero": "{}岁",
+      "one": "{}岁",
+      "two": "{}岁",
+      "few": "{}岁",
+      "many": "{}岁",
+      "other": "{}岁"
+    },
+    "sex": "性别",
+    "sex_male": "男",
+    "sex_female": "女",
+    "sex_hint": "用于估算代谢和营养目标。",
+    "child_badge": "儿童资料",
+    "personal": "个人信息",
+    "first_name": "名字",
+    "last_name": "姓氏",
+    "birth_date": "出生日期",
+    "activity": "日常活动量",
+    "activity_unset": "未设置",
+    "activity_sedentary": "久坐（每天少于 5000 步）",
+    "activity_light": "轻度活动（5000–7500 步）",
+    "activity_moderate": "常走路或站立工作（7500–10000 步）",
+    "activity_active": "体力工作或超过 10000 步",
+    "activity_very_active": "重体力劳动",
+    "activity_hint": "不含训练：训练消耗将单独计算。",
+    "sharing_title": "谁能看到我的数据",
+    "sharing_hint": "各群组成员可以看到这里开启的部分：先显示当前数值，再显示历史。",
+    "sharing_hint_child": "群组成员可以看到这里开启的部分。",
+    "password": "密码",
+    "pwd_hint": "修改密码后，你的其他设备都会退出登录。",
+    "pwd_current": "当前密码",
+    "pwd_new": "新密码",
+    "pwd_repeat": "再次输入新密码",
+    "pwd_change": "修改密码",
+    "pwd_required": "请填写所有密码字段",
+    "pwd_mismatch": "两次输入的新密码不一致",
+    "pwd_changed": "密码已修改"
   },
   "dashboard": {
     "welcome": "欢迎",
@@ -151,7 +192,13 @@
     "join_by_code": "通过邀请码加入",
     "join_hint": "请输入群组管理员提供的邀请码。",
     "join": "加入",
-    "joined": "您已加入群组"
+    "joined": "您已加入群组",
+    "add_child": "添加孩子",
+    "add_child_action": "添加",
+    "add_child_hint": "无需登录的资料：孩子的测量数据由资料创建者和群组管理员填写。群组成员看到的方式与其他成员的数据相同。",
+    "add_child_required": "请填写名字、姓氏、出生日期和性别",
+    "child_profile": "儿童资料",
+    "remove_child_confirm": "将{}移出群组？如果孩子不在其他群组中，其资料和所有测量数据都会被删除。"
   },
   "common": {
     "save": "保存",
@@ -168,7 +215,8 @@
     "actions": "操作",
     "soon": "即将推出",
     "no_data": "暂无数据",
-    "delete_confirm": "确定要删除吗？"
+    "delete_confirm": "确定要删除吗？",
+    "back": "返回"
   },
   "wallet": {
     "title": "钱包",
@@ -608,5 +656,58 @@
     "usage": "今天已识别 {} / {}，本月 {} / {}。",
     "tokens": "本月 Token：输入 {}，输出 {}。",
     "saved": "设置已保存"
+  },
+  "metrics": {
+    "height": "身高",
+    "weight": "体重",
+    "body_fat": "体脂率",
+    "muscle_mass": "肌肉量",
+    "skeletal_muscle": "骨骼肌",
+    "bone_mass": "骨量",
+    "body_water": "水分",
+    "protein": "蛋白质",
+    "visceral_fat": "内脏脂肪",
+    "neck": "颈围",
+    "chest": "胸围",
+    "waist": "腰围",
+    "hips": "臀围",
+    "biceps_left": "左上臂",
+    "biceps_right": "右上臂",
+    "forearm_left": "左前臂",
+    "forearm_right": "右前臂",
+    "thigh_left": "左大腿",
+    "thigh_right": "右大腿",
+    "calf_left": "左小腿",
+    "calf_right": "右小腿",
+    "group_body": "身高和体重",
+    "group_composition": "身体成分",
+    "group_measures": "围度",
+    "unit_cm": "厘米",
+    "unit_kg": "千克",
+    "add_entry": "添加测量",
+    "new_entry": "新的测量",
+    "edit_entry": "编辑测量",
+    "delete_entry": "删除测量",
+    "delete_confirm": "删除 {} 的整次测量及其所有数值？",
+    "note": "备注",
+    "entry_hint": "只填写测量过的项目。每天在同一时间称重，最好在早上进食前。",
+    "was": "上次 {}",
+    "err_range": "{} 到 {}",
+    "err_fix_fields": "请修正标出的字段",
+    "err_empty": "请至少填写一个数值",
+    "saved": "测量已保存",
+    "hidden": "此人未向你的群组公开测量数据。",
+    "empty": "还没有测量。",
+    "group_empty": "还没有测量",
+    "delta_since": "{}（自 {}）",
+    "series_measured": "测量值",
+    "series_trend": "趋势",
+    "trend_hint": "趋势线会平滑水分和饮食造成的体重波动，显示真实变化。",
+    "history_list": "全部测量",
+    "no_history": "此项目还没有测量。",
+    "current": "当前",
+    "change_since": "自 {} 的变化",
+    "min": "最小值",
+    "max": "最大值"
   }
 }

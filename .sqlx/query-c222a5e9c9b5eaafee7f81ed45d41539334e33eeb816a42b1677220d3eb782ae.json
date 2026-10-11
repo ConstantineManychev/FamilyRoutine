@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO family_mems (family_id, user_id, role) VALUES ($1, $2, 'standard')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c222a5e9c9b5eaafee7f81ed45d41539334e33eeb816a42b1677220d3eb782ae"
+}

@@ -52,7 +52,9 @@
     "AI_KEY_MISSING": "先にこのプロバイダーのキーを追加してください。",
     "AI_OWN_KEYS_DISABLED": "サーバー管理者が個人キーを無効にしています。",
     "AI_NO_MODELS": "このキーで利用できる適切なモデルがありません。",
-    "AI_PROVIDER_UNAVAILABLE": "プロバイダーが一時的に利用できません。後でもう一度お試しください。"
+    "AI_PROVIDER_UNAVAILABLE": "プロバイダーが一時的に利用できません。後でもう一度お試しください。",
+    "WRONG_PASSWORD": "現在のパスワードが正しくありません",
+    "CHILD_PROFILE": "子どものプロフィールではこの操作はできません"
   },
   "sidebar": {
     "routine": "ルーティン",
@@ -68,7 +70,8 @@
     "toggle_list": "一覧を表示",
     "toggle_menu": "メニューの折りたたみ・展開",
     "transactions": "取引",
-    "receipts": "レシート"
+    "receipts": "レシート",
+    "profile": "マイプロフィール"
   },
   "dicts": {
     "events": "イベント",
@@ -76,7 +79,45 @@
     "items": "商品・サービス"
   },
   "profile": {
-    "sign_out": "ログアウト"
+    "sign_out": "ログアウト",
+    "saved": "保存しました",
+    "years": {
+      "zero": "{}歳",
+      "one": "{}歳",
+      "two": "{}歳",
+      "few": "{}歳",
+      "many": "{}歳",
+      "other": "{}歳"
+    },
+    "sex": "性別",
+    "sex_male": "男性",
+    "sex_female": "女性",
+    "sex_hint": "基礎代謝と栄養目標の計算に必要です。",
+    "child_badge": "子どものプロフィール",
+    "personal": "個人情報",
+    "first_name": "名",
+    "last_name": "姓",
+    "birth_date": "生年月日",
+    "activity": "日常の活動量",
+    "activity_unset": "未設定",
+    "activity_sedentary": "座りがち（1日5,000歩未満）",
+    "activity_light": "やや活動的（5,000〜7,500歩）",
+    "activity_moderate": "よく歩く・立ち仕事（7,500〜10,000歩）",
+    "activity_active": "肉体労働または10,000歩以上",
+    "activity_very_active": "重い肉体労働",
+    "activity_hint": "トレーニングは含めません。トレーニングの消費は別に計算します。",
+    "sharing_title": "データを見られる人",
+    "sharing_hint": "各グループのメンバーは、ここで有効にした項目を見られます。まず現在の値、次に履歴が表示されます。",
+    "sharing_hint_child": "グループのメンバーは、ここで有効にした項目を見られます。",
+    "password": "パスワード",
+    "pwd_hint": "パスワードを変更すると、他のすべての端末からログアウトします。",
+    "pwd_current": "現在のパスワード",
+    "pwd_new": "新しいパスワード",
+    "pwd_repeat": "新しいパスワード（確認）",
+    "pwd_change": "パスワードを変更",
+    "pwd_required": "パスワードの項目をすべて入力してください",
+    "pwd_mismatch": "新しいパスワードが一致しません",
+    "pwd_changed": "パスワードを変更しました"
   },
   "dashboard": {
     "welcome": "ようこそ",
@@ -151,7 +192,13 @@
     "join_by_code": "コードで参加",
     "join_hint": "グループ管理者から受け取ったコードを入力してください。",
     "join": "参加する",
-    "joined": "グループに参加しました"
+    "joined": "グループに参加しました",
+    "add_child": "子どもを追加",
+    "add_child_action": "追加",
+    "add_child_hint": "ログインなしのプロフィールです。子どもの測定値やデータは、プロフィールの作成者とグループ管理者が入力します。グループのメンバーには他のメンバーのデータと同様に表示されます。",
+    "add_child_required": "名、姓、生年月日、性別を入力してください",
+    "child_profile": "子どものプロフィール",
+    "remove_child_confirm": "{}をグループから外しますか？ほかのグループに属していない場合、プロフィールとすべての測定値が削除されます。"
   },
   "common": {
     "save": "保存",
@@ -168,7 +215,8 @@
     "actions": "操作",
     "soon": "近日公開",
     "no_data": "データはまだありません",
-    "delete_confirm": "本当に削除しますか？"
+    "delete_confirm": "本当に削除しますか？",
+    "back": "戻る"
   },
   "wallet": {
     "title": "ウォレット",
@@ -608,5 +656,58 @@
     "usage": "今日の認識：{}／{}、今月：{}／{}。",
     "tokens": "今月のトークン：入力{}、出力{}。",
     "saved": "設定を保存しました"
+  },
+  "metrics": {
+    "height": "身長",
+    "weight": "体重",
+    "body_fat": "体脂肪率",
+    "muscle_mass": "筋肉量",
+    "skeletal_muscle": "骨格筋量",
+    "bone_mass": "骨量",
+    "body_water": "体水分率",
+    "protein": "タンパク質",
+    "visceral_fat": "内臓脂肪",
+    "neck": "首",
+    "chest": "胸囲",
+    "waist": "ウエスト",
+    "hips": "ヒップ",
+    "biceps_left": "左上腕",
+    "biceps_right": "右上腕",
+    "forearm_left": "左前腕",
+    "forearm_right": "右前腕",
+    "thigh_left": "左太もも",
+    "thigh_right": "右太もも",
+    "calf_left": "左ふくらはぎ",
+    "calf_right": "右ふくらはぎ",
+    "group_body": "身長と体重",
+    "group_composition": "体組成",
+    "group_measures": "周囲径",
+    "unit_cm": "cm",
+    "unit_kg": "kg",
+    "add_entry": "測定を追加",
+    "new_entry": "新しい測定",
+    "edit_entry": "測定を編集",
+    "delete_entry": "測定を削除",
+    "delete_confirm": "{}の測定をすべての値ごと削除しますか？",
+    "note": "メモ",
+    "entry_hint": "測った項目だけ入力してください。体重は毎日同じ時間、できれば朝食前に測りましょう。",
+    "was": "前回 {}",
+    "err_range": "{}〜{}",
+    "err_fix_fields": "印の付いた項目を修正してください",
+    "err_empty": "少なくとも1つの値を入力してください",
+    "saved": "測定を保存しました",
+    "hidden": "この人は測定値をあなたのグループに公開していません。",
+    "empty": "まだ測定がありません。",
+    "group_empty": "まだ測定がありません",
+    "delta_since": "{}（{}から）",
+    "series_measured": "測定値",
+    "series_trend": "傾向",
+    "trend_hint": "傾向線は水分や食事による体重の揺れをならし、実際の変化を示します。",
+    "history_list": "すべての測定",
+    "no_history": "この項目の測定はまだありません。",
+    "current": "現在",
+    "change_since": "{}からの変化",
+    "min": "最小",
+    "max": "最大"
   }
 }

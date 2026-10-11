@@ -622,6 +622,83 @@ class ApiSvc
     return DashboardDto.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<PersonProfile> getPerson(String aPersonId) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId');
+    return PersonProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<PersonProfile> updatePerson(
+    String aPersonId,
+    {
+      required String aFirstName,
+      required String aLastName,
+      required DateTime aBirthDate,
+      Sex? aSex,
+      ActivityLevel? aActivity,
+    }
+  ) async
+  {
+    final res = await _dio.put('/api/people/$aPersonId', data: {
+      'first_name': aFirstName,
+      'last_name': aLastName,
+      'birth_date': _dateWire(aBirthDate),
+      'sex': aSex?.name,
+      'activity': aActivity?.wire,
+    });
+    return PersonProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> changePassword(String aCurrent, String aNew) =>
+      _dio.post('/api/user/password', data: {'current_password': aCurrent, 'new_password': aNew});
+
+  Future<List<BodyEntry>> getBodyEntries(String aPersonId, {int aLimit = 100}) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/entries', queryParameters: {'limit': aLimit});
+    return (res.data as List<dynamic>).map((aItem) => BodyEntry.fromJson(aItem as Map<String, dynamic>)).toList();
+  }
+
+  Future<BodyEntry> getBodyEntry(String aPersonId, String aEntryId) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/entries/$aEntryId');
+    return BodyEntry.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<BodyEntry> saveBodyEntry(String aPersonId, String? aEntryId, DateTime aMeasuredTs, String? aNote, List<BodyValue> aValues) async
+  {
+    final data = {
+      'measured_ts': aMeasuredTs.toUtc().toIso8601String(),
+      'note': aNote,
+      'values': aValues.map((aValue) => aValue.toJson()).toList(),
+    };
+    final res = aEntryId == null
+        ? await _dio.post('/api/people/$aPersonId/entries', data: data)
+        : await _dio.put('/api/people/$aPersonId/entries/$aEntryId', data: data);
+    return BodyEntry.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteBodyEntry(String aPersonId, String aEntryId) => _dio.delete('/api/people/$aPersonId/entries/$aEntryId');
+
+  Future<List<MetricPoint>> getMetricHistory(String aPersonId, BodyMetric aMetric) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/metrics/${aMetric.wire}');
+    return (res.data as List<dynamic>).map((aItem) => MetricPoint.fromJson(aItem as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> setProfileSharing(String aPersonId, ProfileSharing aSharing) =>
+      _dio.put('/api/people/$aPersonId/sharing/${aSharing.familyId}', data: aSharing.toJson());
+
+  Future<PersonProfile> createChild(String aFamId, String aFirstName, String aLastName, DateTime aBirthDate, Sex aSex) async
+  {
+    final res = await _dio.post('/api/families/$aFamId/children', data: {
+      'first_name': aFirstName,
+      'last_name': aLastName,
+      'birth_date': _dateWire(aBirthDate),
+      'sex': aSex.name,
+    });
+    return PersonProfile.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<AiFeatures> getFeatures() async
   {
     final res = await _dio.get('/api/features');
@@ -675,5 +752,11 @@ class ApiSvc
       options: Options(receiveTimeout: const Duration(seconds: 150), sendTimeout: const Duration(seconds: 60)),
     );
     return RecognizedReceipt.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  String _dateWire(DateTime aDate)
+  {
+    String twoDigits(int aValue) => aValue.toString().padLeft(2, '0');
+    return '${aDate.year.toString().padLeft(4, '0')}-${twoDigits(aDate.month)}-${twoDigits(aDate.day)}';
   }
 }

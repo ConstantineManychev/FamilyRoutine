@@ -2,6 +2,7 @@ import 'finance_models.dart';
 
 export 'ai_models.dart';
 export 'finance_models.dart';
+export 'profile_models.dart';
 export 'routine_models.dart';
 
 enum MemberRole
@@ -103,6 +104,7 @@ class FamMemberDto
   final String lName;
   final MemberRole role;
   final bool isOwner;
+  final bool isManaged;
 
   const FamMemberDto({
     required this.id,
@@ -110,6 +112,7 @@ class FamMemberDto
     required this.lName,
     required this.role,
     required this.isOwner,
+    this.isManaged = false,
   });
 
   bool get isAdmin => isOwner || role == MemberRole.admin;
@@ -120,6 +123,7 @@ class FamMemberDto
         lName: aJson['last_name'] as String? ?? '',
         role: MemberRole.fromJson(aJson['role']),
         isOwner: aJson['is_owner'] as bool? ?? false,
+        isManaged: aJson['is_managed'] as bool? ?? false,
       );
 }
 

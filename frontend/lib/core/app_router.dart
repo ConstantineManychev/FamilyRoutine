@@ -22,6 +22,8 @@ import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/main_screen.dart';
 import '../ui/places/place_detail_screen.dart';
 import '../ui/places/places_screen.dart';
+import '../ui/profile/metric_history_screen.dart';
+import '../ui/profile/profile_screen.dart';
 import '../ui/settings/settings_screen.dart';
 import '../ui/wallets/bank_callback_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
@@ -107,6 +109,19 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                 ),
               ),
               GoRoute(path: 'settings', builder: (_, __) => const SettingsScreen()),
+              GoRoute(path: 'profile', builder: (_, __) => const ProfileScreen()),
+              GoRoute(
+                path: 'people/:id',
+                builder: (_, aState) => ProfileScreen(key: ValueKey(aState.pathParameters['id']), personId: aState.pathParameters['id']),
+              ),
+              GoRoute(
+                path: 'people/:id/metrics/:metric',
+                builder: (_, aState) => MetricHistoryScreen(
+                  key: ValueKey(aState.uri.path),
+                  personId: aState.pathParameters['id']!,
+                  metric: BodyMetric.parse(aState.pathParameters['metric']) ?? BodyMetric.weight,
+                ),
+              ),
               GoRoute(path: 'exercises', builder: (_, __) => const ExercisesScreen()),
               GoRoute(path: 'exercises/new', builder: (_, __) => const ExerciseDetailScreen()),
               GoRoute(

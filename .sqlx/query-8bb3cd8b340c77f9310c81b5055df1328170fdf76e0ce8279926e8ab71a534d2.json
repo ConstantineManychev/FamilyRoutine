@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM users u\n        WHERE u.is_managed AND NOT EXISTS (SELECT 1 FROM family_mems fm WHERE fm.user_id = u.id)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "8bb3cd8b340c77f9310c81b5055df1328170fdf76e0ce8279926e8ab71a534d2"
+}

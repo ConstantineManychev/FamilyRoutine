@@ -12,8 +12,8 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     ai_handlers, auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers,
-    item_handlers, place_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, tx_handlers,
-    user_handlers, wallet_handlers,
+    item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers,
+    stats_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -32,6 +32,24 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/auth/logout", post(auth_handlers::logout))
         .route("/auth/logout-all", post(auth_handlers::logout_all))
         .route("/user/me", get(user_handlers::get_me))
+        .route("/user/password", post(profile_handlers::change_password))
+        .route(
+            "/people/:id",
+            get(profile_handlers::get_person).put(profile_handlers::update_person),
+        )
+        .route(
+            "/people/:id/entries",
+            get(profile_handlers::list_entries).post(profile_handlers::create_entry),
+        )
+        .route(
+            "/people/:id/entries/:entry_id",
+            get(profile_handlers::get_entry)
+                .put(profile_handlers::update_entry)
+                .delete(profile_handlers::delete_entry),
+        )
+        .route("/people/:id/metrics/:metric", get(profile_handlers::metric_history))
+        .route("/people/:id/sharing/:family_id", put(profile_handlers::set_sharing))
+        .route("/families/:id/children", post(profile_handlers::create_child))
         .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
         .route("/dicts", get(user_handlers::get_avail_dicts))
         .route("/features", get(recognize_handlers::features))

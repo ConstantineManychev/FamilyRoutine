@@ -1,10 +1,12 @@
 mod ai;
 mod finance;
+mod profile;
 mod routine;
 
 pub use ai::*;
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
+pub use profile::*;
 pub use routine::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -136,6 +138,7 @@ pub struct FamMemberDto
     pub last_name: String,
     pub role: MemberRole,
     pub is_owner: bool,
+    pub is_managed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

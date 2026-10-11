@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            u.id,\n            u.first_name,\n            u.last_name,\n            fm.role AS \"role: MemberRole\",\n            (f.owner_id = fm.user_id) AS \"is_owner!\"\n        FROM family_mems fm\n        JOIN families f ON f.id = fm.family_id\n        JOIN users u ON u.id = fm.user_id\n        WHERE fm.family_id = $1\n        ORDER BY (f.owner_id = fm.user_id) DESC, fm.joined_ts\n        ",
+  "query": "\n        SELECT\n            u.id,\n            u.first_name,\n            u.last_name,\n            fm.role AS \"role: MemberRole\",\n            (f.owner_id = fm.user_id) AS \"is_owner!\",\n            u.is_managed\n        FROM family_mems fm\n        JOIN families f ON f.id = fm.family_id\n        JOIN users u ON u.id = fm.user_id\n        WHERE fm.family_id = $1\n        ORDER BY (f.owner_id = fm.user_id) DESC, u.is_managed, fm.joined_ts\n        ",
   "describe": {
     "columns": [
       {
@@ -37,6 +37,11 @@
         "ordinal": 4,
         "name": "is_owner!",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_managed",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -49,8 +54,9 @@
       false,
       false,
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "1526cb16b2d67bbaf8334327064578d06d993d5901fd37f32d4a255d915e6d4a"
+  "hash": "c8cf3001ef15def2338d0c7397ef6d97a4b865690c2dc885460bc5cc813da582"
 }

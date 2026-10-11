@@ -48,7 +48,10 @@ pub async fn authenticate(a_state: &AppState, a_email: &str, a_password: String)
     };
 
     let row = sqlx::query!(
-        "SELECT id, email, first_name, last_name, password_hash, is_pwd_peppered FROM users WHERE email = $1",
+        r#"
+        SELECT id, email AS "email!", first_name, last_name, password_hash AS "password_hash!", is_pwd_peppered
+        FROM users WHERE email = $1 AND NOT is_managed
+        "#,
         email
     )
     .fetch_optional(&a_state.db)

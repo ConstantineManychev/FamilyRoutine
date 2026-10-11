@@ -52,7 +52,9 @@
     "AI_KEY_MISSING": "Fügen Sie zuerst einen Schlüssel für diesen Anbieter hinzu.",
     "AI_OWN_KEYS_DISABLED": "Der Serveradministrator hat eigene Schlüssel deaktiviert.",
     "AI_NO_MODELS": "Für diesen Schlüssel sind keine geeigneten Modelle verfügbar.",
-    "AI_PROVIDER_UNAVAILABLE": "Der Anbieter ist vorübergehend nicht erreichbar, versuchen Sie es später erneut."
+    "AI_PROVIDER_UNAVAILABLE": "Der Anbieter ist vorübergehend nicht erreichbar, versuchen Sie es später erneut.",
+    "WRONG_PASSWORD": "Das aktuelle Passwort ist falsch",
+    "CHILD_PROFILE": "Diese Aktion ist für ein Kinderprofil nicht verfügbar"
   },
   "sidebar": {
     "routine": "Routine",
@@ -68,7 +70,8 @@
     "toggle_list": "Liste anzeigen",
     "toggle_menu": "Menü ein- oder ausklappen",
     "transactions": "Buchungen",
-    "receipts": "Belege"
+    "receipts": "Belege",
+    "profile": "Mein Profil"
   },
   "dicts": {
     "events": "Ereignisse",
@@ -76,7 +79,45 @@
     "items": "Waren und Dienstleistungen"
   },
   "profile": {
-    "sign_out": "Abmelden"
+    "sign_out": "Abmelden",
+    "saved": "Gespeichert",
+    "years": {
+      "zero": "{} Jahre",
+      "one": "{} Jahr",
+      "two": "{} Jahre",
+      "few": "{} Jahre",
+      "many": "{} Jahre",
+      "other": "{} Jahre"
+    },
+    "sex": "Geschlecht",
+    "sex_male": "Männlich",
+    "sex_female": "Weiblich",
+    "sex_hint": "Wird für Grundumsatz und Ernährungsziele benötigt.",
+    "child_badge": "Kinderprofil",
+    "personal": "Persönliche Daten",
+    "first_name": "Vorname",
+    "last_name": "Nachname",
+    "birth_date": "Geburtsdatum",
+    "activity": "Alltagsaktivität",
+    "activity_unset": "Nicht angegeben",
+    "activity_sedentary": "Sitzend (unter 5.000 Schritte am Tag)",
+    "activity_light": "Leicht aktiv (5.000–7.500 Schritte)",
+    "activity_moderate": "Viel zu Fuß oder Arbeit im Stehen (7.500–10.000 Schritte)",
+    "activity_active": "Körperliche Arbeit oder über 10.000 Schritte",
+    "activity_very_active": "Schwere körperliche Arbeit",
+    "activity_hint": "Ohne Training: dessen Verbrauch wird separat gezählt.",
+    "sharing_title": "Wer meine Daten sieht",
+    "sharing_hint": "Mitglieder jeder Gruppe sehen die hier aktivierten Bereiche: zuerst die aktuellen Werte, dann den Verlauf.",
+    "sharing_hint_child": "Gruppenmitglieder sehen die hier aktivierten Bereiche.",
+    "password": "Passwort",
+    "pwd_hint": "Nach dem Ändern des Passworts werden alle anderen Geräte abgemeldet.",
+    "pwd_current": "Aktuelles Passwort",
+    "pwd_new": "Neues Passwort",
+    "pwd_repeat": "Neues Passwort wiederholen",
+    "pwd_change": "Passwort ändern",
+    "pwd_required": "Alle Passwortfelder ausfüllen",
+    "pwd_mismatch": "Die neuen Passwörter stimmen nicht überein",
+    "pwd_changed": "Passwort geändert"
   },
   "dashboard": {
     "welcome": "Willkommen",
@@ -151,7 +192,13 @@
     "join_by_code": "Mit Code beitreten",
     "join_hint": "Geben Sie den Code ein, den Sie vom Gruppenadministrator erhalten haben.",
     "join": "Beitreten",
-    "joined": "Sie sind der Gruppe beigetreten"
+    "joined": "Sie sind der Gruppe beigetreten",
+    "add_child": "Kind hinzufügen",
+    "add_child_action": "Hinzufügen",
+    "add_child_hint": "Ein Profil ohne Anmeldung: Messwerte und Daten des Kindes tragen der Ersteller des Profils und die Gruppenadmins ein. Gruppenmitglieder sehen sie wie die Daten anderer Mitglieder.",
+    "add_child_required": "Vorname, Nachname, Geburtsdatum und Geschlecht ausfüllen",
+    "child_profile": "Kinderprofil",
+    "remove_child_confirm": "{} aus der Gruppe entfernen? Ist das Kind in keiner anderen Gruppe, werden das Profil und alle Messwerte gelöscht."
   },
   "common": {
     "save": "Speichern",
@@ -168,7 +215,8 @@
     "actions": "Aktionen",
     "soon": "Demnächst",
     "no_data": "Noch keine Daten",
-    "delete_confirm": "Möchten Sie das wirklich löschen?"
+    "delete_confirm": "Möchten Sie das wirklich löschen?",
+    "back": "Zurück"
   },
   "wallet": {
     "title": "Geldbörsen",
@@ -608,5 +656,58 @@
     "usage": "Heute erkannt: {} von {}; in diesem Monat: {} von {}.",
     "tokens": "Tokens in diesem Monat: {} Eingabe, {} Ausgabe.",
     "saved": "Einstellungen gespeichert"
+  },
+  "metrics": {
+    "height": "Größe",
+    "weight": "Gewicht",
+    "body_fat": "Körperfett",
+    "muscle_mass": "Muskelmasse",
+    "skeletal_muscle": "Skelettmuskulatur",
+    "bone_mass": "Knochenmasse",
+    "body_water": "Körperwasser",
+    "protein": "Protein",
+    "visceral_fat": "Viszeralfett",
+    "neck": "Hals",
+    "chest": "Brust",
+    "waist": "Taille",
+    "hips": "Hüfte",
+    "biceps_left": "Bizeps links",
+    "biceps_right": "Bizeps rechts",
+    "forearm_left": "Unterarm links",
+    "forearm_right": "Unterarm rechts",
+    "thigh_left": "Oberschenkel links",
+    "thigh_right": "Oberschenkel rechts",
+    "calf_left": "Wade links",
+    "calf_right": "Wade rechts",
+    "group_body": "Größe und Gewicht",
+    "group_composition": "Körperzusammensetzung",
+    "group_measures": "Umfänge",
+    "unit_cm": "cm",
+    "unit_kg": "kg",
+    "add_entry": "Messung hinzufügen",
+    "new_entry": "Neue Messung",
+    "edit_entry": "Messung bearbeiten",
+    "delete_entry": "Messung löschen",
+    "delete_confirm": "Die gesamte Messung vom {} mit allen Werten löschen?",
+    "note": "Notiz",
+    "entry_hint": "Nur ausfüllen, was gemessen wurde. Wiegen Sie sich immer zur gleichen Zeit, am besten morgens vor dem Essen.",
+    "was": "vorher {}",
+    "err_range": "von {} bis {}",
+    "err_fix_fields": "Markierte Felder korrigieren",
+    "err_empty": "Mindestens einen Wert ausfüllen",
+    "saved": "Messung gespeichert",
+    "hidden": "Diese Person hat ihre Messwerte nicht für Ihre Gruppen freigegeben.",
+    "empty": "Noch keine Messungen.",
+    "group_empty": "Noch keine Messungen",
+    "delta_since": "{} seit {}",
+    "series_measured": "Gemessen",
+    "series_trend": "Trend",
+    "trend_hint": "Der Trend glättet Gewichtsschwankungen durch Wasser und Essen und zeigt so die echte Veränderung.",
+    "history_list": "Alle Messungen",
+    "no_history": "Für diesen Wert gibt es noch keine Messungen.",
+    "current": "Aktuell",
+    "change_since": "Veränderung seit {}",
+    "min": "Minimum",
+    "max": "Maximum"
   }
 }

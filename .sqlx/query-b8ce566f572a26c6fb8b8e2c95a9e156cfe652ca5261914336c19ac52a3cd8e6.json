@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO users (first_name, last_name, birth_date, sex, is_managed, managed_by)\n        VALUES ($1, $2, $3, $4, TRUE, $5)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Date",
+        {
+          "Custom": {
+            "name": "sex_t",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        },
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b8ce566f572a26c6fb8b8e2c95a9e156cfe652ca5261914336c19ac52a3cd8e6"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) AS \"count!\"\n            FROM family_mems fm JOIN users u ON u.id = fm.user_id\n            WHERE fm.family_id = $1 AND NOT u.is_managed\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c9d365e3a134be434d0af4c43f217fb86c74344cc7f7d73d5a4720b7dbef7b0c"
+}

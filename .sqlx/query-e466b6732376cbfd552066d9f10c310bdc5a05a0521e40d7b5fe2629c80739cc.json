@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT entry_id, metric AS \"metric: BodyMetric\", value\n        FROM body_values WHERE entry_id = ANY($1)\n        ORDER BY entry_id, metric\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entry_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "metric: BodyMetric",
+        "type_info": {
+          "Custom": {
+            "name": "body_metric_t",
+            "kind": {
+              "Enum": [
+                "height",
+                "weight",
+                "body_fat",
+                "muscle_mass",
+                "skeletal_muscle",
+                "bone_mass",
+                "body_water",
+                "protein",
+                "visceral_fat",
+                "neck",
+                "chest",
+                "waist",
+                "hips",
+                "biceps_left",
+                "biceps_right",
+                "forearm_left",
+                "forearm_right",
+                "thigh_left",
+                "thigh_right",
+                "calf_left",
+                "calf_right"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e466b6732376cbfd552066d9f10c310bdc5a05a0521e40d7b5fe2629c80739cc"
+}

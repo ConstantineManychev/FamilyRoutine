@@ -92,6 +92,7 @@ class _SidebarState extends ConsumerState<Sidebar>
           _buildDictMenu(),
         ],
         const SizedBox(height: 24.0),
+        _buildNavItem(AppIcons.user, 'sidebar.profile'.tr(), () => _go('/app/profile')),
         _buildNavItem(AppIcons.settings, 'sidebar.settings'.tr(), () => _go('/app/settings')),
       ],
     );
@@ -189,11 +190,14 @@ class _SidebarState extends ConsumerState<Sidebar>
           if (widget.isExpanded) ...[
             const SizedBox(width: 16.0),
             Expanded(
-              child: Text(
-                '${widget.fName} ${widget.lName}',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.0, color: Color(0xFF1F2937)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: InkWell(
+                onTap: () => _go('/app/profile'),
+                child: Text(
+                  '${widget.fName} ${widget.lName}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.0, color: Color(0xFF1F2937)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,\n                   fm.is_measures_shared\n            FROM family_mems fm\n            JOIN families f ON f.id = fm.family_id\n            WHERE fm.user_id = $1\n            ORDER BY f.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "family_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_body_shared",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_composition_shared",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_measures_shared",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "01f85ec1a92298c6505d8152e972f96384b730ba7f7f339775f6f62192d4cfc1"
+}

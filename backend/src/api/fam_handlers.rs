@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::api::extract::{ApiJson, ApiPath, AuthUser, ClientIp};
 use crate::api::item_handlers::detach_family_items;
 use crate::api::place_handlers::detach_family_places;
+use crate::api::profile_handlers::delete_orphan_children;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text, MAX_NAME_LEN};
 use crate::security::authz::{lock_family, member_access, require_admin, require_member, require_owner, FamAccess};
@@ -147,7 +148,11 @@ pub async fn leave_family(
     if access.is_owner
     {
         let member_count = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "count!" FROM family_mems WHERE family_id = $1"#,
+            r#"
+            SELECT COUNT(*) AS "count!"
+            FROM family_mems fm JOIN users u ON u.id = fm.user_id
+            WHERE fm.family_id = $1 AND NOT u.is_managed
+            "#,
             a_fam_id
         )
         .fetch_one(&mut *tx)
@@ -185,6 +190,10 @@ pub async fn update_member_role(
     if target.is_owner
     {
         return Err(ApiError::Conflict("OWNER_PROTECTED"));
+    }
+    if is_child(&mut tx, a_target_id).await?
+    {
+        return Err(ApiError::Conflict("CHILD_PROFILE"));
     }
 
     sqlx::query!(
@@ -228,6 +237,7 @@ pub async fn remove_member(
     }
 
     drop_membership(&mut tx, a_fam_id, a_target_id).await?;
+    delete_orphan_children(&mut tx).await?;
 
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -251,6 +261,10 @@ pub async fn transfer_ownership(
     if target.is_owner
     {
         return Err(ApiError::Validation("user_id"));
+    }
+    if is_child(&mut tx, a_req.user_id).await?
+    {
+        return Err(ApiError::Conflict("CHILD_PROFILE"));
     }
 
     sqlx::query!(
@@ -493,12 +507,13 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_access: FamAccess) 
             u.first_name,
             u.last_name,
             fm.role AS "role: MemberRole",
-            (f.owner_id = fm.user_id) AS "is_owner!"
+            (f.owner_id = fm.user_id) AS "is_owner!",
+            u.is_managed
         FROM family_mems fm
         JOIN families f ON f.id = fm.family_id
         JOIN users u ON u.id = fm.user_id
         WHERE fm.family_id = $1
-        ORDER BY (f.owner_id = fm.user_id) DESC, fm.joined_ts
+        ORDER BY (f.owner_id = fm.user_id) DESC, u.is_managed, fm.joined_ts
         "#,
         a_fam_id
     )
@@ -548,6 +563,17 @@ async fn remove_family(a_conn: &mut PgConnection, a_fam_id: Uuid, a_owner_id: Uu
     sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
         .execute(&mut *a_conn)
         .await?;
+    delete_orphan_children(a_conn).await?;
 
     Ok(())
+}
+
+async fn is_child(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<bool, ApiError>
+{
+    Ok(
+        sqlx::query_scalar!("SELECT is_managed FROM users WHERE id = $1", a_user_id)
+            .fetch_optional(&mut *a_conn)
+            .await?
+            .unwrap_or(false),
+    )
 }

@@ -169,10 +169,13 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
 
   Future<void> _removeMember(FamMemberDto aMember) async
   {
+    final name = '${aMember.fName} ${aMember.lName}';
     final isConfirmed = await confirmAction(
       context,
       aTitle: 'family.remove_member'.tr(),
-      aMessage: 'family.remove_member_confirm'.tr(namedArgs: {'name': '${aMember.fName} ${aMember.lName}'}),
+      aMessage: aMember.isManaged
+          ? 'family.remove_child_confirm'.tr(args: [name])
+          : 'family.remove_member_confirm'.tr(namedArgs: {'name': name}),
     );
 
     if (isConfirmed)
@@ -204,6 +207,26 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
         showInfoSnack(context, 'family.transfer_owner_done'.tr());
       }
     });
+  }
+
+  Future<void> _addChild() async
+  {
+    final draft = await showDialog<_ChildDraft>(context: context, builder: (_) => const _ChildDialog());
+    if (draft == null || !mounted)
+    {
+      return;
+    }
+
+    PersonProfile? child;
+    await _runAction(() async
+    {
+      child = await ref.read(apiProv).createChild(widget.famId!, draft.firstName, draft.lastName, draft.birthDate, draft.sex);
+    });
+    ref.invalidate(famsProv);
+    if (child != null && mounted)
+    {
+      context.push('/app/people/${child!.id}');
+    }
   }
 
   Future<void> _createInvite() async
@@ -316,7 +339,17 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
             ),
           ),
           const SizedBox(height: 32),
-          Text('family.members'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ScreenHeader(
+            title: 'family.members'.tr(),
+            actions: [
+              if (_isAdmin)
+                OutlinedButton.icon(
+                  onPressed: _isSaving ? null : _addChild,
+                  icon: const Icon(AppIcons.plus, size: 18),
+                  label: Text('family.add_child'.tr()),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
           _buildMembers(currUserId),
           if (_isAdmin) ...[
@@ -340,6 +373,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
         children: [
           for (final member in members)
             ListTile(
+              onTap: () => context.push(member.id == aCurrUserId ? '/app/profile' : '/app/people/${member.id}'),
               leading: CircleAvatar(child: Text(member.fName.isNotEmpty ? member.fName[0] : '?')),
               title: Text('${member.fName} ${member.lName}'),
               subtitle: Row(
@@ -349,7 +383,11 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
                     const SizedBox(width: 4),
                   ],
                   Text(
-                    member.isOwner ? 'family.roles.owner'.tr() : 'family.roles.${member.role.name}'.tr(),
+                    member.isManaged
+                        ? 'family.child_profile'.tr()
+                        : member.isOwner
+                            ? 'family.roles.owner'.tr()
+                            : 'family.roles.${member.role.name}'.tr(),
                     style: TextStyle(color: member.isAdmin ? Colors.blue : Colors.grey),
                   ),
                 ],
@@ -363,7 +401,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
 
   Widget? _buildMemberMenu(FamDetailDto aFam, FamMemberDto aMember)
   {
-    final isRoleEditable = aFam.isOwner && !aMember.isOwner;
+    final isRoleEditable = aFam.isOwner && !aMember.isOwner && !aMember.isManaged;
     final isRemovable = aFam.canRemove(aMember);
 
     if (!isRoleEditable && !isRemovable)
@@ -568,6 +606,132 @@ class _InviteCodeDialog extends StatelessWidget
           label: Text('common.copy'.tr()),
         ),
         ElevatedButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.ok'.tr())),
+      ],
+    );
+  }
+}
+
+class _ChildDraft
+{
+  final String firstName;
+  final String lastName;
+  final DateTime birthDate;
+  final Sex sex;
+
+  const _ChildDraft(this.firstName, this.lastName, this.birthDate, this.sex);
+}
+
+class _ChildDialog extends StatefulWidget
+{
+  const _ChildDialog();
+
+  @override
+  State<_ChildDialog> createState() => _ChildDialogState();
+}
+
+class _ChildDialogState extends State<_ChildDialog>
+{
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  DateTime? _birthDate;
+  Sex? _sex;
+  bool _isSubmitted = false;
+
+  @override
+  void dispose()
+  {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _isValid =>
+      _firstNameCtrl.text.trim().isNotEmpty && _lastNameCtrl.text.trim().isNotEmpty && _birthDate != null && _sex != null;
+
+  Future<void> _pickDate() async
+  {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime.now().subtract(const Duration(days: 365 * 5)),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null)
+    {
+      setState(() => _birthDate = picked);
+    }
+  }
+
+  void _submit()
+  {
+    setState(() => _isSubmitted = true);
+    if (!_isValid)
+    {
+      return;
+    }
+    Navigator.of(context).pop(_ChildDraft(_firstNameCtrl.text.trim(), _lastNameCtrl.text.trim(), _birthDate!, _sex!));
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final birthDate = _birthDate;
+
+    return AlertDialog(
+      title: Text('family.add_child'.tr()),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('family.add_child_hint'.tr(), style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _firstNameCtrl,
+                inputFormatters: [LengthLimitingTextInputFormatter(100)],
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(labelText: 'profile.first_name'.tr(), border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _lastNameCtrl,
+                inputFormatters: [LengthLimitingTextInputFormatter(100)],
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(labelText: 'profile.last_name'.tr(), border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _pickDate,
+                icon: const Icon(AppIcons.calendar, size: 18),
+                label: Text(
+                  birthDate == null
+                      ? 'profile.birth_date'.tr()
+                      : '${'profile.birth_date'.tr()}: ${DateFormat.yMMMd(aContext.locale.toLanguageTag()).format(birthDate)}',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<Sex>(
+                emptySelectionAllowed: true,
+                segments: [
+                  ButtonSegment(value: Sex.female, label: Text('profile.sex_female'.tr())),
+                  ButtonSegment(value: Sex.male, label: Text('profile.sex_male'.tr())),
+                ],
+                selected: {if (_sex != null) _sex!},
+                onSelectionChanged: (aSelected) => setState(() => _sex = aSelected.firstOrNull),
+              ),
+              if (_isSubmitted && !_isValid) ...[
+                const SizedBox(height: 12),
+                Text('family.add_child_required'.tr(), style: TextStyle(color: Colors.red.shade700)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
+        ElevatedButton(onPressed: _submit, child: Text('family.add_child_action'.tr())),
       ],
     );
   }

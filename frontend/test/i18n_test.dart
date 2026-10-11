@@ -13,9 +13,18 @@ const Map<String, List<String>> dynamicKeys = {
     'BANK_APP_REJECTED', 'BANK_APP_INACTIVE', 'BANK_REJECTED', 'BARCODE_TAKEN', 'RECOGNITION_DISABLED',
     'RECOGNITION_UNAVAILABLE', 'RECEIPT_UNREADABLE', 'NOT_A_RECEIPT', 'AI_KEY_REJECTED', 'AI_MODEL_REJECTED',
     'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
-    'AI_PROVIDER_UNAVAILABLE',
+    'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
+  'metrics': [
+    'height', 'weight', 'body_fat', 'muscle_mass', 'skeletal_muscle', 'bone_mass', 'body_water', 'protein', 'visceral_fat',
+    'neck', 'chest', 'waist', 'hips', 'biceps_left', 'biceps_right', 'forearm_left', 'forearm_right', 'thigh_left',
+    'thigh_right', 'calf_left', 'calf_right', 'group_body', 'group_composition', 'group_measures',
+  ],
+  'profile': [
+    'sex_male', 'sex_female', 'activity_sedentary', 'activity_light', 'activity_moderate', 'activity_active',
+    'activity_very_active', 'years.one', 'years.few', 'years.many', 'years.other',
+  ],
   'bank': [
     'provider_monobank', 'provider_enable_banking', 'status_pending', 'status_active', 'status_error', 'status_expired',
     'error_UNAUTHORIZED', 'error_APP_INACTIVE', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',

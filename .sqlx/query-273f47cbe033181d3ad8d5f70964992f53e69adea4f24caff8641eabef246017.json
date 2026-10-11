@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, email, first_name, last_name FROM users WHERE id = $1",
+  "query": "SELECT id, email AS \"email!\", first_name, last_name FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "email",
+        "name": "email!",
         "type_info": "Varchar"
       },
       {
@@ -31,10 +31,10 @@
     },
     "nullable": [
       false,
-      false,
+      true,
       false,
       false
     ]
   },
-  "hash": "5c48f8897c783ea43fa6e69cbf654ca967d4410510988d153d27829e0d36250e"
+  "hash": "273f47cbe033181d3ad8d5f70964992f53e69adea4f24caff8641eabef246017"
 }
