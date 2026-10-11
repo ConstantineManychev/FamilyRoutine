@@ -10,6 +10,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'item_form.dart';
+import 'scope_widgets.dart';
 
 final AutoDisposeFutureProviderFamily<List<DictItemDto>, String> itemsProv =
     FutureProvider.autoDispose.family<List<DictItemDto>, String>((aRef, aQuery) async
@@ -85,7 +86,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
               controller: _searchCtrl,
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
-                hintText: 'items.search'.tr(),
+                hintText: 'items.search_barcode'.tr(),
                 prefixIcon: const Icon(AppIcons.search, size: 18),
                 border: const OutlineInputBorder(),
                 isDense: true,
@@ -123,6 +124,7 @@ class _ItemTile extends StatelessWidget
     final details = [
       itemKindLabel(item.kind),
       itemUnitShort(item.unit),
+      if (item.barcode != null) item.barcode!,
       if (!item.isCustom) 'items.shared'.tr(),
     ].join(' · ');
 
@@ -130,7 +132,17 @@ class _ItemTile extends StatelessWidget
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(itemKindIcon(item.kind), color: Colors.blue.shade700),
-        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(item.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            if (item.familyName != null) ...[
+              const SizedBox(width: 8),
+              FamilyBadge(name: item.familyName!),
+            ],
+          ],
+        ),
         subtitle: Text(details),
         trailing: const Icon(AppIcons.chevronRight),
         onTap: () => aContext.go('/app/items/${item.id}'),

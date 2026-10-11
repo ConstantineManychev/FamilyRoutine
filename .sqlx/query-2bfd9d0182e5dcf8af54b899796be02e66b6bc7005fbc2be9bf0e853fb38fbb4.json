@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            ip.id,\n            ip.place_id,\n            ip.place_addr_id,\n            COALESCE(pl.name, ip.merchant_name) AS store_name,\n            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,\n            c.code AS curr_code,\n            ip.qty,\n            ip.price,\n            ip.seen_ts,\n            ip.note\n        FROM item_prices ip\n        JOIN currencies c ON c.id = ip.curr_id\n        LEFT JOIN places pl ON pl.id = ip.place_id\n        LEFT JOIN place_addrs pa ON pa.id = ip.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        WHERE ip.item_id = $1 AND ip.owner_id = $2 AND ($3::uuid IS NULL OR ip.id = $3)\n        ORDER BY ip.seen_ts DESC\n        LIMIT 200\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "place_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "place_addr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "store_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "branch",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "seen_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "note",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      null,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "2bfd9d0182e5dcf8af54b899796be02e66b6bc7005fbc2be9bf0e853fb38fbb4"
+}

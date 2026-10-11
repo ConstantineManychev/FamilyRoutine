@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../dicts/scope_widgets.dart';
 
 final AutoDisposeFutureProvider<List<PlaceDto>> placesProv = FutureProvider.autoDispose<List<PlaceDto>>((aRef) async
 {
@@ -29,10 +30,14 @@ class PlacesScreen extends ConsumerWidget
       return 'places.no_address'.tr();
     }
 
-    final parts = [addr.zip, '${'places.house'.tr()} ${addr.houseNum}'];
+    final parts = [addr.label ?? '${'places.house'.tr()} ${addr.houseNum}'];
     if (addr.apt != null && addr.apt!.isNotEmpty)
     {
       parts.add('${'places.apt'.tr()} ${addr.apt}');
+    }
+    if (aPlace.addrs.length > 1)
+    {
+      parts.add('places.branch_count'.tr(args: ['${aPlace.addrs.length}']));
     }
     return parts.join(', ');
   }
@@ -74,7 +79,21 @@ class PlacesScreen extends ConsumerWidget
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: const Icon(AppIcons.mapPin, color: Colors.blue),
-                            title: Text(place.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    place.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                if (place.familyName != null) ...[
+                                  const SizedBox(width: 8),
+                                  FamilyBadge(name: place.familyName!),
+                                ],
+                              ],
+                            ),
                             subtitle: Text(_subtitle(place)),
                             trailing: const Icon(AppIcons.chevronRight),
                             onTap: () => aContext.go('/app/places/${place.id}'),

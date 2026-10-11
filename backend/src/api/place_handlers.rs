@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use shared_schema::{PlaceAddrDto, PlaceDto, SavePlaceRequest};
-use sqlx::{PgConnection, PgPool};
+use shared_schema::{PlaceAddrDto, PlaceDto, SavePlaceRequest, ShareToFamilyRequest};
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, AuthUser};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text, clean_text};
+use crate::security::authz::require_member;
 use crate::state::AppState;
 
 const MAX_ADDRS: usize = 20;
@@ -20,6 +21,16 @@ struct PlaceRow
 {
     id: Uuid,
     name: String,
+    family_id: Option<Uuid>,
+    family_name: Option<String>,
+    is_editable: bool,
+}
+
+struct PlaceScope
+{
+    owner_id: Option<Uuid>,
+    is_visible: bool,
+    is_editable: bool,
 }
 
 struct AddrRow
@@ -30,16 +41,28 @@ struct AddrRow
 
 pub async fn list_places(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<Vec<PlaceDto>>, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
     let places = sqlx::query_as!(
         PlaceRow,
-        "SELECT id, name FROM places WHERE owner_id = $1 ORDER BY name",
+        r#"
+        SELECT
+            p.id,
+            p.name,
+            p.family_id,
+            f.name AS "family_name?",
+            can_edit_scoped(p.owner_id, p.family_id, p.created_by, $1) AS "is_editable!"
+        FROM places p
+        LEFT JOIN families f ON f.id = p.family_id
+        WHERE p.owner_id = $1 OR p.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1)
+        ORDER BY p.name, f.name NULLS FIRST
+        "#,
         a_user.user_id
     )
-    .fetch_all(&a_state.db)
+    .fetch_all(&mut *conn)
     .await?;
 
     let ids: Vec<Uuid> = places.iter().map(|place| place.id).collect();
-    let mut addrs_by_place = load_addrs(&a_state.db, &ids).await?;
+    let mut addrs_by_place = load_addrs(&mut conn, &ids).await?;
 
     let result = places
         .into_iter()
@@ -47,6 +70,9 @@ pub async fn list_places(State(a_state): State<AppState>, a_user: AuthUser) -> R
             addrs: addrs_by_place.remove(&place.id).unwrap_or_default(),
             id: place.id,
             name: place.name,
+            family_id: place.family_id,
+            family_name: place.family_name,
+            is_editable: place.is_editable,
         })
         .collect();
 
@@ -59,7 +85,8 @@ pub async fn get_place(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<Json<PlaceDto>, ApiError>
 {
-    load_place(&a_state.db, a_id, a_user.user_id).await.map(Json)
+    let mut conn = a_state.db.acquire().await?;
+    load_place(&mut conn, a_id, a_user.user_id).await.map(Json)
 }
 
 pub async fn create_place(
@@ -73,9 +100,19 @@ pub async fn create_place(
 
     let mut tx = a_state.db.begin().await?;
 
+    if let Some(family_id) = a_req.family_id
+    {
+        require_member(&mut *tx, family_id, a_user.user_id)
+            .await
+            .map_err(|_| ApiError::Validation("family_id"))?;
+    }
+    let owner_id = a_req.family_id.is_none().then_some(a_user.user_id);
+
     let place_id = sqlx::query_scalar!(
-        "INSERT INTO places (name, owner_id) VALUES ($1, $2) RETURNING id",
+        "INSERT INTO places (name, owner_id, family_id, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
         name,
+        owner_id,
+        a_req.family_id,
         a_user.user_id
     )
     .fetch_one(&mut *tx)
@@ -87,9 +124,8 @@ pub async fn create_place(
         insert_addr(&mut tx, place_id, addr).await?;
     }
 
+    let place = load_place(&mut tx, place_id, a_user.user_id).await?;
     tx.commit().await?;
-
-    let place = load_place(&a_state.db, place_id, a_user.user_id).await?;
     Ok((StatusCode::CREATED, Json(place)))
 }
 
@@ -104,20 +140,11 @@ pub async fn update_place(
     let addrs = clean_addrs(a_req.addrs)?;
 
     let mut tx = a_state.db.begin().await?;
+    require_editable(&mut tx, a_id, a_user.user_id).await?;
 
-    let result = sqlx::query!(
-        "UPDATE places SET name = $3 WHERE id = $1 AND owner_id = $2",
-        a_id,
-        a_user.user_id,
-        name
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    if result.rows_affected() == 0
-    {
-        return Err(ApiError::NotFound);
-    }
+    sqlx::query!("UPDATE places SET name = $2 WHERE id = $1", a_id, name)
+        .execute(&mut *tx)
+        .await?;
 
     let kept_ids: Vec<Uuid> = addrs.iter().filter_map(|addr| addr.id).collect();
 
@@ -171,9 +198,9 @@ pub async fn update_place(
         }
     }
 
+    let place = load_place(&mut tx, a_id, a_user.user_id).await?;
     tx.commit().await?;
-
-    load_place(&a_state.db, a_id, a_user.user_id).await.map(Json)
+    Ok(Json(place))
 }
 
 pub async fn delete_place(
@@ -182,35 +209,173 @@ pub async fn delete_place(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
-    let result = sqlx::query!(
-        "DELETE FROM places WHERE id = $1 AND owner_id = $2",
-        a_id,
-        a_user.user_id
-    )
-    .execute(&a_state.db)
-    .await?;
+    let mut tx = a_state.db.begin().await?;
+    require_editable(&mut tx, a_id, a_user.user_id).await?;
 
-    if result.rows_affected() == 0
-    {
-        return Err(ApiError::NotFound);
-    }
+    sqlx::query!("DELETE FROM places WHERE id = $1", a_id)
+        .execute(&mut *tx)
+        .await?;
 
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn load_place(a_db: &PgPool, a_id: Uuid, a_owner_id: Uuid) -> Result<PlaceDto, ApiError>
+pub async fn share_place(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<ShareToFamilyRequest>,
+) -> Result<Json<PlaceDto>, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    let scope = require_editable(&mut tx, a_id, a_user.user_id).await?;
+    if scope.owner_id != Some(a_user.user_id)
+    {
+        return Err(ApiError::Validation("family_id"));
+    }
+
+    require_member(&mut *tx, a_req.family_id, a_user.user_id)
+        .await
+        .map_err(|_| ApiError::Validation("family_id"))?;
+
+    sqlx::query!(
+        "UPDATE places SET owner_id = NULL, family_id = $2 WHERE id = $1",
+        a_id,
+        a_req.family_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let place = load_place(&mut tx, a_id, a_user.user_id).await?;
+    tx.commit().await?;
+    Ok(Json(place))
+}
+
+pub async fn require_visible_place(
+    a_conn: &mut PgConnection,
+    a_place_id: Option<Uuid>,
+    a_addr_id: Option<Uuid>,
+    a_user_id: Uuid,
+    a_attached_place_id: Option<Uuid>,
+) -> Result<(), ApiError>
+{
+    let Some(place_id) = a_place_id
+    else
+    {
+        return match a_addr_id
+        {
+            Some(_) => Err(ApiError::Validation("place_addr_id")),
+            None => Ok(()),
+        };
+    };
+
+    let check = sqlx::query!(
+        r#"
+        SELECT
+            EXISTS (
+                SELECT 1 FROM places p
+                WHERE p.id = $1 AND (p.id = $4 OR can_see_scoped(p.owner_id, p.family_id, $3))
+            ) AS "is_visible!",
+            ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM place_addrs a WHERE a.id = $2 AND a.place_id = $1)) AS "is_addr_ok!"
+        "#,
+        place_id,
+        a_addr_id,
+        a_user_id,
+        a_attached_place_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    if !check.is_visible
+    {
+        return Err(ApiError::Validation("place_id"));
+    }
+    if !check.is_addr_ok
+    {
+        return Err(ApiError::Validation("place_addr_id"));
+    }
+
+    Ok(())
+}
+
+pub async fn detach_family_places(
+    a_conn: &mut PgConnection,
+    a_family_id: Uuid,
+    a_fallback_owner: Uuid,
+) -> Result<(), ApiError>
+{
+    sqlx::query!(
+        r#"
+        UPDATE places p
+        SET owner_id = CASE
+                WHEN EXISTS (SELECT 1 FROM family_mems fm WHERE fm.family_id = $1 AND fm.user_id = p.created_by)
+                    THEN p.created_by
+                ELSE $2
+            END,
+            family_id = NULL
+        WHERE p.family_id = $1
+        "#,
+        a_family_id,
+        a_fallback_owner
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    Ok(())
+}
+
+async fn require_editable(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<PlaceScope, ApiError>
+{
+    let scope = sqlx::query_as!(
+        PlaceScope,
+        r#"
+        SELECT
+            owner_id,
+            can_see_scoped(owner_id, family_id, $2) AS "is_visible!",
+            can_edit_scoped(owner_id, family_id, created_by, $2) AS "is_editable!"
+        FROM places
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+        a_id,
+        a_user_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?
+    .filter(|scope| scope.is_visible)
+    .ok_or(ApiError::NotFound)?;
+
+    if !scope.is_editable
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    Ok(scope)
+}
+
+async fn load_place(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<PlaceDto, ApiError>
 {
     let place = sqlx::query_as!(
         PlaceRow,
-        "SELECT id, name FROM places WHERE id = $1 AND owner_id = $2",
+        r#"
+        SELECT
+            p.id,
+            p.name,
+            p.family_id,
+            f.name AS "family_name?",
+            can_edit_scoped(p.owner_id, p.family_id, p.created_by, $2) AS "is_editable!"
+        FROM places p
+        LEFT JOIN families f ON f.id = p.family_id
+        WHERE p.id = $1 AND can_see_scoped(p.owner_id, p.family_id, $2)
+        "#,
         a_id,
-        a_owner_id
+        a_user_id
     )
-    .fetch_optional(a_db)
+    .fetch_optional(&mut *a_conn)
     .await?
     .ok_or(ApiError::NotFound)?;
 
-    let addrs = load_addrs(a_db, &[place.id])
+    let addrs = load_addrs(a_conn, &[place.id])
         .await?
         .remove(&place.id)
         .unwrap_or_default();
@@ -218,11 +383,17 @@ async fn load_place(a_db: &PgPool, a_id: Uuid, a_owner_id: Uuid) -> Result<Place
     Ok(PlaceDto {
         id: place.id,
         name: place.name,
+        family_id: place.family_id,
+        family_name: place.family_name,
+        is_editable: place.is_editable,
         addrs,
     })
 }
 
-async fn load_addrs(a_db: &PgPool, a_place_ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<PlaceAddrDto>>, ApiError>
+async fn load_addrs(
+    a_conn: &mut PgConnection,
+    a_place_ids: &[Uuid],
+) -> Result<HashMap<Uuid, Vec<PlaceAddrDto>>, ApiError>
 {
     if a_place_ids.is_empty()
     {
@@ -231,14 +402,18 @@ async fn load_addrs(a_db: &PgPool, a_place_ids: &[Uuid]) -> Result<HashMap<Uuid,
 
     let rows = sqlx::query!(
         r#"
-        SELECT id, place_id, is_main, country_id, city_id, street_id, house_num, apt, zip, merchant_id
-        FROM place_addrs
-        WHERE place_id = ANY($1)
-        ORDER BY is_main DESC, id
+        SELECT
+            a.id, a.place_id, a.is_main, a.country_id, a.city_id, a.street_id, a.house_num, a.apt, a.zip, a.merchant_id,
+            ci.name || ', ' || st.name || ' ' || a.house_num AS "label!"
+        FROM place_addrs a
+        JOIN streets st ON st.id = a.street_id
+        JOIN cities ci ON ci.id = a.city_id
+        WHERE a.place_id = ANY($1)
+        ORDER BY a.is_main DESC, a.id
         "#,
         a_place_ids
     )
-    .fetch_all(a_db)
+    .fetch_all(&mut *a_conn)
     .await?;
 
     let mut grouped: HashMap<Uuid, Vec<PlaceAddrDto>> = HashMap::new();
@@ -255,6 +430,7 @@ async fn load_addrs(a_db: &PgPool, a_place_ids: &[Uuid]) -> Result<HashMap<Uuid,
             apt: row.apt,
             zip: row.zip,
             merchant_id: row.merchant_id,
+            label: Some(row.label),
         },
     })
     {

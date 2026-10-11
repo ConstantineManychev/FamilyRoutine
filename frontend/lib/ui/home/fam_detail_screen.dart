@@ -236,6 +236,11 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
     await _runAction(() => ref.read(apiProv).setRoutineSharing(widget.famId!, aIsShared));
   }
 
+  Future<void> _setPriceSharing(bool aIsShared) async
+  {
+    await _runAction(() => ref.read(apiProv).setPriceSharing(widget.famId!, aIsShared));
+  }
+
   Future<void> _revokeInvite(FamInviteDto aInvite) async
   {
     await _runAction(() => ref.read(apiProv).revokeInvite(widget.famId!, aInvite.id));
@@ -290,12 +295,24 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
               borderRadius: BorderRadius.circular(12),
               side: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
-            child: SwitchListTile(
-              secondary: const Icon(AppIcons.calendarClock),
-              title: Text('routine.share_title'.tr()),
-              subtitle: Text('routine.share_hint'.tr()),
-              value: _famData?.isRoutineShared ?? true,
-              onChanged: _isSaving ? null : _setRoutineSharing,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(AppIcons.calendarClock),
+                  title: Text('routine.share_title'.tr()),
+                  subtitle: Text('routine.share_hint'.tr()),
+                  value: _famData?.isRoutineShared ?? true,
+                  onChanged: _isSaving ? null : _setRoutineSharing,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(AppIcons.tag),
+                  title: Text('catalog.prices_share_title'.tr()),
+                  subtitle: Text('catalog.prices_share_hint'.tr()),
+                  value: _famData?.isPricesShared ?? false,
+                  onChanged: _isSaving ? null : _setPriceSharing,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 32),

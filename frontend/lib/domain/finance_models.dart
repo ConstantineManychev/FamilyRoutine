@@ -99,59 +99,148 @@ class DictItemDto
   final String name;
   final ItemKind kind;
   final ItemUnit unit;
+  final String? barcode;
   final bool isCustom;
+  final String? familyId;
+  final String? familyName;
+  final bool isEditable;
 
   const DictItemDto({
     required this.id,
     required this.name,
     required this.kind,
     required this.unit,
+    this.barcode,
     required this.isCustom,
+    this.familyId,
+    this.familyName,
+    this.isEditable = false,
   });
+
+  bool get isPersonal => isCustom && familyId == null;
 
   factory DictItemDto.fromJson(Map<String, dynamic> aJson) => DictItemDto(
         id: aJson['id'] as String,
         name: aJson['name'] as String,
         kind: ItemKind.parse(aJson['kind']),
         unit: ItemUnit.parse(aJson['unit']),
+        barcode: aJson['barcode'] as String?,
         isCustom: aJson['is_custom'] as bool? ?? false,
+        familyId: aJson['family_id'] as String?,
+        familyName: aJson['family_name'] as String?,
+        isEditable: aJson['is_editable'] as bool? ?? false,
       );
 
-  static Map<String, dynamic> payload(String aName, ItemKind aKind, ItemUnit aUnit) => {
+  static Map<String, dynamic> payload(
+    String aName,
+    ItemKind aKind,
+    ItemUnit aUnit,
+    {
+      String? aBarcode,
+      String? aFamilyId,
+    }
+  ) => {
         'name': aName,
         'kind': aKind.name,
         'unit': aUnit.wire,
+        if (aBarcode != null && aBarcode.trim().isNotEmpty) 'barcode': aBarcode.trim(),
+        if (aFamilyId != null) 'family_id': aFamilyId,
       };
 }
 
 class ItemPriceDto
 {
-  final String? merchantName;
+  final String? storeName;
+  final String? branch;
   final String currCode;
   final double lastPrice;
   final double minPrice;
   final double avgPrice;
-  final int purchaseCount;
+  final int count;
   final DateTime lastTs;
+  final bool isShared;
 
   const ItemPriceDto({
-    this.merchantName,
+    this.storeName,
+    this.branch,
     required this.currCode,
     required this.lastPrice,
     required this.minPrice,
     required this.avgPrice,
-    required this.purchaseCount,
+    required this.count,
     required this.lastTs,
+    this.isShared = false,
   });
 
   factory ItemPriceDto.fromJson(Map<String, dynamic> aJson) => ItemPriceDto(
-        merchantName: aJson['merchant_name'] as String?,
+        storeName: aJson['store_name'] as String?,
+        branch: aJson['branch'] as String?,
         currCode: aJson['curr_code'] as String,
         lastPrice: parseDecimal(aJson['last_price']),
         minPrice: parseDecimal(aJson['min_price']),
         avgPrice: parseDecimal(aJson['avg_price']),
-        purchaseCount: (aJson['purchase_count'] as num).toInt(),
+        count: (aJson['count'] as num).toInt(),
         lastTs: parseTs(aJson['last_ts']),
+        isShared: aJson['is_shared'] as bool? ?? false,
+      );
+}
+
+class ItemPricesData
+{
+  final List<ItemPriceDto> prices;
+  final List<String> missingRates;
+  final int matchedItems;
+
+  const ItemPricesData({required this.prices, this.missingRates = const [], this.matchedItems = 1});
+
+  factory ItemPricesData.fromJson(Map<String, dynamic> aJson) => ItemPricesData(
+        prices: (aJson['prices'] as List? ?? const [])
+            .map((aItem) => ItemPriceDto.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+        missingRates: (aJson['missing_rates'] as List? ?? const []).cast<String>(),
+        matchedItems: (aJson['matched_items'] as num?)?.toInt() ?? 1,
+      );
+}
+
+class ManualPriceDto
+{
+  final String id;
+  final String? placeId;
+  final String? placeAddrId;
+  final String? storeName;
+  final String? branch;
+  final String currCode;
+  final double qty;
+  final double price;
+  final DateTime seenTs;
+  final String? note;
+
+  const ManualPriceDto({
+    required this.id,
+    this.placeId,
+    this.placeAddrId,
+    this.storeName,
+    this.branch,
+    required this.currCode,
+    required this.qty,
+    required this.price,
+    required this.seenTs,
+    this.note,
+  });
+
+  double get unitPrice => qty == 0 ? price : price / qty;
+
+  factory ManualPriceDto.fromJson(Map<String, dynamic> aJson) => ManualPriceDto(
+        id: aJson['id'] as String,
+        placeId: aJson['place_id'] as String?,
+        placeAddrId: aJson['place_addr_id'] as String?,
+        storeName: aJson['store_name'] as String?,
+        branch: aJson['branch'] as String?,
+        currCode: aJson['curr_code'] as String? ?? '',
+        qty: parseDecimal(aJson['qty']),
+        price: parseDecimal(aJson['price']),
+        seenTs: parseTs(aJson['seen_ts']),
+        note: aJson['note'] as String?,
       );
 }
 
@@ -365,6 +454,8 @@ class ReceiptDto
   final String? merchantName;
   final String? placeId;
   final String? placeName;
+  final String? placeAddrId;
+  final String? branch;
   final String currId;
   final String currCode;
   final String? cashAccountId;
@@ -383,6 +474,8 @@ class ReceiptDto
     this.merchantName,
     this.placeId,
     this.placeName,
+    this.placeAddrId,
+    this.branch,
     required this.currId,
     required this.currCode,
     this.cashAccountId,
@@ -402,6 +495,8 @@ class ReceiptDto
         merchantName: aJson['merchant_name'] as String?,
         placeId: aJson['place_id'] as String?,
         placeName: aJson['place_name'] as String?,
+        placeAddrId: aJson['place_addr_id'] as String?,
+        branch: aJson['branch'] as String?,
         currId: aJson['curr_id'] as String,
         currCode: aJson['curr_code'] as String? ?? '',
         cashAccountId: aJson['cash_account_id'] as String?,

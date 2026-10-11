@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, name, type AS \"kind: ItemKind\", unit AS \"unit: ItemUnit\", owner_id IS NOT NULL AS \"is_custom!\"\n        FROM items\n        WHERE (owner_id IS NULL OR owner_id = $1)\n          AND ($2::text IS NULL OR name ILIKE $2)\n        ORDER BY ($3::text IS NOT NULL AND name ILIKE $3) DESC, LOWER(name)\n        LIMIT $4\n        ",
+  "query": "\n        SELECT\n            i.id,\n            i.name,\n            i.type AS \"kind: ItemKind\",\n            i.unit AS \"unit: ItemUnit\",\n            i.barcode,\n            (i.owner_id IS NOT NULL OR i.family_id IS NOT NULL) AS \"is_custom!\",\n            i.family_id,\n            f.name AS \"family_name?\",\n            can_edit_scoped(i.owner_id, i.family_id, i.created_by, $2) AS \"is_editable!\"\n        FROM items i\n        LEFT JOIN families f ON f.id = i.family_id\n        WHERE i.id = $1\n          AND ((i.owner_id IS NULL AND i.family_id IS NULL) OR can_see_scoped(i.owner_id, i.family_id, $2))\n        ",
   "describe": {
     "columns": [
       {
@@ -50,16 +50,34 @@
       },
       {
         "ordinal": 4,
+        "name": "barcode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
         "name": "is_custom!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_editable!",
         "type_info": "Bool"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
-        "Text",
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -67,8 +85,12 @@
       false,
       false,
       false,
+      true,
+      null,
+      true,
+      false,
       null
     ]
   },
-  "hash": "8c6c7efb4c199413be9360299043e121674a7b55dd6407848166000556737f0f"
+  "hash": "5aeeeabe1d1d2565ef2ce0074b559590dda4a473ddf3490271103a1cfc125618"
 }

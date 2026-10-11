@@ -52,6 +52,16 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(item_handlers::delete_item),
         )
         .route("/dicts/items/:id/prices", get(item_handlers::item_prices))
+        .route("/dicts/items/:id/family", put(item_handlers::share_item))
+        .route("/dicts/items/:id/merge", post(item_handlers::merge_item))
+        .route(
+            "/dicts/items/:id/manual-prices",
+            get(item_handlers::list_manual_prices).post(item_handlers::create_manual_price),
+        )
+        .route(
+            "/dicts/items/:id/manual-prices/:price_id",
+            axum::routing::delete(item_handlers::delete_manual_price),
+        )
         .route(
             "/families",
             get(fam_handlers::list_families).post(fam_handlers::create_family),
@@ -80,6 +90,7 @@ pub fn build_router(a_state: AppState) -> Router
             "/families/:id/routine-sharing",
             put(routine_handlers::set_routine_sharing),
         )
+        .route("/families/:id/price-sharing", put(fam_handlers::set_price_sharing))
         .route("/invites/accept", post(fam_handlers::accept_invite))
         .route("/routine/marks", post(routine_handlers::create_mark))
         .route(
@@ -179,6 +190,7 @@ pub fn build_router(a_state: AppState) -> Router
                 .put(place_handlers::update_place)
                 .delete(place_handlers::delete_place),
         )
+        .route("/places/:id/family", put(place_handlers::share_place))
         .fallback(|| async { ApiError::NotFound });
 
     let router = Router::new()

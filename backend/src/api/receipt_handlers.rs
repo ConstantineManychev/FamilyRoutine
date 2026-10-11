@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::item_handlers::require_visible_items;
+use crate::api::place_handlers::require_visible_place;
 use crate::api::tx_handlers::load_txs;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::require_account_editor;
@@ -28,6 +29,8 @@ struct ReceiptHead
     merchant_name: Option<String>,
     place_id: Option<Uuid>,
     place_name: Option<String>,
+    place_addr_id: Option<Uuid>,
+    branch: Option<String>,
     curr_id: Uuid,
     curr_code: String,
     cash_account_id: Option<Uuid>,
@@ -159,9 +162,14 @@ async fn save_receipt(
     }
 
     let mut tx = a_state.db.begin().await?;
+    let attached_place_id = match a_id
+    {
+        Some(id) => lock_owned(&mut tx, id, a_user_id).await?,
+        None => None,
+    };
 
     let item_ids: Vec<Uuid> = items.iter().map(|item| item.item_id).collect();
-    require_visible_items(&mut tx, &item_ids, a_user_id).await?;
+    require_visible_items(&mut tx, &item_ids, a_user_id, a_id).await?;
 
     let is_currency_known = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM currencies WHERE id = $1) AS "exists!""#,
@@ -174,20 +182,14 @@ async fn save_receipt(
         return Err(ApiError::Validation("curr_id"));
     }
 
-    if let Some(place_id) = a_req.place_id
-    {
-        let is_own_place = sqlx::query_scalar!(
-            r#"SELECT EXISTS(SELECT 1 FROM places WHERE id = $1 AND owner_id = $2) AS "exists!""#,
-            place_id,
-            a_user_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
-        if !is_own_place
-        {
-            return Err(ApiError::Validation("place_id"));
-        }
-    }
+    require_visible_place(
+        &mut tx,
+        a_req.place_id,
+        a_req.place_addr_id,
+        a_user_id,
+        attached_place_id,
+    )
+    .await?;
 
     if let Some(merchant_id) = a_req.merchant_id
     {
@@ -218,12 +220,11 @@ async fn save_receipt(
     {
         Some(id) =>
         {
-            lock_owned(&mut tx, id, a_user_id).await?;
             sqlx::query!(
                 r#"
                 UPDATE receipts
                 SET receipt_ts = $2, merchant_id = $3, merchant_name = $4, place_id = $5, curr_id = $6,
-                    cash_account_id = $7, note = $8
+                    cash_account_id = $7, note = $8, place_addr_id = $9
                 WHERE id = $1
                 "#,
                 id,
@@ -233,7 +234,8 @@ async fn save_receipt(
                 a_req.place_id,
                 a_req.curr_id,
                 a_req.cash_account_id,
-                note
+                note,
+                a_req.place_addr_id
             )
             .execute(&mut *tx)
             .await?;
@@ -241,8 +243,10 @@ async fn save_receipt(
         }
         None => sqlx::query_scalar!(
             r#"
-            INSERT INTO receipts (owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO receipts (
+                owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note, place_addr_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
             "#,
             a_user_id,
@@ -252,7 +256,8 @@ async fn save_receipt(
             a_req.place_id,
             a_req.curr_id,
             a_req.cash_account_id,
-            note
+            note,
+            a_req.place_addr_id
         )
         .fetch_one(&mut *tx)
         .await?,
@@ -478,10 +483,10 @@ async fn sync_cash_payment(
     Ok(())
 }
 
-async fn lock_owned(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<(), ApiError>
+async fn lock_owned(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<Option<Uuid>, ApiError>
 {
-    sqlx::query_scalar!(
-        "SELECT id FROM receipts WHERE id = $1 AND owner_id = $2 FOR UPDATE",
+    let row = sqlx::query!(
+        "SELECT place_id FROM receipts WHERE id = $1 AND owner_id = $2 FOR UPDATE",
         a_id,
         a_user_id
     )
@@ -489,7 +494,7 @@ async fn lock_owned(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> R
     .await?
     .ok_or(ApiError::NotFound)?;
 
-    Ok(())
+    Ok(row.place_id)
 }
 
 async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<ReceiptDto, ApiError>
@@ -504,6 +509,8 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
             COALESCE(r.merchant_name, m.name) AS merchant_name,
             r.place_id,
             p.name AS "place_name?",
+            r.place_addr_id,
+            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,
             r.curr_id,
             c.code AS curr_code,
             r.cash_account_id,
@@ -512,6 +519,9 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
         JOIN currencies c ON c.id = r.curr_id
         LEFT JOIN merchants m ON m.id = r.merchant_id
         LEFT JOIN places p ON p.id = r.place_id
+        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id
+        LEFT JOIN streets st ON st.id = pa.street_id
+        LEFT JOIN cities ci ON ci.id = pa.city_id
         WHERE r.id = $1 AND r.owner_id = $2
         "#,
         a_id,
@@ -560,6 +570,8 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
         merchant_name: head.merchant_name,
         place_id: head.place_id,
         place_name: head.place_name,
+        place_addr_id: head.place_addr_id,
+        branch: head.branch,
         curr_id: head.curr_id,
         curr_code: head.curr_code,
         cash_account_id: head.cash_account_id,

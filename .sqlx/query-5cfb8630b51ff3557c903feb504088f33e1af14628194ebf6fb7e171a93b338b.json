@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            owner_id,\n            can_see_scoped(owner_id, family_id, $2) AS \"is_visible!\",\n            can_edit_scoped(owner_id, family_id, created_by, $2) AS \"is_editable!\"\n        FROM places\n        WHERE id = $1\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_visible!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "5cfb8630b51ff3557c903feb504088f33e1af14628194ebf6fb7e171a93b338b"
+}

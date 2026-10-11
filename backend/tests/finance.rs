@@ -734,15 +734,16 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         )
         .await;
     assert_eq!(prices.status, StatusCode::OK, "{}", prices.body);
-    let rows = prices.body.as_array().unwrap();
+    let rows = prices.body["prices"].as_array().unwrap();
     assert_eq!(rows.len(), 2, "{}", prices.body);
-    assert_eq!(rows[0]["merchant_name"], "АТБ");
+    assert_eq!(rows[0]["store_name"], "АТБ");
     assert_eq!(rows[0]["last_price"], "28.00");
-    assert_eq!(rows[1]["merchant_name"], "сільпо");
+    assert_eq!(rows[1]["store_name"], "сільпо");
     assert_eq!(rows[1]["last_price"], "32.00");
     assert_eq!(rows[1]["min_price"], "30.00");
     assert_eq!(rows[1]["avg_price"], "31.00");
-    assert_eq!(rows[1]["purchase_count"], 2);
+    assert_eq!(rows[1]["count"], 2);
+    assert_eq!(rows[1]["is_shared"], false);
 
     let search = app
         .call(

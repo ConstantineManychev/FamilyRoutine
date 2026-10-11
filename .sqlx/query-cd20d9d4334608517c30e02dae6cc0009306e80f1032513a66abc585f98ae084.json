@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM places WHERE id = $1 AND owner_id = $2",
+  "query": "UPDATE item_prices SET item_id = $2 WHERE item_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "ed68390de3d55f3b402830111209efd134879b9e6e3c7e75acbcfeff3a0ae3c6"
+  "hash": "cd20d9d4334608517c30e02dae6cc0009306e80f1032513a66abc585f98ae084"
 }

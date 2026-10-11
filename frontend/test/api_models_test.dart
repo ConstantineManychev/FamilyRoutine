@@ -191,24 +191,62 @@ void main()
       expect(dashboard.widgets.single.isAvailable, isFalse);
     });
 
-    test('dictionary item and price stats parse', ()
+    test('dictionary item, family scope and price comparison parse', ()
     {
-      final item = DictItemDto.fromJson({'id': 'i1', 'name': 'Плитка', 'kind': 'product', 'unit': 'square_meter', 'is_custom': true});
-      expect(item.unit, ItemUnit.squareMeter);
-      expect(DictItemDto.payload('Плитка', ItemKind.service, ItemUnit.hour), {'name': 'Плитка', 'kind': 'service', 'unit': 'hour'});
-
-      final price = ItemPriceDto.fromJson({
-        'merchant_name': null,
-        'curr_code': 'UAH',
-        'last_price': '32.00',
-        'min_price': '30.00',
-        'avg_price': '31.00',
-        'purchase_count': 2,
-        'last_ts': '2026-10-09T10:00:00Z',
+      final item = DictItemDto.fromJson({
+        'id': 'i1',
+        'name': 'Плитка',
+        'kind': 'product',
+        'unit': 'square_meter',
+        'barcode': '4820024700016',
+        'is_custom': true,
+        'family_id': 'f1',
+        'family_name': 'Home',
+        'is_editable': false,
       });
-      expect(price.merchantName, isNull);
+      expect(item.unit, ItemUnit.squareMeter);
+      expect(item.isPersonal, isFalse);
+      expect(item.familyName, 'Home');
+      expect(DictItemDto.payload('Плитка', ItemKind.service, ItemUnit.hour), {'name': 'Плитка', 'kind': 'service', 'unit': 'hour'});
+      expect(
+        DictItemDto.payload('Кава', ItemKind.product, ItemUnit.piece, aBarcode: ' 4820024700016 ', aFamilyId: 'f1'),
+        {'name': 'Кава', 'kind': 'product', 'unit': 'piece', 'barcode': '4820024700016', 'family_id': 'f1'},
+      );
+
+      final data = ItemPricesData.fromJson({
+        'prices': [
+          {
+            'store_name': 'АТБ',
+            'branch': 'Київ, Хрещатик 5',
+            'curr_code': 'UAH',
+            'last_price': '32.00',
+            'min_price': '30.00',
+            'avg_price': '31.00',
+            'count': 2,
+            'last_ts': '2026-10-09T10:00:00Z',
+            'is_shared': true,
+          },
+        ],
+        'missing_rates': ['EUR'],
+        'matched_items': 2,
+      });
+      final price = data.prices.single;
+      expect(price.branch, 'Київ, Хрещатик 5');
       expect(price.minPrice, 30);
-      expect(price.purchaseCount, 2);
+      expect(price.count, 2);
+      expect(price.isShared, isTrue);
+      expect(data.missingRates, ['EUR']);
+      expect(data.matchedItems, 2);
+
+      final manual = ManualPriceDto.fromJson({
+        'id': 'p1',
+        'store_name': 'Tesco',
+        'curr_code': 'EUR',
+        'qty': '2.000',
+        'price': '10.00',
+        'seen_ts': '2026-10-09T10:00:00Z',
+      });
+      expect(manual.unitPrice, 5);
     });
 
     test('family detail carries my role', ()

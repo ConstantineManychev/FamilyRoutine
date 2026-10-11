@@ -1,14 +1,8 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO items (owner_id, name, type, unit) VALUES ($1, $2, $3, $4) RETURNING id",
+  "query": "UPDATE items SET name = $2, type = $3, unit = $4, barcode = $5 WHERE id = $1",
   "describe": {
-    "columns": [
-      {
-        "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
-      }
-    ],
+    "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
@@ -39,12 +33,11 @@
               ]
             }
           }
-        }
+        },
+        "Varchar"
       ]
     },
-    "nullable": [
-      false
-    ]
+    "nullable": []
   },
-  "hash": "3c59a327e39123dbebf5c7009d4e6dfc9b087a354a4da13bbff7c09ac1bf08d5"
+  "hash": "98e0f4dcf9a92d528c67b3987913a7554004ced6bbdd2bde228ce1e564901328"
 }

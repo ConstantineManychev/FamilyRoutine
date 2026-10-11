@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) AS \"count!\"\n        FROM items i\n        WHERE i.id = ANY($1)\n          AND ((i.owner_id IS NULL AND i.family_id IS NULL)\n               OR can_see_scoped(i.owner_id, i.family_id, $2)\n               OR EXISTS (SELECT 1 FROM receipt_items ri WHERE ri.receipt_id = $3 AND ri.item_id = i.id))\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "58ddbf6c3d3cd68b6a76478241c8c658200f7d5dd72830fa35d9e19ad3491813"
+}

@@ -5,8 +5,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use shared_schema::{
-    CreateMarkRequest, RoutineSharingRequest, RoutineStatus, StatusMarkDto, TimelineDto, TimelineMemberDto,
-    TimelineQuery, UpdateMarkRequest,
+    CreateMarkRequest, RoutineStatus, SharingRequest, StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery,
+    UpdateMarkRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -274,7 +274,7 @@ pub async fn set_routine_sharing(
     State(a_state): State<AppState>,
     a_user: AuthUser,
     ApiPath(a_family_id): ApiPath<Uuid>,
-    ApiJson(a_req): ApiJson<RoutineSharingRequest>,
+    ApiJson(a_req): ApiJson<SharingRequest>,
 ) -> Result<StatusCode, ApiError>
 {
     let updated = sqlx::query!(

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            EXISTS (\n                SELECT 1 FROM places p\n                WHERE p.id = $1 AND (p.id = $4 OR can_see_scoped(p.owner_id, p.family_id, $3))\n            ) AS \"is_visible!\",\n            ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM place_addrs a WHERE a.id = $2 AND a.place_id = $1)) AS \"is_addr_ok!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_visible!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_addr_ok!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "43529b328169d1091c89325bf00d70003dbe3c511c71a043965868cfef1674b0"
+}

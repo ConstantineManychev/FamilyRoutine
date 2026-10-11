@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH heirs AS (\n            SELECT\n                i.id,\n                CASE\n                    WHEN EXISTS (SELECT 1 FROM family_mems fm WHERE fm.family_id = $1 AND fm.user_id = i.created_by)\n                        THEN i.created_by\n                    ELSE $2\n                END AS heir_id\n            FROM items i\n            WHERE i.family_id = $1\n        )\n        UPDATE items i\n        SET owner_id = h.heir_id,\n            family_id = NULL,\n            name = CASE\n                WHEN EXISTS (SELECT 1 FROM items p WHERE p.owner_id = h.heir_id AND LOWER(p.name) = LOWER(i.name))\n                    THEN LEFT(i.name, 170) || ' (' || LEFT(f.name, 25) || ')'\n                ELSE i.name\n            END,\n            barcode = CASE\n                WHEN EXISTS (SELECT 1 FROM items p WHERE p.owner_id = h.heir_id AND p.barcode = i.barcode)\n                    THEN NULL\n                ELSE i.barcode\n            END\n        FROM heirs h, families f\n        WHERE i.id = h.id AND f.id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e1c477363a278e3dbf4d0349524cf911da0fe32fbb85fe57ba4ffe7ab8cb818c"
+}

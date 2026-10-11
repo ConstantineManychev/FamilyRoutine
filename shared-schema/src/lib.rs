@@ -144,6 +144,7 @@ pub struct FamDetailDto
     pub my_role: MemberRole,
     pub is_owner: bool,
     pub is_routine_shared: bool,
+    pub is_prices_shared: bool,
     pub members: Vec<FamMemberDto>,
 }
 
@@ -313,6 +314,8 @@ pub struct PlaceAddrDto
     pub zip: String,
     #[serde(default)]
     pub merchant_id: Option<String>,
+    #[serde(default, skip_deserializing)]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -320,6 +323,9 @@ pub struct PlaceDto
 {
     pub id: Uuid,
     pub name: String,
+    pub family_id: Option<Uuid>,
+    pub family_name: Option<String>,
+    pub is_editable: bool,
     pub addrs: Vec<PlaceAddrDto>,
 }
 
@@ -327,6 +333,8 @@ pub struct PlaceDto
 pub struct SavePlaceRequest
 {
     pub name: String,
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
     #[serde(default)]
     pub addrs: Vec<PlaceAddrDto>,
 }

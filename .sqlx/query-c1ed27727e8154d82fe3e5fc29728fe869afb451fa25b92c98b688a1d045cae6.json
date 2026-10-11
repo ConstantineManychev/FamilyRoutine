@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            p.id,\n            p.name,\n            p.family_id,\n            f.name AS \"family_name?\",\n            can_edit_scoped(p.owner_id, p.family_id, p.created_by, $2) AS \"is_editable!\"\n        FROM places p\n        LEFT JOIN families f ON f.id = p.family_id\n        WHERE p.id = $1 AND can_see_scoped(p.owner_id, p.family_id, $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "c1ed27727e8154d82fe3e5fc29728fe869afb451fa25b92c98b688a1d045cae6"
+}

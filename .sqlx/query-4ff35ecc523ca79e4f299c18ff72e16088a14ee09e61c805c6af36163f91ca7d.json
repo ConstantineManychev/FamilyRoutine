@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            r.merchant_id,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            r.place_id,\n            p.name AS \"place_name?\",\n            r.place_addr_id,\n            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,\n            r.curr_id,\n            c.code AS curr_code,\n            r.cash_account_id,\n            r.note\n        FROM receipts r\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        WHERE r.id = $1 AND r.owner_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "receipt_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "merchant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "merchant_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "place_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "place_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "place_addr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "branch",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "curr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "cash_account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "note",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      true,
+      false,
+      true,
+      null,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4ff35ecc523ca79e4f299c18ff72e16088a14ee09e61c805c6af36163f91ca7d"
+}

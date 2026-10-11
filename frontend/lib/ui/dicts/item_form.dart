@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import 'scope_widgets.dart';
 
 const int maxItemNameLen = 200;
 
@@ -29,27 +30,37 @@ String itemUnitShort(ItemUnit aUnit) => 'items.unit_short_${aUnit.wire}'.tr();
 class ItemFormFields extends StatelessWidget
 {
   final TextEditingController nameCtrl;
+  final TextEditingController barcodeCtrl;
   final ItemKind kind;
   final ItemUnit unit;
   final bool isEnabled;
   final bool isNameFocused;
   final ValueChanged<ItemKind> onKindChanged;
   final ValueChanged<ItemUnit> onUnitChanged;
+  final List<FamDto>? scopeFams;
+  final String? scopeFamilyId;
+  final ValueChanged<String?>? onScopeChanged;
 
   const ItemFormFields({
     super.key,
     required this.nameCtrl,
+    required this.barcodeCtrl,
     required this.kind,
     required this.unit,
     required this.onKindChanged,
     required this.onUnitChanged,
     this.isEnabled = true,
     this.isNameFocused = false,
+    this.scopeFams,
+    this.scopeFamilyId,
+    this.onScopeChanged,
   });
 
   @override
   Widget build(BuildContext aContext)
   {
+    final fams = scopeFams ?? const <FamDto>[];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -60,6 +71,29 @@ class ItemFormFields extends StatelessWidget
           autofocus: isNameFocused,
           inputFormatters: [LengthLimitingTextInputFormatter(maxItemNameLen)],
           decoration: InputDecoration(labelText: 'items.name'.tr(), border: const OutlineInputBorder()),
+        ),
+        const SizedBox(height: 16),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: barcodeCtrl,
+          builder: (_, aValue, __)
+          {
+            final text = aValue.text.trim();
+            final isInvalid = text.isNotEmpty && !isValidGtin(text);
+            return TextField(
+              controller: barcodeCtrl,
+              enabled: isEnabled,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(14)],
+              decoration: InputDecoration(
+                labelText: 'items.barcode'.tr(),
+                helperText: 'items.barcode_hint'.tr(),
+                helperMaxLines: 2,
+                errorText: isInvalid ? 'items.barcode_invalid'.tr() : null,
+                prefixIcon: const Icon(AppIcons.scanBarcode, size: 18),
+                border: const OutlineInputBorder(),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 16),
         SegmentedButton<ItemKind>(
@@ -83,16 +117,23 @@ class ItemFormFields extends StatelessWidget
               .toList(),
           onChanged: isEnabled ? (aValue) => onUnitChanged(aValue ?? unit) : null,
         ),
+        if (onScopeChanged != null && fams.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          ScopeDropdown(fams: fams, familyId: scopeFamilyId, onChanged: onScopeChanged!),
+        ],
       ],
     );
   }
 }
 
+bool isBarcodeAcceptable(String aValue) => aValue.trim().isEmpty || isValidGtin(aValue);
+
 class ItemCreateDialog extends ConsumerStatefulWidget
 {
   final String initialName;
+  final String? initialBarcode;
 
-  const ItemCreateDialog({super.key, required this.initialName});
+  const ItemCreateDialog({super.key, required this.initialName, this.initialBarcode});
 
   @override
   ConsumerState<ItemCreateDialog> createState() => _ItemCreateDialogState();
@@ -101,14 +142,17 @@ class ItemCreateDialog extends ConsumerStatefulWidget
 class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
 {
   late final TextEditingController _nameCtrl = TextEditingController(text: widget.initialName.trim());
+  late final TextEditingController _barcodeCtrl = TextEditingController(text: widget.initialBarcode ?? '');
   ItemKind _kind = ItemKind.product;
   ItemUnit _unit = ItemUnit.piece;
+  String? _familyId;
   bool _isSaving = false;
 
   @override
   void dispose()
   {
     _nameCtrl.dispose();
+    _barcodeCtrl.dispose();
     super.dispose();
   }
 
@@ -120,12 +164,20 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
       showInfoSnack(context, 'items.err_name'.tr());
       return;
     }
+    if (!isBarcodeAcceptable(_barcodeCtrl.text))
+    {
+      showInfoSnack(context, 'items.barcode_invalid'.tr());
+      return;
+    }
 
     setState(() => _isSaving = true);
 
     try
     {
-      final item = await ref.read(apiProv).saveItem(null, DictItemDto.payload(name, _kind, _unit));
+      final item = await ref.read(apiProv).saveItem(
+            null,
+            DictItemDto.payload(name, _kind, _unit, aBarcode: _barcodeCtrl.text, aFamilyId: _familyId),
+          );
       if (mounted)
       {
         Navigator.of(context).pop(item);
@@ -148,13 +200,19 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
       title: Text('items.new'.tr()),
       content: SizedBox(
         width: 420,
-        child: ItemFormFields(
-          nameCtrl: _nameCtrl,
-          kind: _kind,
-          unit: _unit,
-          isNameFocused: true,
-          onKindChanged: (aKind) => setState(() => _kind = aKind),
-          onUnitChanged: (aUnit) => setState(() => _unit = aUnit),
+        child: SingleChildScrollView(
+          child: ItemFormFields(
+            nameCtrl: _nameCtrl,
+            barcodeCtrl: _barcodeCtrl,
+            kind: _kind,
+            unit: _unit,
+            isNameFocused: true,
+            scopeFams: ref.watch(famsProv).valueOrNull,
+            scopeFamilyId: _familyId,
+            onScopeChanged: (aValue) => setState(() => _familyId = aValue),
+            onKindChanged: (aKind) => setState(() => _kind = aKind),
+            onUnitChanged: (aUnit) => setState(() => _unit = aUnit),
+          ),
         ),
       ),
       actions: [
@@ -167,5 +225,12 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
 
 Future<DictItemDto?> showItemCreateDialog(BuildContext aContext, String aInitialName)
 {
-  return showDialog<DictItemDto>(context: aContext, builder: (_) => ItemCreateDialog(initialName: aInitialName));
+  final isBarcode = isValidGtin(aInitialName);
+  return showDialog<DictItemDto>(
+    context: aContext,
+    builder: (_) => ItemCreateDialog(
+      initialName: isBarcode ? '' : aInitialName,
+      initialBarcode: isBarcode ? normalizeBarcode(aInitialName) : null,
+    ),
+  );
 }

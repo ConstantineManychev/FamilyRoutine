@@ -253,9 +253,18 @@ class ApiSvc
     return PlaceDto.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<PlaceDto> createPlace(String aName, List<PlaceAddrDto> aAddrs) async
+  Future<PlaceDto> createPlace(String aName, List<PlaceAddrDto> aAddrs, {String? aFamilyId}) async
   {
-    final res = await _dio.post('/api/places', data: _placePayload(aName, aAddrs));
+    final res = await _dio.post('/api/places', data: {
+      ..._placePayload(aName, aAddrs),
+      if (aFamilyId != null) 'family_id': aFamilyId,
+    });
+    return PlaceDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<PlaceDto> sharePlace(String aId, String aFamilyId) async
+  {
+    final res = await _dio.put('/api/places/$aId/family', data: {'family_id': aFamilyId});
     return PlaceDto.fromJson(res.data as Map<String, dynamic>);
   }
 
@@ -409,11 +418,12 @@ class ApiSvc
 
   Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
 
-  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit}) async
+  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode}) async
   {
     final res = await _dio.get('/api/dicts/items', queryParameters: {
       if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
       if (aLimit != null) 'limit': aLimit,
+      if (aBarcode != null) 'barcode': aBarcode,
     });
     return _list(res.data, DictItemDto.fromJson);
   }
@@ -434,11 +444,43 @@ class ApiSvc
 
   Future<void> deleteItem(String aId) => _dio.delete('/api/dicts/items/$aId');
 
-  Future<List<ItemPriceDto>> getItemPrices(String aId) async
+  Future<ItemPricesData> getItemPrices(String aId, {String? aConvertTo}) async
   {
-    final res = await _dio.get('/api/dicts/items/$aId/prices');
-    return _list(res.data, ItemPriceDto.fromJson);
+    final res = await _dio.get('/api/dicts/items/$aId/prices', queryParameters: {
+      if (aConvertTo != null) 'convert_to': aConvertTo,
+    });
+    return ItemPricesData.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<DictItemDto> shareItem(String aId, String aFamilyId) async
+  {
+    final res = await _dio.put('/api/dicts/items/$aId/family', data: {'family_id': aFamilyId});
+    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<DictItemDto> mergeItem(String aId, String aTargetId) async
+  {
+    final res = await _dio.post('/api/dicts/items/$aId/merge', data: {'target_id': aTargetId});
+    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<ManualPriceDto>> getManualPrices(String aItemId) async
+  {
+    final res = await _dio.get('/api/dicts/items/$aItemId/manual-prices');
+    return _list(res.data, ManualPriceDto.fromJson);
+  }
+
+  Future<ManualPriceDto> addManualPrice(String aItemId, Map<String, dynamic> aPayload) async
+  {
+    final res = await _dio.post('/api/dicts/items/$aItemId/manual-prices', data: aPayload);
+    return ManualPriceDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteManualPrice(String aItemId, String aPriceId) =>
+      _dio.delete('/api/dicts/items/$aItemId/manual-prices/$aPriceId');
+
+  Future<void> setPriceSharing(String aFamId, bool aIsShared) =>
+      _dio.put('/api/families/$aFamId/price-sharing', data: {'is_shared': aIsShared});
 
   Future<List<MerchantDto>> getMerchants(String aQuery) async
   {

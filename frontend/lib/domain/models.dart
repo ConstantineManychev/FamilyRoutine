@@ -129,6 +129,7 @@ class FamDetailDto
   final MemberRole myRole;
   final bool isOwner;
   final bool isRoutineShared;
+  final bool isPricesShared;
   final List<FamMemberDto> members;
 
   const FamDetailDto({
@@ -137,6 +138,7 @@ class FamDetailDto
     required this.myRole,
     required this.isOwner,
     this.isRoutineShared = true,
+    this.isPricesShared = false,
     required this.members,
   });
 
@@ -150,6 +152,7 @@ class FamDetailDto
         myRole: MemberRole.fromJson(aJson['my_role']),
         isOwner: aJson['is_owner'] as bool? ?? false,
         isRoutineShared: aJson['is_routine_shared'] as bool? ?? true,
+        isPricesShared: aJson['is_prices_shared'] as bool? ?? false,
         members: (aJson['members'] as List? ?? const [])
             .map((aItem) => FamMemberDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),
@@ -326,6 +329,7 @@ class PlaceAddrDto
   final String? apt;
   final String zip;
   final String? merchantId;
+  final String? label;
 
   const PlaceAddrDto({
     this.id,
@@ -337,6 +341,7 @@ class PlaceAddrDto
     this.apt,
     required this.zip,
     this.merchantId,
+    this.label,
   });
 
   factory PlaceAddrDto.fromJson(Map<String, dynamic> aJson) => PlaceAddrDto(
@@ -349,6 +354,7 @@ class PlaceAddrDto
         apt: aJson['apt'] as String?,
         zip: aJson['zip'] as String? ?? '',
         merchantId: aJson['merchant_id'] as String?,
+        label: aJson['label'] as String?,
       );
 
   PlaceAddrDto copyWith({bool? aIsMain}) => PlaceAddrDto(
@@ -361,6 +367,7 @@ class PlaceAddrDto
         apt: apt,
         zip: zip,
         merchantId: merchantId,
+        label: label,
       );
 
   Map<String, dynamic> toJson() => {
@@ -380,9 +387,19 @@ class PlaceDto
 {
   final String id;
   final String name;
+  final String? familyId;
+  final String? familyName;
+  final bool isEditable;
   final List<PlaceAddrDto> addrs;
 
-  const PlaceDto({required this.id, required this.name, required this.addrs});
+  const PlaceDto({
+    required this.id,
+    required this.name,
+    this.familyId,
+    this.familyName,
+    this.isEditable = true,
+    required this.addrs,
+  });
 
   PlaceAddrDto? get mainAddr
   {
@@ -399,6 +416,9 @@ class PlaceDto
   factory PlaceDto.fromJson(Map<String, dynamic> aJson) => PlaceDto(
         id: aJson['id'] as String,
         name: aJson['name'] as String,
+        familyId: aJson['family_id'] as String?,
+        familyName: aJson['family_name'] as String?,
+        isEditable: aJson['is_editable'] as bool? ?? true,
         addrs: (aJson['addrs'] as List? ?? const [])
             .map((aItem) => PlaceAddrDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),

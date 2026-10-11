@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM item_prices WHERE id = $1 AND item_id = $2 AND owner_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3f4e9ab3a5614a78b92db46f63397a3ae72e55bcd92dff79aa61e8bd4c2c67b9"
+}

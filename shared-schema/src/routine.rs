@@ -76,7 +76,7 @@ pub struct TimelineDto
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct RoutineSharingRequest
+pub struct SharingRequest
 {
     pub is_shared: bool,
 }

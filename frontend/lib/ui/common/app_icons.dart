@@ -53,6 +53,7 @@ abstract final class AppIcons
   static const IconData lock = IconData(0xe10b, fontFamily: _family);
   static const IconData logOut = IconData(0xe10e, fontFamily: _family);
   static const IconData mapPin = IconData(0xe111, fontFamily: _family);
+  static const IconData merge = IconData(0xe43f, fontFamily: _family);
   static const IconData moon = IconData(0xe11e, fontFamily: _family);
   static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
   static const IconData navigation = IconData(0xe123, fontFamily: _family);
@@ -66,6 +67,7 @@ abstract final class AppIcons
   static const IconData receipt = IconData(0xe3d3, fontFamily: _family);
   static const IconData refreshCw = IconData(0xe145, fontFamily: _family);
   static const IconData save = IconData(0xe14d, fontFamily: _family);
+  static const IconData scanBarcode = IconData(0xe535, fontFamily: _family);
   static const IconData search = IconData(0xe151, fontFamily: _family);
   static const IconData settings = IconData(0xe154, fontFamily: _family);
   static const IconData shieldCheck = IconData(0xe1ff, fontFamily: _family);
@@ -74,6 +76,7 @@ abstract final class AppIcons
   static const IconData shoppingCart = IconData(0xe15c, fontFamily: _family);
   static const IconData store = IconData(0xe3e4, fontFamily: _family);
   static const IconData table = IconData(0xe17d, fontFamily: _family);
+  static const IconData tag = IconData(0xe17f, fontFamily: _family);
   static const IconData ticket = IconData(0xe20f, fontFamily: _family);
   static const IconData trash = IconData(0xe18d, fontFamily: _family);
   static const IconData trash2 = IconData(0xe18e, fontFamily: _family);

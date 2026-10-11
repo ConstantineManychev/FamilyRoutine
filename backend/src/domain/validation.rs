@@ -11,6 +11,7 @@ pub const MIN_SYNC_TOKEN_LEN: usize = 16;
 pub const MAX_SYNC_TOKEN_LEN: usize = 256;
 pub const MAX_NOTE_LEN: usize = 500;
 pub const MAX_QUERY_LEN: usize = 100;
+const GTIN_LENGTHS: [usize; 4] = [8, 12, 13, 14];
 
 const MONEY_SCALE: u32 = 2;
 const QTY_SCALE: u32 = 3;
@@ -211,6 +212,57 @@ pub fn clean_sync_token(a_value: &str) -> Result<String, ApiError>
     Ok(token.to_string())
 }
 
+pub fn clean_barcode(a_value: Option<&str>) -> Result<Option<String>, ApiError>
+{
+    let Some(raw) = a_value
+    else
+    {
+        return Ok(None);
+    };
+
+    let value: String = raw.chars().filter(|ch| !ch.is_whitespace() && *ch != '-').collect();
+    if value.is_empty()
+    {
+        return Ok(None);
+    }
+
+    let is_digits = value.chars().all(|ch| ch.is_ascii_digit());
+    if !is_digits || !GTIN_LENGTHS.contains(&value.len()) || !has_valid_check_digit(&value)
+    {
+        return Err(ApiError::Validation("barcode"));
+    }
+
+    Ok(Some(value))
+}
+
+fn has_valid_check_digit(a_digits: &str) -> bool
+{
+    let digits: Vec<u32> = a_digits.chars().filter_map(|ch| ch.to_digit(10)).collect();
+    let Some((check, body)) = digits.split_last()
+    else
+    {
+        return false;
+    };
+
+    let sum: u32 = body
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(index, digit)| {
+            if index % 2 == 0
+            {
+                digit * 3
+            }
+            else
+            {
+                *digit
+            }
+        })
+        .sum();
+
+    (10 - sum % 10) % 10 == *check
+}
+
 #[cfg(test)]
 mod tests
 {
@@ -284,6 +336,23 @@ mod tests
         assert!(clean_name("", "name").is_err());
         assert!(clean_name("bad\u{0}name", "name").is_err());
         assert!(clean_name(&"x".repeat(MAX_NAME_LEN + 1), "name").is_err());
+    }
+
+    #[test]
+    fn barcodes_require_a_valid_gtin_check_digit()
+    {
+        assert_eq!(
+            clean_barcode(Some(" 4006381-333931 ")).unwrap().as_deref(),
+            Some("4006381333931")
+        );
+        assert!(clean_barcode(Some("96385074")).unwrap().is_some());
+        assert!(clean_barcode(Some("036000291452")).unwrap().is_some());
+        assert!(clean_barcode(Some("10012345678902")).unwrap().is_some());
+        assert_eq!(clean_barcode(Some("  ")).unwrap(), None);
+        assert_eq!(clean_barcode(None).unwrap(), None);
+        assert!(clean_barcode(Some("4006381333932")).is_err());
+        assert!(clean_barcode(Some("40063813339")).is_err());
+        assert!(clean_barcode(Some("40063813339a1")).is_err());
     }
 
     #[test]

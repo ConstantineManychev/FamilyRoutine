@@ -4,13 +4,15 @@ use axum::Json;
 use chrono::{Duration, Utc};
 use shared_schema::{
     AcceptInviteRequest, AcceptInviteResponse, CreateFamilyRequest, CreateInviteRequest, CreatedInviteDto,
-    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest,
+    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest, SharingRequest,
     TransferOwnershipRequest, UpdateMemberRoleRequest,
 };
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, AuthUser, ClientIp};
+use crate::api::item_handlers::detach_family_items;
+use crate::api::place_handlers::detach_family_places;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text, MAX_NAME_LEN};
 use crate::security::authz::{lock_family, member_access, require_admin, require_member, require_owner, FamAccess};
@@ -82,6 +84,7 @@ pub async fn create_family(
         role: MemberRole::Admin,
         is_owner: true,
         is_routine_shared: true,
+        is_prices_shared: false,
     };
 
     let detail = load_family_detail(&a_state.db, fam_id, owner_access).await?;
@@ -125,9 +128,7 @@ pub async fn delete_family(
     lock_family(&mut tx, a_fam_id).await?;
     require_owner(&mut *tx, a_fam_id, a_user.user_id).await?;
 
-    sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
-        .execute(&mut *tx)
-        .await?;
+    remove_family(&mut tx, a_fam_id, a_user.user_id).await?;
 
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -157,9 +158,7 @@ pub async fn leave_family(
             return Err(ApiError::Conflict("OWNER_MUST_TRANSFER"));
         }
 
-        sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
-            .execute(&mut *tx)
-            .await?;
+        remove_family(&mut tx, a_fam_id, a_user.user_id).await?;
     }
     else
     {
@@ -512,6 +511,43 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_access: FamAccess) 
         my_role: a_access.role,
         is_owner: a_access.is_owner,
         is_routine_shared: a_access.is_routine_shared,
+        is_prices_shared: a_access.is_prices_shared,
         members,
     })
+}
+
+pub async fn set_price_sharing(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_fam_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<SharingRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let updated = sqlx::query!(
+        "UPDATE family_mems SET is_prices_shared = $3 WHERE family_id = $1 AND user_id = $2",
+        a_fam_id,
+        a_user.user_id,
+        a_req.is_shared
+    )
+    .execute(&a_state.db)
+    .await?;
+
+    if updated.rows_affected() == 0
+    {
+        return Err(ApiError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn remove_family(a_conn: &mut PgConnection, a_fam_id: Uuid, a_owner_id: Uuid) -> Result<(), ApiError>
+{
+    detach_family_items(a_conn, a_fam_id, a_owner_id).await?;
+    detach_family_places(a_conn, a_fam_id, a_owner_id).await?;
+
+    sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)
+        .execute(&mut *a_conn)
+        .await?;
+
+    Ok(())
 }

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE places p\n        SET owner_id = CASE\n                WHEN EXISTS (SELECT 1 FROM family_mems fm WHERE fm.family_id = $1 AND fm.user_id = p.created_by)\n                    THEN p.created_by\n                ELSE $2\n            END,\n            family_id = NULL\n        WHERE p.family_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4e369b22dab6a106cd44bdb596f3b2a65e279ef757adbdb84eccff59aa297449"
+}

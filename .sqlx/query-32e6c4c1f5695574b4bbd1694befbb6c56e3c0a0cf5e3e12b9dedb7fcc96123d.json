@@ -1,12 +1,12 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS(SELECT 1 FROM places WHERE id = $1 AND owner_id = $2) AS \"exists!\"",
+  "query": "SELECT COUNT(*) AS \"count!\" FROM item_prices WHERE item_id = $1 AND owner_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "exists!",
-        "type_info": "Bool"
+        "name": "count!",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "734cead6ebd5db78b09f812b217e6e6385fdbe1e317a093bbcf76cd40e529fa4"
+  "hash": "32e6c4c1f5695574b4bbd1694befbb6c56e3c0a0cf5e3e12b9dedb7fcc96123d"
 }

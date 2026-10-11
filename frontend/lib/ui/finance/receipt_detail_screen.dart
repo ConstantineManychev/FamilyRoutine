@@ -24,6 +24,8 @@ class ReceiptDetailScreen extends ConsumerStatefulWidget
   ConsumerState<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
 }
 
+const String _fallbackCurrencyCode = 'UAH';
+
 class _ItemChoice
 {
   final DictItemDto? item;
@@ -125,6 +127,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   ReceiptDto? _saved;
   String? _merchantId;
   String? _placeId;
+  String? _placeAddrId;
   String? _currId;
   String? _cashAccountId;
   bool _isCashChosen = false;
@@ -164,6 +167,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       final api = ref.read(apiProv);
       final currs = await api.getCurrencies();
       final places = await api.getPlaces();
+      final wallets = _isEdit ? const <AccountDto>[] : await api.getWallets();
       final receipt = _isEdit ? await api.getReceipt(widget.receiptId!) : null;
 
       if (!mounted)
@@ -186,7 +190,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           _ts = tx?.txTs ?? DateTime.now();
           _merchantCtrl.text = tx?.merchantName ?? tx?.counterparty ?? '';
           _merchantId = tx?.merchantId;
-          _currId = currs.where((aCurr) => aCurr.code == tx?.currCode).firstOrNull?.id ?? _defaultCurrency(currs);
+          _currId = currs.where((aCurr) => aCurr.code == tx?.currCode).firstOrNull?.id ?? _defaultCurrency(currs, wallets);
           _rows.add(_ItemRow());
         }
       });
@@ -207,11 +211,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     }
   }
 
-  String? _defaultCurrency(List<CurrencyDto> aCurrs)
+  String? _defaultCurrency(List<CurrencyDto> aCurrs, List<AccountDto> aWallets)
   {
-    final wallets = ref.read(walletsProv).valueOrNull ?? const <AccountDto>[];
-    final preferred = wallets.where((aWallet) => aWallet.isCash).firstOrNull?.currId ?? wallets.firstOrNull?.currId;
-    return preferred ?? aCurrs.firstOrNull?.id;
+    final preferred = aWallets.where((aWallet) => aWallet.isCash).firstOrNull?.currId ?? aWallets.firstOrNull?.currId;
+    final local = aCurrs.where((aCurr) => aCurr.code == _fallbackCurrencyCode).firstOrNull?.id;
+    return preferred ?? local ?? aCurrs.firstOrNull?.id;
   }
 
   void _apply(ReceiptDto aReceipt)
@@ -221,6 +225,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     _merchantCtrl.text = aReceipt.merchantName ?? '';
     _merchantId = aReceipt.merchantId;
     _placeId = aReceipt.placeId;
+    _placeAddrId = aReceipt.placeAddrId;
     _currId = aReceipt.currId;
     _cashAccountId = aReceipt.cashAccountId;
     _isCashChosen = true;
@@ -313,6 +318,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'merchant_name': merchantName.isEmpty ? null : merchantName,
         'merchant_id': _merchantId,
         'place_id': _placeId,
+        'place_addr_id': _placeId == null ? null : _placeAddrId,
         'curr_id': _currId,
         'cash_account_id': cashAccountId,
         'note': note.isEmpty ? null : note,
@@ -441,11 +447,39 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
                 decoration: InputDecoration(labelText: 'finance.place'.tr(), border: const OutlineInputBorder()),
                 items: [
                   DropdownMenuItem<String?>(value: null, child: Text('finance.no_place'.tr())),
-                  ..._places.map((aPlace) => DropdownMenuItem<String?>(value: aPlace.id, child: Text(aPlace.name))),
+                  ..._placeOptions().map((aPlace) => DropdownMenuItem<String?>(
+                        value: aPlace.id,
+                        child: Text(
+                          aPlace.familyName == null ? aPlace.name : '${aPlace.name} · ${aPlace.familyName}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )),
                 ],
-                onChanged: (aValue) => setState(() => _placeId = aValue),
+                onChanged: (aValue) => setState(()
+                {
+                  _placeId = aValue;
+                  _placeAddrId = _branchesOf(aValue).length == 1 ? _branchesOf(aValue).first.id : null;
+                }),
               ),
             ),
+            if (_branchesOf(_placeId).isNotEmpty)
+              SizedBox(
+                width: 280,
+                child: DropdownButtonFormField<String?>(
+                  key: ValueKey('branch:$_placeId'),
+                  initialValue: _placeAddrId,
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: 'catalog.branch'.tr(), border: const OutlineInputBorder()),
+                  items: [
+                    DropdownMenuItem<String?>(value: null, child: Text('catalog.branch_any'.tr())),
+                    ..._branchesOf(_placeId).map((aAddr) => DropdownMenuItem<String?>(
+                          value: aAddr.id,
+                          child: Text(aAddr.label ?? aAddr.houseNum, overflow: TextOverflow.ellipsis),
+                        )),
+                  ],
+                  onChanged: (aValue) => setState(() => _placeAddrId = aValue),
+                ),
+              ),
             SizedBox(width: 240, child: DateTimeField(value: _ts, onChanged: (aValue) => setState(() => _ts = aValue))),
             SizedBox(
               width: 140,
@@ -595,6 +629,47 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     );
   }
 
+  List<PlaceDto> _placeOptions()
+  {
+    final saved = _saved;
+    final isMissing = saved?.placeId != null && !_places.any((aPlace) => aPlace.id == saved!.placeId);
+    if (!isMissing)
+    {
+      return _places;
+    }
+
+    final branch = saved!.placeAddrId == null
+        ? const <PlaceAddrDto>[]
+        : [
+            PlaceAddrDto(
+              id: saved.placeAddrId,
+              isMain: true,
+              countryId: '',
+              cityId: '',
+              streetId: '',
+              houseNum: '',
+              zip: '',
+              label: saved.branch,
+            ),
+          ];
+    return [
+      ..._places,
+      PlaceDto(id: saved.placeId!, name: saved.placeName ?? '', isEditable: false, addrs: branch),
+    ];
+  }
+
+  List<PlaceAddrDto> _branchesOf(String? aPlaceId)
+  {
+    for (final place in _placeOptions())
+    {
+      if (place.id == aPlaceId)
+      {
+        return place.addrs;
+      }
+    }
+    return const [];
+  }
+
   Future<List<_ItemChoice>> _itemChoices(String aText) async
   {
     final query = aText.trim();
@@ -613,7 +688,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       items = const [];
     }
 
-    final isKnown = items.any((aItem) => aItem.name.toLowerCase() == query.toLowerCase());
+    final isKnown = items.any((aItem) => aItem.name.toLowerCase() == query.toLowerCase() || aItem.barcode == query);
     return [
       ...items.map(_ItemChoice.existing),
       if (!isKnown) _ItemChoice.create(query),
@@ -820,7 +895,14 @@ class _ItemChoiceTile extends StatelessWidget
       tileColor: isHighlighted ? Colors.blue.shade50 : null,
       leading: Icon(item == null ? AppIcons.plusCircle : itemKindIcon(item.kind), size: 18),
       title: Text(item?.name ?? 'items.create_option'.tr(args: [choice.newName])),
-      subtitle: item == null ? null : Text('${itemKindLabel(item.kind)} · ${itemUnitShort(item.unit)}'),
+      subtitle: item == null
+          ? null
+          : Text([
+              itemKindLabel(item.kind),
+              itemUnitShort(item.unit),
+              if (item.barcode != null) item.barcode!,
+              if (item.familyName != null) item.familyName!,
+            ].join(' · ')),
       onTap: onTap,
     );
   }

@@ -306,6 +306,8 @@ pub struct SaveReceiptRequest
     pub merchant_id: Option<Uuid>,
     #[serde(default)]
     pub place_id: Option<Uuid>,
+    #[serde(default)]
+    pub place_addr_id: Option<Uuid>,
     pub curr_id: Uuid,
     #[serde(default)]
     pub cash_account_id: Option<Uuid>,
@@ -326,6 +328,8 @@ pub struct ReceiptDto
     pub merchant_name: Option<String>,
     pub place_id: Option<Uuid>,
     pub place_name: Option<String>,
+    pub place_addr_id: Option<Uuid>,
+    pub branch: Option<String>,
     pub curr_id: Uuid,
     pub curr_code: String,
     pub cash_account_id: Option<Uuid>,
@@ -463,7 +467,11 @@ pub struct DictItemDto
     pub name: String,
     pub kind: ItemKind,
     pub unit: ItemUnit,
+    pub barcode: Option<String>,
     pub is_custom: bool,
+    pub family_id: Option<Uuid>,
+    pub family_name: Option<String>,
+    pub is_editable: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -472,6 +480,10 @@ pub struct SaveItemRequest
     pub name: String,
     pub kind: ItemKind,
     pub unit: ItemUnit,
+    #[serde(default)]
+    pub barcode: Option<String>,
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -480,17 +492,82 @@ pub struct ItemQuery
     #[serde(default)]
     pub q: Option<String>,
     #[serde(default)]
+    pub barcode: Option<String>,
+    #[serde(default)]
     pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShareToFamilyRequest
+{
+    pub family_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MergeItemRequest
+{
+    pub target_id: Uuid,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ItemPriceQuery
+{
+    #[serde(default)]
+    pub convert_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ItemPriceDto
 {
-    pub merchant_name: Option<String>,
+    pub store_name: Option<String>,
+    pub branch: Option<String>,
     pub curr_code: String,
     pub last_price: Decimal,
     pub min_price: Decimal,
     pub avg_price: Decimal,
-    pub purchase_count: i64,
+    pub count: i64,
     pub last_ts: DateTime<Utc>,
+    pub is_shared: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ItemPricesDto
+{
+    pub prices: Vec<ItemPriceDto>,
+    pub missing_rates: Vec<String>,
+    pub matched_items: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ManualPriceDto
+{
+    pub id: Uuid,
+    pub place_id: Option<Uuid>,
+    pub place_addr_id: Option<Uuid>,
+    pub store_name: Option<String>,
+    pub branch: Option<String>,
+    pub curr_code: String,
+    pub qty: Decimal,
+    pub price: Decimal,
+    pub seen_ts: DateTime<Utc>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveManualPriceRequest
+{
+    #[serde(default)]
+    pub place_id: Option<Uuid>,
+    #[serde(default)]
+    pub place_addr_id: Option<Uuid>,
+    #[serde(default)]
+    pub merchant_name: Option<String>,
+    pub curr_id: Uuid,
+    #[serde(default = "default_qty")]
+    pub qty: Decimal,
+    pub price: Decimal,
+    #[serde(default)]
+    pub seen_ts: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub note: Option<String>,
 }
