@@ -18,6 +18,8 @@ dependencies:
   flutter_riverpod: ^2.4.9
   url_launcher: ^6.3.3
   shared_preferences: ^2.5.4
+  mobile_scanner: ^7.4.2
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            owner_id,\n            family_id,\n            unit AS \"unit: ItemUnit\",\n            ((owner_id IS NULL AND family_id IS NULL) OR can_see_scoped(owner_id, family_id, $2)) AS \"is_visible!\",\n            can_edit_scoped(owner_id, family_id, created_by, $2) AS \"is_editable!\"\n        FROM items\n        WHERE id = $1\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT\n            owner_id,\n            family_id,\n            barcode,\n            unit AS \"unit: ItemUnit\",\n            ((owner_id IS NULL AND family_id IS NULL) OR can_see_scoped(owner_id, family_id, $2)) AS \"is_visible!\",\n            can_edit_scoped(owner_id, family_id, created_by, $2) AS \"is_editable!\"\n        FROM items\n        WHERE id = $1\n        FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
@@ -15,6 +15,11 @@
       },
       {
         "ordinal": 2,
+        "name": "barcode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
         "name": "unit: ItemUnit",
         "type_info": {
           "Custom": {
@@ -33,12 +38,12 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "is_visible!",
         "type_info": "Bool"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "is_editable!",
         "type_info": "Bool"
       }
@@ -52,10 +57,11 @@
     "nullable": [
       true,
       true,
+      true,
       false,
       null,
       null
     ]
   },
-  "hash": "c7f8abdf64cfe0ecdce21f4c0451b35fddd1f95e57cfe145b85d53c7d4686c6a"
+  "hash": "7b075807c1671d3d9366674dbbe9bcb914185e8783d8903acf63cd02633f5024"
 }

@@ -446,6 +446,179 @@ class ReceiptItem
       };
 }
 
+class NewItemDraft
+{
+  final String name;
+  final ItemKind kind;
+  final ItemUnit unit;
+  final String? barcode;
+
+  const NewItemDraft({required this.name, required this.kind, required this.unit, this.barcode});
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'kind': kind.name,
+        'unit': unit.wire,
+        if (barcode != null) 'barcode': barcode,
+      };
+}
+
+class NewPlaceDraft
+{
+  final String? placeId;
+  final String name;
+  final String? countryCode;
+  final String? city;
+  final String? street;
+  final String? houseNum;
+  final String? zip;
+
+  const NewPlaceDraft({
+    this.placeId,
+    required this.name,
+    this.countryCode,
+    this.city,
+    this.street,
+    this.houseNum,
+    this.zip,
+  });
+
+  bool get isBranch => placeId != null;
+
+  String get address => [
+        city,
+        [street, houseNum].whereType<String>().join(' '),
+      ].whereType<String>().where((aPart) => aPart.trim().isNotEmpty).join(', ');
+
+  factory NewPlaceDraft.fromJson(Map<String, dynamic> aJson) => NewPlaceDraft(
+        placeId: aJson['place_id'] as String?,
+        name: aJson['name'] as String? ?? '',
+        countryCode: aJson['country_code'] as String?,
+        city: aJson['city'] as String?,
+        street: aJson['street'] as String?,
+        houseNum: aJson['house_num'] as String?,
+        zip: aJson['zip'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'place_id': placeId,
+        'name': name,
+        'country_code': countryCode,
+        'city': city,
+        'street': street,
+        'house_num': houseNum,
+        'zip': zip,
+      };
+}
+
+enum LineMatch
+{
+  barcode,
+  alias,
+  name,
+  similar,
+  isNew;
+
+  static LineMatch parse(Object? aValue) => switch (aValue)
+  {
+    'barcode' => LineMatch.barcode,
+    'alias' => LineMatch.alias,
+    'name' => LineMatch.name,
+    'similar' => LineMatch.similar,
+    _ => LineMatch.isNew,
+  };
+}
+
+class RecognizedLine
+{
+  final String text;
+  final String name;
+  final ItemKind kind;
+  final ItemUnit unit;
+  final double qty;
+  final double? unitPrice;
+  final double amount;
+  final String? barcode;
+  final String? itemId;
+  final String? itemName;
+  final LineMatch match;
+
+  const RecognizedLine({
+    required this.text,
+    required this.name,
+    required this.kind,
+    required this.unit,
+    required this.qty,
+    this.unitPrice,
+    required this.amount,
+    this.barcode,
+    this.itemId,
+    this.itemName,
+    required this.match,
+  });
+
+  factory RecognizedLine.fromJson(Map<String, dynamic> aJson) => RecognizedLine(
+        text: aJson['text'] as String? ?? '',
+        name: aJson['name'] as String? ?? '',
+        kind: ItemKind.parse(aJson['kind']),
+        unit: ItemUnit.parse(aJson['unit']),
+        qty: parseDecimal(aJson['qty']),
+        unitPrice: parseDecimalOrNull(aJson['unit_price']),
+        amount: parseDecimal(aJson['amount']),
+        barcode: aJson['barcode'] as String?,
+        itemId: aJson['item_id'] as String?,
+        itemName: aJson['item_name'] as String?,
+        match: LineMatch.parse(aJson['match_kind']),
+      );
+}
+
+class RecognizedReceipt
+{
+  final DateTime? receiptTs;
+  final String? currId;
+  final String? currCode;
+  final double? total;
+  final double linesTotal;
+  final String? storeName;
+  final String? placeId;
+  final String? placeName;
+  final String? placeAddrId;
+  final NewPlaceDraft? newPlace;
+  final List<RecognizedLine> lines;
+
+  const RecognizedReceipt({
+    this.receiptTs,
+    this.currId,
+    this.currCode,
+    this.total,
+    required this.linesTotal,
+    this.storeName,
+    this.placeId,
+    this.placeName,
+    this.placeAddrId,
+    this.newPlace,
+    required this.lines,
+  });
+
+  bool get isTotalMismatch => total != null && (total! - linesTotal).abs() > 0.009;
+
+  factory RecognizedReceipt.fromJson(Map<String, dynamic> aJson) => RecognizedReceipt(
+        receiptTs: aJson['receipt_ts'] == null ? null : parseTs(aJson['receipt_ts']),
+        currId: aJson['curr_id'] as String?,
+        currCode: aJson['curr_code'] as String?,
+        total: parseDecimalOrNull(aJson['total']),
+        linesTotal: parseDecimal(aJson['lines_total']),
+        storeName: aJson['store_name'] as String?,
+        placeId: aJson['place_id'] as String?,
+        placeName: aJson['place_name'] as String?,
+        placeAddrId: aJson['place_addr_id'] as String?,
+        newPlace: aJson['new_place'] == null ? null : NewPlaceDraft.fromJson(aJson['new_place'] as Map<String, dynamic>),
+        lines: (aJson['lines'] as List? ?? const [])
+            .map((aItem) => RecognizedLine.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 class ReceiptDto
 {
   final String id;

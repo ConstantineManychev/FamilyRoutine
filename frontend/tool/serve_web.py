@@ -8,8 +8,8 @@ from urllib.parse import SplitResult, unquote, urlsplit
 FRONTEND_DIR = Path(__file__).resolve().parent.parent
 BUILD_COMMAND = 'flutter build web --release --wasm --csp --no-web-resources-cdn'
 API_PREFIX = '/api/'
-API_TIMEOUT_SECS = 60
-MAX_BODY_BYTES = 64 * 1024
+API_TIMEOUT_SECS = 160
+MAX_BODY_BYTES = 8 * 1024 * 1024
 HOP_BY_HOP_HEADERS = {
     'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailers',
     'transfer-encoding', 'upgrade', 'host', 'content-length',

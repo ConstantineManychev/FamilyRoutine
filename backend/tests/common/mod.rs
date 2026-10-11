@@ -8,7 +8,7 @@ use axum::Router;
 use axum_extra::extract::cookie::SameSite;
 use std::time::Duration;
 
-use backend::config::{AppConfig, BankConfig};
+use backend::config::{AppConfig, BankConfig, ReceiptAiConfig};
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -60,6 +60,22 @@ impl TestApp
 
     pub fn with_banks(a_db: PgPool, a_banks: BankConfig) -> Self
     {
+        Self::build(a_db, a_banks, None)
+    }
+
+    pub fn with_receipt_ai(a_db: PgPool, a_api_url: &str, a_daily_limit: i32) -> Self
+    {
+        let receipt_ai = ReceiptAiConfig {
+            api_url: a_api_url.to_string(),
+            api_key: bank_mocks::AI_KEY.to_string(),
+            model: "claude-opus-5-5".to_string(),
+            daily_limit: a_daily_limit,
+        };
+        Self::build(a_db, bank_config("http://127.0.0.1:9"), Some(receipt_ai))
+    }
+
+    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: Option<ReceiptAiConfig>) -> Self
+    {
         let cfg = AppConfig {
             database_url: String::new(),
             bind_addr: "127.0.0.1:0".parse().unwrap(),
@@ -70,6 +86,7 @@ impl TestApp
             data_key: [9u8; 32],
             password_pepper: vec![3u8; 32],
             banks: a_banks,
+            receipt_ai: a_receipt_ai,
         };
 
         let state = AppState::new(a_db, cfg).unwrap();

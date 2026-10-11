@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO item_aliases (user_id, alias_key, item_id)\n                VALUES ($1, $2, $3)\n                ON CONFLICT (user_id, alias_key) DO UPDATE SET item_id = EXCLUDED.item_id, updated_ts = NOW()\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb0b1a987b6d6bc81ecb2e627008c902f78c08578a01f9bf48800f41308586d7"
+}

@@ -343,6 +343,81 @@ async fn eb_transactions(
 pub const NBU_EUR_RATE: &str = "45.5";
 pub const NBU_USD_RATE: &str = "41.2";
 
+pub const AI_KEY: &str = "test-anthropic-key";
+
+#[derive(Clone, Default)]
+pub struct AiMock
+{
+    pub replies: Arc<Mutex<Vec<Value>>>,
+    pub requests: Arc<Mutex<Vec<Value>>>,
+}
+
+impl AiMock
+{
+    pub fn reply_with(&self, a_receipt: Value)
+    {
+        self.replies.lock().unwrap().push(a_receipt);
+    }
+}
+
+pub async fn spawn_anthropic() -> (String, AiMock)
+{
+    let mock = AiMock::default();
+    let router = Router::new()
+        .route("/v1/messages", post(anthropic_messages))
+        .with_state(mock.clone());
+    (serve(router).await, mock)
+}
+
+async fn anthropic_messages(State(a_mock): State<AiMock>, a_headers: HeaderMap, Json(a_body): Json<Value>) -> Response
+{
+    let header = |a_name: &str| {
+        a_headers
+            .get(a_name)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string)
+    };
+    let is_valid = header("x-api-key").as_deref() == Some(AI_KEY)
+        && header("anthropic-version").as_deref() == Some("2023-06-01")
+        && header("anthropic-beta").as_deref() == Some("server-side-fallback-2026-07-01")
+        && a_body["fallbacks"] == "default"
+        && a_body["output_config"]["format"]["type"] == "json_schema"
+        && a_body["messages"][0]["content"][0]["type"] == "image";
+    a_mock.requests.lock().unwrap().push(a_body);
+
+    if !is_valid
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "type": "error", "error": { "type": "invalid_request_error", "message": "bad request" } })),
+        )
+            .into_response();
+    }
+
+    let receipt = a_mock.replies.lock().unwrap().pop();
+    match receipt
+    {
+        Some(receipt) => Json(json!({
+            "id": "msg_test",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-opus-5-5",
+            "stop_reason": "end_turn",
+            "content": [
+                { "type": "thinking", "thinking": "", "signature": "sig" },
+                { "type": "text", "text": receipt.to_string() }
+            ],
+            "usage": { "input_tokens": 1500, "output_tokens": 400 }
+        }))
+        .into_response(),
+        None => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } })),
+        )
+            .into_response(),
+    }
+}
+
 pub async fn spawn_nbu() -> String
 {
     let router = Router::new().route(

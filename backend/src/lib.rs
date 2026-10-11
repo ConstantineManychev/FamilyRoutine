@@ -3,6 +3,7 @@ pub mod banking;
 pub mod config;
 pub mod domain;
 pub mod infrastructure;
+pub mod receipt_ai;
 pub mod security;
 pub mod services;
 pub mod state;

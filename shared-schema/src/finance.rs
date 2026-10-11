@@ -280,10 +280,43 @@ pub struct ReceiptItemDto
     pub amount: Decimal,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewItemRequest
+{
+    pub name: String,
+    pub kind: ItemKind,
+    pub unit: ItemUnit,
+    #[serde(default)]
+    pub barcode: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NewPlaceRequest
+{
+    #[serde(default)]
+    pub place_id: Option<Uuid>,
+    pub name: String,
+    #[serde(default)]
+    pub country_code: Option<String>,
+    #[serde(default)]
+    pub city: Option<String>,
+    #[serde(default)]
+    pub street: Option<String>,
+    #[serde(default)]
+    pub house_num: Option<String>,
+    #[serde(default)]
+    pub zip: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct SaveReceiptItemRequest
 {
-    pub item_id: Uuid,
+    #[serde(default)]
+    pub item_id: Option<Uuid>,
+    #[serde(default)]
+    pub new_item: Option<NewItemRequest>,
+    #[serde(default)]
+    pub source_text: Option<String>,
     #[serde(default = "default_qty")]
     pub qty: Decimal,
     #[serde(default)]
@@ -317,6 +350,66 @@ pub struct SaveReceiptRequest
     pub items: Vec<SaveReceiptItemRequest>,
     #[serde(default)]
     pub tx_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub new_place: Option<NewPlaceRequest>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RecognizeReceiptRequest
+{
+    pub image: String,
+    pub media_type: String,
+    #[serde(default)]
+    pub tz_offset_min: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineMatch
+{
+    Barcode,
+    Alias,
+    Name,
+    Similar,
+    New,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecognizedLineDto
+{
+    pub text: String,
+    pub name: String,
+    pub kind: ItemKind,
+    pub unit: ItemUnit,
+    pub qty: Decimal,
+    pub unit_price: Option<Decimal>,
+    pub amount: Decimal,
+    pub barcode: Option<String>,
+    pub item_id: Option<Uuid>,
+    pub item_name: Option<String>,
+    pub match_kind: LineMatch,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecognizedReceiptDto
+{
+    pub receipt_ts: Option<DateTime<Utc>>,
+    pub curr_id: Option<Uuid>,
+    pub curr_code: Option<String>,
+    pub total: Option<Decimal>,
+    pub lines_total: Decimal,
+    pub store_name: Option<String>,
+    pub place_id: Option<Uuid>,
+    pub place_name: Option<String>,
+    pub place_addr_id: Option<Uuid>,
+    pub new_place: Option<NewPlaceRequest>,
+    pub lines: Vec<RecognizedLineDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FeaturesDto
+{
+    pub is_receipt_recognition: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

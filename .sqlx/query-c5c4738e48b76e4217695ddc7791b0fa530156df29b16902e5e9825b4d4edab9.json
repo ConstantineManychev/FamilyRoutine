@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)\n            ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c5c4738e48b76e4217695ddc7791b0fa530156df29b16902e5e9825b4d4edab9"
+}

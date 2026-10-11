@@ -94,7 +94,10 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                 builder: (_, aState) => PlaceDetailScreen(placeId: aState.pathParameters['id']),
               ),
               GoRoute(path: 'items', builder: (_, __) => const ItemsScreen()),
-              GoRoute(path: 'items/new', builder: (_, __) => const ItemDetailScreen()),
+              GoRoute(
+                path: 'items/new',
+                builder: (_, aState) => ItemDetailScreen(initialBarcode: aState.uri.queryParameters['barcode']),
+              ),
               GoRoute(
                 path: 'items/:id',
                 builder: (_, aState) => ItemDetailScreen(

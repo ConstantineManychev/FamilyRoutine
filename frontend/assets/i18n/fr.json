@@ -39,7 +39,12 @@
     "BANK_LINKED": "Le portefeuille est lié à une banque : déconnectez d'abord la banque ou archivez le portefeuille",
     "BANK_APP_REJECTED": "Enable Banking n’a pas accepté la clé de l’application. Vérifiez ENABLE_BANKING_APP_ID et le fichier PEM ; les détails sont dans le journal du serveur.",
     "BANK_REJECTED": "Enable Banking a refusé la requête. Cause fréquente : l’URL de retour n’est pas enregistrée dans le panneau Enable Banking. Les détails sont dans le journal du serveur.",
-    "BANK_APP_INACTIVE": "L’application Enable Banking n’est pas active. Activez-la dans le panneau Enable Banking avec « Activate by linking accounts »."
+    "BANK_APP_INACTIVE": "L’application Enable Banking n’est pas active. Activez-la dans le panneau Enable Banking avec « Activate by linking accounts ».",
+    "BARCODE_TAKEN": "Un autre article de votre catalogue a déjà ce code-barres.",
+    "RECOGNITION_DISABLED": "La reconnaissance des tickets n’est pas configurée sur le serveur.",
+    "RECOGNITION_UNAVAILABLE": "Le service de reconnaissance est indisponible pour le moment. Réessayez plus tard.",
+    "RECEIPT_UNREADABLE": "Le ticket n’a pas pu être lu. Prenez une photo plus droite et bien éclairée.",
+    "NOT_A_RECEIPT": "Cette photo ne ressemble pas à un ticket."
   },
   "sidebar": {
     "routine": "Routine",
@@ -206,7 +211,7 @@
     "err_country_req": "Choisissez un pays",
     "err_city_req": "Choisissez une ville",
     "err_street_req": "Choisissez une rue",
-    "err_house_zip_req": "Indiquez le numéro et le code postal",
+    "err_house_zip_req": "Indiquez le numéro",
     "branch_n": "Adresse {}",
     "main": "principale",
     "branches": "Adresses et magasins",
@@ -479,7 +484,8 @@
     "merge": "Fusionner avec un autre article",
     "merge_hint": "Les tickets et prix de « {} » passent à l’article choisi et celui-ci est supprimé. Seuls les articles de même unité conviennent.",
     "merge_action": "Fusionner",
-    "family_readonly_hint": "C’est un article du groupe. Son auteur ou un administrateur du groupe peut le modifier."
+    "family_readonly_hint": "C’est un article du groupe. Son auteur ou un administrateur du groupe peut le modifier.",
+    "barcode_used": "Ce code-barres appartient déjà à « {} »"
   },
   "routine": {
     "status_home": "Maison",
@@ -527,5 +533,34 @@
     "branch_any": "Non précisé",
     "prices_share_title": "Partager les prix de mes tickets",
     "prices_share_hint": "Les membres voient le magasin, le prix et la date de vos achats d’articles du catalogue du groupe. Les totaux des tickets et les autres achats restent masqués."
+  },
+  "scanner": {
+    "title": "Scanner un code-barres",
+    "title_many": "Scanner des articles",
+    "hint": "Visez le code-barres du produit",
+    "manual": "Ou saisissez les chiffres du code-barres",
+    "done": "Terminé",
+    "torch": "Lampe",
+    "added": "Ajouté : {}",
+    "skipped": "Article non ajouté",
+    "scan_items": "Scanner des articles",
+    "err_permission": "Pas d’accès à la caméra. Autorisez-le dans les réglages du navigateur ou du téléphone, ou saisissez le code.",
+    "err_unsupported": "La caméra n’est pas disponible sur cet appareil. Saisissez le code.",
+    "err_camera": "Impossible de démarrer la caméra. Saisissez le code."
+  },
+  "receipt": {
+    "recognize": "Lire le ticket",
+    "take_photo": "Photographier le ticket",
+    "pick_photo": "Choisir une photo",
+    "ai_title": "Reconnaissance du ticket",
+    "ai_consent": "La photo du ticket est envoyée à Anthropic (Claude) pour la reconnaissance et n’est pas conservée dans Family Routine. Continuer ?",
+    "recognizing": "Lecture du ticket… cela prend généralement 10 à 30 secondes.",
+    "recognized": "Lignes reconnues : {}, dont nouvelles : {}. Vérifiez avant d’enregistrer.",
+    "total_mismatch": "Les lignes totalisent {}, mais le total du ticket est {}.",
+    "new_place": "Un lieu sera créé : {}",
+    "new_branch": "Un magasin sera ajouté : {}",
+    "new_item_hint": "Nouvel article — il sera ajouté au catalogue à l’enregistrement",
+    "similar_hint": "Ressemble à « {} » — vérifiez qu’il s’agit du bon article",
+    "err_image_type": "Les photos JPEG, PNG et WebP sont prises en charge."
   }
 }

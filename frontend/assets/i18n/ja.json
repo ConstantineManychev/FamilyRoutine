@@ -39,7 +39,12 @@
     "BANK_LINKED": "このウォレットは銀行に連携されています。先に銀行の接続を解除するか、ウォレットをアーカイブしてください",
     "BANK_APP_REJECTED": "Enable Banking がアプリケーションキーを受け付けませんでした。ENABLE_BANKING_APP_ID と PEM ファイルを確認してください。詳細はサーバーログにあります。",
     "BANK_REJECTED": "Enable Banking がリクエストを拒否しました。よくある原因は、リダイレクト URL が Enable Banking の管理画面に登録されていないことです。詳細はサーバーログにあります。",
-    "BANK_APP_INACTIVE": "Enable Banking のアプリケーションが有効になっていません。管理画面の「Activate by linking accounts」で有効化してください。"
+    "BANK_APP_INACTIVE": "Enable Banking のアプリケーションが有効になっていません。管理画面の「Activate by linking accounts」で有効化してください。",
+    "BARCODE_TAKEN": "このバーコードはカタログ内の別の品目で使われています。",
+    "RECOGNITION_DISABLED": "サーバーでレシート認識が設定されていません。",
+    "RECOGNITION_UNAVAILABLE": "認識サービスは現在利用できません。後でもう一度お試しください。",
+    "RECEIPT_UNREADABLE": "レシートを読み取れませんでした。明るい場所でまっすぐ撮影してください。",
+    "NOT_A_RECEIPT": "この写真はレシートではないようです。"
   },
   "sidebar": {
     "routine": "ルーティン",
@@ -206,7 +211,7 @@
     "err_country_req": "国を選択してください",
     "err_city_req": "都市を選択してください",
     "err_street_req": "通りを選択してください",
-    "err_house_zip_req": "番地と郵便番号を入力してください",
+    "err_house_zip_req": "番地を入力してください",
     "branch_n": "住所 {}",
     "main": "メイン",
     "branches": "住所と店舗",
@@ -479,7 +484,8 @@
     "merge": "別の品目に統合",
     "merge_hint": "「{}」のレシートと価格は選んだ品目に移り、この品目は削除されます。同じ単位の品目のみ選べます。",
     "merge_action": "統合",
-    "family_readonly_hint": "グループの品目です。作成者またはグループ管理者が変更できます。"
+    "family_readonly_hint": "グループの品目です。作成者またはグループ管理者が変更できます。",
+    "barcode_used": "このバーコードはすでに「{}」に使われています"
   },
   "routine": {
     "status_home": "自宅",
@@ -527,5 +533,34 @@
     "branch_any": "未指定",
     "prices_share_title": "自分のレシートの価格を共有",
     "prices_share_hint": "グループのカタログ品目について、購入した店・価格・日付がメンバーに表示されます。レシートの合計や他の購入は表示されません。"
+  },
+  "scanner": {
+    "title": "バーコードを読み取る",
+    "title_many": "商品を読み取る",
+    "hint": "カメラを商品のバーコードに向けてください",
+    "manual": "またはバーコードの数字を入力",
+    "done": "完了",
+    "torch": "ライト",
+    "added": "追加しました：{}",
+    "skipped": "品目は追加されませんでした",
+    "scan_items": "商品を読み取る",
+    "err_permission": "カメラへのアクセスがありません。ブラウザまたは端末の設定で許可するか、コードを入力してください。",
+    "err_unsupported": "この端末ではカメラを使えません。コードを入力してください。",
+    "err_camera": "カメラを起動できませんでした。コードを入力してください。"
+  },
+  "receipt": {
+    "recognize": "レシートを読み取る",
+    "take_photo": "レシートを撮影",
+    "pick_photo": "写真を選ぶ",
+    "ai_title": "レシート認識",
+    "ai_consent": "レシートの写真は認識のため Anthropic（Claude）に送信され、Family Routine には保存されません。続けますか？",
+    "recognizing": "レシートを読み取っています… 通常 10〜30 秒かかります。",
+    "recognized": "認識した行：{}、うち新しい品目：{}。保存前に確認してください。",
+    "total_mismatch": "各行の合計は {} ですが、レシートの合計は {} です。",
+    "new_place": "場所を作成します：{}",
+    "new_branch": "店舗を追加します：{}",
+    "new_item_hint": "新しい品目です。保存時にカタログへ追加されます",
+    "similar_hint": "「{}」に似ています。正しい品目か確認してください",
+    "err_image_type": "JPEG、PNG、WebP の写真に対応しています。"
   }
 }

@@ -311,7 +311,8 @@ pub struct PlaceAddrDto
     pub house_num: String,
     #[serde(default)]
     pub apt: Option<String>,
-    pub zip: String,
+    #[serde(default)]
+    pub zip: Option<String>,
     #[serde(default)]
     pub merchant_id: Option<String>,
     #[serde(default, skip_deserializing)]

@@ -7,7 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     DictItemDto, ItemKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery, ItemUnit, ManualPriceDto,
-    MergeItemRequest, SaveItemRequest, SaveManualPriceRequest, ShareToFamilyRequest,
+    MergeItemRequest, NewItemRequest, SaveItemRequest, SaveManualPriceRequest, ShareToFamilyRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -34,6 +34,7 @@ struct ItemScope
 {
     owner_id: Option<Uuid>,
     family_id: Option<Uuid>,
+    barcode: Option<String>,
     unit: ItemUnit,
     is_visible: bool,
     is_editable: bool,
@@ -144,6 +145,7 @@ pub async fn create_item(
             .map_err(|_| ApiError::Validation("family_id"))?;
     }
     let owner_id = a_req.family_id.is_none().then_some(a_user.user_id);
+    require_unique_barcode(&mut tx, barcode.as_deref(), a_user.user_id, a_req.family_id, None).await?;
 
     let id = sqlx::query_scalar!(
         r#"
@@ -177,7 +179,8 @@ pub async fn update_item(
     let name = clean_text(&a_req.name, 1, MAX_ITEM_NAME_LEN, "name")?;
     let barcode = clean_barcode(a_req.barcode.as_deref())?;
     let mut tx = a_state.db.begin().await?;
-    require_editable(&mut tx, a_id, a_user.user_id).await?;
+    let scope = require_editable(&mut tx, a_id, a_user.user_id).await?;
+    require_unique_barcode(&mut tx, barcode.as_deref(), a_user.user_id, scope.family_id, Some(a_id)).await?;
 
     sqlx::query!(
         "UPDATE items SET name = $2, type = $3, unit = $4, barcode = $5 WHERE id = $1",
@@ -234,6 +237,14 @@ pub async fn share_item(
     require_member(&mut *tx, a_req.family_id, a_user.user_id)
         .await
         .map_err(|_| ApiError::Validation("family_id"))?;
+    require_unique_barcode(
+        &mut tx,
+        scope.barcode.as_deref(),
+        a_user.user_id,
+        Some(a_req.family_id),
+        Some(a_id),
+    )
+    .await?;
 
     sqlx::query!(
         "UPDATE items SET owner_id = NULL, family_id = $2 WHERE id = $1",
@@ -308,6 +319,13 @@ pub async fn merge_item(
     .await?;
     sqlx::query!(
         "UPDATE item_prices SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE item_aliases SET item_id = $2 WHERE item_id = $1",
         a_id,
         a_req.target_id
     )
@@ -591,6 +609,100 @@ pub async fn require_visible_items(
     Ok(())
 }
 
+pub async fn resolve_new_item(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_item: &NewItemRequest,
+) -> Result<Uuid, ApiError>
+{
+    let existing = sqlx::query_scalar!(
+        r#"
+        SELECT i.id
+        FROM items i
+        WHERE (($2::text IS NOT NULL AND i.barcode = $2) OR LOWER(i.name) = LOWER($3))
+          AND (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)
+               OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
+        ORDER BY (i.barcode IS NOT DISTINCT FROM $2) DESC, (i.owner_id = $1) DESC
+        LIMIT 1
+        "#,
+        a_user_id,
+        a_item.barcode,
+        a_item.name
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    if let Some(id) = existing
+    {
+        return Ok(id);
+    }
+
+    require_unique_barcode(a_conn, a_item.barcode.as_deref(), a_user_id, None, None).await?;
+    sqlx::query_scalar!(
+        r#"
+        INSERT INTO items (owner_id, created_by, name, type, unit, barcode)
+        VALUES ($1, $1, $2, $3, $4, $5)
+        RETURNING id
+        "#,
+        a_user_id,
+        a_item.name,
+        a_item.kind as ItemKind,
+        a_item.unit as ItemUnit,
+        a_item.barcode
+    )
+    .fetch_one(&mut *a_conn)
+    .await
+    .map_err(ApiError::from)
+}
+
+pub async fn require_unique_barcode(
+    a_conn: &mut PgConnection,
+    a_barcode: Option<&str>,
+    a_user_id: Uuid,
+    a_family_id: Option<Uuid>,
+    a_except_id: Option<Uuid>,
+) -> Result<(), ApiError>
+{
+    let Some(barcode) = a_barcode
+    else
+    {
+        return Ok(());
+    };
+
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtext($1::text))",
+        format!("barcode:{barcode}")
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    let is_taken = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM items i
+            WHERE i.barcode = $1
+              AND ($4::uuid IS NULL OR i.id <> $4)
+              AND ((i.owner_id IS NULL AND i.family_id IS NULL)
+                   OR i.owner_id = $2
+                   OR i.family_id = $3
+                   OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))
+        ) AS "is_taken!"
+        "#,
+        barcode,
+        a_user_id,
+        a_family_id,
+        a_except_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    if is_taken
+    {
+        return Err(ApiError::Conflict("BARCODE_TAKEN"));
+    }
+
+    Ok(())
+}
+
 pub async fn detach_family_items(
     a_conn: &mut PgConnection,
     a_family_id: Uuid,
@@ -756,6 +868,7 @@ async fn item_scope(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> R
         SELECT
             owner_id,
             family_id,
+            barcode,
             unit AS "unit: ItemUnit",
             ((owner_id IS NULL AND family_id IS NULL) OR can_see_scoped(owner_id, family_id, $2)) AS "is_visible!",
             can_edit_scoped(owner_id, family_id, created_by, $2) AS "is_editable!"

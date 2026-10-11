@@ -12,7 +12,8 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers, item_handlers,
-    place_handlers, receipt_handlers, routine_handlers, stats_handlers, tx_handlers, user_handlers, wallet_handlers,
+    place_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, tx_handlers, user_handlers,
+    wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -20,6 +21,8 @@ use crate::state::AppState;
 
 const MAX_BODY_BYTES: usize = 64 * 1024;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const RECOGNITION_BODY_BYTES: usize = 8 * 1024 * 1024;
+const RECOGNITION_TIMEOUT: Duration = Duration::from_secs(150);
 
 pub fn build_router(a_state: AppState) -> Router
 {
@@ -31,6 +34,7 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/user/me", get(user_handlers::get_me))
         .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
         .route("/dicts", get(user_handlers::get_avail_dicts))
+        .route("/features", get(recognize_handlers::features))
         .route(
             "/dicts/exercises",
             get(ex_handlers::list_exercises).post(ex_handlers::create_exercise),
@@ -191,7 +195,14 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(place_handlers::delete_place),
         )
         .route("/places/:id/family", put(place_handlers::share_place))
-        .fallback(|| async { ApiError::NotFound });
+        .layer(TimeoutLayer::new(REQUEST_TIMEOUT));
+
+    let recognition = Router::new()
+        .route("/receipts/recognize", post(recognize_handlers::recognize_receipt))
+        .layer(DefaultBodyLimit::max(RECOGNITION_BODY_BYTES))
+        .layer(TimeoutLayer::new(RECOGNITION_TIMEOUT));
+
+    let api = api.merge(recognition).fallback(|| async { ApiError::NotFound });
 
     let router = Router::new()
         .route("/", get(|| async { "FamilyRoutine API" }))
@@ -199,7 +210,7 @@ pub fn build_router(a_state: AppState) -> Router
         .nest("/api", api)
         .fallback(|| async { ApiError::NotFound })
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .layer(TimeoutLayer::new(REQUEST_TIMEOUT))
+        .layer(TimeoutLayer::new(RECOGNITION_TIMEOUT))
         .layer(SetResponseHeaderLayer::overriding(
             CACHE_CONTROL,
             HeaderValue::from_static("no-store"),

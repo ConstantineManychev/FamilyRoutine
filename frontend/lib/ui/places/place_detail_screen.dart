@@ -63,7 +63,7 @@ class _AddrDraft
     {
       return 'places.err_street_req';
     }
-    if (houseNum.trim().isEmpty || zip.trim().isEmpty)
+    if (houseNum.trim().isEmpty)
     {
       return 'places.err_house_zip_req';
     }

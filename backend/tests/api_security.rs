@@ -43,6 +43,8 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
         (Method::GET, format!("/api/dicts/items/{nil}/manual-prices")),
         (Method::PUT, format!("/api/families/{nil}/price-sharing")),
         (Method::PUT, format!("/api/places/{nil}/family")),
+        (Method::GET, "/api/features".to_string()),
+        (Method::POST, "/api/receipts/recognize".to_string()),
     ];
 
     for (method, uri) in endpoints

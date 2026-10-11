@@ -621,4 +621,24 @@ class ApiSvc
     final res = await _dio.put('/api/dashboards/$aDashboardId/widgets/order', data: {'widget_ids': aWidgetIds});
     return DashboardDto.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<bool> isReceiptRecognitionEnabled() async
+  {
+    final res = await _dio.get('/api/features');
+    return (res.data as Map<String, dynamic>)['is_receipt_recognition'] as bool? ?? false;
+  }
+
+  Future<RecognizedReceipt> recognizeReceipt(String aImageBase64, String aMediaType) async
+  {
+    final res = await _dio.post(
+      '/api/receipts/recognize',
+      data: {
+        'image': aImageBase64,
+        'media_type': aMediaType,
+        'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+      },
+      options: Options(receiveTimeout: const Duration(seconds: 150), sendTimeout: const Duration(seconds: 60)),
+    );
+    return RecognizedReceipt.fromJson(res.data as Map<String, dynamic>);
+  }
 }

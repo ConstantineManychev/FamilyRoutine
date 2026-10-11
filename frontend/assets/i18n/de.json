@@ -39,7 +39,12 @@
     "BANK_LINKED": "Das Konto ist mit einer Bank verbunden: Trennen Sie zuerst die Bank oder archivieren Sie das Konto",
     "BANK_APP_REJECTED": "Enable Banking hat den Anwendungsschlüssel nicht akzeptiert. Prüfen Sie ENABLE_BANKING_APP_ID und die PEM-Datei; Details stehen im Serverprotokoll.",
     "BANK_REJECTED": "Enable Banking hat die Anfrage abgelehnt. Häufige Ursache: Die Weiterleitungs-URL ist im Enable-Banking-Kontrollzentrum nicht registriert. Details stehen im Serverprotokoll.",
-    "BANK_APP_INACTIVE": "Die Enable-Banking-Anwendung ist nicht aktiv. Aktivieren Sie sie im Enable-Banking-Kontrollzentrum über „Activate by linking accounts“."
+    "BANK_APP_INACTIVE": "Die Enable-Banking-Anwendung ist nicht aktiv. Aktivieren Sie sie im Enable-Banking-Kontrollzentrum über „Activate by linking accounts“.",
+    "BARCODE_TAKEN": "Ein anderer Artikel in Ihrem Katalog hat bereits diesen Barcode.",
+    "RECOGNITION_DISABLED": "Die Belegerkennung ist auf dem Server nicht eingerichtet.",
+    "RECOGNITION_UNAVAILABLE": "Der Erkennungsdienst ist gerade nicht verfügbar. Bitte später erneut versuchen.",
+    "RECEIPT_UNREADABLE": "Der Beleg konnte nicht gelesen werden. Fotografieren Sie ihn gerader und bei gutem Licht.",
+    "NOT_A_RECEIPT": "Das Foto sieht nicht nach einem Beleg aus."
   },
   "sidebar": {
     "routine": "Routine",
@@ -206,7 +211,7 @@
     "err_country_req": "Bitte ein Land wählen",
     "err_city_req": "Bitte eine Stadt wählen",
     "err_street_req": "Bitte eine Straße wählen",
-    "err_house_zip_req": "Bitte Hausnummer und Postleitzahl angeben",
+    "err_house_zip_req": "Hausnummer angeben",
     "branch_n": "Adresse {}",
     "main": "Hauptadresse",
     "branches": "Adressen und Filialen",
@@ -479,7 +484,8 @@
     "merge": "Mit anderem Artikel zusammenführen",
     "merge_hint": "Belege und Preise von „{}“ gehen auf den gewählten Artikel über, dieser wird gelöscht. Nur Artikel mit derselben Einheit passen.",
     "merge_action": "Zusammenführen",
-    "family_readonly_hint": "Dies ist ein Gruppenartikel. Ändern können ihn der Autor oder ein Gruppenadmin."
+    "family_readonly_hint": "Dies ist ein Gruppenartikel. Ändern können ihn der Autor oder ein Gruppenadmin.",
+    "barcode_used": "Dieser Barcode gehört bereits zu „{}“"
   },
   "routine": {
     "status_home": "Zuhause",
@@ -527,5 +533,34 @@
     "branch_any": "Nicht angegeben",
     "prices_share_title": "Preise aus meinen Belegen teilen",
     "prices_share_hint": "Mitglieder sehen Geschäft, Preis und Datum Ihrer Käufe von Artikeln aus dem Gruppenkatalog. Belegsummen und andere Käufe bleiben verborgen."
+  },
+  "scanner": {
+    "title": "Barcode scannen",
+    "title_many": "Artikel scannen",
+    "hint": "Richten Sie die Kamera auf den Barcode",
+    "manual": "Oder die Ziffern des Barcodes eingeben",
+    "done": "Fertig",
+    "torch": "Taschenlampe",
+    "added": "Hinzugefügt: {}",
+    "skipped": "Artikel nicht hinzugefügt",
+    "scan_items": "Artikel scannen",
+    "err_permission": "Kein Kamerazugriff. Erlauben Sie ihn in den Browser- oder Telefoneinstellungen oder geben Sie den Code ein.",
+    "err_unsupported": "Auf diesem Gerät ist keine Kamera verfügbar. Geben Sie den Code ein.",
+    "err_camera": "Die Kamera konnte nicht gestartet werden. Geben Sie den Code ein."
+  },
+  "receipt": {
+    "recognize": "Beleg erkennen",
+    "take_photo": "Beleg fotografieren",
+    "pick_photo": "Foto auswählen",
+    "ai_title": "Belegerkennung",
+    "ai_consent": "Das Belegfoto wird zur Erkennung an Anthropic (Claude) gesendet und nicht in Family Routine gespeichert. Fortfahren?",
+    "recognizing": "Beleg wird gelesen… das dauert meist 10–30 Sekunden.",
+    "recognized": "Erkannte Positionen: {}, davon neu: {}. Bitte vor dem Speichern prüfen.",
+    "total_mismatch": "Die Positionen ergeben {}, die Belegsumme ist {}.",
+    "new_place": "Ein Ort wird angelegt: {}",
+    "new_branch": "Eine Filiale wird hinzugefügt: {}",
+    "new_item_hint": "Neuer Artikel – wird beim Speichern in den Katalog aufgenommen",
+    "similar_hint": "Ähnlich wie „{}“ – prüfen Sie, ob der Artikel stimmt",
+    "err_image_type": "Unterstützt werden JPEG-, PNG- und WebP-Fotos."
   }
 }

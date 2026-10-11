@@ -39,7 +39,12 @@
     "BANK_LINKED": "The wallet is linked to a bank: disconnect the bank or archive the wallet first",
     "BANK_APP_REJECTED": "Enable Banking did not accept the application key. Check ENABLE_BANKING_APP_ID and the PEM file; details are in the server log.",
     "BANK_REJECTED": "Enable Banking rejected the request. A common cause is a redirect URL that is not registered in the Enable Banking control panel. Details are in the server log.",
-    "BANK_APP_INACTIVE": "The Enable Banking application is not active. Activate it in the Enable Banking control panel with “Activate by linking accounts”."
+    "BANK_APP_INACTIVE": "The Enable Banking application is not active. Activate it in the Enable Banking control panel with “Activate by linking accounts”.",
+    "BARCODE_TAKEN": "Another item in your catalog already has this barcode.",
+    "RECOGNITION_DISABLED": "Receipt recognition is not configured on the server.",
+    "RECOGNITION_UNAVAILABLE": "The recognition service is unavailable right now. Try again later.",
+    "RECEIPT_UNREADABLE": "The receipt could not be read. Take a straighter photo in good light.",
+    "NOT_A_RECEIPT": "This photo does not look like a receipt."
   },
   "sidebar": {
     "routine": "Routine",
@@ -206,7 +211,7 @@
     "err_country_req": "Choose a country",
     "err_city_req": "Choose a city",
     "err_street_req": "Choose a street",
-    "err_house_zip_req": "Enter the house number and postal code",
+    "err_house_zip_req": "Enter the house number",
     "branch_n": "Address {}",
     "main": "main",
     "branches": "Addresses and branches",
@@ -479,7 +484,8 @@
     "merge": "Merge into another item",
     "merge_hint": "Receipts and prices of “{}” move to the chosen item and this one is deleted. Only items with the same unit fit.",
     "merge_action": "Merge",
-    "family_readonly_hint": "This is a group item. Its author or a group admin can change it."
+    "family_readonly_hint": "This is a group item. Its author or a group admin can change it.",
+    "barcode_used": "This barcode already belongs to “{}”"
   },
   "routine": {
     "status_home": "Home",
@@ -527,5 +533,34 @@
     "branch_any": "Not specified",
     "prices_share_title": "Share prices from my receipts",
     "prices_share_hint": "Members see the shop, price and date of your purchases of group catalog items. Receipt totals and other purchases stay hidden."
+  },
+  "scanner": {
+    "title": "Scan barcode",
+    "title_many": "Scan products",
+    "hint": "Point the camera at the product barcode",
+    "manual": "Or type the barcode digits",
+    "done": "Done",
+    "torch": "Flashlight",
+    "added": "Added: {}",
+    "skipped": "Item not added",
+    "scan_items": "Scan products",
+    "err_permission": "No camera access. Allow it in the browser or phone settings, or type the code.",
+    "err_unsupported": "The camera is not available on this device. Type the code instead.",
+    "err_camera": "The camera could not be started. Type the code instead."
+  },
+  "receipt": {
+    "recognize": "Read receipt",
+    "take_photo": "Photograph receipt",
+    "pick_photo": "Choose photo",
+    "ai_title": "Receipt recognition",
+    "ai_consent": "The receipt photo is sent to Anthropic (Claude) for recognition and is not stored in Family Routine. Continue?",
+    "recognizing": "Reading the receipt… this usually takes 10–30 seconds.",
+    "recognized": "Lines recognised: {}, new items: {}. Check them before saving.",
+    "total_mismatch": "Lines add up to {}, but the receipt total is {}.",
+    "new_place": "A place will be created: {}",
+    "new_branch": "A branch will be added: {}",
+    "new_item_hint": "New item — it will be added to the catalog when you save",
+    "similar_hint": "Looks like “{}” — check that this is the right item",
+    "err_image_type": "JPEG, PNG and WebP photos are supported."
   }
 }

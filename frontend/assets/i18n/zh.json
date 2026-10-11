@@ -39,7 +39,12 @@
     "BANK_LINKED": "该钱包已关联银行：请先断开银行或将钱包归档",
     "BANK_APP_REJECTED": "Enable Banking 未接受应用密钥。请检查 ENABLE_BANKING_APP_ID 和 PEM 文件，详情见服务器日志。",
     "BANK_REJECTED": "Enable Banking 拒绝了请求。常见原因是回调地址未在 Enable Banking 控制台中注册。详情见服务器日志。",
-    "BANK_APP_INACTIVE": "Enable Banking 应用尚未激活。请在 Enable Banking 控制台中点击“Activate by linking accounts”进行激活。"
+    "BANK_APP_INACTIVE": "Enable Banking 应用尚未激活。请在 Enable Banking 控制台中点击“Activate by linking accounts”进行激活。",
+    "BARCODE_TAKEN": "你的目录中已有其他条目使用此条形码。",
+    "RECOGNITION_DISABLED": "服务器未配置收据识别。",
+    "RECOGNITION_UNAVAILABLE": "识别服务暂时不可用，请稍后再试。",
+    "RECEIPT_UNREADABLE": "无法读取收据。请在光线充足处正对收据拍照。",
+    "NOT_A_RECEIPT": "这张照片看起来不像收据。"
   },
   "sidebar": {
     "routine": "日常",
@@ -206,7 +211,7 @@
     "err_country_req": "请选择国家",
     "err_city_req": "请选择城市",
     "err_street_req": "请选择街道",
-    "err_house_zip_req": "请填写门牌号和邮政编码",
+    "err_house_zip_req": "请输入门牌号",
     "branch_n": "地址 {}",
     "main": "主地址",
     "branches": "地址和门店",
@@ -479,7 +484,8 @@
     "merge": "合并到其他条目",
     "merge_hint": "“{}”的收据和价格将转到所选条目，此条目将被删除。只能选择单位相同的条目。",
     "merge_action": "合并",
-    "family_readonly_hint": "这是群组条目。作者或群组管理员可以修改。"
+    "family_readonly_hint": "这是群组条目。作者或群组管理员可以修改。",
+    "barcode_used": "此条形码已属于“{}”"
   },
   "routine": {
     "status_home": "在家",
@@ -527,5 +533,34 @@
     "branch_any": "未指定",
     "prices_share_title": "共享我收据中的价格",
     "prices_share_hint": "成员可以看到你购买群组目录商品的商店、价格和日期。收据总额和其他购买不会显示。"
+  },
+  "scanner": {
+    "title": "扫描条形码",
+    "title_many": "扫描商品",
+    "hint": "将摄像头对准商品条形码",
+    "manual": "或输入条形码数字",
+    "done": "完成",
+    "torch": "手电筒",
+    "added": "已添加：{}",
+    "skipped": "未添加条目",
+    "scan_items": "扫描商品",
+    "err_permission": "没有摄像头权限。请在浏览器或手机设置中允许，或手动输入条形码。",
+    "err_unsupported": "此设备无法使用摄像头。请手动输入条形码。",
+    "err_camera": "无法启动摄像头。请手动输入条形码。"
+  },
+  "receipt": {
+    "recognize": "识别收据",
+    "take_photo": "拍摄收据",
+    "pick_photo": "选择照片",
+    "ai_title": "收据识别",
+    "ai_consent": "收据照片将发送给 Anthropic（Claude）进行识别，不会保存在 Family Routine 中。继续吗？",
+    "recognizing": "正在识别收据……通常需要 10–30 秒。",
+    "recognized": "已识别 {} 行，其中新条目 {} 个。保存前请检查。",
+    "total_mismatch": "各行合计为 {}，但收据总额为 {}。",
+    "new_place": "将创建地点：{}",
+    "new_branch": "将添加门店：{}",
+    "new_item_hint": "新条目——保存时将加入目录",
+    "similar_hint": "与“{}”相似——请确认是否为同一条目",
+    "err_image_type": "支持 JPEG、PNG 和 WebP 照片。"
   }
 }

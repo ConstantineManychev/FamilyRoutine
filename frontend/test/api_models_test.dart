@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:family_routine/core/api_error.dart';
+import 'package:family_routine/domain/barcode.dart';
 import 'package:family_routine/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -247,6 +248,44 @@ void main()
         'seen_ts': '2026-10-09T10:00:00Z',
       });
       expect(manual.unitPrice, 5);
+    });
+
+    test('recognized receipt keeps matches, new items and the place proposal', ()
+    {
+      final draft = RecognizedReceipt.fromJson({
+        'receipt_ts': '2026-10-10T21:15:00Z',
+        'curr_id': 'c1',
+        'curr_code': 'UAH',
+        'total': '300.50',
+        'lines_total': '298.00',
+        'store_name': 'Новус',
+        'place_id': null,
+        'new_place': {'place_id': null, 'name': 'Новус', 'city': 'Київ', 'street': 'Велика Васильківська', 'house_num': '72'},
+        'lines': [
+          {'text': 'ХЛІБ', 'name': 'Хліб', 'kind': 'food', 'unit': 'piece', 'qty': '1', 'amount': '30.00', 'item_id': 'i1', 'item_name': 'Хліб білий', 'match_kind': 'similar'},
+          {'text': 'БАНАНИ ВАГ', 'name': 'Банани', 'kind': 'food', 'unit': 'kilogram', 'qty': '1.235', 'amount': '61.20', 'match_kind': 'new'},
+        ],
+      });
+      expect(draft.isTotalMismatch, isTrue);
+      expect(draft.newPlace!.isBranch, isFalse);
+      expect(draft.newPlace!.address, 'Київ, Велика Васильківська 72');
+      expect(draft.lines.first.match, LineMatch.similar);
+      expect(draft.lines.last.match, LineMatch.isNew);
+      expect(draft.lines.last.unit, ItemUnit.kilogram);
+      expect(
+        const NewItemDraft(name: 'Банани', kind: ItemKind.food, unit: ItemUnit.kilogram).toJson(),
+        {'name': 'Банани', 'kind': 'food', 'unit': 'kilogram'},
+      );
+    });
+
+    test('barcodes need a valid GTIN check digit', ()
+    {
+      expect(isValidGtin('4820024700016'), isTrue);
+      expect(isValidGtin('4820024700017'), isFalse);
+      expect(isValidGtin('036000291452'), isTrue);
+      expect(isValidGtin('96385074'), isTrue);
+      expect(isValidGtin('123'), isFalse);
+      expect(normalizeBarcode(' 4006381-333931 '), '4006381333931');
     });
 
     test('family detail carries my role', ()

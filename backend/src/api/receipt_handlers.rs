@@ -3,19 +3,22 @@ use axum::http::StatusCode;
 use axum::Json;
 use rust_decimal::Decimal;
 use shared_schema::{
-    AccountType, ItemKind, ItemUnit, ReceiptDto, ReceiptItemDto, ReceiptListItemDto, ReceiptQuery,
+    AccountType, ItemKind, ItemUnit, NewItemRequest, ReceiptDto, ReceiptItemDto, ReceiptListItemDto, ReceiptQuery,
     SaveReceiptItemRequest, SaveReceiptRequest, TxSource,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
-use crate::api::item_handlers::require_visible_items;
-use crate::api::place_handlers::require_visible_place;
+use crate::api::item_handlers::{require_visible_items, resolve_new_item, MAX_ITEM_NAME_LEN};
+use crate::api::place_handlers::{place_from_receipt, require_visible_place};
+use crate::api::recognize_handlers::alias_key;
 use crate::api::tx_handlers::load_txs;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::require_account_editor;
-use crate::domain::validation::{check_money, check_qty, clean_optional_text, money, MAX_NAME_LEN, MAX_NOTE_LEN};
+use crate::domain::validation::{
+    check_money, check_qty, clean_barcode, clean_optional_text, clean_text, money, MAX_NAME_LEN, MAX_NOTE_LEN,
+};
 use crate::state::AppState;
 
 const MAX_ITEMS: usize = 300;
@@ -35,6 +38,21 @@ struct ReceiptHead
     curr_code: String,
     cash_account_id: Option<Uuid>,
     note: Option<String>,
+}
+
+enum ItemRef
+{
+    Existing(Uuid),
+    New(NewItemRequest),
+}
+
+struct CleanItem
+{
+    item: ItemRef,
+    alias: Option<String>,
+    qty: Decimal,
+    unit_price: Option<Decimal>,
+    amount: Decimal,
 }
 
 struct LinkCandidate
@@ -168,7 +186,14 @@ async fn save_receipt(
         None => None,
     };
 
-    let item_ids: Vec<Uuid> = items.iter().map(|item| item.item_id).collect();
+    let item_ids: Vec<Uuid> = items
+        .iter()
+        .filter_map(|item| match item.item
+        {
+            ItemRef::Existing(id) => Some(id),
+            ItemRef::New(_) => None,
+        })
+        .collect();
     require_visible_items(&mut tx, &item_ids, a_user_id, a_id).await?;
 
     let is_currency_known = sqlx::query_scalar!(
@@ -182,14 +207,32 @@ async fn save_receipt(
         return Err(ApiError::Validation("curr_id"));
     }
 
-    require_visible_place(
-        &mut tx,
-        a_req.place_id,
-        a_req.place_addr_id,
-        a_user_id,
-        attached_place_id,
-    )
-    .await?;
+    let (place_id, place_addr_id) = match (&a_req.new_place, a_req.place_id)
+    {
+        (Some(new_place), None) if new_place.place_id.is_none() =>
+        {
+            let (place_id, addr_id) = place_from_receipt(&mut tx, a_user_id, new_place).await?;
+            (Some(place_id), addr_id)
+        }
+        (Some(new_place), Some(place_id)) if new_place.place_id == Some(place_id) && a_req.place_addr_id.is_none() =>
+        {
+            require_visible_place(&mut tx, Some(place_id), None, a_user_id, attached_place_id).await?;
+            let (_, addr_id) = place_from_receipt(&mut tx, a_user_id, new_place).await?;
+            (Some(place_id), addr_id)
+        }
+        _ =>
+        {
+            require_visible_place(
+                &mut tx,
+                a_req.place_id,
+                a_req.place_addr_id,
+                a_user_id,
+                attached_place_id,
+            )
+            .await?;
+            (a_req.place_id, a_req.place_addr_id)
+        }
+    };
 
     if let Some(merchant_id) = a_req.merchant_id
     {
@@ -231,11 +274,11 @@ async fn save_receipt(
                 a_req.receipt_ts,
                 a_req.merchant_id,
                 merchant_name,
-                a_req.place_id,
+                place_id,
                 a_req.curr_id,
                 a_req.cash_account_id,
                 note,
-                a_req.place_addr_id
+                place_addr_id
             )
             .execute(&mut *tx)
             .await?;
@@ -253,11 +296,11 @@ async fn save_receipt(
             a_req.receipt_ts,
             a_req.merchant_id,
             merchant_name,
-            a_req.place_id,
+            place_id,
             a_req.curr_id,
             a_req.cash_account_id,
             note,
-            a_req.place_addr_id
+            place_addr_id
         )
         .fetch_one(&mut *tx)
         .await?,
@@ -267,8 +310,28 @@ async fn save_receipt(
         .execute(&mut *tx)
         .await?;
 
+    let mut created: Vec<(String, Uuid)> = Vec::new();
     for (pos, item) in items.iter().enumerate()
     {
+        let item_id = match &item.item
+        {
+            ItemRef::Existing(id) => *id,
+            ItemRef::New(new_item) =>
+            {
+                let key = new_item.name.to_lowercase();
+                match created.iter().find(|(name, _)| *name == key)
+                {
+                    Some((_, id)) => *id,
+                    None =>
+                    {
+                        let id = resolve_new_item(&mut tx, a_user_id, new_item).await?;
+                        created.push((key, id));
+                        id
+                    }
+                }
+            }
+        };
+
         sqlx::query!(
             r#"
             INSERT INTO receipt_items (receipt_id, pos, item_id, qty, unit_price, amount)
@@ -276,13 +339,29 @@ async fn save_receipt(
             "#,
             receipt_id,
             pos as i16,
-            item.item_id,
+            item_id,
             item.qty,
             item.unit_price,
             item.amount
         )
         .execute(&mut *tx)
         .await?;
+
+        if let Some(alias) = &item.alias
+        {
+            sqlx::query!(
+                r#"
+                INSERT INTO item_aliases (user_id, alias_key, item_id)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (user_id, alias_key) DO UPDATE SET item_id = EXCLUDED.item_id, updated_ts = NOW()
+                "#,
+                a_user_id,
+                alias,
+                item_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
     }
 
     let paid_total = link_transactions(&mut tx, receipt_id, a_user_id, a_req.curr_id, &tx_ids).await?;
@@ -305,7 +384,7 @@ async fn save_receipt(
     Ok(receipt)
 }
 
-fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<SaveReceiptItemRequest>, ApiError>
+fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<CleanItem>, ApiError>
 {
     if a_items.len() > MAX_ITEMS
     {
@@ -327,8 +406,21 @@ fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<SaveReceiptItem
                 .transpose()?
                 .filter(|price| *price >= Decimal::ZERO);
 
-            Ok(SaveReceiptItemRequest {
-                item_id: item.item_id,
+            let item_ref = match (item.item_id, &item.new_item)
+            {
+                (Some(id), None) => ItemRef::Existing(id),
+                (None, Some(new_item)) => ItemRef::New(NewItemRequest {
+                    name: clean_text(&new_item.name, 1, MAX_ITEM_NAME_LEN, "new_item.name")?,
+                    kind: new_item.kind,
+                    unit: new_item.unit,
+                    barcode: clean_barcode(new_item.barcode.as_deref())?,
+                }),
+                _ => return Err(ApiError::Validation("item_id")),
+            };
+
+            Ok(CleanItem {
+                item: item_ref,
+                alias: item.source_text.as_deref().and_then(alias_key),
                 qty: check_qty(item.qty)?,
                 unit_price,
                 amount,

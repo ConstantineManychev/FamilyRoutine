@@ -378,7 +378,7 @@ class PlaceAddrDto
         'street_id': streetId,
         'house_num': houseNum,
         'apt': apt,
-        'zip': zip,
+        'zip': zip.trim().isEmpty ? null : zip.trim(),
         'merchant_id': merchantId,
       };
 }

@@ -263,6 +263,7 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
     let app = TestApp::new(a_db.clone());
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
+    let carol = app.user("carol@example.com").await;
     let home = app.family(&alice, "Home").await;
     let uah = app.currency_by_code(&alice.token, "UAH").await;
     let eur = app.currency_by_code(&alice.token, "EUR").await;
@@ -283,21 +284,61 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         json!({ "name": "Кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
     )
     .await;
-    let family_coffee = item(
+    for body in [
+        json!({ "name": "Кава Lavazza", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE, "family_id": home }),
+        json!({ "name": "Інша кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
+    ]
+    {
+        let taken = app
+            .call(Method::POST, "/api/dicts/items", Some(&alice.token), Some(body))
+            .await;
+        assert_eq!(taken.status, StatusCode::CONFLICT);
+        assert_eq!(taken.body["code"], "BARCODE_TAKEN");
+    }
+    let tea = item(
         &app,
         &alice,
+        json!({ "name": "Чай", "kind": "product", "unit": "piece" }),
+    )
+    .await;
+    item(
+        &app,
+        &alice,
+        json!({ "name": "Цукор", "kind": "product", "unit": "piece" }),
+    )
+    .await;
+    let tea_with_coffee_code = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{tea}"),
+            Some(&alice.token),
+            Some(json!({ "name": "Чай", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE })),
+        )
+        .await;
+    assert_eq!(tea_with_coffee_code.body["code"], "BARCODE_TAKEN");
+
+    app.join(&alice, &bob, &home, "standard").await;
+    let family_coffee = item(
+        &app,
+        &bob,
         json!({ "name": "Кава Lavazza", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE, "family_id": home }),
     )
     .await;
-    let duplicate = app
+    let bob_duplicate = app
         .call(
             Method::POST,
             "/api/dicts/items",
-            Some(&alice.token),
-            Some(json!({ "name": "Інша кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE })),
+            Some(&bob.token),
+            Some(json!({ "name": "Кава 2", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE })),
         )
         .await;
-    assert_eq!(duplicate.status, StatusCode::CONFLICT);
+    assert_eq!(bob_duplicate.body["code"], "BARCODE_TAKEN");
+    item(
+        &app,
+        &carol,
+        json!({ "name": "Моя кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
+    )
+    .await;
 
     let search = app
         .call(
@@ -312,11 +353,12 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         .call(
             Method::GET,
             &format!("/api/dicts/items?barcode={COFFEE_BARCODE}"),
-            Some(&bob.token),
+            Some(&carol.token),
             None,
         )
         .await;
-    assert_eq!(exact.body, json!([]));
+    assert_eq!(exact.body.as_array().unwrap().len(), 1);
+    assert_eq!(exact.body[0]["name"], "Моя кава");
 
     let (status, _) = receipt(
         &app,

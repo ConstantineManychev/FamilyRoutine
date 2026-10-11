@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use shared_schema::{PlaceAddrDto, PlaceDto, SavePlaceRequest, ShareToFamilyRequest};
+use shared_schema::{NewPlaceRequest, PlaceAddrDto, PlaceDto, SavePlaceRequest, ShareToFamilyRequest};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
@@ -16,6 +16,7 @@ use crate::state::AppState;
 const MAX_ADDRS: usize = 20;
 const MAX_SHORT_LEN: usize = 50;
 const MAX_MERCHANT_LEN: usize = 255;
+const MAX_GEO_NAME_LEN: usize = 100;
 
 struct PlaceRow
 {
@@ -324,6 +325,183 @@ pub async fn detach_family_places(
     Ok(())
 }
 
+pub async fn place_from_receipt(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_req: &NewPlaceRequest,
+) -> Result<(Uuid, Option<Uuid>), ApiError>
+{
+    let place_id = match a_req.place_id
+    {
+        Some(place_id) =>
+        {
+            let is_editable = sqlx::query_scalar!(
+                r#"
+                SELECT can_edit_scoped(owner_id, family_id, created_by, $2) AS "is_editable!"
+                FROM places WHERE id = $1
+                "#,
+                place_id,
+                a_user_id
+            )
+            .fetch_optional(&mut *a_conn)
+            .await?
+            .unwrap_or(false);
+            if !is_editable
+            {
+                return Ok((place_id, None));
+            }
+            place_id
+        }
+        None =>
+        {
+            let name = clean_name(&a_req.name, "new_place.name")?;
+            sqlx::query_scalar!(
+                "INSERT INTO places (name, owner_id, created_by) VALUES ($1, $2, $2) RETURNING id",
+                name,
+                a_user_id
+            )
+            .fetch_one(&mut *a_conn)
+            .await?
+        }
+    };
+
+    let Some(addr) = resolve_receipt_address(a_conn, a_user_id, a_req).await?
+    else
+    {
+        return Ok((place_id, None));
+    };
+
+    let has_addresses = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM place_addrs WHERE place_id = $1) AS "exists!""#,
+        place_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    let addr_id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO place_addrs (place_id, is_main, country_id, city_id, street_id, house_num, zip)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
+        "#,
+        place_id,
+        !has_addresses,
+        addr.country_id,
+        addr.city_id,
+        addr.street_id,
+        addr.house_num,
+        addr.zip
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    Ok((place_id, Some(addr_id)))
+}
+
+struct ResolvedAddr
+{
+    country_id: Uuid,
+    city_id: Uuid,
+    street_id: Uuid,
+    house_num: String,
+    zip: Option<String>,
+}
+
+async fn resolve_receipt_address(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_req: &NewPlaceRequest,
+) -> Result<Option<ResolvedAddr>, ApiError>
+{
+    let code = match a_req.country_code.as_deref().map(str::to_uppercase).as_deref()
+    {
+        Some("UA") => Some("UKR".to_string()),
+        Some("IE") => Some("IRL".to_string()),
+        Some("PL") => Some("POL".to_string()),
+        Some("GB") => Some("GBR".to_string()),
+        other => other.map(str::to_string),
+    };
+    let parts = (
+        code,
+        clean_optional_text(a_req.city.as_deref(), MAX_GEO_NAME_LEN, "new_place.city")?,
+        clean_optional_text(a_req.street.as_deref(), MAX_GEO_NAME_LEN, "new_place.street")?,
+        clean_optional_text(a_req.house_num.as_deref(), MAX_SHORT_LEN, "new_place.house_num")?,
+    );
+    let (Some(code), Some(city), Some(street), Some(house_num)) = parts
+    else
+    {
+        return Ok(None);
+    };
+
+    let Some(country_id) = sqlx::query_scalar!("SELECT id FROM countries WHERE code = $1", code)
+        .fetch_optional(&mut *a_conn)
+        .await?
+    else
+    {
+        return Ok(None);
+    };
+
+    let city_id = match sqlx::query_scalar!(
+        "SELECT id FROM cities WHERE country_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1",
+        country_id,
+        city
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?
+    {
+        Some(id) => id,
+        None =>
+        {
+            sqlx::query_scalar!(
+                r#"
+            INSERT INTO cities (country_id, name, created_by) VALUES ($1, $2, $3)
+            ON CONFLICT (country_id, name) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id
+            "#,
+                country_id,
+                city,
+                a_user_id
+            )
+            .fetch_one(&mut *a_conn)
+            .await?
+        }
+    };
+
+    let street_id = match sqlx::query_scalar!(
+        "SELECT id FROM streets WHERE city_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1",
+        city_id,
+        street
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?
+    {
+        Some(id) => id,
+        None =>
+        {
+            sqlx::query_scalar!(
+                r#"
+            INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)
+            ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id
+            "#,
+                city_id,
+                street,
+                a_user_id
+            )
+            .fetch_one(&mut *a_conn)
+            .await?
+        }
+    };
+
+    Ok(Some(ResolvedAddr {
+        country_id,
+        city_id,
+        street_id,
+        house_num,
+        zip: clean_optional_text(a_req.zip.as_deref(), MAX_SHORT_LEN, "new_place.zip")?,
+    }))
+}
+
 async fn require_editable(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<PlaceScope, ApiError>
 {
     let scope = sqlx::query_as!(
@@ -464,7 +642,7 @@ fn clean_addrs(a_addrs: Vec<PlaceAddrDto>) -> Result<Vec<PlaceAddrDto>, ApiError
             Ok(PlaceAddrDto {
                 house_num: clean_text(&addr.house_num, 1, MAX_SHORT_LEN, "house_num")?,
                 apt: clean_optional_text(addr.apt.as_deref(), MAX_SHORT_LEN, "apt")?,
-                zip: clean_text(&addr.zip, 1, MAX_SHORT_LEN, "zip")?,
+                zip: clean_optional_text(addr.zip.as_deref(), MAX_SHORT_LEN, "zip")?,
                 merchant_id: clean_optional_text(addr.merchant_id.as_deref(), MAX_MERCHANT_LEN, "merchant_id")?,
                 ..addr
             })

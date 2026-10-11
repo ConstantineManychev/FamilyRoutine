@@ -19,6 +19,7 @@ abstract final class AppIcons
   static const IconData bus = IconData(0xe1d4, fontFamily: _family);
   static const IconData calendar = IconData(0xe063, fontFamily: _family);
   static const IconData calendarClock = IconData(0xe304, fontFamily: _family);
+  static const IconData camera = IconData(0xe064, fontFamily: _family);
   static const IconData chartColumn = IconData(0xe2a3, fontFamily: _family);
   static const IconData check = IconData(0xe06c, fontFamily: _family);
   static const IconData checkCircle = IconData(0xe226, fontFamily: _family);
@@ -44,6 +45,7 @@ abstract final class AppIcons
   static const IconData history = IconData(0xe1f5, fontFamily: _family);
   static const IconData home = IconData(0xe0f5, fontFamily: _family);
   static const IconData house = IconData(0xe0f5, fontFamily: _family);
+  static const IconData image = IconData(0xe0f6, fontFamily: _family);
   static const IconData key = IconData(0xe0fd, fontFamily: _family);
   static const IconData keyRound = IconData(0xe4a3, fontFamily: _family);
   static const IconData landmark = IconData(0xe23a, fontFamily: _family);

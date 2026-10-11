@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
+import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import 'scope_widgets.dart';
 
@@ -40,6 +41,7 @@ class ItemFormFields extends StatelessWidget
   final List<FamDto>? scopeFams;
   final String? scopeFamilyId;
   final ValueChanged<String?>? onScopeChanged;
+  final VoidCallback? onScanBarcode;
 
   const ItemFormFields({
     super.key,
@@ -54,6 +56,7 @@ class ItemFormFields extends StatelessWidget
     this.scopeFams,
     this.scopeFamilyId,
     this.onScopeChanged,
+    this.onScanBarcode,
   });
 
   @override
@@ -90,6 +93,13 @@ class ItemFormFields extends StatelessWidget
                 helperMaxLines: 2,
                 errorText: isInvalid ? 'items.barcode_invalid'.tr() : null,
                 prefixIcon: const Icon(AppIcons.scanBarcode, size: 18),
+                suffixIcon: onScanBarcode == null || !isEnabled
+                    ? null
+                    : IconButton(
+                        tooltip: 'scanner.title'.tr(),
+                        icon: const Icon(AppIcons.camera, size: 18),
+                        onPressed: onScanBarcode,
+                      ),
                 border: const OutlineInputBorder(),
               ),
             );
@@ -127,6 +137,40 @@ class ItemFormFields extends StatelessWidget
 }
 
 bool isBarcodeAcceptable(String aValue) => aValue.trim().isEmpty || isValidGtin(aValue);
+
+Future<void> scanIntoBarcodeField(
+  BuildContext aContext,
+  WidgetRef aRef,
+  TextEditingController aCtrl,
+  {
+    String? aCurrentItemId,
+  }
+) async
+{
+  final code = await scanBarcode(aContext);
+  if (code == null || !aContext.mounted)
+  {
+    return;
+  }
+
+  aCtrl.text = code;
+  try
+  {
+    final owners = await aRef.read(apiProv).getItems(aBarcode: code, aLimit: 1);
+    final owner = owners.where((aItem) => aItem.id != aCurrentItemId).firstOrNull;
+    if (owner != null && aContext.mounted)
+    {
+      showInfoSnack(aContext, 'items.barcode_used'.tr(args: [owner.name]));
+    }
+  }
+  catch (aError)
+  {
+    if (aContext.mounted)
+    {
+      showErrorSnack(aContext, aError);
+    }
+  }
+}
 
 class ItemCreateDialog extends ConsumerStatefulWidget
 {
@@ -210,6 +254,7 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
             scopeFams: ref.watch(famsProv).valueOrNull,
             scopeFamilyId: _familyId,
             onScopeChanged: (aValue) => setState(() => _familyId = aValue),
+            onScanBarcode: () => scanIntoBarcodeField(context, ref, _barcodeCtrl),
             onKindChanged: (aKind) => setState(() => _kind = aKind),
             onUnitChanged: (aUnit) => setState(() => _unit = aUnit),
           ),

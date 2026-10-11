@@ -15,6 +15,8 @@ pub const MIN_PEPPER_LEN: usize = 32;
 const DEFAULT_MONO_API: &str = "https://api.monobank.ua";
 const DEFAULT_EB_API: &str = "https://api.enablebanking.com";
 const DEFAULT_FX_API: &str = "https://bank.gov.ua";
+const DEFAULT_ANTHROPIC_API: &str = "https://api.anthropic.com";
+const DEFAULT_RECEIPT_MODEL: &str = "claude-opus-5-5";
 
 pub struct BankConfig
 {
@@ -98,6 +100,38 @@ impl EnableBankingConfig
     }
 }
 
+pub struct ReceiptAiConfig
+{
+    pub api_url: String,
+    pub api_key: String,
+    pub model: String,
+    pub daily_limit: i32,
+}
+
+impl ReceiptAiConfig
+{
+    fn from_env() -> Result<Option<Self>, String>
+    {
+        let Some(api_key) = optional("ANTHROPIC_API_KEY")
+        else
+        {
+            return Ok(None);
+        };
+
+        if !parse_bool("RECEIPT_AI_ENABLED", true)?
+        {
+            return Ok(None);
+        }
+
+        Ok(Some(Self {
+            api_url: optional("ANTHROPIC_API_URL").unwrap_or_else(|| DEFAULT_ANTHROPIC_API.into()),
+            api_key,
+            model: optional("RECEIPT_AI_MODEL").unwrap_or_else(|| DEFAULT_RECEIPT_MODEL.into()),
+            daily_limit: parse_u64("RECEIPT_AI_DAILY_LIMIT", 30, 1, 1000)? as i32,
+        }))
+    }
+}
+
 pub struct AppConfig
 {
     pub database_url: String,
@@ -109,6 +143,7 @@ pub struct AppConfig
     pub data_key: [u8; DATA_KEY_LEN],
     pub password_pepper: Vec<u8>,
     pub banks: BankConfig,
+    pub receipt_ai: Option<ReceiptAiConfig>,
 }
 
 impl AppConfig
@@ -145,6 +180,7 @@ impl AppConfig
             data_key,
             password_pepper,
             banks: BankConfig::from_env(a_env_dir)?,
+            receipt_ai: ReceiptAiConfig::from_env()?,
         })
     }
 }

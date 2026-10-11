@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'core/app_router.dart';
+import 'ui/common/barcode_scanner.dart';
 
 const List<Locale> supportedLocales = [
   Locale('ru'),
@@ -23,6 +24,7 @@ Future<void> main() async
   usePathUrlStrategy();
   final binding = WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(_lucideLicense);
+  configureBarcodeScanner();
   Intl.systemLocale = Intl.canonicalizedLocale(binding.platformDispatcher.locale.toLanguageTag());
   await EasyLocalization.ensureInitialized();
 

@@ -4,6 +4,7 @@ use sqlx::PgPool;
 
 use crate::banking::BankClients;
 use crate::config::AppConfig;
+use crate::receipt_ai::ReceiptReader;
 use crate::security::crypto::SecretBox;
 use crate::security::password::PasswordService;
 use crate::security::rate_limit::RateLimiter;
@@ -17,6 +18,7 @@ pub struct AppState
     pub passwords: Arc<PasswordService>,
     pub limiter: Arc<RateLimiter>,
     pub banks: Arc<BankClients>,
+    pub receipt_ai: Option<Arc<ReceiptReader>>,
 }
 
 impl AppState
@@ -26,6 +28,12 @@ impl AppState
         let secret_box = SecretBox::new(&a_cfg.data_key);
         let passwords = PasswordService::new(a_cfg.password_pepper.clone());
         let banks = BankClients::new(&a_cfg.banks)?;
+        let receipt_ai = a_cfg
+            .receipt_ai
+            .as_ref()
+            .map(ReceiptReader::new)
+            .transpose()?
+            .map(Arc::new);
 
         Ok(Self {
             db: a_db,
@@ -34,6 +42,7 @@ impl AppState
             passwords: Arc::new(passwords),
             limiter: Arc::new(RateLimiter::default()),
             banks: Arc::new(banks),
+            receipt_ai,
         })
     }
 }

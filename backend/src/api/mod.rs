@@ -8,6 +8,7 @@ pub mod geo_handlers;
 pub mod item_handlers;
 pub mod place_handlers;
 pub mod receipt_handlers;
+pub mod recognize_handlers;
 pub mod router;
 pub mod routine_handlers;
 pub mod stats_handlers;

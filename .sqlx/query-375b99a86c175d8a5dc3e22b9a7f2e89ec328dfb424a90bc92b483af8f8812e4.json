@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT i.id, i.name, i.unit AS \"unit: ItemUnit\"\n            FROM items i\n            WHERE i.barcode = $2\n              AND (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)\n                   OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n            ORDER BY (i.owner_id = $1) DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "375b99a86c175d8a5dc3e22b9a7f2e89ec328dfb424a90bc92b483af8f8812e4"
+}

@@ -1,12 +1,18 @@
+import 'dart:convert';
+
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
+import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import '../dicts/item_form.dart';
@@ -25,6 +31,10 @@ class ReceiptDetailScreen extends ConsumerStatefulWidget
 }
 
 const String _fallbackCurrencyCode = 'UAH';
+const double _wideRowWidth = 640;
+const String _aiConsentPref = 'receipt.ai_consent';
+const double _photoMaxSide = 2000;
+const int _photoQuality = 85;
 
 class _ItemChoice
 {
@@ -50,8 +60,29 @@ class _ItemRow
   String itemName = '';
   ItemKind kind = ItemKind.product;
   ItemUnit unit = ItemUnit.piece;
+  NewItemDraft? newItem;
+  String? sourceText;
+  LineMatch? match;
 
   _ItemRow();
+
+  _ItemRow.recognized(RecognizedLine aLine)
+  {
+    itemId = aLine.itemId;
+    itemName = aLine.itemName ?? aLine.name;
+    kind = aLine.kind;
+    unit = aLine.unit;
+    sourceText = aLine.text;
+    match = aLine.match;
+    if (aLine.itemId == null)
+    {
+      newItem = NewItemDraft(name: aLine.name, kind: aLine.kind, unit: aLine.unit, barcode: aLine.barcode);
+    }
+    nameCtrl.text = itemName;
+    qtyCtrl.text = _trimZeros(aLine.qty);
+    priceCtrl.text = aLine.unitPrice == null ? '' : aLine.unitPrice!.toStringAsFixed(2);
+    amountCtrl.text = aLine.amount.toStringAsFixed(2);
+  }
 
   _ItemRow.from(ReceiptItem aItem)
   {
@@ -74,11 +105,15 @@ class _ItemRow
 
   bool get isPicked => itemId != null;
 
+  bool get isNew => itemId == null && newItem != null;
+
   bool get isBlank => nameCtrl.text.trim().isEmpty && (parseAmountInput(amountCtrl.text) ?? 0) == 0;
 
   void select(DictItemDto aItem)
   {
     itemId = aItem.id;
+    newItem = null;
+    match = null;
     itemName = aItem.name;
     kind = aItem.kind;
     unit = aItem.unit;
@@ -93,6 +128,8 @@ class _ItemRow
     if (aText.trim() != itemName)
     {
       itemId = null;
+      newItem = null;
+      match = null;
     }
   }
 
@@ -128,8 +165,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   String? _merchantId;
   String? _placeId;
   String? _placeAddrId;
+  NewPlaceDraft? _newPlace;
   String? _currId;
   String? _cashAccountId;
+  String? _recognitionNote;
   bool _isCashChosen = false;
   DateTime _ts = DateTime.now();
   Object? _loadError;
@@ -289,19 +328,31 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
       final amount = parseAmountInput(row.amountCtrl.text);
       final itemId = row.itemId;
-      if (itemId == null || amount == null || amount < 0)
+      final newItem = row.newItem;
+      if ((itemId == null && newItem == null) || amount == null || amount < 0)
       {
         showInfoSnack(context, 'finance.err_item'.tr());
         return;
       }
 
       final qty = row.qty;
-      items.add(ReceiptItem(
-        itemId: itemId,
+      final line = ReceiptItem(
+        itemId: itemId ?? '',
         qty: qty <= 0 ? 1 : qty,
         unitPrice: parseAmountInput(row.priceCtrl.text),
         amount: amount,
-      ).toJson());
+      ).toJson();
+      if (itemId == null)
+      {
+        line
+          ..remove('item_id')
+          ..['new_item'] = newItem!.toJson();
+      }
+      if (row.sourceText != null)
+      {
+        line['source_text'] = row.sourceText;
+      }
+      items.add(line);
     }
 
     final cashWallets = _cashWallets();
@@ -324,6 +375,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'note': note.isEmpty ? null : note,
         'items': items,
         'tx_ids': _txs.map((aTx) => aTx.id).toList(),
+        if (_pendingPlace() != null) 'new_place': _pendingPlace()!.toJson(),
       });
 
       ref.invalidate(receiptsProv);
@@ -419,6 +471,12 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         ScreenHeader(
           title: _isEdit ? 'finance.receipt'.tr() : 'finance.new_receipt'.tr(),
           actions: [
+            if (ref.watch(receiptRecognitionProv).valueOrNull ?? false)
+              OutlinedButton.icon(
+                onPressed: _isSaving ? null : _chooseRecognitionSource,
+                icon: const Icon(AppIcons.camera, size: 18),
+                label: Text('receipt.recognize'.tr()),
+              ),
             if (_isEdit)
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
@@ -442,6 +500,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
             SizedBox(
               width: 260,
               child: DropdownButtonFormField<String?>(
+                key: ValueKey('place:$_placeId'),
                 initialValue: _placeId,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: 'finance.place'.tr(), border: const OutlineInputBorder()),
@@ -459,6 +518,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
                 {
                   _placeId = aValue;
                   _placeAddrId = _branchesOf(aValue).length == 1 ? _branchesOf(aValue).first.id : null;
+                  if (_newPlace?.placeId != aValue)
+                  {
+                    _newPlace = null;
+                  }
                 }),
               ),
             ),
@@ -466,7 +529,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
               SizedBox(
                 width: 280,
                 child: DropdownButtonFormField<String?>(
-                  key: ValueKey('branch:$_placeId'),
+                  key: ValueKey('branch:$_placeId:$_placeAddrId'),
                   initialValue: _placeAddrId,
                   isExpanded: true,
                   decoration: InputDecoration(labelText: 'catalog.branch'.tr(), border: const OutlineInputBorder()),
@@ -484,6 +547,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
             SizedBox(
               width: 140,
               child: DropdownButtonFormField<String>(
+                key: ValueKey('curr:$_currId'),
                 initialValue: _currId,
                 decoration: InputDecoration(labelText: 'wallet.currency'.tr(), border: const OutlineInputBorder()),
                 items: _currs.map((aCurr) => DropdownMenuItem(value: aCurr.id, child: Text(aCurr.code))).toList(),
@@ -496,18 +560,52 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
             ),
           ],
         ),
+        if (_pendingPlace() != null) ...[
+          const SizedBox(height: 12),
+          InputChip(
+            avatar: const Icon(AppIcons.store, size: 16),
+            label: Text(_pendingPlaceLabel(_pendingPlace()!)),
+            onDeleted: () => setState(() => _newPlace = null),
+          ),
+        ],
+        if (_recognitionNote != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                const Icon(AppIcons.checkCircle, size: 18, color: Color(0xFF1D4ED8)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_recognitionNote!, style: const TextStyle(color: inkPrimary))),
+                IconButton(
+                  tooltip: 'common.cancel'.tr(),
+                  icon: const Icon(AppIcons.x, size: 16),
+                  onPressed: () => setState(() => _recognitionNote = null),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 32),
         Text('finance.items'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         ..._rows.map(_buildItemRow),
         if (rest > 0.004) _buildVirtualRow(aContext, 'finance.rest'.tr(), rest, AppIcons.circleDot),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _rows.add(_ItemRow())),
-            icon: const Icon(AppIcons.plus, size: 18),
-            label: Text('finance.add_item'.tr()),
-          ),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _rows.add(_ItemRow())),
+              icon: const Icon(AppIcons.plus, size: 18),
+              label: Text('finance.add_item'.tr()),
+            ),
+            TextButton.icon(
+              onPressed: () => scanBarcodes(context, _addScanned),
+              icon: const Icon(AppIcons.scanBarcode, size: 18),
+              label: Text('scanner.scan_items'.tr()),
+            ),
+          ],
         ),
         const SizedBox(height: 24),
         Text('finance.payments'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -629,6 +727,343 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     );
   }
 
+  NewPlaceDraft? _pendingPlace()
+  {
+    final draft = _newPlace;
+    if (draft == null)
+    {
+      return null;
+    }
+    final isNewPlace = !draft.isBranch && _placeId == null;
+    final isNewBranch = draft.isBranch && draft.placeId == _placeId && _placeAddrId == null;
+    return isNewPlace || isNewBranch ? draft : null;
+  }
+
+  String _pendingPlaceLabel(NewPlaceDraft aDraft)
+  {
+    if (aDraft.isBranch)
+    {
+      return 'receipt.new_branch'.tr(args: [aDraft.address]);
+    }
+    final description = [aDraft.name, aDraft.address].where((aPart) => aPart.isNotEmpty).join(', ');
+    return 'receipt.new_place'.tr(args: [description]);
+  }
+
+  Future<SharedPreferences?> _prefs() async
+  {
+    try
+    {
+      return await SharedPreferences.getInstance();
+    }
+    on Exception
+    {
+      return null;
+    }
+  }
+
+  Future<bool> _confirmAiConsent() async
+  {
+    final prefs = await _prefs();
+    if (prefs?.getBool(_aiConsentPref) ?? false)
+    {
+      return true;
+    }
+    if (!mounted)
+    {
+      return false;
+    }
+
+    final isAccepted = await confirmAction(
+      context,
+      aTitle: 'receipt.ai_title'.tr(),
+      aMessage: 'receipt.ai_consent'.tr(),
+      aIsDestructive: false,
+    );
+    if (isAccepted)
+    {
+      await prefs?.setBool(_aiConsentPref, true);
+    }
+    return isAccepted;
+  }
+
+  String? _mediaType(Uint8List aBytes)
+  {
+    bool hasPrefix(List<int> aPrefix, [int aOffset = 0])
+    {
+      if (aBytes.length < aOffset + aPrefix.length)
+      {
+        return false;
+      }
+      for (var index = 0; index < aPrefix.length; index++)
+      {
+        if (aBytes[aOffset + index] != aPrefix[index])
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (hasPrefix([0xFF, 0xD8, 0xFF]))
+    {
+      return 'image/jpeg';
+    }
+    if (hasPrefix([0x89, 0x50, 0x4E, 0x47]))
+    {
+      return 'image/png';
+    }
+    if (hasPrefix('RIFF'.codeUnits) && hasPrefix('WEBP'.codeUnits, 8))
+    {
+      return 'image/webp';
+    }
+    return null;
+  }
+
+  Future<void> _recognize(ImageSource aSource) async
+  {
+    if (!await _confirmAiConsent())
+    {
+      return;
+    }
+
+    final XFile? photo;
+    try
+    {
+      photo = await ImagePicker().pickImage(
+        source: aSource,
+        maxWidth: _photoMaxSide,
+        maxHeight: _photoMaxSide,
+        imageQuality: _photoQuality,
+      );
+    }
+    on PlatformException
+    {
+      if (mounted)
+      {
+        showInfoSnack(context, 'scanner.err_permission'.tr());
+      }
+      return;
+    }
+    if (photo == null)
+    {
+      return;
+    }
+
+    final bytes = await photo.readAsBytes();
+    final mediaType = _mediaType(bytes);
+    if (!mounted)
+    {
+      return;
+    }
+    if (mediaType == null)
+    {
+      showInfoSnack(context, 'receipt.err_image_type'.tr());
+      return;
+    }
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3)),
+              const SizedBox(width: 16),
+              Expanded(child: Text('receipt.recognizing'.tr())),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    RecognizedReceipt? draft;
+    try
+    {
+      draft = await ref.read(apiProv).recognizeReceipt(base64Encode(bytes), mediaType);
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    finally
+    {
+      navigator.pop();
+    }
+
+    if (draft != null && mounted)
+    {
+      _applyDraft(draft);
+    }
+  }
+
+  void _applyDraft(RecognizedReceipt aDraft)
+  {
+    final currCode = aDraft.currCode ?? _currCode;
+    final newCount = aDraft.lines.where((aLine) => aLine.itemId == null).length;
+    final summary = 'receipt.recognized'.tr(args: ['${aDraft.lines.length}', '$newCount']);
+    final mismatch = aDraft.isTotalMismatch
+        ? 'receipt.total_mismatch'.tr(args: [
+            formatMoney(context, aDraft.linesTotal, currCode),
+            formatMoney(context, aDraft.total!, currCode),
+          ])
+        : null;
+    final blank = _rows.where((aRow) => aRow.isBlank).toList();
+
+    setState(()
+    {
+      if (aDraft.receiptTs != null)
+      {
+        _ts = aDraft.receiptTs!;
+      }
+      if (aDraft.currId != null)
+      {
+        _currId = aDraft.currId;
+        _isCashChosen = false;
+      }
+      if (aDraft.storeName != null && _merchantCtrl.text.trim().isEmpty)
+      {
+        _merchantCtrl.text = aDraft.storeName!;
+        _merchantId = null;
+      }
+      if (aDraft.placeId != null)
+      {
+        _placeId = aDraft.placeId;
+        _placeAddrId = aDraft.placeAddrId;
+      }
+      else if (aDraft.newPlace != null)
+      {
+        _placeId = null;
+        _placeAddrId = null;
+      }
+      _newPlace = aDraft.newPlace;
+
+      for (final row in blank)
+      {
+        _rows.remove(row);
+        row.dispose();
+      }
+      _rows.addAll(aDraft.lines.map(_ItemRow.recognized));
+      if (_rows.isEmpty)
+      {
+        _rows.add(_ItemRow());
+      }
+      _recognitionNote = mismatch == null ? summary : '$summary $mismatch';
+    });
+  }
+
+  Future<DictItemDto?> _itemByBarcode(String aCode) async
+  {
+    final found = await ref.read(apiProv).getItems(aBarcode: aCode, aLimit: 1);
+    if (found.isNotEmpty || !mounted)
+    {
+      return found.firstOrNull;
+    }
+    return showItemCreateDialog(context, aCode);
+  }
+
+  Future<String?> _addScanned(String aCode) async
+  {
+    try
+    {
+      final item = await _itemByBarcode(aCode);
+      if (item == null || !mounted)
+      {
+        return 'scanner.skipped'.tr();
+      }
+
+      setState(()
+      {
+        final filled = _rows.where((aRow) => !aRow.isBlank).toList();
+        final last = filled.lastOrNull;
+        if (last != null && last.itemId == item.id)
+        {
+          last.qtyCtrl.text = _ItemRow._trimZeros(last.qty + 1);
+          last.recalc();
+          return;
+        }
+
+        final target = _rows.where((aRow) => aRow.isBlank).firstOrNull ?? _ItemRow();
+        if (!_rows.contains(target))
+        {
+          _rows.add(target);
+        }
+        target.select(item);
+        target.qtyCtrl.text = '1';
+      });
+      return 'scanner.added'.tr(args: [item.name]);
+    }
+    catch (aError)
+    {
+      return errorText(aError);
+    }
+  }
+
+  Future<void> _scanIntoRow(_ItemRow aRow) async
+  {
+    final code = await scanBarcode(context);
+    if (code == null || !mounted)
+    {
+      return;
+    }
+
+    try
+    {
+      final item = await _itemByBarcode(code);
+      if (item != null && mounted)
+      {
+        setState(() => aRow.select(item));
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+  }
+
+  Future<void> _chooseRecognitionSource() async
+  {
+    final isPhone = kIsWeb || defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+    if (!isPhone)
+    {
+      await _recognize(ImageSource.gallery);
+      return;
+    }
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (aSheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(AppIcons.camera),
+              title: Text('receipt.take_photo'.tr()),
+              onTap: () => Navigator.of(aSheetContext).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.image),
+              title: Text('receipt.pick_photo'.tr()),
+              onTap: () => Navigator.of(aSheetContext).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null)
+    {
+      await _recognize(source);
+    }
+  }
+
   List<PlaceDto> _placeOptions()
   {
     final saved = _saved;
@@ -707,14 +1142,35 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   Widget _buildItemPicker(_ItemRow aRow, InputDecoration aDecoration)
   {
     final hasText = aRow.nameCtrl.text.trim().isNotEmpty;
-    final Widget? status = aRow.isPicked
-        ? Icon(itemKindIcon(aRow.kind), size: 18, color: Colors.blue.shade700)
-        : hasText
-            ? Tooltip(
-                message: 'items.pick_hint'.tr(),
-                child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
-              )
-            : null;
+    final Widget? state = switch (aRow)
+    {
+      _ItemRow(isPicked: true, match: LineMatch.similar) => Tooltip(
+          message: 'receipt.similar_hint'.tr(args: [aRow.sourceText ?? '']),
+          child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
+        ),
+      _ItemRow(isPicked: true) => Icon(itemKindIcon(aRow.kind), size: 18, color: Colors.blue.shade700),
+      _ItemRow(isNew: true) => Tooltip(
+          message: 'receipt.new_item_hint'.tr(),
+          child: const Icon(AppIcons.plusCircle, size: 18, color: Color(0xFF15803D)),
+        ),
+      _ when hasText => Tooltip(
+          message: 'items.pick_hint'.tr(),
+          child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
+        ),
+      _ => null,
+    };
+    final status = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (state != null) state,
+        IconButton(
+          tooltip: 'scanner.title'.tr(),
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(AppIcons.scanBarcode, size: 18),
+          onPressed: () => _scanIntoRow(aRow),
+        ),
+      ],
+    );
 
     return RawAutocomplete<_ItemChoice>(
       textEditingController: aRow.nameCtrl,
@@ -758,61 +1214,88 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   {
     InputDecoration decoration(String aLabel) => InputDecoration(labelText: aLabel, border: const OutlineInputBorder(), isDense: true);
 
+    final picker = _buildItemPicker(aRow, decoration('finance.item_name'.tr()));
+    final qty = TextField(
+      controller: aRow.qtyCtrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: amountFormatters,
+      onChanged: (_) => setState(aRow.recalc),
+      decoration: decoration('finance.qty'.tr()).copyWith(
+        hintText: '1',
+        suffixText: aRow.isPicked ? itemUnitShort(aRow.unit) : null,
+      ),
+    );
+    final price = TextField(
+      controller: aRow.priceCtrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: amountFormatters,
+      onChanged: (_) => setState(aRow.recalc),
+      decoration: decoration('finance.price'.tr()),
+    );
+    final amount = TextField(
+      controller: aRow.amountCtrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: amountFormatters,
+      onChanged: (_) => setState(() {}),
+      decoration: decoration('finance.amount'.tr()),
+    );
+    final remove = IconButton(
+      tooltip: 'common.delete'.tr(),
+      icon: const Icon(AppIcons.x, size: 18),
+      onPressed: () => setState(()
+      {
+        _rows.remove(aRow);
+        aRow.dispose();
+      }),
+    );
+
     return Padding(
       key: aRow.key,
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: _buildItemPicker(aRow, decoration('finance.item_name'.tr())),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: aRow.qtyCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: amountFormatters,
-              onChanged: (_) => setState(aRow.recalc),
-              decoration: decoration('finance.qty'.tr()).copyWith(
-                hintText: '1',
-                suffixText: aRow.isPicked ? itemUnitShort(aRow.unit) : null,
+      child: LayoutBuilder(
+        builder: (_, aConstraints)
+        {
+          if (aConstraints.maxWidth >= _wideRowWidth)
+          {
+            return Row(
+              children: [
+                Expanded(flex: 5, child: picker),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: qty),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: price),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: amount),
+                remove,
+              ],
+            );
+          }
+
+          return DecoratedBox(
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                children: [
+                  Row(children: [Expanded(child: picker), remove]),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 48),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: qty),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 3, child: price),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 4, child: amount),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: aRow.priceCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: amountFormatters,
-              onChanged: (_) => setState(aRow.recalc),
-              decoration: decoration('finance.price'.tr()),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: aRow.amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: amountFormatters,
-              onChanged: (_) => setState(() {}),
-              decoration: decoration('finance.amount'.tr()),
-            ),
-          ),
-          IconButton(
-            tooltip: 'common.delete'.tr(),
-            icon: const Icon(AppIcons.x, size: 18),
-            onPressed: () => setState(()
-            {
-              _rows.remove(aRow);
-              aRow.dispose();
-            }),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

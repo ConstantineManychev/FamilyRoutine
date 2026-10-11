@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO cities (country_id, name, created_by) VALUES ($1, $2, $3)\n            ON CONFLICT (country_id, name) DO UPDATE SET name = EXCLUDED.name\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2bd7014efb8141dfb88a9ca1ca3b657ea5be3567a7d504e01e8200626bea7543"
+}

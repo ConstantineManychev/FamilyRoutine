@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
+import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import 'item_form.dart';
 import 'scope_widgets.dart';
@@ -44,6 +45,33 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     _searchTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _scan() async
+  {
+    final code = await scanBarcode(context);
+    if (code == null || !mounted)
+    {
+      return;
+    }
+
+    try
+    {
+      final found = await ref.read(apiProv).getItems(aBarcode: code, aLimit: 1);
+      if (!mounted)
+      {
+        return;
+      }
+      final item = found.firstOrNull;
+      context.go(item == null ? Uri(path: '/app/items/new', queryParameters: {'barcode': code}).toString() : '/app/items/${item.id}');
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
   }
 
   void _onSearchChanged(String aValue)
@@ -88,6 +116,11 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
               decoration: InputDecoration(
                 hintText: 'items.search_barcode'.tr(),
                 prefixIcon: const Icon(AppIcons.search, size: 18),
+                suffixIcon: IconButton(
+                  tooltip: 'scanner.title'.tr(),
+                  icon: const Icon(AppIcons.scanBarcode, size: 18),
+                  onPressed: _scan,
+                ),
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),

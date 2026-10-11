@@ -68,3 +68,12 @@ final AutoDisposeFutureProvider<List<ReceiptListItem>> receiptsProv =
   }
   return aRef.read(apiProv).getReceipts();
 });
+
+final AutoDisposeFutureProvider<bool> receiptRecognitionProv = FutureProvider.autoDispose<bool>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return false;
+  }
+  return aRef.read(apiProv).isReceiptRecognitionEnabled();
+});

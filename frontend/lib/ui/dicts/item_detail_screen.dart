@@ -20,8 +20,9 @@ enum _ItemAction { share, merge }
 class ItemDetailScreen extends ConsumerStatefulWidget
 {
   final String? itemId;
+  final String? initialBarcode;
 
-  const ItemDetailScreen({super.key, this.itemId});
+  const ItemDetailScreen({super.key, this.itemId, this.initialBarcode});
 
   @override
   ConsumerState<ItemDetailScreen> createState() => _ItemDetailScreenState();
@@ -50,6 +51,10 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     if (_isEdit)
     {
       _load();
+    }
+    else
+    {
+      _barcodeCtrl.text = widget.initialBarcode ?? '';
     }
   }
 
@@ -326,6 +331,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
             scopeFams: _isEdit ? null : fams,
             scopeFamilyId: _familyId,
             onScopeChanged: _isEdit ? null : (aValue) => setState(() => _familyId = aValue),
+            onScanBarcode: () => scanIntoBarcodeField(context, ref, _barcodeCtrl, aCurrentItemId: widget.itemId),
             onKindChanged: (aKind) => setState(() => _kind = aKind),
             onUnitChanged: (aUnit) => setState(() => _unit = aUnit),
           ),
