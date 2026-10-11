@@ -36,6 +36,10 @@ pub const BANK_CONNECT_PER_USER: Rule = Rule {
     limit: 10,
     period: Duration::from_secs(60 * 60),
 };
+pub const AI_KEY_CHECK_PER_USER: Rule = Rule {
+    limit: 30,
+    period: Duration::from_secs(60 * 60),
+};
 pub const INVITE_ACCEPT_PER_IP: Rule = Rule {
     limit: 30,
     period: Duration::from_secs(60 * 60),

@@ -622,11 +622,46 @@ class ApiSvc
     return DashboardDto.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<bool> isReceiptRecognitionEnabled() async
+  Future<AiFeatures> getFeatures() async
   {
     final res = await _dio.get('/api/features');
-    return (res.data as Map<String, dynamic>)['is_receipt_recognition'] as bool? ?? false;
+    return AiFeatures.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<AiSettings> getAiSettings() async
+  {
+    final res = await _dio.get('/api/settings/ai');
+    return AiSettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<AiSettings> saveAiSettings(AiSource aSource, int? aDailyLimit, int? aMonthlyLimit) async
+  {
+    final res = await _dio.put(
+      '/api/settings/ai',
+      data: {'source': aSource.toJson(), 'daily_limit': aDailyLimit, 'monthly_limit': aMonthlyLimit},
+    );
+    return AiSettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<AiKeySaved> saveAiKey(AiProvider aProvider, String aApiKey) async
+  {
+    final res = await _dio.put('/api/settings/ai/keys/${aProvider.toJson()}', data: {'api_key': aApiKey});
+    return AiKeySaved.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<AiKey> setAiModel(AiProvider aProvider, String aModel) async
+  {
+    final res = await _dio.patch('/api/settings/ai/keys/${aProvider.toJson()}', data: {'model': aModel});
+    return AiKey.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<AiModel>> getAiModels(AiProvider aProvider) async
+  {
+    final res = await _dio.get('/api/settings/ai/keys/${aProvider.toJson()}/models');
+    return AiModel.listFromJson(res.data);
+  }
+
+  Future<void> deleteAiKey(AiProvider aProvider) => _dio.delete('/api/settings/ai/keys/${aProvider.toJson()}');
 
   Future<RecognizedReceipt> recognizeReceipt(String aImageBase64, String aMediaType) async
   {

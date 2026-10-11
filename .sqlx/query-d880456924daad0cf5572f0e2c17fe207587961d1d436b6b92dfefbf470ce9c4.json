@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(SUM(scan_count), 0)::BIGINT AS \"count!\"\n        FROM receipt_scans\n        WHERE user_id = $1 AND is_own_key = $2\n          AND scan_day >= date_trunc('month', NOW() AT TIME ZONE 'UTC')::date\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d880456924daad0cf5572f0e2c17fe207587961d1d436b6b92dfefbf470ce9c4"
+}

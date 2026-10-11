@@ -11,9 +11,9 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers, item_handlers,
-    place_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, tx_handlers, user_handlers,
-    wallet_handlers,
+    ai_handlers, auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers,
+    item_handlers, place_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, tx_handlers,
+    user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -35,6 +35,17 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
         .route("/dicts", get(user_handlers::get_avail_dicts))
         .route("/features", get(recognize_handlers::features))
+        .route(
+            "/settings/ai",
+            get(ai_handlers::get_settings).put(ai_handlers::save_settings),
+        )
+        .route(
+            "/settings/ai/keys/:provider",
+            put(ai_handlers::save_key)
+                .patch(ai_handlers::set_model)
+                .delete(ai_handlers::delete_key),
+        )
+        .route("/settings/ai/keys/:provider/models", get(ai_handlers::get_models))
         .route(
             "/dicts/exercises",
             get(ex_handlers::list_exercises).post(ex_handlers::create_exercise),

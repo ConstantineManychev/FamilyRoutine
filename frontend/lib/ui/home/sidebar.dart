@@ -92,7 +92,7 @@ class _SidebarState extends ConsumerState<Sidebar>
           _buildDictMenu(),
         ],
         const SizedBox(height: 24.0),
-        _buildNavItem(AppIcons.settings, 'sidebar.settings'.tr(), null),
+        _buildNavItem(AppIcons.settings, 'sidebar.settings'.tr(), () => _go('/app/settings')),
       ],
     );
   }

@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO user_ai_keys (user_id, provider, sealed_key, key_hint, model)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (user_id, provider) DO UPDATE\n        SET sealed_key = EXCLUDED.sealed_key, key_hint = EXCLUDED.key_hint, model = EXCLUDED.model, updated_ts = NOW()\n        RETURNING provider AS \"provider: AiProvider\", key_hint, model, updated_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider: AiProvider",
+        "type_info": {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "key_hint",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "model",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        },
+        "Bytea",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "19ebd07b4f67187fb237d40ed2e0ed441e4a06443678ac254b945528ff693ef8"
+}

@@ -11,6 +11,7 @@ use shared_schema::{
 use sqlx::PgConnection;
 use uuid::Uuid;
 
+use crate::api::ai_handlers::{charge_scan, read_error, record_usage, refund_scan, resolve_ai};
 use crate::api::extract::{ApiJson, AuthUser};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{check_money, check_qty, clean_barcode, money};
@@ -75,11 +76,17 @@ struct ScoredBranch
     is_same_house: bool,
 }
 
-pub async fn features(State(a_state): State<AppState>, _a_user: AuthUser) -> Json<FeaturesDto>
+pub async fn features(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<FeaturesDto>, ApiError>
 {
-    Json(FeaturesDto {
-        is_receipt_recognition: a_state.receipt_ai.is_some(),
-    })
+    let mut conn = a_state.db.acquire().await?;
+    let provider = resolve_ai(&a_state, &mut conn, a_user.user_id)
+        .await?
+        .map(|resolved| resolved.target.provider);
+
+    Ok(Json(FeaturesDto {
+        is_receipt_recognition: provider.is_some(),
+        recognition_provider: provider,
+    }))
 }
 
 pub async fn recognize_receipt(
@@ -88,28 +95,36 @@ pub async fn recognize_receipt(
     ApiJson(a_req): ApiJson<RecognizeReceiptRequest>,
 ) -> Result<Json<RecognizedReceiptDto>, ApiError>
 {
-    let reader = a_state
-        .receipt_ai
-        .clone()
-        .ok_or(ApiError::Conflict("RECOGNITION_DISABLED"))?;
     let image = check_image(&a_req.media_type, &a_req.image)?;
 
     let mut conn = a_state.db.acquire().await?;
-    charge_scan(&mut conn, a_user.user_id, reader.daily_limit).await?;
+    let resolved = resolve_ai(&a_state, &mut conn, a_user.user_id)
+        .await?
+        .ok_or(ApiError::Conflict("RECOGNITION_DISABLED"))?;
     drop(conn);
+    charge_scan(&a_state, a_user.user_id, &resolved).await?;
 
-    let raw = reader.read(&image).await.map_err(|err| match err
+    let outcome = match a_state.receipt_ai.read(&resolved.target, &image).await
     {
-        ReadError::Unavailable => ApiError::Upstream("RECOGNITION_UNAVAILABLE"),
-        ReadError::Refused | ReadError::Unreadable => ApiError::Conflict("RECEIPT_UNREADABLE"),
-    })?;
-    if !raw.is_receipt
+        Ok(outcome) => outcome,
+        Err(err) =>
+        {
+            if matches!(err, ReadError::KeyRejected | ReadError::ModelRejected)
+            {
+                refund_scan(&a_state, a_user.user_id, resolved.is_own_key).await?;
+            }
+            return Err(read_error(err, resolved.is_own_key));
+        }
+    };
+    record_usage(&a_state, a_user.user_id, resolved.is_own_key, outcome.usage).await?;
+
+    if !outcome.receipt.is_receipt
     {
         return Err(ApiError::Conflict("NOT_A_RECEIPT"));
     }
 
     let mut conn = a_state.db.acquire().await?;
-    build_draft(&mut conn, a_user.user_id, raw, a_req.tz_offset_min)
+    build_draft(&mut conn, a_user.user_id, outcome.receipt, a_req.tz_offset_min)
         .await
         .map(Json)
 }
@@ -155,33 +170,6 @@ fn check_image(a_media_type: &str, a_data: &str) -> Result<ReceiptImage, ApiErro
         media_type,
         data_base64: STANDARD.encode(&bytes),
     })
-}
-
-async fn charge_scan(a_conn: &mut PgConnection, a_user_id: Uuid, a_daily_limit: i32) -> Result<(), ApiError>
-{
-    let used = sqlx::query_scalar!(
-        r#"
-        INSERT INTO receipt_scans (user_id, scan_day, scan_count)
-        VALUES ($1, CURRENT_DATE, 1)
-        ON CONFLICT (user_id, scan_day) DO UPDATE SET scan_count = receipt_scans.scan_count + 1
-        RETURNING scan_count
-        "#,
-        a_user_id
-    )
-    .fetch_one(&mut *a_conn)
-    .await?;
-
-    if used > a_daily_limit
-    {
-        let now = Utc::now();
-        let tomorrow = (now + Duration::days(1))
-            .date_naive()
-            .and_time(NaiveTime::MIN)
-            .and_utc();
-        return Err(ApiError::TooManyRequests((tomorrow - now).num_seconds().max(1) as u64));
-    }
-
-    Ok(())
 }
 
 async fn build_draft(

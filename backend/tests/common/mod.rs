@@ -8,10 +8,11 @@ use axum::Router;
 use axum_extra::extract::cookie::SameSite;
 use std::time::Duration;
 
-use backend::config::{AppConfig, BankConfig, ReceiptAiConfig};
+use backend::config::{AiEndpoints, AppConfig, BankConfig, ReceiptAiConfig, ServerAiConfig};
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
+use shared_schema::AiProvider;
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -29,6 +30,19 @@ pub fn bank_config(a_mono_url: &str) -> BankConfig
         sync_timezone: "Europe/Dublin".parse().unwrap(),
         eb_sync_hours: vec![0, 6, 12, 18],
         fx_api_url: None,
+    }
+}
+
+pub fn ai_config(a_api_url: &str, a_server: Option<ServerAiConfig>) -> ReceiptAiConfig
+{
+    ReceiptAiConfig {
+        endpoints: AiEndpoints {
+            anthropic: a_api_url.to_string(),
+            openai: a_api_url.to_string(),
+            gemini: a_api_url.to_string(),
+        },
+        server: a_server,
+        is_own_keys_allowed: true,
     }
 }
 
@@ -60,21 +74,27 @@ impl TestApp
 
     pub fn with_banks(a_db: PgPool, a_banks: BankConfig) -> Self
     {
-        Self::build(a_db, a_banks, None)
+        Self::build(a_db, a_banks, ai_config("http://127.0.0.1:9", None))
     }
 
     pub fn with_receipt_ai(a_db: PgPool, a_api_url: &str, a_daily_limit: i32) -> Self
     {
-        let receipt_ai = ReceiptAiConfig {
-            api_url: a_api_url.to_string(),
+        let server = ServerAiConfig {
+            provider: AiProvider::Anthropic,
             api_key: bank_mocks::AI_KEY.to_string(),
             model: "claude-opus-5-5".to_string(),
             daily_limit: a_daily_limit,
+            monthly_limit: 300,
         };
-        Self::build(a_db, bank_config("http://127.0.0.1:9"), Some(receipt_ai))
+        Self::with_ai(a_db, ai_config(a_api_url, Some(server)))
     }
 
-    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: Option<ReceiptAiConfig>) -> Self
+    pub fn with_ai(a_db: PgPool, a_receipt_ai: ReceiptAiConfig) -> Self
+    {
+        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai)
+    }
+
+    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: ReceiptAiConfig) -> Self
     {
         let cfg = AppConfig {
             database_url: String::new(),

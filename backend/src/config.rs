@@ -8,6 +8,9 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use chrono_tz::Tz;
 use jsonwebtoken::EncodingKey;
+use shared_schema::AiProvider;
+
+use crate::receipt_ai::is_valid_model_id;
 
 pub const DATA_KEY_LEN: usize = 32;
 pub const MIN_PEPPER_LEN: usize = 32;
@@ -16,7 +19,9 @@ const DEFAULT_MONO_API: &str = "https://api.monobank.ua";
 const DEFAULT_EB_API: &str = "https://api.enablebanking.com";
 const DEFAULT_FX_API: &str = "https://bank.gov.ua";
 const DEFAULT_ANTHROPIC_API: &str = "https://api.anthropic.com";
-const DEFAULT_RECEIPT_MODEL: &str = "claude-opus-5-5";
+const DEFAULT_OPENAI_API: &str = "https://api.openai.com";
+const DEFAULT_GEMINI_API: &str = "https://generativelanguage.googleapis.com";
+const DEFAULT_ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 
 pub struct BankConfig
 {
@@ -100,19 +105,64 @@ impl EnableBankingConfig
     }
 }
 
-pub struct ReceiptAiConfig
+#[derive(Clone)]
+pub struct AiEndpoints
 {
-    pub api_url: String,
+    pub anthropic: String,
+    pub openai: String,
+    pub gemini: String,
+}
+
+pub struct ServerAiConfig
+{
+    pub provider: AiProvider,
     pub api_key: String,
     pub model: String,
     pub daily_limit: i32,
+    pub monthly_limit: i32,
 }
 
-impl ReceiptAiConfig
+pub struct ReceiptAiConfig
+{
+    pub endpoints: AiEndpoints,
+    pub server: Option<ServerAiConfig>,
+    pub is_own_keys_allowed: bool,
+}
+
+impl AiEndpoints
+{
+    fn from_env() -> Self
+    {
+        Self {
+            anthropic: optional("ANTHROPIC_API_URL").unwrap_or_else(|| DEFAULT_ANTHROPIC_API.into()),
+            openai: optional("OPENAI_API_URL").unwrap_or_else(|| DEFAULT_OPENAI_API.into()),
+            gemini: optional("GEMINI_API_URL").unwrap_or_else(|| DEFAULT_GEMINI_API.into()),
+        }
+    }
+}
+
+impl ServerAiConfig
 {
     fn from_env() -> Result<Option<Self>, String>
     {
-        let Some(api_key) = optional("ANTHROPIC_API_KEY")
+        let provider = match optional("RECEIPT_AI_PROVIDER")
+            .as_deref()
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            None | Some("anthropic") => AiProvider::Anthropic,
+            Some("openai") => AiProvider::Openai,
+            Some("gemini") => AiProvider::Gemini,
+            Some(_) => return Err("RECEIPT_AI_PROVIDER must be anthropic, openai or gemini".into()),
+        };
+        let key_var = match provider
+        {
+            AiProvider::Anthropic => "ANTHROPIC_API_KEY",
+            AiProvider::Openai => "OPENAI_API_KEY",
+            AiProvider::Gemini => "GEMINI_API_KEY",
+        };
+
+        let Some(api_key) = optional(key_var)
         else
         {
             return Ok(None);
@@ -123,12 +173,36 @@ impl ReceiptAiConfig
             return Ok(None);
         }
 
+        let model = match (optional("RECEIPT_AI_MODEL"), provider)
+        {
+            (Some(model), _) => model,
+            (None, AiProvider::Anthropic) => DEFAULT_ANTHROPIC_MODEL.into(),
+            (None, _) => return Err(format!("RECEIPT_AI_MODEL is required for {}", provider.as_str())),
+        };
+        if !is_valid_model_id(provider, &model)
+        {
+            return Err("RECEIPT_AI_MODEL contains unsupported characters".into());
+        }
+
         Ok(Some(Self {
-            api_url: optional("ANTHROPIC_API_URL").unwrap_or_else(|| DEFAULT_ANTHROPIC_API.into()),
+            provider,
             api_key,
-            model: optional("RECEIPT_AI_MODEL").unwrap_or_else(|| DEFAULT_RECEIPT_MODEL.into()),
+            model,
             daily_limit: parse_u64("RECEIPT_AI_DAILY_LIMIT", 30, 1, 1000)? as i32,
+            monthly_limit: parse_u64("RECEIPT_AI_MONTHLY_LIMIT", 300, 1, 30_000)? as i32,
         }))
+    }
+}
+
+impl ReceiptAiConfig
+{
+    fn from_env() -> Result<Self, String>
+    {
+        Ok(Self {
+            endpoints: AiEndpoints::from_env(),
+            server: ServerAiConfig::from_env()?,
+            is_own_keys_allowed: parse_bool("RECEIPT_AI_USER_KEYS", true)?,
+        })
     }
 }
 
@@ -143,7 +217,7 @@ pub struct AppConfig
     pub data_key: [u8; DATA_KEY_LEN],
     pub password_pepper: Vec<u8>,
     pub banks: BankConfig,
-    pub receipt_ai: Option<ReceiptAiConfig>,
+    pub receipt_ai: ReceiptAiConfig,
 }
 
 impl AppConfig

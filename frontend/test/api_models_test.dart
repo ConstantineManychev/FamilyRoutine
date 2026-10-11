@@ -278,6 +278,36 @@ void main()
       );
     });
 
+    test('ai settings expose keys, server limits and usage of the active source', ()
+    {
+      final settings = AiSettings.fromJson({
+        'source': 'openai',
+        'daily_limit': 5,
+        'monthly_limit': null,
+        'effective_daily_limit': 5,
+        'effective_monthly_limit': 300,
+        'server': {'provider': 'anthropic', 'model': 'claude-opus-5-5', 'daily_limit': 30, 'monthly_limit': 300},
+        'is_own_keys_allowed': true,
+        'keys': [
+          {'provider': 'openai', 'key_hint': 'cdef', 'model': 'gpt-5.5', 'updated_ts': '2026-10-11T10:00:00Z'},
+        ],
+        'usage': [
+          {'is_own_key': false, 'today_count': 1, 'month_count': 4, 'month_input_tokens': 10, 'month_output_tokens': 5},
+          {'is_own_key': true, 'today_count': 2, 'month_count': 7, 'month_input_tokens': 2200, 'month_output_tokens': 700},
+        ],
+      });
+      expect(settings.source.ownProvider, AiProvider.openai);
+      expect(settings.keyOf(AiProvider.openai)?.keyHint, 'cdef');
+      expect(settings.keyOf(AiProvider.gemini), isNull);
+      expect(settings.server?.provider.label, 'Anthropic (Claude)');
+      expect(settings.currentUsage.monthCount, 7);
+      expect(AiSource.fromProvider(AiProvider.gemini).toJson(), 'gemini');
+
+      final features = AiFeatures.fromJson({'is_receipt_recognition': true, 'recognition_provider': 'gemini'});
+      expect(features.provider?.product, 'Gemini');
+      expect(AiFeatures.fromJson({'is_receipt_recognition': false, 'recognition_provider': null}).provider, isNull);
+    });
+
     test('barcodes need a valid GTIN check digit', ()
     {
       expect(isValidGtin('4820024700016'), isTrue);

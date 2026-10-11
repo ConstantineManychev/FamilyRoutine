@@ -343,13 +343,16 @@ async fn eb_transactions(
 pub const NBU_EUR_RATE: &str = "45.5";
 pub const NBU_USD_RATE: &str = "41.2";
 
-pub const AI_KEY: &str = "test-anthropic-key";
+pub const AI_KEY: &str = "test-anthropic-key-0123456789";
+pub const OPENAI_KEY: &str = "sk-test-openai-0123456789abcdef";
+pub const GEMINI_KEY: &str = "AIza-test-gemini-0123456789abcdef";
 
 #[derive(Clone, Default)]
 pub struct AiMock
 {
     pub replies: Arc<Mutex<Vec<Value>>>,
     pub requests: Arc<Mutex<Vec<Value>>>,
+    pub calls: Arc<Mutex<Vec<String>>>,
 }
 
 impl AiMock
@@ -358,33 +361,105 @@ impl AiMock
     {
         self.replies.lock().unwrap().push(a_receipt);
     }
+
+    pub fn calls(&self) -> Vec<String>
+    {
+        self.calls.lock().unwrap().clone()
+    }
+
+    fn record(&self, a_call: String, a_body: Value)
+    {
+        self.calls.lock().unwrap().push(a_call);
+        self.requests.lock().unwrap().push(a_body);
+    }
+
+    fn next_reply(&self) -> Option<Value>
+    {
+        self.replies.lock().unwrap().pop()
+    }
 }
 
 pub async fn spawn_anthropic() -> (String, AiMock)
 {
+    spawn_ai().await
+}
+
+pub async fn spawn_ai() -> (String, AiMock)
+{
     let mock = AiMock::default();
     let router = Router::new()
         .route("/v1/messages", post(anthropic_messages))
+        .route("/v1/models", get(provider_models))
+        .route("/v1/responses", post(openai_responses))
+        .route("/v1beta/models", get(gemini_models))
+        .route("/v1beta/models/:action", post(gemini_generate))
         .with_state(mock.clone());
     (serve(router).await, mock)
 }
 
+fn header(a_headers: &HeaderMap, a_name: &str) -> Option<String>
+{
+    a_headers
+        .get(a_name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+}
+
+fn overloaded() -> Response
+{
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(json!({ "error": { "type": "overloaded_error", "status": "UNAVAILABLE", "message": "Overloaded" } })),
+    )
+        .into_response()
+}
+
+fn anthropic_key_error() -> Response
+{
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "type": "error", "error": { "type": "authentication_error", "message": "invalid x-api-key" } })),
+    )
+        .into_response()
+}
+
+fn openai_key_error() -> Response
+{
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({ "error": { "message": "Incorrect API key provided: sk-***", "type": "invalid_request_error", "code": "invalid_api_key" } })),
+    )
+        .into_response()
+}
+
+fn gemini_key_error() -> Response
+{
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": {
+            "code": 400, "message": "API key not valid. Please pass a valid API key.", "status": "INVALID_ARGUMENT",
+            "details": [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": "API_KEY_INVALID" }]
+        }})),
+    )
+        .into_response()
+}
+
 async fn anthropic_messages(State(a_mock): State<AiMock>, a_headers: HeaderMap, Json(a_body): Json<Value>) -> Response
 {
-    let header = |a_name: &str| {
-        a_headers
-            .get(a_name)
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_string)
-    };
-    let is_valid = header("x-api-key").as_deref() == Some(AI_KEY)
-        && header("anthropic-version").as_deref() == Some("2023-06-01")
-        && header("anthropic-beta").as_deref() == Some("server-side-fallback-2026-07-01")
-        && a_body["fallbacks"] == "default"
+    let model = a_body["model"].as_str().unwrap_or_default().to_string();
+    a_mock.record(format!("anthropic:{model}"), a_body.clone());
+    if header(&a_headers, "x-api-key").as_deref() != Some(AI_KEY)
+    {
+        return anthropic_key_error();
+    }
+
+    let is_fallback_valid = !model.starts_with("claude-opus-5")
+        || (header(&a_headers, "anthropic-beta").as_deref() == Some("server-side-fallback-2026-07-01")
+            && a_body["fallbacks"] == "default");
+    let is_valid = is_fallback_valid
+        && header(&a_headers, "anthropic-version").as_deref() == Some("2023-06-01")
         && a_body["output_config"]["format"]["type"] == "json_schema"
         && a_body["messages"][0]["content"][0]["type"] == "image";
-    a_mock.requests.lock().unwrap().push(a_body);
-
     if !is_valid
     {
         return (
@@ -394,14 +469,13 @@ async fn anthropic_messages(State(a_mock): State<AiMock>, a_headers: HeaderMap, 
             .into_response();
     }
 
-    let receipt = a_mock.replies.lock().unwrap().pop();
-    match receipt
+    match a_mock.next_reply()
     {
         Some(receipt) => Json(json!({
             "id": "msg_test",
             "type": "message",
             "role": "assistant",
-            "model": "claude-opus-5-5",
+            "model": model,
             "stop_reason": "end_turn",
             "content": [
                 { "type": "thinking", "thinking": "", "signature": "sig" },
@@ -410,11 +484,135 @@ async fn anthropic_messages(State(a_mock): State<AiMock>, a_headers: HeaderMap, 
             "usage": { "input_tokens": 1500, "output_tokens": 400 }
         }))
         .into_response(),
-        None => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } })),
+        None => overloaded(),
+    }
+}
+
+async fn provider_models(State(a_mock): State<AiMock>, a_headers: HeaderMap) -> Response
+{
+    if let Some(key) = header(&a_headers, "x-api-key")
+    {
+        a_mock.record("anthropic:models".into(), Value::Null);
+        if key != AI_KEY
+        {
+            return anthropic_key_error();
+        }
+        return Json(json!({ "data": [
+            { "type": "model", "id": "claude-opus-5-5", "display_name": "Claude Opus 5.5" },
+            { "type": "model", "id": "claude-haiku-5-5", "display_name": "Claude Haiku 5.5" }
+        ], "has_more": false }))
+        .into_response();
+    }
+
+    a_mock.record("openai:models".into(), Value::Null);
+    if header(&a_headers, "authorization").as_deref() != Some(&format!("Bearer {OPENAI_KEY}"))
+    {
+        return openai_key_error();
+    }
+    Json(json!({ "object": "list", "data": [
+        { "id": "gpt-5.5-mini", "object": "model", "created": 300, "owned_by": "system" },
+        { "id": "gpt-5.5", "object": "model", "created": 300, "owned_by": "system" },
+        { "id": "gpt-realtime", "object": "model", "created": 400, "owned_by": "system" },
+        { "id": "text-embedding-3-small", "object": "model", "created": 100, "owned_by": "system" }
+    ]}))
+    .into_response()
+}
+
+async fn openai_responses(State(a_mock): State<AiMock>, a_headers: HeaderMap, Json(a_body): Json<Value>) -> Response
+{
+    let model = a_body["model"].as_str().unwrap_or_default().to_string();
+    a_mock.record(format!("openai:{model}"), a_body.clone());
+    if header(&a_headers, "authorization").as_deref() != Some(&format!("Bearer {OPENAI_KEY}"))
+    {
+        return openai_key_error();
+    }
+
+    let image = a_body["input"][0]["content"][0]["image_url"]
+        .as_str()
+        .unwrap_or_default();
+    let is_valid = a_body["store"] == false
+        && a_body["text"]["format"]["type"] == "json_schema"
+        && a_body["text"]["format"]["strict"] == true
+        && image.starts_with("data:image/jpeg;base64,");
+    if !is_valid
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "message": "bad request", "type": "invalid_request_error" } })),
         )
-            .into_response(),
+            .into_response();
+    }
+
+    match a_mock.next_reply()
+    {
+        Some(receipt) => Json(json!({
+            "id": "resp_test",
+            "object": "response",
+            "status": "completed",
+            "model": model,
+            "output": [
+                { "type": "reasoning", "id": "rs_1", "summary": [] },
+                { "type": "message", "id": "msg_1", "role": "assistant", "content": [{ "type": "output_text", "text": receipt.to_string(), "annotations": [] }] }
+            ],
+            "usage": { "input_tokens": 1100, "output_tokens": 350, "total_tokens": 1450 }
+        }))
+        .into_response(),
+        None => overloaded(),
+    }
+}
+
+async fn gemini_models(State(a_mock): State<AiMock>, a_headers: HeaderMap) -> Response
+{
+    a_mock.record("gemini:models".into(), Value::Null);
+    if header(&a_headers, "x-goog-api-key").as_deref() != Some(GEMINI_KEY)
+    {
+        return gemini_key_error();
+    }
+    Json(json!({ "models": [
+        { "name": "models/gemini-3.8-flash", "displayName": "Gemini 3.8 Flash", "supportedGenerationMethods": ["generateContent", "countTokens"] },
+        { "name": "models/gemini-3.1-pro-preview", "displayName": "Gemini 3.1 Pro Preview", "supportedGenerationMethods": ["generateContent"] },
+        { "name": "models/gemini-embedding-001", "displayName": "Gemini Embedding", "supportedGenerationMethods": ["embedContent"] }
+    ]}))
+    .into_response()
+}
+
+async fn gemini_generate(
+    State(a_mock): State<AiMock>,
+    Path(a_action): Path<String>,
+    a_headers: HeaderMap,
+    Json(a_body): Json<Value>,
+) -> Response
+{
+    a_mock.record(format!("gemini:{a_action}"), a_body.clone());
+    if header(&a_headers, "x-goog-api-key").as_deref() != Some(GEMINI_KEY)
+    {
+        return gemini_key_error();
+    }
+
+    let is_valid = a_action.ends_with(":generateContent")
+        && a_body["generationConfig"]["responseMimeType"] == "application/json"
+        && a_body["generationConfig"]["responseSchema"]["type"] == "OBJECT"
+        && a_body["contents"][0]["parts"][0]["inlineData"]["mimeType"] == "image/jpeg";
+    if !is_valid
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": 400, "message": "bad request", "status": "INVALID_ARGUMENT" } })),
+        )
+            .into_response();
+    }
+
+    match a_mock.next_reply()
+    {
+        Some(receipt) => Json(json!({
+            "candidates": [{
+                "content": { "role": "model", "parts": [{ "text": "plan", "thought": true }, { "text": receipt.to_string() }] },
+                "finishReason": "STOP"
+            }],
+            "usageMetadata": { "promptTokenCount": 1300, "candidatesTokenCount": 300, "thoughtsTokenCount": 120 }
+        }))
+        .into_response(),
+        None => overloaded(),
     }
 }
 

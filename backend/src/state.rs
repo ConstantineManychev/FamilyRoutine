@@ -18,7 +18,7 @@ pub struct AppState
     pub passwords: Arc<PasswordService>,
     pub limiter: Arc<RateLimiter>,
     pub banks: Arc<BankClients>,
-    pub receipt_ai: Option<Arc<ReceiptReader>>,
+    pub receipt_ai: Arc<ReceiptReader>,
 }
 
 impl AppState
@@ -28,12 +28,7 @@ impl AppState
         let secret_box = SecretBox::new(&a_cfg.data_key);
         let passwords = PasswordService::new(a_cfg.password_pepper.clone());
         let banks = BankClients::new(&a_cfg.banks)?;
-        let receipt_ai = a_cfg
-            .receipt_ai
-            .as_ref()
-            .map(ReceiptReader::new)
-            .transpose()?
-            .map(Arc::new);
+        let receipt_ai = Arc::new(ReceiptReader::new(&a_cfg.receipt_ai.endpoints)?);
 
         Ok(Self {
             db: a_db,

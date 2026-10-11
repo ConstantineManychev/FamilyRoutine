@@ -471,7 +471,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         ScreenHeader(
           title: _isEdit ? 'finance.receipt'.tr() : 'finance.new_receipt'.tr(),
           actions: [
-            if (ref.watch(receiptRecognitionProv).valueOrNull ?? false)
+            if (ref.watch(aiFeaturesProv).valueOrNull?.isReceiptRecognition ?? false)
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : _chooseRecognitionSource,
                 icon: const Icon(AppIcons.camera, size: 18),
@@ -763,8 +763,15 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
   Future<bool> _confirmAiConsent() async
   {
+    final provider = ref.read(aiFeaturesProv).valueOrNull?.provider;
+    if (provider == null)
+    {
+      return false;
+    }
+
+    final consentPref = '$_aiConsentPref.${provider.name}';
     final prefs = await _prefs();
-    if (prefs?.getBool(_aiConsentPref) ?? false)
+    if (prefs?.getBool(consentPref) ?? false)
     {
       return true;
     }
@@ -776,12 +783,12 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     final isAccepted = await confirmAction(
       context,
       aTitle: 'receipt.ai_title'.tr(),
-      aMessage: 'receipt.ai_consent'.tr(),
+      aMessage: 'receipt.ai_consent'.tr(args: [provider.company, provider.product]),
       aIsDestructive: false,
     );
     if (isAccepted)
     {
-      await prefs?.setBool(_aiConsentPref, true);
+      await prefs?.setBool(consentPref, true);
     }
     return isAccepted;
   }

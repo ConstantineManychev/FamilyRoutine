@@ -36,9 +36,14 @@ services:
       ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-}
       ENABLE_BANKING_KEY_FILE: ${ENABLE_BANKING_APP_ID:+/run/secrets/enable_banking_key}
       ENABLE_BANKING_REDIRECT_URL: https://${APP_DOMAIN:-localhost}/app/bank-callback
+      RECEIPT_AI_PROVIDER: ${RECEIPT_AI_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      RECEIPT_AI_MODEL: ${RECEIPT_AI_MODEL:-claude-opus-5-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RECEIPT_AI_MODEL: ${RECEIPT_AI_MODEL:-}
       RECEIPT_AI_DAILY_LIMIT: ${RECEIPT_AI_DAILY_LIMIT:-30}
+      RECEIPT_AI_MONTHLY_LIMIT: ${RECEIPT_AI_MONTHLY_LIMIT:-300}
+      RECEIPT_AI_USER_KEYS: ${RECEIPT_AI_USER_KEYS:-true}
     secrets:
       - enable_banking_key
     depends_on:

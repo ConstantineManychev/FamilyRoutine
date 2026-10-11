@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE receipt_scans\n        SET input_tokens = input_tokens + $3, output_tokens = output_tokens + $4\n        WHERE user_id = $1 AND is_own_key = $2 AND scan_day = (NOW() AT TIME ZONE 'UTC')::date\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "75a9bc4b85a0eb6a5f1f882351130e087a54bedd3bbdaf5d8f94a920e01ab9a7"
+}

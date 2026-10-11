@@ -45,6 +45,12 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
         (Method::PUT, format!("/api/places/{nil}/family")),
         (Method::GET, "/api/features".to_string()),
         (Method::POST, "/api/receipts/recognize".to_string()),
+        (Method::GET, "/api/settings/ai".to_string()),
+        (Method::PUT, "/api/settings/ai".to_string()),
+        (Method::PUT, "/api/settings/ai/keys/openai".to_string()),
+        (Method::PATCH, "/api/settings/ai/keys/gemini".to_string()),
+        (Method::DELETE, "/api/settings/ai/keys/anthropic".to_string()),
+        (Method::GET, "/api/settings/ai/keys/openai/models".to_string()),
     ];
 
     for (method, uri) in endpoints

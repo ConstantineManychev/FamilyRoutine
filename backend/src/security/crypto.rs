@@ -70,10 +70,34 @@ pub fn bank_conn_aad(a_conn_id: Uuid) -> Vec<u8>
     aad
 }
 
+pub fn ai_key_aad(a_user_id: Uuid, a_provider: &str) -> Vec<u8>
+{
+    let mut aad = b"family-routine/ai-key/v1/".to_vec();
+    aad.extend_from_slice(a_user_id.as_bytes());
+    aad.push(b'/');
+    aad.extend_from_slice(a_provider.as_bytes());
+    aad
+}
+
 #[cfg(test)]
 mod tests
 {
     use super::*;
+
+    #[test]
+    fn ai_key_is_bound_to_user_and_provider()
+    {
+        let secret_box = SecretBox::new(&[7u8; 32]);
+        let user_id = Uuid::new_v4();
+        let sealed = secret_box.seal(b"sk-test", &ai_key_aad(user_id, "openai")).unwrap();
+
+        assert_eq!(
+            secret_box.open(&sealed, &ai_key_aad(user_id, "openai")).unwrap(),
+            b"sk-test"
+        );
+        assert!(secret_box.open(&sealed, &ai_key_aad(user_id, "gemini")).is_err());
+        assert!(secret_box.open(&sealed, &ai_key_aad(Uuid::new_v4(), "openai")).is_err());
+    }
 
     #[test]
     fn sealed_secret_round_trips_and_hides_plaintext()

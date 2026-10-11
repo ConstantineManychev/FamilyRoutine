@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO user_ai_settings (user_id, source, daily_limit, monthly_limit)\n        VALUES ($1, $2, $3, $4)\n        ON CONFLICT (user_id) DO UPDATE\n        SET source = EXCLUDED.source, daily_limit = EXCLUDED.daily_limit,\n            monthly_limit = EXCLUDED.monthly_limit, updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_source_t",
+            "kind": {
+              "Enum": [
+                "off",
+                "server",
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6c15ce7a344ddfcbca57dd8502c8ee3b9a9c104ca7813eb41b894833ea3f4f91"
+}

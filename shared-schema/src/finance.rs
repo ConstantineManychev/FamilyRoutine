@@ -407,12 +407,6 @@ pub struct RecognizedReceiptDto
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct FeaturesDto
-{
-    pub is_receipt_recognition: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct ReceiptDto
 {
     pub id: Uuid,

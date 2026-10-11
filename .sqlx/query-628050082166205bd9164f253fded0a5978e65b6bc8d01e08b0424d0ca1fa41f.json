@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_ai_keys SET model = $3, updated_ts = NOW()\n        WHERE user_id = $1 AND provider = $2\n        RETURNING provider AS \"provider: AiProvider\", key_hint, model, updated_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider: AiProvider",
+        "type_info": {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "key_hint",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "model",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        },
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "628050082166205bd9164f253fded0a5978e65b6bc8d01e08b0424d0ca1fa41f"
+}

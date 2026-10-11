@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT is_own_key,\n               COALESCE(SUM(scan_count) FILTER (WHERE scan_day = (NOW() AT TIME ZONE 'UTC')::date), 0)::BIGINT AS \"today_count!\",\n               COALESCE(SUM(scan_count), 0)::BIGINT AS \"month_count!\",\n               COALESCE(SUM(input_tokens), 0)::BIGINT AS \"month_input_tokens!\",\n               COALESCE(SUM(output_tokens), 0)::BIGINT AS \"month_output_tokens!\"\n        FROM receipt_scans\n        WHERE user_id = $1 AND scan_day >= date_trunc('month', NOW() AT TIME ZONE 'UTC')::date\n        GROUP BY is_own_key\n        ORDER BY is_own_key\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_own_key",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "today_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "month_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "month_input_tokens!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "month_output_tokens!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "0a47f5388cb8cb0f28cefc21c60824d8320460c368e7f45917cffb1afe4b3904"
+}

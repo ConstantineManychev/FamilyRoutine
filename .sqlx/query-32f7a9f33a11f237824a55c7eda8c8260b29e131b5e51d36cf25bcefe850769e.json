@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT provider AS \"provider: AiProvider\", key_hint, model, updated_ts\n        FROM user_ai_keys WHERE user_id = $1 ORDER BY provider\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider: AiProvider",
+        "type_info": {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "key_hint",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "model",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "32f7a9f33a11f237824a55c7eda8c8260b29e131b5e51d36cf25bcefe850769e"
+}

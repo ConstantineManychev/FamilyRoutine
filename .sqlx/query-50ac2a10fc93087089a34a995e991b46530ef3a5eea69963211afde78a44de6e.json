@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO user_ai_settings (user_id, source) VALUES ($1, $2)\n        ON CONFLICT (user_id) DO UPDATE SET source = EXCLUDED.source, updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_source_t",
+            "kind": {
+              "Enum": [
+                "off",
+                "server",
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "50ac2a10fc93087089a34a995e991b46530ef3a5eea69963211afde78a44de6e"
+}

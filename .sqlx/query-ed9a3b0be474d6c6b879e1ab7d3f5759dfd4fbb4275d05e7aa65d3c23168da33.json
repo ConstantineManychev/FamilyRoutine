@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM user_ai_keys WHERE user_id = $1 AND provider = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_provider_t",
+            "kind": {
+              "Enum": [
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed9a3b0be474d6c6b879e1ab7d3f5759dfd4fbb4275d05e7aa65d3c23168da33"
+}

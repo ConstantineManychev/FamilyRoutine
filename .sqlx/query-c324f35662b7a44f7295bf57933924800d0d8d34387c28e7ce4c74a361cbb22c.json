@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE receipt_scans SET scan_count = GREATEST(scan_count - 1, 0)\n        WHERE user_id = $1 AND is_own_key = $2 AND scan_day = (NOW() AT TIME ZONE 'UTC')::date\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c324f35662b7a44f7295bf57933924800d0d8d34387c28e7ce4c74a361cbb22c"
+}

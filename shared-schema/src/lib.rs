@@ -1,6 +1,8 @@
+mod ai;
 mod finance;
 mod routine;
 
+pub use ai::*;
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
 pub use routine::*;

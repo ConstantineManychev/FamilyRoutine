@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE user_ai_settings SET source = $3, updated_ts = NOW() WHERE user_id = $1 AND source = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "ai_source_t",
+            "kind": {
+              "Enum": [
+                "off",
+                "server",
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "ai_source_t",
+            "kind": {
+              "Enum": [
+                "off",
+                "server",
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "79436b81e22c63442885786e17fdc2470431cfcc4b9f94075dfdeac0b7795262"
+}

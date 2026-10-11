@@ -1,5 +1,6 @@
 import 'finance_models.dart';
 
+export 'ai_models.dart';
 export 'finance_models.dart';
 export 'routine_models.dart';
 

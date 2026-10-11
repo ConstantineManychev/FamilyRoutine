@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO receipt_scans (user_id, scan_day, is_own_key, scan_count)\n        VALUES ($1, (NOW() AT TIME ZONE 'UTC')::date, $2, 1)\n        ON CONFLICT (user_id, scan_day, is_own_key) DO UPDATE SET scan_count = receipt_scans.scan_count + 1\n        RETURNING scan_count\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scan_count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a7d3ab591936f6e60c87b010440744c4c2c01abc970101bab49b30d53921d4df"
+}

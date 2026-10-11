@@ -11,8 +11,11 @@ const Map<String, List<String>> dynamicKeys = {
     'EMAIL_TAKEN', 'IN_USE', 'OWNER_PROTECTED', 'OWNER_MUST_TRANSFER', 'TOO_MANY_INVITES', 'TOO_MANY_REQUESTS',
     'INTERNAL', 'NETWORK', 'UNKNOWN', 'BANK_NOT_CONFIGURED', 'ALREADY_CONNECTED', 'BANK_UNAVAILABLE', 'BANK_LINKED',
     'BANK_APP_REJECTED', 'BANK_APP_INACTIVE', 'BANK_REJECTED', 'BARCODE_TAKEN', 'RECOGNITION_DISABLED',
-    'RECOGNITION_UNAVAILABLE', 'RECEIPT_UNREADABLE', 'NOT_A_RECEIPT',
+    'RECOGNITION_UNAVAILABLE', 'RECEIPT_UNREADABLE', 'NOT_A_RECEIPT', 'AI_KEY_REJECTED', 'AI_MODEL_REJECTED',
+    'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
+    'AI_PROVIDER_UNAVAILABLE',
   ],
+  'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'bank': [
     'provider_monobank', 'provider_enable_banking', 'status_pending', 'status_active', 'status_error', 'status_expired',
     'error_UNAUTHORIZED', 'error_APP_INACTIVE', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',

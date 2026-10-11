@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source AS \"source: AiSource\", daily_limit, monthly_limit FROM user_ai_settings WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source: AiSource",
+        "type_info": {
+          "Custom": {
+            "name": "ai_source_t",
+            "kind": {
+              "Enum": [
+                "off",
+                "server",
+                "anthropic",
+                "openai",
+                "gemini"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "daily_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "monthly_limit",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "6c71e193f4e2a76795750b6e72a9912f6e115295360ebfa78810f85489480339"
+}
