@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE place_addrs\n                    SET is_main = $3, country_id = $4, city_id = $5, street_id = $6,\n                        house_num = $7, apt = $8, zip = $9\n                    WHERE id = $1 AND place_id = $2\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1639d0dad67b5ea1d417c2a4440c2a08610bc15e7c4200b4e6ab89be0d231e9c"
+}

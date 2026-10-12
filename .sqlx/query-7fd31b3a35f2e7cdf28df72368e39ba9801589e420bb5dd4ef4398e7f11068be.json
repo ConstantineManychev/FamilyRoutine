@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)\n            ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name\n            RETURNING id\n            ",
+  "query": "\n        INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)\n        ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name\n        RETURNING id\n        ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "c5c4738e48b76e4217695ddc7791b0fa530156df29b16902e5e9825b4d4edab9"
+  "hash": "7fd31b3a35f2e7cdf28df72368e39ba9801589e420bb5dd4ef4398e7f11068be"
 }

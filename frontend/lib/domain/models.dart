@@ -330,11 +330,10 @@ class PlaceAddrDto
   final bool isMain;
   final String countryId;
   final String cityId;
-  final String streetId;
-  final String houseNum;
+  final String? streetId;
+  final String? houseNum;
   final String? apt;
-  final String zip;
-  final String? merchantId;
+  final String? zip;
   final String? label;
 
   const PlaceAddrDto({
@@ -342,11 +341,10 @@ class PlaceAddrDto
     required this.isMain,
     required this.countryId,
     required this.cityId,
-    required this.streetId,
-    required this.houseNum,
+    this.streetId,
+    this.houseNum,
     this.apt,
-    required this.zip,
-    this.merchantId,
+    this.zip,
     this.label,
   });
 
@@ -355,11 +353,10 @@ class PlaceAddrDto
         isMain: aJson['is_main'] as bool? ?? false,
         countryId: aJson['country_id'] as String,
         cityId: aJson['city_id'] as String,
-        streetId: aJson['street_id'] as String,
-        houseNum: aJson['house_num'] as String? ?? '',
+        streetId: aJson['street_id'] as String?,
+        houseNum: aJson['house_num'] as String?,
         apt: aJson['apt'] as String?,
-        zip: aJson['zip'] as String? ?? '',
-        merchantId: aJson['merchant_id'] as String?,
+        zip: aJson['zip'] as String?,
         label: aJson['label'] as String?,
       );
 
@@ -372,9 +369,14 @@ class PlaceAddrDto
         houseNum: houseNum,
         apt: apt,
         zip: zip,
-        merchantId: merchantId,
         label: label,
       );
+
+  static String? _blankToNull(String? aValue)
+  {
+    final trimmed = aValue?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
 
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
@@ -382,11 +384,25 @@ class PlaceAddrDto
         'country_id': countryId,
         'city_id': cityId,
         'street_id': streetId,
-        'house_num': houseNum,
-        'apt': apt,
-        'zip': zip.trim().isEmpty ? null : zip.trim(),
-        'merchant_id': merchantId,
+        'house_num': _blankToNull(houseNum),
+        'apt': _blankToNull(apt),
+        'zip': _blankToNull(zip),
       };
+}
+
+class LinkedMerchant
+{
+  final String merchantId;
+  final String name;
+  final String? placeAddrId;
+
+  const LinkedMerchant({required this.merchantId, required this.name, this.placeAddrId});
+
+  factory LinkedMerchant.fromJson(Map<String, dynamic> aJson) => LinkedMerchant(
+        merchantId: aJson['merchant_id'] as String,
+        name: aJson['name'] as String? ?? '',
+        placeAddrId: aJson['place_addr_id'] as String?,
+      );
 }
 
 class PlaceDto
@@ -397,6 +413,7 @@ class PlaceDto
   final String? familyName;
   final bool isEditable;
   final List<PlaceAddrDto> addrs;
+  final List<LinkedMerchant> merchants;
 
   const PlaceDto({
     required this.id,
@@ -405,6 +422,7 @@ class PlaceDto
     this.familyName,
     this.isEditable = true,
     required this.addrs,
+    this.merchants = const [],
   });
 
   PlaceAddrDto? get mainAddr
@@ -427,6 +445,9 @@ class PlaceDto
         isEditable: aJson['is_editable'] as bool? ?? true,
         addrs: (aJson['addrs'] as List? ?? const [])
             .map((aItem) => PlaceAddrDto.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+        merchants: (aJson['merchants'] as List? ?? const [])
+            .map((aItem) => LinkedMerchant.fromJson(aItem as Map<String, dynamic>))
             .toList(),
       );
 }

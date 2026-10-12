@@ -3,19 +3,21 @@ use std::collections::HashMap;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use shared_schema::{NewPlaceRequest, PlaceAddrDto, PlaceDto, SavePlaceRequest, ShareToFamilyRequest};
+use shared_schema::{
+    LinkMerchantRequest, LinkedMerchantDto, NewPlaceRequest, PlaceAddrDto, PlaceDto, SavePlaceRequest,
+    ShareToFamilyRequest,
+};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, AuthUser};
 use crate::domain::errors::ApiError;
-use crate::domain::validation::{clean_name, clean_optional_text, clean_text};
+use crate::domain::validation::{clean_name, clean_optional_text};
 use crate::security::authz::require_member;
 use crate::state::AppState;
 
 const MAX_ADDRS: usize = 20;
 const MAX_SHORT_LEN: usize = 50;
-const MAX_MERCHANT_LEN: usize = 255;
 const MAX_GEO_NAME_LEN: usize = 100;
 
 struct PlaceRow
@@ -38,6 +40,12 @@ struct AddrRow
 {
     place_id: Uuid,
     addr: PlaceAddrDto,
+}
+
+struct MerchantLinkRow
+{
+    place_id: Uuid,
+    link: LinkedMerchantDto,
 }
 
 pub async fn list_places(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<Vec<PlaceDto>>, ApiError>
@@ -64,11 +72,13 @@ pub async fn list_places(State(a_state): State<AppState>, a_user: AuthUser) -> R
 
     let ids: Vec<Uuid> = places.iter().map(|place| place.id).collect();
     let mut addrs_by_place = load_addrs(&mut conn, &ids).await?;
+    let mut merchants_by_place = load_merchant_links(&mut conn, &ids, a_user.user_id).await?;
 
     let result = places
         .into_iter()
         .map(|place| PlaceDto {
             addrs: addrs_by_place.remove(&place.id).unwrap_or_default(),
+            merchants: merchants_by_place.remove(&place.id).unwrap_or_default(),
             id: place.id,
             name: place.name,
             family_id: place.family_id,
@@ -174,7 +184,7 @@ pub async fn update_place(
                     r#"
                     UPDATE place_addrs
                     SET is_main = $3, country_id = $4, city_id = $5, street_id = $6,
-                        house_num = $7, apt = $8, zip = $9, merchant_id = $10
+                        house_num = $7, apt = $8, zip = $9
                     WHERE id = $1 AND place_id = $2
                     "#,
                     addr_id,
@@ -185,8 +195,7 @@ pub async fn update_place(
                     addr.street_id,
                     addr.house_num,
                     addr.apt,
-                    addr.zip,
-                    addr.merchant_id
+                    addr.zip
                 )
                 .execute(&mut *tx)
                 .await?;
@@ -250,6 +259,116 @@ pub async fn share_place(
     let place = load_place(&mut tx, a_id, a_user.user_id).await?;
     tx.commit().await?;
     Ok(Json(place))
+}
+
+pub async fn link_merchant(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_merchant_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<LinkMerchantRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    require_seen_merchant(&mut tx, a_merchant_id, a_user.user_id).await?;
+    require_visible_place(&mut tx, Some(a_req.place_id), a_req.place_addr_id, a_user.user_id, None).await?;
+
+    sqlx::query!(
+        r#"
+        INSERT INTO merchant_places (user_id, merchant_id, place_id, place_addr_id)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id, merchant_id)
+        DO UPDATE SET place_id = EXCLUDED.place_id, place_addr_id = EXCLUDED.place_addr_id, updated_ts = NOW()
+        "#,
+        a_user.user_id,
+        a_merchant_id,
+        a_req.place_id,
+        a_req.place_addr_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn unlink_merchant(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_merchant_id): ApiPath<Uuid>,
+) -> Result<StatusCode, ApiError>
+{
+    let deleted = sqlx::query!(
+        "DELETE FROM merchant_places WHERE user_id = $1 AND merchant_id = $2",
+        a_user.user_id,
+        a_merchant_id
+    )
+    .execute(&a_state.db)
+    .await?;
+
+    if deleted.rows_affected() == 0
+    {
+        return Err(ApiError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn learn_merchant_places(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_receipt_id: Uuid,
+    a_place_id: Option<Uuid>,
+    a_place_addr_id: Option<Uuid>,
+) -> Result<(), ApiError>
+{
+    let Some(place_id) = a_place_id
+    else
+    {
+        return Ok(());
+    };
+
+    sqlx::query!(
+        r#"
+        INSERT INTO merchant_places (user_id, merchant_id, place_id, place_addr_id)
+        SELECT DISTINCT $1::uuid, t.merchant_id, $2::uuid, $3::uuid
+        FROM transactions t
+        WHERE t.receipt_id = $4 AND t.merchant_id IS NOT NULL
+        ON CONFLICT (user_id, merchant_id) DO NOTHING
+        "#,
+        a_user_id,
+        place_id,
+        a_place_addr_id,
+        a_receipt_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    Ok(())
+}
+
+async fn require_seen_merchant(a_conn: &mut PgConnection, a_merchant_id: Uuid, a_user_id: Uuid)
+    -> Result<(), ApiError>
+{
+    let is_seen = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM transactions t
+            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
+            WHERE t.merchant_id = $1
+        ) AS "is_seen!"
+        "#,
+        a_merchant_id,
+        a_user_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    if !is_seen
+    {
+        return Err(ApiError::NotFound);
+    }
+
+    Ok(())
 }
 
 pub async fn require_visible_place(
@@ -355,9 +474,17 @@ pub async fn place_from_receipt(
         None =>
         {
             let name = clean_name(&a_req.name, "new_place.name")?;
+            if let Some(family_id) = a_req.family_id
+            {
+                require_member(&mut *a_conn, family_id, a_user_id)
+                    .await
+                    .map_err(|_| ApiError::Validation("new_place.family_id"))?;
+            }
             sqlx::query_scalar!(
-                "INSERT INTO places (name, owner_id, created_by) VALUES ($1, $2, $2) RETURNING id",
+                "INSERT INTO places (name, owner_id, family_id, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
                 name,
+                a_req.family_id.is_none().then_some(a_user_id),
+                a_req.family_id,
                 a_user_id
             )
             .fetch_one(&mut *a_conn)
@@ -402,8 +529,8 @@ struct ResolvedAddr
 {
     country_id: Uuid,
     city_id: Uuid,
-    street_id: Uuid,
-    house_num: String,
+    street_id: Option<Uuid>,
+    house_num: Option<String>,
     zip: Option<String>,
 }
 
@@ -421,13 +548,10 @@ async fn resolve_receipt_address(
         Some("GB") => Some("GBR".to_string()),
         other => other.map(str::to_string),
     };
-    let parts = (
-        code,
-        clean_optional_text(a_req.city.as_deref(), MAX_GEO_NAME_LEN, "new_place.city")?,
-        clean_optional_text(a_req.street.as_deref(), MAX_GEO_NAME_LEN, "new_place.street")?,
-        clean_optional_text(a_req.house_num.as_deref(), MAX_SHORT_LEN, "new_place.house_num")?,
-    );
-    let (Some(code), Some(city), Some(street), Some(house_num)) = parts
+    let city = clean_optional_text(a_req.city.as_deref(), MAX_GEO_NAME_LEN, "new_place.city")?;
+    let street = clean_optional_text(a_req.street.as_deref(), MAX_GEO_NAME_LEN, "new_place.street")?;
+    let house_num = clean_optional_text(a_req.house_num.as_deref(), MAX_SHORT_LEN, "new_place.house_num")?;
+    let (Some(code), Some(city)) = (code, city)
     else
     {
         return Ok(None);
@@ -467,30 +591,10 @@ async fn resolve_receipt_address(
         }
     };
 
-    let street_id = match sqlx::query_scalar!(
-        "SELECT id FROM streets WHERE city_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1",
-        city_id,
-        street
-    )
-    .fetch_optional(&mut *a_conn)
-    .await?
+    let street_id = match street
     {
-        Some(id) => id,
-        None =>
-        {
-            sqlx::query_scalar!(
-                r#"
-            INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)
-            ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name
-            RETURNING id
-            "#,
-                city_id,
-                street,
-                a_user_id
-            )
-            .fetch_one(&mut *a_conn)
-            .await?
-        }
+        Some(street) => Some(resolve_street(a_conn, a_user_id, city_id, &street).await?),
+        None => None,
     };
 
     Ok(Some(ResolvedAddr {
@@ -500,6 +604,41 @@ async fn resolve_receipt_address(
         house_num,
         zip: clean_optional_text(a_req.zip.as_deref(), MAX_SHORT_LEN, "new_place.zip")?,
     }))
+}
+
+async fn resolve_street(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_city_id: Uuid,
+    a_name: &str,
+) -> Result<Uuid, ApiError>
+{
+    let existing = sqlx::query_scalar!(
+        "SELECT id FROM streets WHERE city_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1",
+        a_city_id,
+        a_name
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    if let Some(id) = existing
+    {
+        return Ok(id);
+    }
+
+    let id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO streets (city_id, name, created_by) VALUES ($1, $2, $3)
+        ON CONFLICT (city_id, name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id
+        "#,
+        a_city_id,
+        a_name,
+        a_user_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    Ok(id)
 }
 
 async fn require_editable(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<PlaceScope, ApiError>
@@ -557,6 +696,10 @@ async fn load_place(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> R
         .await?
         .remove(&place.id)
         .unwrap_or_default();
+    let merchants = load_merchant_links(a_conn, &[place.id], a_user_id)
+        .await?
+        .remove(&place.id)
+        .unwrap_or_default();
 
     Ok(PlaceDto {
         id: place.id,
@@ -565,6 +708,7 @@ async fn load_place(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> R
         family_name: place.family_name,
         is_editable: place.is_editable,
         addrs,
+        merchants,
     })
 }
 
@@ -581,10 +725,10 @@ async fn load_addrs(
     let rows = sqlx::query!(
         r#"
         SELECT
-            a.id, a.place_id, a.is_main, a.country_id, a.city_id, a.street_id, a.house_num, a.apt, a.zip, a.merchant_id,
-            ci.name || ', ' || st.name || ' ' || a.house_num AS "label!"
+            a.id, a.place_id, a.is_main, a.country_id, a.city_id, a.street_id, a.house_num, a.apt, a.zip,
+            addr_label(ci.name, st.name, a.house_num, a.zip) AS "label!"
         FROM place_addrs a
-        JOIN streets st ON st.id = a.street_id
+        LEFT JOIN streets st ON st.id = a.street_id
         JOIN cities ci ON ci.id = a.city_id
         WHERE a.place_id = ANY($1)
         ORDER BY a.is_main DESC, a.id
@@ -607,12 +751,52 @@ async fn load_addrs(
             house_num: row.house_num,
             apt: row.apt,
             zip: row.zip,
-            merchant_id: row.merchant_id,
             label: Some(row.label),
         },
     })
     {
         grouped.entry(row.place_id).or_default().push(row.addr);
+    }
+
+    Ok(grouped)
+}
+
+async fn load_merchant_links(
+    a_conn: &mut PgConnection,
+    a_place_ids: &[Uuid],
+    a_user_id: Uuid,
+) -> Result<HashMap<Uuid, Vec<LinkedMerchantDto>>, ApiError>
+{
+    if a_place_ids.is_empty()
+    {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT mp.place_id, mp.merchant_id, m.name, mp.place_addr_id
+        FROM merchant_places mp
+        JOIN merchants m ON m.id = mp.merchant_id
+        WHERE mp.user_id = $1 AND mp.place_id = ANY($2)
+        ORDER BY m.name
+        "#,
+        a_user_id,
+        a_place_ids
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+
+    let mut grouped: HashMap<Uuid, Vec<LinkedMerchantDto>> = HashMap::new();
+    for row in rows.into_iter().map(|row| MerchantLinkRow {
+        place_id: row.place_id,
+        link: LinkedMerchantDto {
+            merchant_id: row.merchant_id,
+            name: row.name,
+            place_addr_id: row.place_addr_id,
+        },
+    })
+    {
+        grouped.entry(row.place_id).or_default().push(row.link);
     }
 
     Ok(grouped)
@@ -640,10 +824,9 @@ fn clean_addrs(a_addrs: Vec<PlaceAddrDto>) -> Result<Vec<PlaceAddrDto>, ApiError
             }
 
             Ok(PlaceAddrDto {
-                house_num: clean_text(&addr.house_num, 1, MAX_SHORT_LEN, "house_num")?,
+                house_num: clean_optional_text(addr.house_num.as_deref(), MAX_SHORT_LEN, "house_num")?,
                 apt: clean_optional_text(addr.apt.as_deref(), MAX_SHORT_LEN, "apt")?,
                 zip: clean_optional_text(addr.zip.as_deref(), MAX_SHORT_LEN, "zip")?,
-                merchant_id: clean_optional_text(addr.merchant_id.as_deref(), MAX_MERCHANT_LEN, "merchant_id")?,
                 ..addr
             })
         })
@@ -655,8 +838,9 @@ async fn check_geo_chain(a_conn: &mut PgConnection, a_addr: &PlaceAddrDto) -> Re
     let is_consistent = sqlx::query_scalar!(
         r#"
         SELECT EXISTS (
-            SELECT 1 FROM streets s JOIN cities c ON c.id = s.city_id
-            WHERE s.id = $3 AND c.id = $2 AND c.country_id = $1
+            SELECT 1 FROM cities c
+            WHERE c.id = $2 AND c.country_id = $1
+              AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM streets s WHERE s.id = $3 AND s.city_id = c.id))
         ) AS "is_consistent!"
         "#,
         a_addr.country_id,
@@ -678,8 +862,8 @@ async fn insert_addr(a_conn: &mut PgConnection, a_place_id: Uuid, a_addr: &Place
 {
     sqlx::query!(
         r#"
-        INSERT INTO place_addrs (place_id, is_main, country_id, city_id, street_id, house_num, apt, zip, merchant_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO place_addrs (place_id, is_main, country_id, city_id, street_id, house_num, apt, zip)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
         a_place_id,
         a_addr.is_main,
@@ -688,8 +872,7 @@ async fn insert_addr(a_conn: &mut PgConnection, a_place_id: Uuid, a_addr: &Place
         a_addr.street_id,
         a_addr.house_num,
         a_addr.apt,
-        a_addr.zip,
-        a_addr.merchant_id
+        a_addr.zip
     )
     .execute(&mut *a_conn)
     .await?;

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT t.id, t.amount, t.mcc, t.description, t.counterparty, t.is_category_locked,\n                   COALESCE(a.user_id, t.user_id) AS \"owner_id!\"\n            FROM transactions t\n            JOIN accounts a ON a.id = t.account_id\n            WHERE t.source = 'bank' AND t.rule_key IS NULL\n            ORDER BY t.id\n            LIMIT $1\n            ",
+  "query": "\n            SELECT t.id, t.amount, t.mcc, t.description, t.counterparty, t.is_category_locked, t.merchant_id,\n                   COALESCE(a.user_id, t.user_id) AS \"owner_id!\"\n            FROM transactions t\n            JOIN accounts a ON a.id = t.account_id\n            WHERE t.source = 'bank' AND t.rule_key IS NULL\n            ORDER BY t.id\n            LIMIT $1\n            ",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,11 @@
       },
       {
         "ordinal": 6,
+        "name": "merchant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
         "name": "owner_id!",
         "type_info": "Uuid"
       }
@@ -51,8 +56,9 @@
       true,
       true,
       false,
+      true,
       null
     ]
   },
-  "hash": "9424d19ab3ecbaf9c25a2152eb0472930ec7cd02cf5a6644f1895c466c3463be"
+  "hash": "e803a2cc6e0cb99cf7ad547070f8487438e5d5849bbc321fb8ea20f01258999f"
 }

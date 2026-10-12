@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO merchant_places (user_id, merchant_id, place_id, place_addr_id)\n        SELECT DISTINCT $1::uuid, t.merchant_id, $2::uuid, $3::uuid\n        FROM transactions t\n        WHERE t.receipt_id = $4 AND t.merchant_id IS NOT NULL\n        ON CONFLICT (user_id, merchant_id) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8354b275ebb62880afa5bbe767c8a2624ba104577447487b76138e8401bb020f"
+}

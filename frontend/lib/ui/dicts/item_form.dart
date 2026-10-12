@@ -190,7 +190,10 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
   ItemKind _kind = ItemKind.product;
   ItemUnit _unit = ItemUnit.piece;
   String? _familyId;
+  bool _isScopeChosen = false;
   bool _isSaving = false;
+
+  String? _scopeOf(List<FamDto>? aFams) => _isScopeChosen ? _familyId : defaultFamilyId(aFams);
 
   @override
   void dispose()
@@ -220,7 +223,13 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
     {
       final item = await ref.read(apiProv).saveItem(
             null,
-            DictItemDto.payload(name, _kind, _unit, aBarcode: _barcodeCtrl.text, aFamilyId: _familyId),
+            DictItemDto.payload(
+              name,
+              _kind,
+              _unit,
+              aBarcode: _barcodeCtrl.text,
+              aFamilyId: _scopeOf(ref.read(famsProv).valueOrNull),
+            ),
           );
       if (mounted)
       {
@@ -252,8 +261,12 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
             unit: _unit,
             isNameFocused: true,
             scopeFams: ref.watch(famsProv).valueOrNull,
-            scopeFamilyId: _familyId,
-            onScopeChanged: (aValue) => setState(() => _familyId = aValue),
+            scopeFamilyId: _scopeOf(ref.watch(famsProv).valueOrNull),
+            onScopeChanged: (aValue) => setState(()
+            {
+              _familyId = aValue;
+              _isScopeChosen = true;
+            }),
             onScanBarcode: () => scanIntoBarcodeField(context, ref, _barcodeCtrl),
             onKindChanged: (aKind) => setState(() => _kind = aKind),
             onUnitChanged: (aUnit) => setState(() => _unit = aUnit),

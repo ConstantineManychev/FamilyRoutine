@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::item_handlers::{require_visible_items, resolve_new_item, MAX_ITEM_NAME_LEN};
-use crate::api::place_handlers::{place_from_receipt, require_visible_place};
+use crate::api::place_handlers::{learn_merchant_places, place_from_receipt, require_visible_place};
 use crate::api::recognize_handlers::alias_key;
 use crate::api::tx_handlers::load_txs;
 use crate::domain::errors::ApiError;
@@ -365,6 +365,7 @@ async fn save_receipt(
     }
 
     let paid_total = link_transactions(&mut tx, receipt_id, a_user_id, a_req.curr_id, &tx_ids).await?;
+    learn_merchant_places(&mut tx, a_user_id, receipt_id, place_id, place_addr_id).await?;
     let items_total: Decimal = items.iter().map(|item| item.amount).sum();
     let cash_amount = (items_total - paid_total).max(Decimal::ZERO);
 
@@ -414,6 +415,7 @@ fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<CleanItem>, Api
                     kind: new_item.kind,
                     unit: new_item.unit,
                     barcode: clean_barcode(new_item.barcode.as_deref())?,
+                    family_id: new_item.family_id,
                 }),
                 _ => return Err(ApiError::Validation("item_id")),
             };
@@ -602,7 +604,7 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
             r.place_id,
             p.name AS "place_name?",
             r.place_addr_id,
-            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,
+            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,
             r.curr_id,
             c.code AS curr_code,
             r.cash_account_id,

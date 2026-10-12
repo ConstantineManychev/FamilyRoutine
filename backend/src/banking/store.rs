@@ -188,7 +188,7 @@ pub async fn store_transactions(
         let merchant_id = if categories::is_merchant_payment(bank_tx.mcc, bank_tx.amount, &text)
         {
             let raw_name = bank_tx.counterparty.as_deref().or(bank_tx.description.as_deref());
-            match raw_name.and_then(merchant_name)
+            match raw_name.and_then(bank_merchant_name)
             {
                 Some(name) => Some(merchant_id(&mut tx, &name, bank_tx.mcc).await?),
                 None => None,
@@ -265,7 +265,7 @@ pub async fn recategorize_pending(a_db: &PgPool) -> Result<u64, ApiError>
     {
         let rows = sqlx::query!(
             r#"
-            SELECT t.id, t.amount, t.mcc, t.description, t.counterparty, t.is_category_locked,
+            SELECT t.id, t.amount, t.mcc, t.description, t.counterparty, t.is_category_locked, t.merchant_id,
                    COALESCE(a.user_id, t.user_id) AS "owner_id!"
             FROM transactions t
             JOIN accounts a ON a.id = t.account_id
@@ -297,17 +297,33 @@ pub async fn recategorize_pending(a_db: &PgPool) -> Result<u64, ApiError>
                 .get(&row.owner_id)
                 .and_then(|rules| rules.get(&key).copied())
                 .unwrap_or_else(|| categories::detect(row.mcc, row.amount, &text));
+            let merchant = match row.merchant_id
+            {
+                Some(id) => Some(id),
+                None if categories::is_merchant_payment(row.mcc, row.amount, &text) =>
+                {
+                    let raw_name = row.counterparty.as_deref().or(row.description.as_deref());
+                    match raw_name.and_then(bank_merchant_name)
+                    {
+                        Some(name) => Some(merchant_id(&mut tx, &name, row.mcc).await?),
+                        None => None,
+                    }
+                }
+                None => None,
+            };
 
             sqlx::query!(
                 r#"
                 UPDATE transactions
                 SET rule_key = $2,
-                    category = CASE WHEN is_category_locked THEN category ELSE $3 END
+                    category = CASE WHEN is_category_locked THEN category ELSE $3 END,
+                    merchant_id = $4
                 WHERE id = $1
                 "#,
                 row.id,
                 key,
-                category as TxCategory
+                category as TxCategory,
+                merchant
             )
             .execute(&mut *tx)
             .await?;
@@ -370,6 +386,11 @@ pub fn merchant_name(a_raw: &str) -> Option<String>
     clean_text(Some(stripped), 100)
 }
 
+pub fn bank_merchant_name(a_raw: &str) -> Option<String>
+{
+    merchant_name(a_raw.split(';').next().unwrap_or(a_raw))
+}
+
 pub fn merchant_key(a_name: &str) -> String
 {
     a_name
@@ -429,6 +450,11 @@ mod tests
         assert_eq!(merchant_key("Tesco  Stores-3092"), "tesco stores 3092");
         assert_eq!(merchant_key("СІЛЬПО"), "сільпо");
         assert_eq!(merchant_name("boı-shop").as_deref(), Some("boı-shop"));
+        assert_eq!(
+            bank_merchant_name("VDC-LIDL 0907 ATHL; Purchase").as_deref(),
+            Some("LIDL 0907 ATHL")
+        );
+        assert_eq!(bank_merchant_name("Lidl").as_deref(), Some("Lidl"));
     }
 
     #[test]

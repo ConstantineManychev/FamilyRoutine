@@ -74,6 +74,8 @@ struct ScoredBranch
     id: Uuid,
     street_score: f64,
     is_same_house: bool,
+    is_same_city: bool,
+    is_city_only: bool,
 }
 
 pub async fn features(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<FeaturesDto>, ApiError>
@@ -183,6 +185,7 @@ async fn build_draft(
     let country_code = clean_part(a_raw.country_code.as_deref()).map(|code| code.to_uppercase());
     let address = NewPlaceRequest {
         place_id: None,
+        family_id: None,
         name: store_name.clone().unwrap_or_default(),
         country_code: country_code.clone(),
         city: clean_part(a_raw.city.as_deref()),
@@ -490,13 +493,12 @@ async fn match_place(
     .await?
     .filter(|place| place.score >= PLACE_MATCH_SCORE);
 
-    let has_address = a_address.street.is_some() && a_address.house_num.is_some();
     let Some(place) = best
     else
     {
         return Ok((None, None, Some(a_address.clone())));
     };
-    if !has_address
+    if a_address.city.is_none()
     {
         return Ok((Some(place), None, None));
     }
@@ -506,23 +508,34 @@ async fn match_place(
         r#"
         SELECT
             a.id,
-            similarity(LOWER(st.name), LOWER($2))::float8 AS "street_score!",
-            (LOWER(TRIM(a.house_num)) = LOWER(TRIM($3))) AS "is_same_house!"
+            COALESCE(similarity(LOWER(st.name), LOWER($2)), 0)::float8 AS "street_score!",
+            (a.house_num IS NOT NULL AND LOWER(TRIM(a.house_num)) = LOWER(TRIM($3))) AS "is_same_house!",
+            (LOWER(ci.name) = LOWER($4)) AS "is_same_city!",
+            (a.street_id IS NULL) AS "is_city_only!"
         FROM place_addrs a
-        JOIN streets st ON st.id = a.street_id
+        JOIN cities ci ON ci.id = a.city_id
+        LEFT JOIN streets st ON st.id = a.street_id
         WHERE a.place_id = $1
         "#,
         place.id,
         a_address.street.as_deref().unwrap_or_default(),
-        a_address.house_num.as_deref().unwrap_or_default()
+        a_address.house_num.as_deref().unwrap_or_default(),
+        a_address.city.as_deref().unwrap_or_default()
     )
     .fetch_all(&mut *a_conn)
     .await?;
 
-    let branch = branches
+    let has_street_address = a_address.street.is_some() && a_address.house_num.is_some();
+    let same_street = branches
         .iter()
-        .filter(|branch| branch.is_same_house && branch.street_score >= STREET_MATCH_SCORE)
-        .max_by(|left, right| left.street_score.total_cmp(&right.street_score))
+        .filter(|branch| has_street_address && branch.is_same_house && branch.street_score >= STREET_MATCH_SCORE)
+        .max_by(|left, right| left.street_score.total_cmp(&right.street_score));
+    let in_city: Vec<&ScoredBranch> = branches
+        .iter()
+        .filter(|branch| branch.is_same_city && (branch.is_city_only || !has_street_address))
+        .collect();
+    let branch = same_street
+        .or_else(|| (in_city.len() == 1).then(|| in_city[0]))
         .map(|branch| branch.id);
 
     let new_branch = (branch.is_none() && place.is_editable).then(|| NewPlaceRequest {

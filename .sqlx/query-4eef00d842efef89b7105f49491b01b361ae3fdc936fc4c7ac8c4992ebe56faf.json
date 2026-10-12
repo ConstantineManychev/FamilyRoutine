@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM cities c\n            WHERE c.id = $2 AND c.country_id = $1\n              AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM streets s WHERE s.id = $3 AND s.city_id = c.id))\n        ) AS \"is_consistent!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_consistent!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4eef00d842efef89b7105f49491b01b361ae3fdc936fc4c7ac8c4992ebe56faf"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            a.id, a.place_id, a.is_main, a.country_id, a.city_id, a.street_id, a.house_num, a.apt, a.zip, a.merchant_id,\n            ci.name || ', ' || st.name || ' ' || a.house_num AS \"label!\"\n        FROM place_addrs a\n        JOIN streets st ON st.id = a.street_id\n        JOIN cities ci ON ci.id = a.city_id\n        WHERE a.place_id = ANY($1)\n        ORDER BY a.is_main DESC, a.id\n        ",
+  "query": "\n        SELECT\n            a.id, a.place_id, a.is_main, a.country_id, a.city_id, a.street_id, a.house_num, a.apt, a.zip,\n            addr_label(ci.name, st.name, a.house_num, a.zip) AS \"label!\"\n        FROM place_addrs a\n        LEFT JOIN streets st ON st.id = a.street_id\n        JOIN cities ci ON ci.id = a.city_id\n        WHERE a.place_id = ANY($1)\n        ORDER BY a.is_main DESC, a.id\n        ",
   "describe": {
     "columns": [
       {
@@ -50,11 +50,6 @@
       },
       {
         "ordinal": 9,
-        "name": "merchant_id",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 10,
         "name": "label!",
         "type_info": "Text"
       }
@@ -70,13 +65,12 @@
       false,
       false,
       false,
-      false,
-      false,
+      true,
       true,
       true,
       true,
       null
     ]
   },
-  "hash": "455b0d2c5926ac281e2b6029e5bc284c48dc39049cb79fa5f420147fc7340e7a"
+  "hash": "9395e13321b59ae059a1a97990eee322efc5f52cb83ec72f3fe08e899293263f"
 }

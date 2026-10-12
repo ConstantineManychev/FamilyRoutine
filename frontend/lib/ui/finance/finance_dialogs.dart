@@ -9,6 +9,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import 'merchant_place_dialog.dart';
 import 'transactions_screen.dart';
 
 final List<TextInputFormatter> amountFormatters = [
@@ -499,6 +500,15 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
     }
   }
 
+  Future<void> _linkPlace() async
+  {
+    final isDone = await showMerchantPlaceDialog(context, widget.tx);
+    if (isDone == true && mounted)
+    {
+      Navigator.of(context).pop(true);
+    }
+  }
+
   Future<void> _linkTransfer() async
   {
     final isDone = await showDialog<bool>(context: context, builder: (_) => LinkTransferDialog(tx: widget.tx));
@@ -516,9 +526,10 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
     final canLinkCash = tx.isEditable && tx.isOutflow && !tx.isTransfer && tx.receiptId == null && !tx.isReceiptCash;
     final canLinkTransfer = tx.isEditable && !tx.isTransfer && tx.receiptId == null && !tx.isReceiptCash;
     final canApplyToSimilar = tx.similarKey != null && _category != null && _category != tx.category;
+    final shown = {tx.title, tx.merchantName};
     final details = [
-      if (tx.description != null && tx.description != tx.title) tx.description!,
-      if (tx.counterparty != null && tx.counterparty != tx.title) tx.counterparty!,
+      if (tx.description != null && !shown.contains(tx.description)) tx.description!,
+      if (tx.counterparty != null && !shown.contains(tx.counterparty)) tx.counterparty!,
       if (tx.opAmount != null && tx.opCurrCode != null) formatMoney(aContext, tx.opAmount!, tx.opCurrCode!),
       if (tx.mcc != null) 'MCC ${tx.mcc}',
     ];
@@ -545,6 +556,10 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
               if (details.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(details.join(' · '), style: const TextStyle(color: inkMuted)),
+              ],
+              if (tx.merchantId != null || tx.placeId != null) ...[
+                const SizedBox(height: 12),
+                _PlaceInfo(tx: tx, onLink: tx.merchantId == null || _isBusy ? null : _linkPlace),
               ],
               if (tx.isTransfer) ...[
                 const SizedBox(height: 12),
@@ -650,6 +665,56 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
             child: Text('common.save'.tr()),
           ),
       ],
+    );
+  }
+}
+
+class _PlaceInfo extends StatelessWidget
+{
+  final TxDto tx;
+  final VoidCallback? onLink;
+
+  const _PlaceInfo({required this.tx, required this.onLink});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final placeLabel = tx.placeLabel;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Icon(placeLabel == null ? AppIcons.mapPin : AppIcons.store, size: 18, color: inkSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  placeLabel ?? 'finance.place_none'.tr(),
+                  style: TextStyle(fontWeight: FontWeight.w600, color: placeLabel == null ? inkMuted : inkPrimary),
+                ),
+                if (tx.merchantName != null)
+                  Text(
+                    'finance.bank_merchant'.tr(args: [tx.merchantName!]),
+                    style: const TextStyle(fontSize: 12, color: inkSecondary),
+                  ),
+              ],
+            ),
+          ),
+          if (onLink != null)
+            TextButton(
+              onPressed: onLink,
+              child: Text(tx.isMerchantLinked ? 'finance.place_change'.tr() : 'finance.place_link'.tr()),
+            ),
+        ],
+      ),
     );
   }
 }

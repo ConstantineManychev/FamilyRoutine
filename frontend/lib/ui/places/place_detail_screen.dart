@@ -22,7 +22,6 @@ class _AddrDraft
   String houseNum;
   String apt;
   String zip;
-  String merchantId;
   String? label;
 
   _AddrDraft({
@@ -33,7 +32,6 @@ class _AddrDraft
     this.houseNum = '',
     this.apt = '',
     this.zip = '',
-    this.merchantId = '',
     this.label,
   });
 
@@ -42,12 +40,14 @@ class _AddrDraft
         countryId: aAddr.countryId,
         cityId: aAddr.cityId,
         streetId: aAddr.streetId,
-        houseNum: aAddr.houseNum,
+        houseNum: aAddr.houseNum ?? '',
         apt: aAddr.apt ?? '',
-        zip: aAddr.zip,
-        merchantId: aAddr.merchantId ?? '',
+        zip: aAddr.zip ?? '',
         label: aAddr.label,
       );
+
+  bool get isBlank =>
+      id == null && countryId == null && cityId == null && streetId == null && '$houseNum$apt$zip'.trim().isEmpty;
 
   String? get missingKey
   {
@@ -59,14 +59,6 @@ class _AddrDraft
     {
       return 'places.err_city_req';
     }
-    if (streetId == null)
-    {
-      return 'places.err_street_req';
-    }
-    if (houseNum.trim().isEmpty)
-    {
-      return 'places.err_house_zip_req';
-    }
     return null;
   }
 
@@ -75,11 +67,10 @@ class _AddrDraft
         isMain: aIsMain,
         countryId: countryId!,
         cityId: cityId!,
-        streetId: streetId!,
-        houseNum: houseNum.trim(),
-        apt: apt.trim().isEmpty ? null : apt.trim(),
-        zip: zip.trim(),
-        merchantId: merchantId.trim().isEmpty ? null : merchantId.trim(),
+        streetId: streetId,
+        houseNum: houseNum,
+        apt: apt,
+        zip: zip,
       );
 }
 
@@ -99,7 +90,6 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
   final _houseCtrl = TextEditingController();
   final _aptCtrl = TextEditingController();
   final _zipCtrl = TextEditingController();
-  final _merchCtrl = TextEditingController();
 
   List<CountryDto> _countries = const [];
   List<CityDto> _cities = const [];
@@ -113,6 +103,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
   int _current = 0;
   int _mainIndex = 0;
   String? _familyId;
+  bool _isScopeChosen = false;
   Object? _loadError;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -120,6 +111,8 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
   bool get _isEdit => widget.placeId != null;
 
   bool get _isEditable => _place?.isEditable ?? true;
+
+  String? _scopeOf(List<FamDto>? aFams) => _isScopeChosen ? _familyId : defaultFamilyId(aFams);
 
   @override
   void initState()
@@ -135,7 +128,6 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
     _houseCtrl.dispose();
     _aptCtrl.dispose();
     _zipCtrl.dispose();
-    _merchCtrl.dispose();
     super.dispose();
   }
 
@@ -195,7 +187,6 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
     _houseCtrl.text = aDraft.houseNum;
     _aptCtrl.text = aDraft.apt;
     _zipCtrl.text = aDraft.zip;
-    _merchCtrl.text = aDraft.merchantId;
   }
 
   void _commitForm()
@@ -207,8 +198,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       ..streetId = _selStreet?.id
       ..houseNum = _houseCtrl.text
       ..apt = _aptCtrl.text
-      ..zip = _zipCtrl.text
-      ..merchantId = _merchCtrl.text;
+      ..zip = _zipCtrl.text;
   }
 
   Future<void> _selectAddr(int aIndex) async
@@ -466,6 +456,20 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
     });
   }
 
+  Future<void> _unlinkMerchant(LinkedMerchant aMerchant) async
+  {
+    await _run(() async
+    {
+      final api = ref.read(apiProv);
+      await api.unlinkMerchant(aMerchant.merchantId);
+      final place = await api.getPlace(widget.placeId!);
+      if (mounted)
+      {
+        setState(() => _place = place);
+      }
+    });
+  }
+
   Future<void> _save() async
   {
     FocusScope.of(context).unfocus();
@@ -485,7 +489,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
 
     for (var index = 0; index < _addrs.length; index++)
     {
-      final missingKey = _addrs[index].missingKey;
+      final missingKey = _addrs[index].isBlank ? null : _addrs[index].missingKey;
       if (missingKey != null)
       {
         await _selectAddr(index);
@@ -497,7 +501,9 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       }
     }
 
-    final addrs = [for (var index = 0; index < _addrs.length; index++) _addrs[index].toDto(index == _mainIndex)];
+    final filled = [for (var index = 0; index < _addrs.length; index++) if (!_addrs[index].isBlank) index];
+    final mainIndex = filled.contains(_mainIndex) ? _mainIndex : filled.firstOrNull;
+    final addrs = [for (final index in filled) _addrs[index].toDto(index == mainIndex)];
 
     await _run(() async
     {
@@ -508,7 +514,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       }
       else
       {
-        await api.createPlace(_nameCtrl.text.trim(), addrs, aFamilyId: _familyId);
+        await api.createPlace(_nameCtrl.text.trim(), addrs, aFamilyId: _scopeOf(ref.read(famsProv).valueOrNull));
       }
 
       ref.invalidate(placesProv);
@@ -600,7 +606,15 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
         ),
         if (!_isEdit && fams.isNotEmpty) ...[
           const SizedBox(height: 16),
-          ScopeDropdown(fams: fams, familyId: _familyId, onChanged: (aValue) => setState(() => _familyId = aValue)),
+          ScopeDropdown(
+            fams: fams,
+            familyId: _scopeOf(fams),
+            onChanged: (aValue) => setState(()
+            {
+              _familyId = aValue;
+              _isScopeChosen = true;
+            }),
+          ),
         ],
         const SizedBox(height: 24),
         Text('places.branches'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -650,8 +664,42 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
             ],
           ),
         ],
+        if (place != null) ..._buildMerchants(place),
       ],
     );
+  }
+
+  List<Widget> _buildMerchants(PlaceDto aPlace)
+  {
+    return [
+      const SizedBox(height: 24),
+      Text('places.bank_names'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 4),
+      Text('places.bank_names_hint'.tr(), style: const TextStyle(fontSize: 12, color: inkSecondary)),
+      const SizedBox(height: 12),
+      if (aPlace.merchants.isEmpty)
+        Text('places.bank_names_empty'.tr(), style: const TextStyle(color: inkMuted))
+      else
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final merchant in aPlace.merchants)
+              InputChip(
+                avatar: const Icon(AppIcons.landmark, size: 16),
+                label: Text(_merchantLabel(aPlace, merchant)),
+                deleteButtonTooltipMessage: 'places.unlink_bank_name'.tr(),
+                onDeleted: _isSaving ? null : () => _unlinkMerchant(merchant),
+              ),
+          ],
+        ),
+    ];
+  }
+
+  String _merchantLabel(PlaceDto aPlace, LinkedMerchant aMerchant)
+  {
+    final branch = aPlace.addrs.where((aAddr) => aAddr.id == aMerchant.placeAddrId).firstOrNull?.label;
+    return branch == null ? aMerchant.name : '${aMerchant.name} → $branch';
   }
 
   List<Widget> _buildAddrForm(bool aIsEnabled)
@@ -730,13 +778,6 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
         enabled: aIsEnabled,
         inputFormatters: [LengthLimitingTextInputFormatter(50)],
         decoration: _decoration('places.zip'),
-      ),
-      const SizedBox(height: 16),
-      TextField(
-        controller: _merchCtrl,
-        enabled: aIsEnabled,
-        inputFormatters: [LengthLimitingTextInputFormatter(255)],
-        decoration: _decoration('places.merchant_id'),
       ),
     ];
   }

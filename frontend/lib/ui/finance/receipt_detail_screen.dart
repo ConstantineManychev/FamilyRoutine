@@ -16,6 +16,7 @@ import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import '../dicts/item_form.dart';
+import '../dicts/scope_widgets.dart';
 import 'finance_dialogs.dart';
 import 'transactions_screen.dart';
 
@@ -229,6 +230,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           _ts = tx?.txTs ?? DateTime.now();
           _merchantCtrl.text = tx?.merchantName ?? tx?.counterparty ?? '';
           _merchantId = tx?.merchantId;
+          _placeId = places.any((aPlace) => aPlace.id == tx?.placeId) ? tx?.placeId : null;
+          _placeAddrId = _placeId == null ? null : tx?.placeAddrId;
           _currId = currs.where((aCurr) => aCurr.code == tx?.currCode).firstOrNull?.id ?? _defaultCurrency(currs, wallets);
           _rows.add(_ItemRow());
         }
@@ -318,6 +321,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
   Future<void> _save() async
   {
+    final familyId = defaultFamilyId(ref.read(famsProv).valueOrNull);
     final items = <Map<String, dynamic>>[];
     for (final row in _rows)
     {
@@ -346,7 +350,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       {
         line
           ..remove('item_id')
-          ..['new_item'] = newItem!.toJson();
+          ..['new_item'] = {...newItem!.toJson(), 'family_id': familyId};
       }
       if (row.sourceText != null)
       {
@@ -375,7 +379,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'note': note.isEmpty ? null : note,
         'items': items,
         'tx_ids': _txs.map((aTx) => aTx.id).toList(),
-        if (_pendingPlace() != null) 'new_place': _pendingPlace()!.toJson(),
+        if (_pendingPlace() != null) 'new_place': {..._pendingPlace()!.toJson(), 'family_id': familyId},
       });
 
       ref.invalidate(receiptsProv);
@@ -448,6 +452,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   {
     aContext.locale;
     ref.watch(walletsProv);
+    ref.watch(famsProv);
 
     if (_isLoading)
     {
@@ -537,7 +542,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
                     DropdownMenuItem<String?>(value: null, child: Text('catalog.branch_any'.tr())),
                     ..._branchesOf(_placeId).map((aAddr) => DropdownMenuItem<String?>(
                           value: aAddr.id,
-                          child: Text(aAddr.label ?? aAddr.houseNum, overflow: TextOverflow.ellipsis),
+                          child: Text(aAddr.label ?? '', overflow: TextOverflow.ellipsis),
                         )),
                   ],
                   onChanged: (aValue) => setState(() => _placeAddrId = aValue),
@@ -1088,9 +1093,6 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
               isMain: true,
               countryId: '',
               cityId: '',
-              streetId: '',
-              houseNum: '',
-              zip: '',
               label: saved.branch,
             ),
           ];

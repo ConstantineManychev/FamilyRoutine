@@ -30,7 +30,7 @@ class PlacesScreen extends ConsumerWidget
       return 'places.no_address'.tr();
     }
 
-    final parts = [addr.label ?? '${'places.house'.tr()} ${addr.houseNum}'];
+    final parts = [addr.label ?? ''];
     if (addr.apt != null && addr.apt!.isNotEmpty)
     {
       parts.add('${'places.apt'.tr()} ${addr.apt}');

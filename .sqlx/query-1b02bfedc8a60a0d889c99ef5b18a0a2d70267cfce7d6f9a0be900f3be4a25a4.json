@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT mp.place_id, mp.merchant_id, m.name, mp.place_addr_id\n        FROM merchant_places mp\n        JOIN merchants m ON m.id = mp.merchant_id\n        WHERE mp.user_id = $1 AND mp.place_id = ANY($2)\n        ORDER BY m.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "place_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "merchant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "place_addr_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "1b02bfedc8a60a0d889c99ef5b18a0a2d70267cfce7d6f9a0be900f3be4a25a4"
+}

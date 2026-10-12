@@ -36,6 +36,9 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
   ItemUnit _unit = ItemUnit.piece;
   DictItemDto? _item;
   String? _familyId;
+  bool _isScopeChosen = false;
+
+  String? _scopeOf(List<FamDto>? aFams) => _isScopeChosen ? _familyId : defaultFamilyId(aFams);
   bool _isLoading = false;
   bool _isSaving = false;
   Object? _loadError;
@@ -150,7 +153,13 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     {
       final saved = await ref.read(apiProv).saveItem(
             widget.itemId,
-            DictItemDto.payload(name, _kind, _unit, aBarcode: _barcodeCtrl.text, aFamilyId: _isEdit ? null : _familyId),
+            DictItemDto.payload(
+              name,
+              _kind,
+              _unit,
+              aBarcode: _barcodeCtrl.text,
+              aFamilyId: _isEdit ? null : _scopeOf(ref.read(famsProv).valueOrNull),
+            ),
           );
       ref.invalidate(itemsProv);
       if (!mounted)
@@ -329,8 +338,14 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
             unit: _unit,
             isEnabled: _isEditable,
             scopeFams: _isEdit ? null : fams,
-            scopeFamilyId: _familyId,
-            onScopeChanged: _isEdit ? null : (aValue) => setState(() => _familyId = aValue),
+            scopeFamilyId: _scopeOf(fams),
+            onScopeChanged: _isEdit
+                ? null
+                : (aValue) => setState(()
+                    {
+                      _familyId = aValue;
+                      _isScopeChosen = true;
+                    }),
             onScanBarcode: () => scanIntoBarcodeField(context, ref, _barcodeCtrl, aCurrentItemId: widget.itemId),
             onKindChanged: (aKind) => setState(() => _kind = aKind),
             onUnitChanged: (aUnit) => setState(() => _unit = aUnit),

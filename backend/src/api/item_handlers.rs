@@ -419,7 +419,7 @@ pub async fn item_prices(
                 ELSE 'none'
             END AS "store_key!",
             COALESCE(pl.name, m.name, o.merchant_name) AS store_name,
-            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,
+            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,
             c.code AS curr_code,
             o.unit_price AS "unit_price!",
             CASE
@@ -636,13 +636,21 @@ pub async fn resolve_new_item(
         return Ok(id);
     }
 
-    require_unique_barcode(a_conn, a_item.barcode.as_deref(), a_user_id, None, None).await?;
+    if let Some(family_id) = a_item.family_id
+    {
+        require_member(&mut *a_conn, family_id, a_user_id)
+            .await
+            .map_err(|_| ApiError::Validation("new_item.family_id"))?;
+    }
+    require_unique_barcode(a_conn, a_item.barcode.as_deref(), a_user_id, a_item.family_id, None).await?;
     sqlx::query_scalar!(
         r#"
-        INSERT INTO items (owner_id, created_by, name, type, unit, barcode)
-        VALUES ($1, $1, $2, $3, $4, $5)
+        INSERT INTO items (owner_id, family_id, created_by, name, type, unit, barcode)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
         "#,
+        a_item.family_id.is_none().then_some(a_user_id),
+        a_item.family_id,
         a_user_id,
         a_item.name,
         a_item.kind as ItemKind,
@@ -835,7 +843,7 @@ async fn load_manual_prices(
             ip.place_id,
             ip.place_addr_id,
             COALESCE(pl.name, ip.merchant_name) AS store_name,
-            CASE WHEN pa.id IS NOT NULL THEN ci.name || ', ' || st.name || ' ' || pa.house_num END AS branch,
+            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,
             c.code AS curr_code,
             ip.qty,
             ip.price,

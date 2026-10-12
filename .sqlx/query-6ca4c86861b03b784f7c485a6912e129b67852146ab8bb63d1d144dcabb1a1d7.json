@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM merchant_places WHERE user_id = $1 AND merchant_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6ca4c86861b03b784f7c485a6912e129b67852146ab8bb63d1d144dcabb1a1d7"
+}

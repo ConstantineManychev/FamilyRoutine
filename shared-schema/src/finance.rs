@@ -188,6 +188,11 @@ pub struct TxDto
     pub peer_amount: Option<Decimal>,
     pub peer_curr_code: Option<String>,
     pub similar_key: Option<String>,
+    pub place_id: Option<Uuid>,
+    pub place_name: Option<String>,
+    pub place_addr_id: Option<Uuid>,
+    pub branch: Option<String>,
+    pub is_merchant_linked: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -288,6 +293,8 @@ pub struct NewItemRequest
     pub unit: ItemUnit,
     #[serde(default)]
     pub barcode: Option<String>,
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -296,6 +303,8 @@ pub struct NewPlaceRequest
     #[serde(default)]
     pub place_id: Option<Uuid>,
     pub name: String,
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
     #[serde(default)]
     pub country_code: Option<String>,
     #[serde(default)]

@@ -7,6 +7,8 @@ import '../common/money.dart';
 
 export '../../domain/barcode.dart';
 
+String? defaultFamilyId(List<FamDto>? aFams) => aFams?.firstOrNull?.id;
+
 class FamilyBadge extends StatelessWidget
 {
   final String name;

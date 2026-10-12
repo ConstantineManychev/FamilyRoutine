@@ -74,7 +74,17 @@ pub async fn list_transactions(
             peer.account_name AS "peer_account_name?",
             peer.amount AS "peer_amount?",
             peer.curr_code AS "peer_curr_code?",
-            NULLIF(t.rule_key, '') AS similar_key
+            NULLIF(t.rule_key, '') AS similar_key,
+            pl.id AS "place_id?",
+            pl.name AS "place_name?",
+            pl.addr_id AS "place_addr_id?",
+            pl.branch AS "branch?",
+            EXISTS (
+                SELECT 1 FROM merchant_places mp
+                JOIN places lp ON lp.id = mp.place_id
+                WHERE mp.user_id = $1 AND mp.merchant_id = t.merchant_id
+                  AND can_see_scoped(lp.owner_id, lp.family_id, $1)
+            ) AS "is_merchant_linked!"
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
         JOIN accounts a ON a.id = t.account_id
@@ -90,12 +100,31 @@ pub async fn list_transactions(
             WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id
             LIMIT 1
         ) peer ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT p.id, p.name, src.addr_id, addr_label(ci.name, st.name, pa.house_num, pa.zip) AS branch
+            FROM (
+                SELECT r.place_id, r.place_addr_id AS addr_id, 0 AS rank
+                FROM receipts r
+                WHERE r.id = t.receipt_id AND r.owner_id = $1 AND r.place_id IS NOT NULL
+                UNION ALL
+                SELECT mp.place_id, mp.place_addr_id, 1
+                FROM merchant_places mp
+                WHERE mp.user_id = $1 AND mp.merchant_id = t.merchant_id
+            ) src
+            JOIN places p ON p.id = src.place_id AND can_see_scoped(p.owner_id, p.family_id, $1)
+            LEFT JOIN place_addrs pa ON pa.id = src.addr_id
+            LEFT JOIN cities ci ON ci.id = pa.city_id
+            LEFT JOIN streets st ON st.id = pa.street_id
+            ORDER BY src.rank
+            LIMIT 1
+        ) pl ON TRUE
         WHERE ($2::uuid IS NULL OR t.account_id = $2)
           AND ($3::timestamptz IS NULL OR t.tx_ts >= $3)
           AND ($4::timestamptz IS NULL OR t.tx_ts < $4)
           AND (NOT $5 OR (t.receipt_id IS NULL AND t.source <> 'receipt_cash' AND t.amount < 0))
           AND ($6::text IS NULL
-               OR t.description ILIKE $6 OR t.counterparty ILIKE $6 OR t.note ILIKE $6 OR m.name ILIKE $6)
+               OR t.description ILIKE $6 OR t.counterparty ILIKE $6 OR t.note ILIKE $6 OR m.name ILIKE $6
+               OR pl.name ILIKE $6)
           AND ($7::timestamptz IS NULL OR (t.tx_ts, t.id) < ($7, $8::uuid))
           AND ($10::tx_cat_t IS NULL OR t.category = $10)
           AND (NOT $11 OR t.category IS NULL)
@@ -541,7 +570,17 @@ where
             peer.account_name AS "peer_account_name?",
             peer.amount AS "peer_amount?",
             peer.curr_code AS "peer_curr_code?",
-            NULLIF(t.rule_key, '') AS similar_key
+            NULLIF(t.rule_key, '') AS similar_key,
+            pl.id AS "place_id?",
+            pl.name AS "place_name?",
+            pl.addr_id AS "place_addr_id?",
+            pl.branch AS "branch?",
+            EXISTS (
+                SELECT 1 FROM merchant_places mp
+                JOIN places lp ON lp.id = mp.place_id
+                WHERE mp.user_id = $2 AND mp.merchant_id = t.merchant_id
+                  AND can_see_scoped(lp.owner_id, lp.family_id, $2)
+            ) AS "is_merchant_linked!"
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
         JOIN accounts a ON a.id = t.account_id
@@ -557,6 +596,24 @@ where
             WHERE t.transfer_id IS NOT NULL AND p.transfer_id = t.transfer_id AND p.id <> t.id
             LIMIT 1
         ) peer ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT p.id, p.name, src.addr_id, addr_label(ci.name, st.name, pa.house_num, pa.zip) AS branch
+            FROM (
+                SELECT r.place_id, r.place_addr_id AS addr_id, 0 AS rank
+                FROM receipts r
+                WHERE r.id = t.receipt_id AND r.owner_id = $2 AND r.place_id IS NOT NULL
+                UNION ALL
+                SELECT mp.place_id, mp.place_addr_id, 1
+                FROM merchant_places mp
+                WHERE mp.user_id = $2 AND mp.merchant_id = t.merchant_id
+            ) src
+            JOIN places p ON p.id = src.place_id AND can_see_scoped(p.owner_id, p.family_id, $2)
+            LEFT JOIN place_addrs pa ON pa.id = src.addr_id
+            LEFT JOIN cities ci ON ci.id = pa.city_id
+            LEFT JOIN streets st ON st.id = pa.street_id
+            ORDER BY src.rank
+            LIMIT 1
+        ) pl ON TRUE
         WHERE t.id = ANY($1)
         ORDER BY t.tx_ts DESC, t.id DESC
         "#,

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO merchant_places (user_id, merchant_id, place_id, place_addr_id)\n        VALUES ($1, $2, $3, $4)\n        ON CONFLICT (user_id, merchant_id)\n        DO UPDATE SET place_id = EXCLUDED.place_id, place_addr_id = EXCLUDED.place_addr_id, updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f0bd28cfb09920adc9e72f4b14cf874eb177e7a77cbf2257d0336c4106cf4dbd"
+}

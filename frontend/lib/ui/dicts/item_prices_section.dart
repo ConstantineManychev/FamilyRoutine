@@ -551,7 +551,7 @@ class _ManualPriceDialogState extends State<_ManualPriceDialog>
                     DropdownMenuItem<String?>(value: null, child: Text('catalog.branch_any'.tr())),
                     ...addrs.map((aAddr) => DropdownMenuItem<String?>(
                           value: aAddr.id,
-                          child: Text(aAddr.label ?? aAddr.houseNum, overflow: TextOverflow.ellipsis),
+                          child: Text(aAddr.label ?? '', overflow: TextOverflow.ellipsis),
                         )),
                   ],
                   onChanged: (aValue) => setState(() => _addrId = aValue),

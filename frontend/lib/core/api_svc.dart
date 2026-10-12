@@ -281,6 +281,13 @@ class ApiSvc
 
   Future<void> deletePlace(String aId) => _dio.delete('/api/places/$aId');
 
+  Future<void> linkMerchant(String aMerchantId, String aPlaceId, {String? aPlaceAddrId}) => _dio.put(
+        '/api/merchants/$aMerchantId/place',
+        data: {'place_id': aPlaceId, 'place_addr_id': aPlaceAddrId},
+      );
+
+  Future<void> unlinkMerchant(String aMerchantId) => _dio.delete('/api/merchants/$aMerchantId/place');
+
   Future<List<DictExDto>> getExercises() async
   {
     final res = await _dio.get('/api/dicts/exercises');

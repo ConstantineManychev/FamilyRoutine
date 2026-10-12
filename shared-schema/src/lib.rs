@@ -314,14 +314,14 @@ pub struct PlaceAddrDto
     pub is_main: bool,
     pub country_id: Uuid,
     pub city_id: Uuid,
-    pub street_id: Uuid,
-    pub house_num: String,
+    #[serde(default)]
+    pub street_id: Option<Uuid>,
+    #[serde(default)]
+    pub house_num: Option<String>,
     #[serde(default)]
     pub apt: Option<String>,
     #[serde(default)]
     pub zip: Option<String>,
-    #[serde(default)]
-    pub merchant_id: Option<String>,
     #[serde(default, skip_deserializing)]
     pub label: Option<String>,
 }
@@ -335,6 +335,23 @@ pub struct PlaceDto
     pub family_name: Option<String>,
     pub is_editable: bool,
     pub addrs: Vec<PlaceAddrDto>,
+    pub merchants: Vec<LinkedMerchantDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LinkedMerchantDto
+{
+    pub merchant_id: Uuid,
+    pub name: String,
+    pub place_addr_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LinkMerchantRequest
+{
+    pub place_id: Uuid,
+    #[serde(default)]
+    pub place_addr_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

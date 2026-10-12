@@ -326,6 +326,11 @@ class TxDto
   final double? peerAmount;
   final String? peerCurrCode;
   final String? similarKey;
+  final String? placeId;
+  final String? placeName;
+  final String? placeAddrId;
+  final String? branch;
+  final bool isMerchantLinked;
 
   const TxDto({
     required this.id,
@@ -354,6 +359,11 @@ class TxDto
     this.peerAmount,
     this.peerCurrCode,
     this.similarKey,
+    this.placeId,
+    this.placeName,
+    this.placeAddrId,
+    this.branch,
+    this.isMerchantLinked = false,
   });
 
   bool get isTransfer => transferId != null;
@@ -361,7 +371,9 @@ class TxDto
   bool get isReceiptCash => source == 'receipt_cash';
   bool get isOutflow => amount < 0;
 
-  String get title => merchantName ?? counterparty ?? description ?? note ?? accountName;
+  String get title => placeName ?? merchantName ?? counterparty ?? description ?? note ?? accountName;
+
+  String? get placeLabel => placeName == null ? null : [placeName!, if (branch != null) branch!].join(' · ');
 
   factory TxDto.fromJson(Map<String, dynamic> aJson) => TxDto(
         id: aJson['id'] as String,
@@ -390,6 +402,11 @@ class TxDto
         peerAmount: parseDecimalOrNull(aJson['peer_amount']),
         peerCurrCode: aJson['peer_curr_code'] as String?,
         similarKey: aJson['similar_key'] as String?,
+        placeId: aJson['place_id'] as String?,
+        placeName: aJson['place_name'] as String?,
+        placeAddrId: aJson['place_addr_id'] as String?,
+        branch: aJson['branch'] as String?,
+        isMerchantLinked: aJson['is_merchant_linked'] as bool? ?? false,
       );
 }
 

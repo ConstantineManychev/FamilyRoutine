@@ -68,7 +68,7 @@ const Map<String, List<String>> dynamicKeys = {
     'skull_crusher', 'plank', 'crunch', 'hanging_leg_raise', 'kettlebell_swing', 'burpee', 'running', 'brisk_walking',
     'stationary_bike', 'rowing_machine', 'elliptical', 'jump_rope', 'swimming', 'stretching', 'yoga',
   ],
-  'places': ['err_name_req', 'err_country_req', 'err_city_req', 'err_street_req', 'err_house_zip_req'],
+  'places': ['err_name_req', 'err_country_req', 'err_city_req'],
 };
 
 Set<String> _flatten(Map<String, dynamic> aJson, [String aPrefix = ''])

@@ -201,6 +201,10 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/transfers/:id", axum::routing::delete(tx_handlers::delete_transfer))
         .route("/merchants", get(tx_handlers::list_merchants))
         .route(
+            "/merchants/:id/place",
+            put(place_handlers::link_merchant).delete(place_handlers::unlink_merchant),
+        )
+        .route(
             "/receipts",
             get(receipt_handlers::list_receipts).post(receipt_handlers::create_receipt),
         )
