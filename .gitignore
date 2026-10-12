@@ -46,3 +46,8 @@ pgdata/
 *.sublime-workspace
 
 .docker-build-cache/
+# Build dist & server secrets
+frontend/dist/
+*.tar.gz
+*.key
+*.pem
