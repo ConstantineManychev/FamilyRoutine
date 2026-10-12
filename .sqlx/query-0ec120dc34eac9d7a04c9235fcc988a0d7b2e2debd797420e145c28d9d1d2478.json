@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT e.met_val::float8 AS \"met!\",\n               (SELECT COUNT(*) FROM session_sets ss WHERE ss.session_exercise_id = se.id AND ss.is_done) AS \"done!\"\n        FROM session_exercises se JOIN dict_exs e ON e.id = se.ex_id\n        WHERE se.session_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "met!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "done!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "0ec120dc34eac9d7a04c9235fcc988a0d7b2e2debd797420e145c28d9d1d2478"
+}

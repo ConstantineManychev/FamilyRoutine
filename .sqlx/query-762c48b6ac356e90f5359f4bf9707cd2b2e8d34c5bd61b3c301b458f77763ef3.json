@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id, s.program_name, s.day_name, s.started_ts, s.finished_ts, s.kcal,\n               COUNT(ss.session_exercise_id) FILTER (WHERE ss.is_done) AS \"done_sets!\",\n               COALESCE(SUM(ss.weight_kg * ss.reps) FILTER (WHERE ss.is_done), 0) AS \"volume_kg!\"\n        FROM workout_sessions s\n        LEFT JOIN session_exercises se ON se.session_id = s.id\n        LEFT JOIN session_sets ss ON ss.session_exercise_id = se.id\n        WHERE s.user_id = $1 AND (NOT $3 OR s.finished_ts IS NOT NULL)\n        GROUP BY s.id\n        ORDER BY s.started_ts DESC\n        LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "program_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "day_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "started_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "finished_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "done_sets!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "volume_kg!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "762c48b6ac356e90f5359f4bf9707cd2b2e8d34c5bd61b3c301b458f77763ef3"
+}

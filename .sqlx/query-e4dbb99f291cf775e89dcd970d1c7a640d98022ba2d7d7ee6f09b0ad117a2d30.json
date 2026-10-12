@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, name, schedule_mode AS \"schedule_mode: ScheduleMode\", is_active, created_ts\n        FROM training_programs WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "schedule_mode: ScheduleMode",
+        "type_info": {
+          "Custom": {
+            "name": "schedule_mode_t",
+            "kind": {
+              "Enum": [
+                "queue",
+                "intervals",
+                "weekdays"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e4dbb99f291cf775e89dcd970d1c7a640d98022ba2d7d7ee6f09b0ad117a2d30"
+}

@@ -4,6 +4,7 @@ export 'ai_models.dart';
 export 'finance_models.dart';
 export 'profile_models.dart';
 export 'routine_models.dart';
+export 'training_models.dart';
 
 enum MemberRole
 {
@@ -478,6 +479,7 @@ class ExMuscGrpDto
 class DictExDto
 {
   final String id;
+  final String? code;
   final String name;
   final String exType;
   final double metVal;
@@ -488,6 +490,7 @@ class DictExDto
 
   const DictExDto({
     required this.id,
+    this.code,
     required this.name,
     required this.exType,
     required this.metVal,
@@ -499,6 +502,7 @@ class DictExDto
 
   factory DictExDto.fromJson(Map<String, dynamic> aJson) => DictExDto(
         id: aJson['id'] as String,
+        code: aJson['code'] as String?,
         name: aJson['name'] as String,
         exType: aJson['ex_type'] as String? ?? 'strength',
         metVal: (aJson['met_val'] as num).toDouble(),

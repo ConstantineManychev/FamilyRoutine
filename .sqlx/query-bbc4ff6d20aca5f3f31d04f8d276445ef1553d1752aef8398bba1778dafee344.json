@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT p.id, p.name, p.schedule_mode AS \"schedule_mode: ScheduleMode\", p.anchor_day_id, p.anchor_date, p.anchor_ts,\n               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS \"day_count!\"\n        FROM training_programs p\n        WHERE p.user_id = $1 AND p.is_active\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "schedule_mode: ScheduleMode",
+        "type_info": {
+          "Custom": {
+            "name": "schedule_mode_t",
+            "kind": {
+              "Enum": [
+                "queue",
+                "intervals",
+                "weekdays"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "anchor_day_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "anchor_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "anchor_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "day_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "bbc4ff6d20aca5f3f31d04f8d276445ef1553d1752aef8398bba1778dafee344"
+}

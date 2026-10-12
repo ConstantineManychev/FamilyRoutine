@@ -83,6 +83,7 @@ class _SidebarState extends ConsumerState<Sidebar>
       children: [
         _buildNavItem(AppIcons.home, 'sidebar.routine'.tr(), () => _go('/app')),
         _buildFamMenu(),
+        _buildNavItem(AppIcons.dumbbell, 'sidebar.training'.tr(), () => _go('/app/training')),
         _buildNavItem(AppIcons.listChecks, 'sidebar.transactions'.tr(), () => _go('/app/transactions')),
         _buildNavItem(AppIcons.receipt, 'sidebar.receipts'.tr(), () => _go('/app/receipts')),
         _buildNavItem(AppIcons.wallet, 'sidebar.wallets'.tr(), () => _go('/app/wallets')),

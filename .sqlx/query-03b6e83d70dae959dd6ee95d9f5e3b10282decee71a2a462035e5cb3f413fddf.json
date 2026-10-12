@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workout_sessions SET finished_ts = $2, intensity = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "03b6e83d70dae959dd6ee95d9f5e3b10282decee71a2a462035e5cb3f413fddf"
+}

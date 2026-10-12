@@ -108,7 +108,8 @@ enum WidgetKind
   myStatus('my_status'),
   familyTimeline('family_timeline'),
   cashflow('cashflow'),
-  familyList('family_list');
+  familyList('family_list'),
+  nextWorkout('next_workout');
 
   final String wire;
 

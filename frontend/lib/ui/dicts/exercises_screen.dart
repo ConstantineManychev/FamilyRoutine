@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
+import '../training/training_format.dart';
 import '../common/feedback.dart';
 
 final AutoDisposeFutureProvider<List<DictExDto>> exercisesProv = FutureProvider.autoDispose<List<DictExDto>>((aRef) async
@@ -61,7 +62,7 @@ class ExercisesScreen extends ConsumerWidget
                               ex.isCustom ? AppIcons.user : AppIcons.activity,
                               color: Colors.blue,
                             ),
-                            title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Text(exerciseDisplayName(ex), style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text('${'exercises.types.${ex.exType}'.tr()} · MET ${ex.metVal}'),
                             trailing: const Icon(AppIcons.chevronRight),
                             onTap: () => aContext.go('/app/exercises/${ex.id}'),

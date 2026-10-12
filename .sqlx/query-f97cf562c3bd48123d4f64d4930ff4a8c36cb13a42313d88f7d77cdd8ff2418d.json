@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, met_val::float8 AS \"met!\"\n        FROM dict_exs\n        WHERE id = ANY($1) AND (NOT is_custom OR created_by = $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "met!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "f97cf562c3bd48123d4f64d4930ff4a8c36cb13a42313d88f7d77cdd8ff2418d"
+}

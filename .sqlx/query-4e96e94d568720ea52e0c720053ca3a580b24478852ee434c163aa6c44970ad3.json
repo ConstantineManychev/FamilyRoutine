@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, program_id, program_name, day_id, day_name, started_ts, finished_ts, intensity, kcal, note, status_mark_id\n        FROM workout_sessions WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "program_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "program_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "day_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "day_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "started_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "finished_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "intensity",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "4e96e94d568720ea52e0c720053ca3a580b24478852ee434c163aa6c44970ad3"
+}

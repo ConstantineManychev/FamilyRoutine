@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT v.value FROM body_values v JOIN body_entries e ON e.id = v.entry_id\n        WHERE e.user_id = $1 AND v.metric = 'weight' AND e.measured_ts <= $2\n        ORDER BY e.measured_ts DESC LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "94e728cff47cc829077de33a65bd425642f4f4eab63bd50617dde610fed4b9c9"
+}

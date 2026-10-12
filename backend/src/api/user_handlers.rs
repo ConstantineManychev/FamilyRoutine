@@ -125,9 +125,9 @@ pub async fn get_energy_timeline(
 
     let workouts = sqlx::query!(
         r#"
-        SELECT start_ts, COALESCE(kcal_burned, 0)::float8 AS "kcal!"
-        FROM user_workouts
-        WHERE user_id = $1 AND start_ts >= $2 AND start_ts < $3
+        SELECT started_ts AS start_ts, COALESCE(kcal, 0)::float8 AS "kcal!"
+        FROM workout_sessions
+        WHERE user_id = $1 AND finished_ts IS NOT NULL AND started_ts >= $2 AND started_ts < $3
         "#,
         a_user.user_id,
         day_start,

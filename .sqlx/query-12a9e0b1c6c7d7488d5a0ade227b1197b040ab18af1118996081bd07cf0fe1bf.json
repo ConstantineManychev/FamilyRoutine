@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT ON (se.ex_id) se.ex_id, se.id AS session_exercise_id, s.started_ts\n        FROM session_exercises se\n        JOIN workout_sessions s ON s.id = se.session_id\n        WHERE s.user_id = $1 AND s.id <> $2 AND s.finished_ts IS NOT NULL AND s.started_ts < $3\n          AND se.ex_id = ANY($4)\n          AND EXISTS (SELECT 1 FROM session_sets ss WHERE ss.session_exercise_id = se.id AND ss.is_done)\n        ORDER BY se.ex_id, (s.day_id IS NOT DISTINCT FROM $5) DESC, s.started_ts DESC, se.position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ex_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "session_exercise_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "started_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "12a9e0b1c6c7d7488d5a0ade227b1197b040ab18af1118996081bd07cf0fe1bf"
+}

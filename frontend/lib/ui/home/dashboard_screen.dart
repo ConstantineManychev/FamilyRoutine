@@ -11,6 +11,7 @@ import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import '../finance/cashflow_card.dart';
+import '../training/next_workout_card.dart';
 import '../routine/dash_card.dart';
 import '../routine/family_list_card.dart';
 import '../routine/family_timeline_card.dart';
@@ -455,6 +456,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       WidgetKind.familyTimeline => FamilyTimelineCard(familyId: aSpec.familyId, title: aSpec.familyName, menu: aMenu),
       WidgetKind.cashflow => CashflowCard(menu: aMenu),
       WidgetKind.familyList => FamilyListCard(menu: aMenu),
+      WidgetKind.nextWorkout => NextWorkoutCard(menu: aMenu),
     };
   }
 }
@@ -492,6 +494,7 @@ class _AddWidgetDialogState extends State<_AddWidgetDialog>
     WidgetKind.familyTimeline => AppIcons.calendarClock,
     WidgetKind.cashflow => AppIcons.chartColumn,
     WidgetKind.familyList => AppIcons.users,
+    WidgetKind.nextWorkout => AppIcons.dumbbell,
   };
 
   @override

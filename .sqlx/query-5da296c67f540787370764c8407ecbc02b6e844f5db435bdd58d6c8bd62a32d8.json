@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO training_programs (user_id, name, schedule_mode, is_active)\n        VALUES ($1, $2, $3, NOT EXISTS (SELECT 1 FROM training_programs WHERE user_id = $1 AND is_active))\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "schedule_mode_t",
+            "kind": {
+              "Enum": [
+                "queue",
+                "intervals",
+                "weekdays"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5da296c67f540787370764c8407ecbc02b6e844f5db435bdd58d6c8bd62a32d8"
+}

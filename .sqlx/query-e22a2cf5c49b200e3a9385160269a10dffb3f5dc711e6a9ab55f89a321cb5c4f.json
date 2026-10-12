@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT se.id, se.ex_id, e.code AS ex_code, e.name AS ex_name, e.type AS \"ex_type: ExType\", se.reps_min, se.reps_max,\n               se.duration_sec, se.target_weight, se.rest_sec\n        FROM session_exercises se JOIN dict_exs e ON e.id = se.ex_id\n        WHERE se.session_id = $1\n        ORDER BY se.position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ex_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "ex_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "ex_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "ex_type: ExType",
+        "type_info": {
+          "Custom": {
+            "name": "ex_type_t",
+            "kind": {
+              "Enum": [
+                "cardio",
+                "strength",
+                "flexibility",
+                "mixed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "reps_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "reps_max",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "duration_sec",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "target_weight",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "rest_sec",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e22a2cf5c49b200e3a9385160269a10dffb3f5dc711e6a9ab55f89a321cb5c4f"
+}

@@ -14,6 +14,7 @@ pub mod recognize_handlers;
 pub mod router;
 pub mod routine_handlers;
 pub mod stats_handlers;
+pub mod training_handlers;
 pub mod tx_handlers;
 pub mod user_handlers;
 pub mod wallet_handlers;

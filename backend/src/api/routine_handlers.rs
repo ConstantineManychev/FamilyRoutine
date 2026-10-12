@@ -74,54 +74,7 @@ pub async fn create_mark(
         return Err(ApiError::Validation("marks"));
     }
 
-    sqlx::query!(
-        "DELETE FROM status_marks WHERE user_id = $1 AND start_ts = $2",
-        a_user.user_id,
-        start
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query!(
-        r#"
-        UPDATE status_marks SET end_ts = $2
-        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
-        "#,
-        a_user.user_id,
-        start
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    let next_start = sqlx::query_scalar!(
-        "SELECT MIN(start_ts) FROM status_marks WHERE user_id = $1 AND start_ts > $2",
-        a_user.user_id,
-        start
-    )
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let end = match (a_req.end_ts, next_start)
-    {
-        (Some(end), Some(next)) => Some(end.min(next)),
-        (end, next) => end.or(next),
-    };
-
-    let mark = sqlx::query_as!(
-        StatusMarkDto,
-        r#"
-        INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, status AS "status: RoutineStatus", note, start_ts, end_ts
-        "#,
-        a_user.user_id,
-        a_req.status as RoutineStatus,
-        note,
-        start,
-        end
-    )
-    .fetch_one(&mut *tx)
-    .await?;
+    let mark = place_mark(&mut tx, a_user.user_id, a_req.status, note, start, a_req.end_ts).await?;
 
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(mark)))
@@ -292,6 +245,67 @@ pub async fn set_routine_sharing(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn place_mark(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_status: RoutineStatus,
+    a_note: Option<String>,
+    a_start: DateTime<Utc>,
+    a_end: Option<DateTime<Utc>>,
+) -> Result<StatusMarkDto, ApiError>
+{
+    lock_user_marks(a_conn, a_user_id).await?;
+
+    sqlx::query!(
+        "DELETE FROM status_marks WHERE user_id = $1 AND start_ts = $2",
+        a_user_id,
+        a_start
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    sqlx::query!(
+        r#"
+        UPDATE status_marks SET end_ts = $2
+        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
+        "#,
+        a_user_id,
+        a_start
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    let next_start = sqlx::query_scalar!(
+        "SELECT MIN(start_ts) FROM status_marks WHERE user_id = $1 AND start_ts > $2",
+        a_user_id,
+        a_start
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+
+    let end = match (a_end, next_start)
+    {
+        (Some(end), Some(next)) => Some(end.min(next)),
+        (end, next) => end.or(next),
+    };
+
+    Ok(sqlx::query_as!(
+        StatusMarkDto,
+        r#"
+        INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, status AS "status: RoutineStatus", note, start_ts, end_ts
+        "#,
+        a_user_id,
+        a_status as RoutineStatus,
+        a_note,
+        a_start,
+        end
+    )
+    .fetch_one(&mut *a_conn)
+    .await?)
 }
 
 async fn lock_user_marks(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<(), ApiError>

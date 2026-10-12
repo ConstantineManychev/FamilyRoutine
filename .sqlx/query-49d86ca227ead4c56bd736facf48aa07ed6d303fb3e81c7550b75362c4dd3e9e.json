@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE program_days SET position = $2, name = $3, rest_days_after = $4, weekday_mask = $5\n                    WHERE id = $1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Varchar",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "49d86ca227ead4c56bd736facf48aa07ed6d303fb3e81c7550b75362c4dd3e9e"
+}

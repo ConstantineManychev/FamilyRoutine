@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE training_programs SET is_active = FALSE WHERE user_id = $1 AND is_active AND id <> $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "428daff60004a3400ac380ab90e7ea93735e704e30c0a0df530ad64165bb4199"
+}

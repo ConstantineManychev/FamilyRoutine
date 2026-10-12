@@ -90,6 +90,7 @@ pub enum WidgetKind
     FamilyTimeline,
     Cashflow,
     FamilyList,
+    NextWorkout,
 }
 
 #[derive(Debug, Clone, Serialize)]

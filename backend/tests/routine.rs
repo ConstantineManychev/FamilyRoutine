@@ -293,6 +293,16 @@ async fn dashboards_are_private_and_track_family_access(a_db: PgPool)
         )
         .await;
     assert_eq!(missing_family.status, StatusCode::BAD_REQUEST);
+    let next_workout = app
+        .call(
+            Method::POST,
+            &format!("/api/dashboards/{anna_dash_id}/widgets"),
+            Some(&anna.token),
+            Some(json!({ "kind": "next_workout" })),
+        )
+        .await;
+    assert_eq!(next_workout.status, StatusCode::CREATED, "{}", next_workout.body);
+    assert_eq!(next_workout.body["widgets"][0]["kind"], "next_workout");
 
     let widget_ids: Vec<String> = created.body["widgets"]
         .as_array()

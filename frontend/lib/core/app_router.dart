@@ -25,6 +25,9 @@ import '../ui/places/places_screen.dart';
 import '../ui/profile/metric_history_screen.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/settings/settings_screen.dart';
+import '../ui/training/program_editor_screen.dart';
+import '../ui/training/training_screen.dart';
+import '../ui/training/workout_session_screen.dart';
 import '../ui/wallets/bank_callback_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
 import '../ui/wallets/wallets_screen.dart';
@@ -109,6 +112,21 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                 ),
               ),
               GoRoute(path: 'settings', builder: (_, __) => const SettingsScreen()),
+              GoRoute(
+                path: 'training',
+                builder: (_, __) => const TrainingScreen(),
+                routes: [
+                  GoRoute(path: 'programs/new', builder: (_, __) => const ProgramEditorScreen()),
+                  GoRoute(
+                    path: 'programs/:id',
+                    builder: (_, aState) => ProgramEditorScreen(key: ValueKey(aState.pathParameters['id']), programId: aState.pathParameters['id']),
+                  ),
+                  GoRoute(
+                    path: 'sessions/:id',
+                    builder: (_, aState) => WorkoutSessionScreen(key: ValueKey(aState.pathParameters['id']), sessionId: aState.pathParameters['id']!),
+                  ),
+                ],
+              ),
               GoRoute(path: 'profile', builder: (_, __) => const ProfileScreen()),
               GoRoute(
                 path: 'people/:id',

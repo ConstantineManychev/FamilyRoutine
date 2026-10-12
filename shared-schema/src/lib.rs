@@ -2,6 +2,7 @@ mod ai;
 mod finance;
 mod profile;
 mod routine;
+mod training;
 
 pub use ai::*;
 use chrono::{DateTime, NaiveDate, Utc};
@@ -10,6 +11,7 @@ pub use profile::*;
 pub use routine::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+pub use training::*;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -356,6 +358,7 @@ pub struct ExMuscGrpDto
 pub struct DictExDto
 {
     pub id: Uuid,
+    pub code: Option<String>,
     pub name: String,
     pub ex_type: ExType,
     pub met_val: f64,

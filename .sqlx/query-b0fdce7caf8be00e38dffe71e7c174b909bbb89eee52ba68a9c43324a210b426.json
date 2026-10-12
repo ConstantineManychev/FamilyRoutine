@@ -14,7 +14,8 @@
                 "my_status",
                 "family_timeline",
                 "cashflow",
-                "family_list"
+                "family_list",
+                "next_workout"
               ]
             }
           }

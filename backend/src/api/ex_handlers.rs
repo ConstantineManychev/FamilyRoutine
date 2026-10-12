@@ -18,6 +18,7 @@ const MAX_MET: f64 = 30.0;
 struct ExRow
 {
     id: Uuid,
+    code: Option<String>,
     name: String,
     ex_type: ExType,
     met_val: f64,
@@ -32,7 +33,7 @@ pub async fn list_exercises(State(a_state): State<AppState>, a_user: AuthUser)
     let rows = sqlx::query_as!(
         ExRow,
         r#"
-        SELECT id, name, type AS "ex_type: ExType", met_val::float8 AS "met_val!",
+        SELECT id, code, name, type AS "ex_type: ExType", met_val::float8 AS "met_val!",
                weight_type AS "weight_type: WeightType", bw_pct::float8 AS "bw_pct!", is_custom
         FROM dict_exs
         WHERE is_custom = FALSE OR created_by = $1
@@ -160,6 +161,7 @@ fn to_dto(a_row: ExRow, a_musc_grps: Vec<ExMuscGrpDto>) -> DictExDto
 {
     DictExDto {
         id: a_row.id,
+        code: a_row.code,
         name: a_row.name,
         ex_type: a_row.ex_type,
         met_val: a_row.met_val,
@@ -229,7 +231,7 @@ async fn load_exercise(a_db: &PgPool, a_id: Uuid, a_user_id: Uuid) -> Result<Dic
     let row = sqlx::query_as!(
         ExRow,
         r#"
-        SELECT id, name, type AS "ex_type: ExType", met_val::float8 AS "met_val!",
+        SELECT id, code, name, type AS "ex_type: ExType", met_val::float8 AS "met_val!",
                weight_type AS "weight_type: WeightType", bw_pct::float8 AS "bw_pct!", is_custom
         FROM dict_exs
         WHERE id = $1 AND (is_custom = FALSE OR created_by = $2)

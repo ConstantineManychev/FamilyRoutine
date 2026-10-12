@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
+import '../training/training_format.dart';
 import '../common/feedback.dart';
 import 'exercises_screen.dart';
 
@@ -95,7 +96,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
 
       setState(()
       {
-        _nameCtrl.text = ex.name;
+        _nameCtrl.text = exerciseDisplayName(ex);
         _metCtrl.text = ex.metVal.toString();
         _selType = ex.exType;
         _selWeightType = ex.weightType;

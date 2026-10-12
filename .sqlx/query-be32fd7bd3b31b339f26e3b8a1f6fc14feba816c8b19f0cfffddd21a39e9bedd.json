@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE training_programs SET name = $3, schedule_mode = $4, updated_ts = NOW()\n        WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "schedule_mode_t",
+            "kind": {
+              "Enum": [
+                "queue",
+                "intervals",
+                "weekdays"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be32fd7bd3b31b339f26e3b8a1f6fc14feba816c8b19f0cfffddd21a39e9bedd"
+}

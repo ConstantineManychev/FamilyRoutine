@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT session_exercise_id, reps, weight_kg, duration_sec, is_done\n        FROM session_sets WHERE session_exercise_id = ANY($1)\n        ORDER BY session_exercise_id, set_index\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_exercise_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "reps",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "weight_kg",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "duration_sec",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_done",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "ffa3bf9c0e4403646cb698ec68fff26d465e26f9c87b10e567a050f8b52685ef"
+}

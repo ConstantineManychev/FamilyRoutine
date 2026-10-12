@@ -13,13 +13,17 @@ const Map<String, List<String>> dynamicKeys = {
     'BANK_APP_REJECTED', 'BANK_APP_INACTIVE', 'BANK_REJECTED', 'BARCODE_TAKEN', 'RECOGNITION_DISABLED',
     'RECOGNITION_UNAVAILABLE', 'RECEIPT_UNREADABLE', 'NOT_A_RECEIPT', 'AI_KEY_REJECTED', 'AI_MODEL_REJECTED',
     'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
-    'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE',
+    'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE', 'SESSION_ACTIVE', 'SESSION_FINISHED', 'TOO_MANY_PROGRAMS',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'metrics': [
     'height', 'weight', 'body_fat', 'muscle_mass', 'skeletal_muscle', 'bone_mass', 'body_water', 'protein', 'visceral_fat',
     'neck', 'chest', 'waist', 'hips', 'biceps_left', 'biceps_right', 'forearm_left', 'forearm_right', 'thigh_left',
     'thigh_right', 'calf_left', 'calf_right', 'group_body', 'group_composition', 'group_measures',
+  ],
+  'training': [
+    'mode_queue', 'mode_intervals', 'mode_weekdays', 'mode_queue_hint', 'mode_intervals_hint', 'mode_weekdays_hint',
+    'days_count.one', 'days_count.other', 'rest_days.zero', 'rest_days.other',
   ],
   'profile': [
     'sex_male', 'sex_female', 'activity_sedentary', 'activity_light', 'activity_moderate', 'activity_active',
@@ -54,6 +58,15 @@ const Map<String, List<String>> dynamicKeys = {
   'dashboard': [
     'widget_my_status', 'widget_my_status_hint', 'widget_family_timeline', 'widget_family_timeline_hint',
     'widget_cashflow', 'widget_cashflow_hint', 'widget_family_list', 'widget_family_list_hint',
+    'widget_next_workout', 'widget_next_workout_hint',
+  ],
+  'exercises.catalog': [
+    'bench_press', 'incline_bench_press', 'dumbbell_bench_press', 'chest_fly', 'push_up', 'dips', 'pull_up',
+    'lat_pulldown', 'barbell_row', 'dumbbell_row', 'seated_cable_row', 'deadlift', 'romanian_deadlift', 'back_squat',
+    'front_squat', 'leg_press', 'lunge', 'leg_extension', 'leg_curl', 'calf_raise', 'hip_thrust', 'overhead_press',
+    'dumbbell_shoulder_press', 'lateral_raise', 'face_pull', 'biceps_curl', 'hammer_curl', 'triceps_pushdown',
+    'skull_crusher', 'plank', 'crunch', 'hanging_leg_raise', 'kettlebell_swing', 'burpee', 'running', 'brisk_walking',
+    'stationary_bike', 'rowing_machine', 'elliptical', 'jump_rope', 'swimming', 'stretching', 'yoga',
   ],
   'places': ['err_name_req', 'err_country_req', 'err_city_req', 'err_street_req', 'err_house_zip_req'],
 };

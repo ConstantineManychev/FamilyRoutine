@@ -13,7 +13,7 @@ use tower_http::trace::TraceLayer;
 use crate::api::{
     ai_handlers, auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers,
     item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers,
-    stats_handlers, tx_handlers, user_handlers, wallet_handlers,
+    stats_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -50,6 +50,33 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/people/:id/metrics/:metric", get(profile_handlers::metric_history))
         .route("/people/:id/sharing/:family_id", put(profile_handlers::set_sharing))
         .route("/families/:id/children", post(profile_handlers::create_child))
+        .route(
+            "/training/programs",
+            get(training_handlers::list_programs).post(training_handlers::create_program),
+        )
+        .route(
+            "/training/programs/:id",
+            get(training_handlers::get_program)
+                .put(training_handlers::update_program)
+                .delete(training_handlers::delete_program),
+        )
+        .route(
+            "/training/programs/:id/activate",
+            post(training_handlers::activate_program),
+        )
+        .route("/training/today", put(training_handlers::set_today))
+        .route("/training/plan", get(training_handlers::get_plan))
+        .route(
+            "/training/sessions",
+            get(training_handlers::list_sessions).post(training_handlers::start_session),
+        )
+        .route(
+            "/training/sessions/:id",
+            get(training_handlers::get_session)
+                .put(training_handlers::save_session)
+                .delete(training_handlers::delete_session),
+        )
+        .route("/training/sessions/:id/finish", post(training_handlers::finish_session))
         .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
         .route("/dicts", get(user_handlers::get_avail_dicts))
         .route("/features", get(recognize_handlers::features))

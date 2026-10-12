@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO program_days (program_id, position, name, rest_days_after, weekday_mask)\n                    VALUES ($1, $2, $3, $4, $5)\n                    RETURNING id\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Varchar",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fdda53a9f2d99adc1aead63c7e41ac7e01f0d87a0f2a61b02337105667d91d3c"
+}

@@ -699,6 +699,78 @@ class ApiSvc
     return PersonProfile.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<List<ProgramListItem>> getPrograms() async
+  {
+    final res = await _dio.get('/api/training/programs');
+    return (res.data as List<dynamic>).map((aItem) => ProgramListItem.fromJson(aItem as Map<String, dynamic>)).toList();
+  }
+
+  Future<TrainingProgram> getProgram(String aId) async
+  {
+    final res = await _dio.get('/api/training/programs/$aId');
+    return TrainingProgram.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TrainingProgram> saveProgram(String? aId, String aName, ScheduleMode aMode, List<ProgramDay> aDays) async
+  {
+    final data = {'name': aName, 'schedule_mode': aMode.name, 'days': aDays.map((aDay) => aDay.toJson()).toList()};
+    final res = aId == null
+        ? await _dio.post('/api/training/programs', data: data)
+        : await _dio.put('/api/training/programs/$aId', data: data);
+    return TrainingProgram.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteProgram(String aId) => _dio.delete('/api/training/programs/$aId');
+
+  Future<void> activateProgram(String aId) => _dio.post('/api/training/programs/$aId/activate');
+
+  Future<void> setTrainingToday(String aDayId) =>
+      _dio.put('/api/training/today', data: {'day_id': aDayId, 'date': _dateWire(DateTime.now())});
+
+  Future<TrainingPlan> getTrainingPlan({int aDays = 14}) async
+  {
+    final res = await _dio.get(
+      '/api/training/plan',
+      queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes, 'days': aDays},
+    );
+    return TrainingPlan.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<SessionSummary>> getSessions({int aLimit = 20}) async
+  {
+    final res = await _dio.get('/api/training/sessions', queryParameters: {'limit': aLimit});
+    return (res.data as List<dynamic>).map((aItem) => SessionSummary.fromJson(aItem as Map<String, dynamic>)).toList();
+  }
+
+  Future<WorkoutSession> startSession(String? aDayId) async
+  {
+    final res = await _dio.post('/api/training/sessions', data: {'day_id': aDayId});
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<WorkoutSession> getSession(String aId) async
+  {
+    final res = await _dio.get('/api/training/sessions/$aId');
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<WorkoutSession> saveSession(String aId, String? aNote, List<SessionExercise> aExercises) async
+  {
+    final res = await _dio.put(
+      '/api/training/sessions/$aId',
+      data: {'note': aNote, 'exercises': aExercises.map((aExercise) => aExercise.toJson()).toList()},
+    );
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<WorkoutSession> finishSession(String aId, int aIntensity) async
+  {
+    final res = await _dio.post('/api/training/sessions/$aId/finish', data: {'intensity': aIntensity});
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteSession(String aId) => _dio.delete('/api/training/sessions/$aId');
+
   Future<AiFeatures> getFeatures() async
   {
     final res = await _dio.get('/api/features');
