@@ -158,6 +158,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   final _merchantCtrl = TextEditingController();
   final _merchantFocus = FocusNode();
   final _noteCtrl = TextEditingController();
+  final _discountCtrl = TextEditingController();
   final List<_ItemRow> _rows = [];
   List<TxDto> _txs = [];
   List<CurrencyDto> _currs = const [];
@@ -193,6 +194,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     _merchantCtrl.dispose();
     _merchantFocus.dispose();
     _noteCtrl.dispose();
+    _discountCtrl.dispose();
     for (final row in _rows)
     {
       row.dispose();
@@ -272,6 +274,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     _cashAccountId = aReceipt.cashAccountId;
     _isCashChosen = true;
     _noteCtrl.text = aReceipt.note ?? '';
+    _discountCtrl.text = _discountText(aReceipt.discount);
     _txs = [...aReceipt.txs];
     for (final row in _rows)
     {
@@ -285,6 +288,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       _rows.add(_ItemRow());
     }
   }
+
+  String _discountText(double aValue) => aValue > 0.004 ? aValue.toStringAsFixed(2) : '';
+
+  double get _discount => (parseAmountInput(_discountCtrl.text) ?? 0).clamp(0, double.infinity).toDouble();
 
   double _paidIn(TxDto aTx)
   {
@@ -359,6 +366,14 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       items.add(line);
     }
 
+    final itemsTotal = _rows.fold<double>(0, (aSum, aRow) => aSum + aRow.amount);
+    final discount = _discount;
+    if (discount > itemsTotal + 0.004)
+    {
+      showInfoSnack(context, 'finance.err_discount'.tr());
+      return;
+    }
+
     final cashWallets = _cashWallets();
     final cashAccountId = _isCashChosen ? _cashAccountId : cashWallets.firstOrNull?.id;
     final merchantName = _merchantCtrl.text.trim();
@@ -379,6 +394,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'note': note.isEmpty ? null : note,
         'items': items,
         'tx_ids': _txs.map((aTx) => aTx.id).toList(),
+        'discount': moneyWire(discount),
         if (_pendingPlace() != null) 'new_place': {..._pendingPlace()!.toJson(), 'family_id': familyId},
       });
 
@@ -465,8 +481,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     }
 
     final itemsTotal = _rows.fold<double>(0, (aSum, aRow) => aSum + aRow.amount);
+    final discount = _discount;
     final paidTotal = _txs.fold<double>(0, (aSum, aTx) => aSum + _paidIn(aTx));
-    final rest = paidTotal - itemsTotal;
+    final rest = paidTotal - (itemsTotal - discount);
     final cashWallets = _cashWallets();
     final effectiveCash = _isCashChosen ? _cashAccountId : cashWallets.firstOrNull?.id;
 
@@ -612,6 +629,29 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            width: 320,
+            child: Semantics(
+              container: true,
+              child: TextField(
+                controller: _discountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: amountFormatters,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'finance.receipt_discount'.tr(),
+                  helperText: 'finance.receipt_discount_hint'.tr(),
+                  helperMaxLines: 3,
+                  prefixIcon: const Icon(AppIcons.tag, size: 18),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         Text('finance.payments'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
@@ -667,7 +707,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           ),
         ],
         const SizedBox(height: 24),
-        _buildTotals(aContext, itemsTotal, paidTotal),
+        _buildTotals(aContext, itemsTotal, discount, paidTotal),
         const SizedBox(height: 24),
         TextField(
           controller: _noteCtrl,
@@ -921,7 +961,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     final summary = 'receipt.recognized'.tr(args: ['${aDraft.lines.length}', '$newCount']);
     final mismatch = aDraft.isTotalMismatch
         ? 'receipt.total_mismatch'.tr(args: [
-            formatMoney(context, aDraft.linesTotal, currCode),
+            formatMoney(context, aDraft.payable, currCode),
             formatMoney(context, aDraft.total!, currCode),
           ])
         : null;
@@ -965,6 +1005,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       {
         _rows.add(_ItemRow());
       }
+      _discountCtrl.text = _discountText(aDraft.discount);
       _recognitionNote = mismatch == null ? summary : '$summary $mismatch';
     });
   }
@@ -1330,7 +1371,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     );
   }
 
-  Widget _buildTotals(BuildContext aContext, double aItemsTotal, double aPaidTotal)
+  Widget _buildTotals(BuildContext aContext, double aItemsTotal, double aDiscount, double aPaidTotal)
   {
     Widget line(String aLabel, double aValue, {bool aIsBold = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1345,7 +1386,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           ),
         );
 
-    final total = aItemsTotal > aPaidTotal ? aItemsTotal : aPaidTotal;
+    final payable = aItemsTotal - aDiscount;
+    final total = payable > aPaidTotal ? payable : aPaidTotal;
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 420),
@@ -1358,9 +1400,13 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       child: Column(
         children: [
           line('finance.items_total'.tr(), aItemsTotal),
+          if (aDiscount > 0.004) ...[
+            line('finance.receipt_discount'.tr(), -aDiscount),
+            line('finance.payable'.tr(), payable),
+          ],
           line('finance.paid_by_tx'.tr(), aPaidTotal),
-          if (aPaidTotal > aItemsTotal + 0.004) line('finance.rest'.tr(), aPaidTotal - aItemsTotal),
-          if (aItemsTotal > aPaidTotal + 0.004) line('finance.cash_rest'.tr(), aItemsTotal - aPaidTotal),
+          if (aPaidTotal > payable + 0.004) line('finance.rest'.tr(), aPaidTotal - payable),
+          if (payable > aPaidTotal + 0.004) line('finance.cash_rest'.tr(), payable - aPaidTotal),
           const Divider(),
           line('finance.receipt_total'.tr(), total, aIsBold: true),
         ],

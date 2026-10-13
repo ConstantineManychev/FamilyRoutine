@@ -361,6 +361,8 @@ pub struct SaveReceiptRequest
     pub tx_ids: Vec<Uuid>,
     #[serde(default)]
     pub new_place: Option<NewPlaceRequest>,
+    #[serde(default)]
+    pub discount: Decimal,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -407,6 +409,7 @@ pub struct RecognizedReceiptDto
     pub curr_code: Option<String>,
     pub total: Option<Decimal>,
     pub lines_total: Decimal,
+    pub discount: Decimal,
     pub store_name: Option<String>,
     pub place_id: Option<Uuid>,
     pub place_name: Option<String>,
@@ -433,6 +436,7 @@ pub struct ReceiptDto
     pub items: Vec<ReceiptItemDto>,
     pub txs: Vec<TxDto>,
     pub items_total: Decimal,
+    pub discount: Decimal,
     pub paid_total: Decimal,
     pub rest_amount: Decimal,
     pub cash_amount: Decimal,
@@ -447,6 +451,7 @@ pub struct ReceiptListItemDto
     pub place_name: Option<String>,
     pub curr_code: String,
     pub items_total: Decimal,
+    pub discount: Decimal,
     pub item_count: i64,
     pub tx_count: i64,
 }

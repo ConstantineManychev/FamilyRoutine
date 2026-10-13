@@ -542,7 +542,11 @@
     "place_suggested": "correspond au nom",
     "place_branch": "Magasin",
     "place_any_branch": "Non précisé",
-    "place_unlink": "Délier"
+    "place_unlink": "Délier",
+    "receipt_discount": "Remise sur tout le ticket",
+    "receipt_discount_hint": "Bon d'achat, coupon ou points appliqués à tout le ticket. Saisissez les remises sur un article dans son montant.",
+    "payable": "À payer",
+    "err_discount": "La remise ne peut pas dépasser le total des articles"
   },
   "items": {
     "title": "Produits et services",

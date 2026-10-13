@@ -38,6 +38,7 @@ struct ReceiptHead
     curr_code: String,
     cash_account_id: Option<Uuid>,
     note: Option<String>,
+    discount: Decimal,
 }
 
 enum ItemRef
@@ -82,6 +83,7 @@ pub async fn list_receipts(
             p.name AS "place_name?",
             c.code AS curr_code,
             COALESCE((SELECT SUM(i.amount) FROM receipt_items i WHERE i.receipt_id = r.id), 0) AS "items_total!",
+            r.discount,
             (SELECT COUNT(*) FROM receipt_items i WHERE i.receipt_id = r.id) AS "item_count!",
             (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id AND t.source <> 'receipt_cash') AS "tx_count!"
         FROM receipts r
@@ -170,6 +172,12 @@ async fn save_receipt(
     let merchant_name = clean_optional_text(a_req.merchant_name.as_deref(), MAX_NAME_LEN, "merchant_name")?;
     let note = clean_optional_text(a_req.note.as_deref(), MAX_NOTE_LEN, "note")?;
     let items = clean_items(&a_req.items)?;
+    let items_total: Decimal = items.iter().map(|item| item.amount).sum();
+    let discount = check_money(a_req.discount, "discount")?;
+    if discount < Decimal::ZERO || discount > items_total
+    {
+        return Err(ApiError::Validation("discount"));
+    }
     let mut tx_ids = a_req.tx_ids.clone();
     tx_ids.sort_unstable();
     tx_ids.dedup();
@@ -267,7 +275,7 @@ async fn save_receipt(
                 r#"
                 UPDATE receipts
                 SET receipt_ts = $2, merchant_id = $3, merchant_name = $4, place_id = $5, curr_id = $6,
-                    cash_account_id = $7, note = $8, place_addr_id = $9
+                    cash_account_id = $7, note = $8, place_addr_id = $9, discount = $10
                 WHERE id = $1
                 "#,
                 id,
@@ -278,7 +286,8 @@ async fn save_receipt(
                 a_req.curr_id,
                 a_req.cash_account_id,
                 note,
-                place_addr_id
+                place_addr_id,
+                discount
             )
             .execute(&mut *tx)
             .await?;
@@ -287,9 +296,10 @@ async fn save_receipt(
         None => sqlx::query_scalar!(
             r#"
             INSERT INTO receipts (
-                owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note, place_addr_id
+                owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note, place_addr_id,
+                discount
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
             "#,
             a_user_id,
@@ -300,7 +310,8 @@ async fn save_receipt(
             a_req.curr_id,
             a_req.cash_account_id,
             note,
-            place_addr_id
+            place_addr_id,
+            discount
         )
         .fetch_one(&mut *tx)
         .await?,
@@ -366,8 +377,7 @@ async fn save_receipt(
 
     let paid_total = link_transactions(&mut tx, receipt_id, a_user_id, a_req.curr_id, &tx_ids).await?;
     learn_merchant_places(&mut tx, a_user_id, receipt_id, place_id, place_addr_id).await?;
-    let items_total: Decimal = items.iter().map(|item| item.amount).sum();
-    let cash_amount = (items_total - paid_total).max(Decimal::ZERO);
+    let cash_amount = (items_total - discount - paid_total).max(Decimal::ZERO);
 
     sync_cash_payment(
         &mut tx,
@@ -608,7 +618,8 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
             r.curr_id,
             c.code AS curr_code,
             r.cash_account_id,
-            r.note
+            r.note,
+            r.discount
         FROM receipts r
         JOIN currencies c ON c.id = r.curr_id
         LEFT JOIN merchants m ON m.id = r.merchant_id
@@ -648,6 +659,7 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
     let txs = load_txs(&mut *a_conn, &tx_ids, a_user_id).await?;
 
     let items_total: Decimal = items.iter().map(|item| item.amount).sum();
+    let payable = items_total - head.discount;
     let paid_total: Decimal = txs
         .iter()
         .map(|tx| match tx.op_curr_code.as_deref()
@@ -673,8 +685,9 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
         items,
         txs,
         items_total: money(items_total),
+        discount: money(head.discount),
         paid_total: money(paid_total),
-        rest_amount: money((paid_total - items_total).max(Decimal::ZERO)),
-        cash_amount: money((items_total - paid_total).max(Decimal::ZERO)),
+        rest_amount: money((paid_total - payable).max(Decimal::ZERO)),
+        cash_amount: money((payable - paid_total).max(Decimal::ZERO)),
     })
 }

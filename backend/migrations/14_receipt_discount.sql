@@ -1,0 +1,1 @@
+ALTER TABLE receipts ADD COLUMN discount NUMERIC(15, 2) NOT NULL DEFAULT 0 CHECK (discount >= 0);

@@ -84,7 +84,7 @@ class _ReceiptTile extends StatelessWidget
         title: Text(receipt.merchantName ?? 'finance.receipt_untitled'.tr()),
         subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: Text(
-          formatMoney(aContext, receipt.itemsTotal, receipt.currCode),
+          formatMoney(aContext, receipt.itemsTotal - receipt.discount, receipt.currCode),
           style: const TextStyle(fontWeight: FontWeight.w600, color: inkPrimary),
         ),
       ),

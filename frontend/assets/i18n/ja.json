@@ -542,7 +542,11 @@
     "place_suggested": "名称が一致",
     "place_branch": "店舗",
     "place_any_branch": "指定しない",
-    "place_unlink": "紐付けを解除"
+    "place_unlink": "紐付けを解除",
+    "receipt_discount": "レシート全体の割引",
+    "receipt_discount_hint": "レシート全体に使ったクーポン、割引券、ポイント。個別商品の割引はその商品の金額に入力してください。",
+    "payable": "支払額",
+    "err_discount": "割引は商品合計を超えられません"
   },
   "items": {
     "title": "商品とサービス",

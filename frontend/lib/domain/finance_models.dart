@@ -596,6 +596,7 @@ class RecognizedReceipt
   final String? currCode;
   final double? total;
   final double linesTotal;
+  final double discount;
   final String? storeName;
   final String? placeId;
   final String? placeName;
@@ -609,6 +610,7 @@ class RecognizedReceipt
     this.currCode,
     this.total,
     required this.linesTotal,
+    this.discount = 0,
     this.storeName,
     this.placeId,
     this.placeName,
@@ -617,7 +619,9 @@ class RecognizedReceipt
     required this.lines,
   });
 
-  bool get isTotalMismatch => total != null && (total! - linesTotal).abs() > 0.009;
+  double get payable => linesTotal - discount;
+
+  bool get isTotalMismatch => total != null && (total! - payable).abs() > 0.009;
 
   factory RecognizedReceipt.fromJson(Map<String, dynamic> aJson) => RecognizedReceipt(
         receiptTs: aJson['receipt_ts'] == null ? null : parseTs(aJson['receipt_ts']),
@@ -625,6 +629,7 @@ class RecognizedReceipt
         currCode: aJson['curr_code'] as String?,
         total: parseDecimalOrNull(aJson['total']),
         linesTotal: parseDecimal(aJson['lines_total']),
+        discount: parseDecimal(aJson['discount']),
         storeName: aJson['store_name'] as String?,
         placeId: aJson['place_id'] as String?,
         placeName: aJson['place_name'] as String?,
@@ -653,6 +658,7 @@ class ReceiptDto
   final List<ReceiptItem> items;
   final List<TxDto> txs;
   final double itemsTotal;
+  final double discount;
   final double paidTotal;
   final double restAmount;
   final double cashAmount;
@@ -673,6 +679,7 @@ class ReceiptDto
     required this.items,
     required this.txs,
     required this.itemsTotal,
+    this.discount = 0,
     required this.paidTotal,
     required this.restAmount,
     required this.cashAmount,
@@ -698,6 +705,7 @@ class ReceiptDto
             .map((aItem) => TxDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),
         itemsTotal: parseDecimal(aJson['items_total']),
+        discount: parseDecimal(aJson['discount']),
         paidTotal: parseDecimal(aJson['paid_total']),
         restAmount: parseDecimal(aJson['rest_amount']),
         cashAmount: parseDecimal(aJson['cash_amount']),
@@ -712,6 +720,7 @@ class ReceiptListItem
   final String? placeName;
   final String currCode;
   final double itemsTotal;
+  final double discount;
   final int itemCount;
   final int txCount;
 
@@ -722,6 +731,7 @@ class ReceiptListItem
     this.placeName,
     required this.currCode,
     required this.itemsTotal,
+    this.discount = 0,
     required this.itemCount,
     required this.txCount,
   });
@@ -733,6 +743,7 @@ class ReceiptListItem
         placeName: aJson['place_name'] as String?,
         currCode: aJson['curr_code'] as String? ?? '',
         itemsTotal: parseDecimal(aJson['items_total']),
+        discount: parseDecimal(aJson['discount']),
         itemCount: (aJson['item_count'] as num?)?.toInt() ?? 0,
         txCount: (aJson['tx_count'] as num?)?.toInt() ?? 0,
       );

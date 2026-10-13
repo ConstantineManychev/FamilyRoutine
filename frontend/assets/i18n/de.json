@@ -542,7 +542,11 @@
     "place_suggested": "passt zum Namen",
     "place_branch": "Filiale",
     "place_any_branch": "Nicht angeben",
-    "place_unlink": "Verknüpfung lösen"
+    "place_unlink": "Verknüpfung lösen",
+    "receipt_discount": "Rabatt auf den ganzen Bon",
+    "receipt_discount_hint": "Gutschein, Coupon oder Punkte für den ganzen Bon. Rabatte auf einzelne Artikel tragen Sie in deren Beträge ein.",
+    "payable": "Zu zahlen",
+    "err_discount": "Der Rabatt darf die Summe der Positionen nicht übersteigen"
   },
   "items": {
     "title": "Waren und Dienstleistungen",

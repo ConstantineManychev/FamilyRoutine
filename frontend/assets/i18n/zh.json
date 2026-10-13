@@ -542,7 +542,11 @@
     "place_suggested": "名称匹配",
     "place_branch": "分店",
     "place_any_branch": "不指定",
-    "place_unlink": "取消关联"
+    "place_unlink": "取消关联",
+    "receipt_discount": "整张小票的折扣",
+    "receipt_discount_hint": "用于整张小票的代金券、优惠券或积分。单个商品的折扣请计入该商品金额。",
+    "payable": "应付",
+    "err_discount": "折扣不能超过商品合计"
   },
   "items": {
     "title": "商品和服务",

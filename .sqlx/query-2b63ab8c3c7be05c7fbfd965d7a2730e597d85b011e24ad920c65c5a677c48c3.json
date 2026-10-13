@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            r.merchant_id,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            r.place_id,\n            p.name AS \"place_name?\",\n            r.place_addr_id,\n            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,\n            r.curr_id,\n            c.code AS curr_code,\n            r.cash_account_id,\n            r.note\n        FROM receipts r\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        WHERE r.id = $1 AND r.owner_id = $2\n        ",
+  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            r.merchant_id,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            r.place_id,\n            p.name AS \"place_name?\",\n            r.place_addr_id,\n            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,\n            r.curr_id,\n            c.code AS curr_code,\n            r.cash_account_id,\n            r.note,\n            r.discount\n        FROM receipts r\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        WHERE r.id = $1 AND r.owner_id = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -62,6 +62,11 @@
         "ordinal": 11,
         "name": "note",
         "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "discount",
+        "type_info": "Numeric"
       }
     ],
     "parameters": {
@@ -82,8 +87,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "0d589a41aa5ad16594f03c3297114efa2c54b2c4c6b32829fed0889f5a6be809"
+  "hash": "2b63ab8c3c7be05c7fbfd965d7a2730e597d85b011e24ad920c65c5a677c48c3"
 }

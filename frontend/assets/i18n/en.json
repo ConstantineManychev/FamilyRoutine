@@ -542,7 +542,11 @@
     "place_suggested": "matches the name",
     "place_branch": "Branch",
     "place_any_branch": "Not specified",
-    "place_unlink": "Unlink"
+    "place_unlink": "Unlink",
+    "receipt_discount": "Discount on the whole receipt",
+    "receipt_discount_hint": "A voucher, coupon or points applied to the whole receipt. Enter discounts on single items in their amounts.",
+    "payable": "To pay",
+    "err_discount": "The discount cannot exceed the items total"
   },
   "items": {
     "title": "Goods and services",

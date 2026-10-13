@@ -31,7 +31,7 @@ pub(crate) const USER_PROMPT: &str = "Transcribe this receipt.\n\
 - city, street, house_number, postal_code: the shop address. For Ukrainian and Russian addresses drop street type prefixes such as вул., просп., бульв., пл.; keep English street names as written (Main Street).\n\
 - date as YYYY-MM-DD and time as HH:MM (24 hours) of the purchase.\n\
 - currency: ISO 4217 (грн or ₴ is UAH, € is EUR, zł is PLN, £ is GBP).\n\
-- total: the amount paid for the whole receipt.\n\
+- total: the final amount the customer paid for the whole receipt after all discounts, vouchers and coupons (all payments together, change excluded).\n\
 - lines: one entry per purchased item, in receipt order.\n\
   - text: the item name exactly as printed, on one line, without quantity or price.\n\
   - name: a clean readable name in the receipt language: expand abbreviations, use normal capitalisation, keep brand, variety, fat percentage and package size (Молоко Галичина 2,5% 900 г).\n\
@@ -40,7 +40,9 @@ pub(crate) const USER_PROMPT: &str = "Transcribe this receipt.\n\
   - unit_price: price per unit when printed.\n\
   - amount: what was actually charged for the line after any discount that belongs to it.\n\
   - barcode: only a complete EAN or UPC number printed for that line.\n\
-- Skip totals, subtotals, taxes (ПДВ, VAT), payment method, change, loyalty points and fiscal data. Fold discount lines into the item they belong to instead of listing them.";
+- Promotion and multi-buy lines printed among the items (SAVER DEAL, 2 FOR, a negative amount under an item) belong to the items they follow: subtract them from those lines instead of listing them. When one deal covers several lines of the same product, split it evenly between them.\n\
+- discounts: reductions for the whole receipt rather than for particular items, such as discount vouchers, coupons, loyalty points or store credit redeemed, usually printed after the subtotal. Give each with its text and a positive amount. Leave out gift cards and payment methods, and do not repeat discounts already subtracted from lines.\n\
+- Skip totals, subtotals, taxes (ПДВ, VAT), payment method, change, loyalty points earned and fiscal data.";
 
 pub struct ReceiptImage
 {
@@ -83,6 +85,15 @@ pub struct RawReceipt
     pub currency: Option<String>,
     pub total: Option<f64>,
     pub lines: Vec<RawLine>,
+    #[serde(default)]
+    pub discounts: Vec<RawDiscount>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RawDiscount
+{
+    pub text: String,
+    pub amount: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -368,7 +379,7 @@ pub(crate) fn receipt_schema() -> Value
         "additionalProperties": false,
         "required": [
             "is_receipt", "store_name", "country_code", "city", "street", "house_number", "postal_code",
-            "date", "time", "currency", "total", "lines"
+            "date", "time", "currency", "total", "lines", "discounts"
         ],
         "properties": {
             "is_receipt": { "type": "boolean" },
@@ -396,7 +407,19 @@ pub(crate) fn receipt_schema() -> Value
                         "quantity": number,
                         "unit_price": nullable(number.clone()),
                         "amount": number,
-                        "barcode": nullable(text)
+                        "barcode": nullable(text.clone())
+                    }
+                }
+            },
+            "discounts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["text", "amount"],
+                    "properties": {
+                        "text": text,
+                        "amount": number
                     }
                 }
             }

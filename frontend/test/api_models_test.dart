@@ -365,6 +365,22 @@ void main()
       expect(ExMuscGrpDto.fromJson({'grp': 'full_body', 'pct': 10}).grp, MuscGrpType.fullBody);
     });
 
+    test('receipt discount is part of the paid total', ()
+    {
+      final draft = RecognizedReceipt.fromJson({
+        'lines_total': '13.45',
+        'discount': '5.00',
+        'total': 8.45,
+        'lines': const [],
+      });
+      expect(draft.payable, closeTo(8.45, 1e-9));
+      expect(draft.isTotalMismatch, isFalse);
+
+      final unpaid = RecognizedReceipt.fromJson({'lines_total': '13.45', 'total': 8.45, 'lines': const []});
+      expect(unpaid.discount, 0);
+      expect(unpaid.isTotalMismatch, isTrue);
+    });
+
     test('place keeps existing address ids when saving', ()
     {
       final place = PlaceDto.fromJson({

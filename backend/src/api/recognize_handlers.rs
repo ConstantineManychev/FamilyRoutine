@@ -15,7 +15,7 @@ use crate::api::ai_handlers::{charge_scan, read_error, record_usage, refund_scan
 use crate::api::extract::{ApiJson, AuthUser};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{check_money, check_qty, clean_barcode, money};
-use crate::receipt_ai::{RawLine, RawReceipt, ReadError, ReceiptImage};
+use crate::receipt_ai::{RawDiscount, RawLine, RawReceipt, ReadError, ReceiptImage};
 use crate::state::AppState;
 
 const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
@@ -195,7 +195,8 @@ async fn build_draft(
     };
     let currency = resolve_currency(a_conn, a_raw.currency.as_deref(), country_code.as_deref()).await?;
 
-    let lines: Vec<CleanLine> = a_raw.lines.into_iter().filter_map(clean_line).take(MAX_LINES).collect();
+    let (folded, leftover_cents) = fold_line_discounts(a_raw.lines);
+    let lines: Vec<CleanLine> = folded.into_iter().filter_map(clean_line).take(MAX_LINES).collect();
     let mut recognized = Vec::with_capacity(lines.len());
     for line in lines
     {
@@ -226,7 +227,8 @@ async fn build_draft(
         Some(name) => match_place(a_conn, a_user_id, name, &address).await?,
     };
 
-    let lines_total = recognized.iter().map(|line| line.amount).sum();
+    let lines_total: Decimal = recognized.iter().map(|line| line.amount).sum();
+    let discount = (receipt_discount(&a_raw.discounts) + Decimal::new(leftover_cents, 2)).min(lines_total);
 
     Ok(RecognizedReceiptDto {
         receipt_ts: purchase_ts(a_raw.date.as_deref(), a_raw.time.as_deref(), a_tz_offset_min),
@@ -234,6 +236,7 @@ async fn build_draft(
         curr_code: currency.map(|(_, code)| code),
         total: a_raw.total.and_then(to_money),
         lines_total: money(lines_total),
+        discount: money(discount),
         store_name,
         place_id: place.as_ref().map(|place| place.id),
         place_name: place.map(|place| place.name),
@@ -275,6 +278,75 @@ fn to_money(a_value: f64) -> Option<Decimal>
         .ok()
         .filter(|amount| *amount >= Decimal::ZERO)
         .map(money)
+}
+
+fn to_cents(a_value: f64) -> i64
+{
+    (a_value * 100.0).round() as i64
+}
+
+fn fold_line_discounts(a_lines: Vec<RawLine>) -> (Vec<RawLine>, i64)
+{
+    let mut kept: Vec<RawLine> = Vec::with_capacity(a_lines.len());
+    let mut leftover = 0;
+
+    for line in a_lines
+    {
+        let cents = to_cents(line.amount);
+        if cents >= 0
+        {
+            kept.push(line);
+            continue;
+        }
+
+        let Some(last) = kept.last()
+        else
+        {
+            leftover -= cents;
+            continue;
+        };
+        let key = last.text.trim().to_lowercase();
+        let group: Vec<usize> = kept
+            .iter()
+            .enumerate()
+            .filter(|(_, other)| other.text.trim().to_lowercase() == key && to_cents(other.amount) > 0)
+            .map(|(index, _)| index)
+            .collect();
+        if group.is_empty()
+        {
+            leftover -= cents;
+            continue;
+        }
+
+        let mut rest = -cents;
+        let share = rest / group.len() as i64;
+        let mut remainder = rest - share * group.len() as i64;
+        for index in group
+        {
+            let target = &mut kept[index];
+            let wanted = share + i64::from(remainder > 0);
+            remainder -= i64::from(remainder > 0);
+            let cut = wanted.min(to_cents(target.amount));
+            let amount = to_cents(target.amount) - cut;
+            target.amount = amount as f64 / 100.0;
+            if target.quantity > 0.0
+            {
+                target.unit_price = Some(target.amount / target.quantity);
+            }
+            rest -= cut;
+        }
+        leftover += rest;
+    }
+
+    (kept, leftover)
+}
+
+fn receipt_discount(a_discounts: &[RawDiscount]) -> Decimal
+{
+    a_discounts
+        .iter()
+        .filter_map(|discount| to_money(discount.amount.abs()))
+        .sum()
 }
 
 fn clean_line(a_raw: RawLine) -> Option<CleanLine>
@@ -551,6 +623,55 @@ async fn match_place(
 mod tests
 {
     use super::*;
+
+    fn raw(a_text: &str, a_amount: f64) -> RawLine
+    {
+        RawLine {
+            text: a_text.into(),
+            name: a_text.into(),
+            kind: "food".into(),
+            unit: "piece".into(),
+            quantity: 1.0,
+            unit_price: Some(a_amount),
+            amount: a_amount,
+            barcode: None,
+        }
+    }
+
+    #[test]
+    fn deal_lines_are_split_between_the_same_items()
+    {
+        let (lines, leftover) = fold_line_discounts(vec![
+            raw("AVONMORE GOLD", 2.25),
+            raw("RED BULL", 2.70),
+            raw("AVONMORE GOLD", 2.25),
+            raw("SAVER DEAL !", -1.50),
+            raw("SUSHI", 7.75),
+        ]);
+        let amounts: Vec<f64> = lines.iter().map(|line| line.amount).collect();
+        assert_eq!(amounts, vec![1.5, 2.7, 1.5, 7.75]);
+        assert_eq!(lines[0].unit_price, Some(1.5));
+        assert_eq!(leftover, 0);
+    }
+
+    #[test]
+    fn unmatched_discounts_become_receipt_discounts()
+    {
+        let (lines, leftover) = fold_line_discounts(vec![raw("COUPON", -1.0), raw("BREAD", 0.30), raw("PROMO", -0.51)]);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].amount, 0.0);
+        assert_eq!(leftover, 121);
+
+        let (odd, _) = fold_line_discounts(vec![raw("TEA", 1.00), raw("TEA", 1.00), raw("2 FOR", -0.51)]);
+        let total: f64 = odd.iter().map(|line| line.amount).sum();
+        assert!((total - 1.49).abs() < 1e-9);
+
+        let discount = receipt_discount(&[RawDiscount {
+            text: "DISCOUNT VOUCHER".into(),
+            amount: 5.0,
+        }]);
+        assert_eq!(discount.to_string(), "5.00");
+    }
 
     #[test]
     fn lines_are_cleaned_and_bounded()

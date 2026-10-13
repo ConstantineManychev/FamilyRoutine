@@ -410,3 +410,76 @@ async fn unknown_shop_is_created_from_the_receipt(a_db: PgPool)
     assert_eq!(bob_draft["place_id"], Value::Null);
     assert_eq!(bob_draft["lines"][0]["match_kind"], "new");
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn vouchers_and_deals_reduce_what_was_paid(a_db: PgPool)
+{
+    let (ai_url, mock) = spawn_anthropic().await;
+    let app = TestApp::with_receipt_ai(a_db, &ai_url, 10);
+    let alice = app.user("alice@example.com").await;
+    let eur = app.currency_by_code(&alice.token, "EUR").await;
+
+    let mut dunnes = receipt(
+        "Dunnes Stores",
+        "Irishtown",
+        "1",
+        vec![
+            line("AVONMORE GOLD", "Avonmore Gold", "piece", 1.0, 2.25, None),
+            line("RED BULL", "Red Bull", "piece", 1.0, 2.70, None),
+            line("AVONMORE GOLD", "Avonmore Gold", "piece", 1.0, 2.25, None),
+            line("SAVER DEAL !", "Saver deal", "piece", 1.0, -1.50, None),
+            line("SUSHI", "Sushi", "piece", 1.0, 7.75, None),
+        ],
+    );
+    dunnes["currency"] = json!("EUR");
+    dunnes["total"] = json!(8.45);
+    dunnes["discounts"] = json!([{ "text": "DISCOUNT VOUCHER", "amount": 5.0 }]);
+
+    let (status, draft) = recognize(&app, &alice, &mock, dunnes).await;
+    assert_eq!(status, StatusCode::OK, "{draft}");
+    let amounts: Vec<&str> = draft["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line["amount"].as_str().unwrap())
+        .collect();
+    assert_eq!(amounts, vec!["1.50", "2.70", "1.50", "7.75"]);
+    assert_eq!(draft["lines_total"], "13.45");
+    assert_eq!(draft["discount"], "5.00");
+
+    let items: Vec<Value> = draft["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| {
+            json!({
+                "new_item": { "name": line["name"], "kind": line["kind"], "unit": line["unit"] },
+                "source_text": line["text"], "qty": line["qty"], "amount": line["amount"]
+            })
+        })
+        .collect();
+    let saved = post(
+        &app,
+        &alice,
+        "/api/receipts",
+        json!({ "receipt_ts": Utc::now(), "curr_id": eur, "items": items.clone(), "discount": draft["discount"] }),
+    )
+    .await;
+    assert_eq!(saved["items_total"], "13.45");
+    assert_eq!(saved["discount"], "5.00");
+    assert_eq!(saved["cash_amount"], "8.45");
+
+    let listed = app.call(Method::GET, "/api/receipts", Some(&alice.token), None).await;
+    assert_eq!(listed.body[0]["discount"], "5.00");
+
+    let too_much = app
+        .call(
+            Method::POST,
+            "/api/receipts",
+            Some(&alice.token),
+            Some(json!({ "receipt_ts": Utc::now(), "curr_id": eur, "items": items, "discount": "20" })),
+        )
+        .await;
+    assert_eq!(too_much.status, StatusCode::BAD_REQUEST);
+    assert_eq!(too_much.body["field"], "discount");
+}
