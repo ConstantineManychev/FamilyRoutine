@@ -18,6 +18,7 @@ import '../common/money.dart';
 import '../dicts/item_form.dart';
 import '../dicts/scope_widgets.dart';
 import 'finance_dialogs.dart';
+import 'receipt_view.dart';
 import 'transactions_screen.dart';
 
 class ReceiptDetailScreen extends ConsumerStatefulWidget
@@ -478,6 +479,12 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     if (_loadError != null)
     {
       return ErrorRetry(error: _loadError!, onRetry: _load);
+    }
+
+    final saved = _saved;
+    if (saved != null && !saved.isEditable)
+    {
+      return ReceiptView(receipt: saved);
     }
 
     final itemsTotal = _rows.fold<double>(0, (aSum, aRow) => aSum + aRow.amount);

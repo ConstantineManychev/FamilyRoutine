@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        WITH flows AS (\n            SELECT\n                t.curr_id,\n                t.category,\n                ((t.tx_ts AT TIME ZONE 'UTC') + make_interval(mins => $2))::date AS day,\n                SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) AS income,\n                SUM(CASE WHEN t.amount < 0 THEN -t.amount ELSE 0 END) AS expense,\n                COUNT(*) AS tx_count\n            FROM transactions t\n            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1\n            WHERE t.tx_ts >= $3 AND t.tx_ts < $4\n              AND ($5::uuid IS NULL OR t.account_id = $5)\n              AND ($6 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category = 'cash')))\n            GROUP BY 1, 2, 3\n        )\n        SELECT\n            c.code AS curr_code,\n            f.category AS \"category: TxCategory\",\n            f.day AS \"day!: NaiveDate\",\n            f.income AS \"income!\",\n            f.expense AS \"expense!\",\n            f.tx_count AS \"tx_count!\",\n            uah_rate(f.curr_id, f.day) AS src_rate,\n            uah_rate($7, f.day) AS dst_rate\n        FROM flows f\n        JOIN currencies c ON c.id = f.curr_id\n        ",
+  "query": "\n        WITH flows AS (\n            SELECT\n                t.curr_id,\n                t.category,\n                ((t.tx_ts AT TIME ZONE 'UTC') + make_interval(mins => $2))::date AS day,\n                SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) AS income,\n                SUM(CASE WHEN t.amount < 0 THEN -t.amount ELSE 0 END) AS expense,\n                COUNT(*) AS tx_count\n            FROM transactions t\n            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1\n            WHERE t.tx_ts >= $3 AND t.tx_ts < $4\n              AND ($5::uuid IS NULL OR t.account_id = $5)\n              AND ($6 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category IS NOT DISTINCT FROM 'cash')))\n              AND ($8::uuid IS NULL OR t.account_id IN (SELECT id FROM accounts WHERE user_id = $8))\n            GROUP BY 1, 2, 3\n        )\n        SELECT\n            c.code AS curr_code,\n            f.category AS \"category: TxCategory\",\n            f.day AS \"day!: NaiveDate\",\n            f.income AS \"income!\",\n            f.expense AS \"expense!\",\n            f.tx_count AS \"tx_count!\",\n            uah_rate(f.curr_id, f.day) AS src_rate,\n            uah_rate($7, f.day) AS dst_rate\n        FROM flows f\n        JOIN currencies c ON c.id = f.curr_id\n        ",
   "describe": {
     "columns": [
       {
@@ -76,6 +76,7 @@
         "Timestamptz",
         "Uuid",
         "Bool",
+        "Uuid",
         "Uuid"
       ]
     },
@@ -90,5 +91,5 @@
       null
     ]
   },
-  "hash": "1265ea7641b7d852a56bc687e4bb52f8081673eb923543b7d1f0681b0d6a0fa3"
+  "hash": "072176c667f12262c621a95444cb952ee2f1e49bd8de96291acd19fe66be6887"
 }

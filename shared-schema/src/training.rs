@@ -107,6 +107,14 @@ pub struct SessionSummaryDto
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PersonTrainingDto
+{
+    pub plan: TrainingPlanDto,
+    pub program: Option<ProgramDto>,
+    pub sessions: Vec<SessionSummaryDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TrainingPlanDto
 {
     pub program: Option<ProgramListItemDto>,

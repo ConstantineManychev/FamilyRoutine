@@ -469,6 +469,18 @@ async fn drop_membership(a_conn: &mut PgConnection, a_fam_id: Uuid, a_user_id: U
     revoke_invites_by(a_conn, a_fam_id, a_user_id).await?;
 
     sqlx::query!(
+        r#"
+        DELETE FROM account_shares s
+        USING accounts a
+        WHERE s.account_id = a.id AND s.family_id = $1 AND a.user_id = $2
+        "#,
+        a_fam_id,
+        a_user_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+
+    sqlx::query!(
         "DELETE FROM family_mems WHERE family_id = $1 AND user_id = $2",
         a_fam_id,
         a_user_id

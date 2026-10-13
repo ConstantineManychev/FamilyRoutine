@@ -7,9 +7,9 @@ use chrono::{DateTime, Duration, Utc};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use shared_schema::{
-    ExType, FinishSessionRequest, PlanQuery, PlannedWorkoutDto, ProgramDayDto, ProgramDto, ProgramExerciseDto,
-    ProgramListItemDto, RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest, ScheduleMode,
-    SessionDto, SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest,
+    ExType, FinishSessionRequest, PersonTrainingDto, PlanQuery, PlannedWorkoutDto, ProgramDayDto, ProgramDto,
+    ProgramExerciseDto, ProgramListItemDto, RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest,
+    ScheduleMode, SessionDto, SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest,
     StartSessionRequest, TrainingPlanDto,
 };
 use sqlx::PgConnection;
@@ -19,6 +19,7 @@ use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::routine_handlers::place_mark;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text};
+use crate::security::profile_access::profile_access;
 use crate::services::training_schedule::{plan, Planned, Reference, ScheduleDay};
 use crate::services::workout_calc::{average_met, session_kcal, ExerciseLoad};
 use crate::state::AppState;
@@ -313,6 +314,56 @@ pub async fn get_plan(
     ApiQuery(a_query): ApiQuery<PlanQuery>,
 ) -> Result<Json<TrainingPlanDto>, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    build_plan(&mut conn, a_user.user_id, &a_query).await.map(Json)
+}
+
+pub async fn person_training(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_person_id): ApiPath<Uuid>,
+    ApiQuery(a_query): ApiQuery<PlanQuery>,
+) -> Result<Json<PersonTrainingDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    profile_access(&mut conn, a_user.user_id, a_person_id)
+        .await?
+        .require_training()?;
+
+    let plan = build_plan(&mut conn, a_person_id, &a_query).await?;
+    let program = match plan.program.as_ref()
+    {
+        Some(program) => Some(load_program(&mut conn, a_person_id, program.id).await?),
+        None => None,
+    };
+    let sessions = load_summaries(&mut conn, a_person_id, DEFAULT_SESSIONS_LIMIT, false).await?;
+
+    Ok(Json(PersonTrainingDto {
+        plan,
+        program,
+        sessions,
+    }))
+}
+
+pub async fn person_session(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_person_id, a_session_id)): ApiPath<(Uuid, Uuid)>,
+) -> Result<Json<SessionDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    profile_access(&mut conn, a_user.user_id, a_person_id)
+        .await?
+        .require_training()?;
+    load_session(&mut conn, a_person_id, a_session_id).await.map(Json)
+}
+
+async fn build_plan(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_query: &PlanQuery,
+) -> Result<TrainingPlanDto, ApiError>
+{
     if a_query.tz_offset_min.abs() > MAX_TZ_OFFSET_MIN
     {
         return Err(ApiError::Validation("tz_offset_min"));
@@ -321,7 +372,6 @@ pub async fn get_plan(
     let horizon = a_query.days.unwrap_or(DEFAULT_HORIZON_DAYS).clamp(1, MAX_HORIZON_DAYS);
     let today = (Utc::now() + offset).date_naive();
 
-    let mut conn = a_state.db.acquire().await?;
     let program = sqlx::query!(
         r#"
         SELECT p.id, p.name, p.schedule_mode AS "schedule_mode: ScheduleMode", p.anchor_day_id, p.anchor_date, p.anchor_ts,
@@ -329,16 +379,16 @@ pub async fn get_plan(
         FROM training_programs p
         WHERE p.user_id = $1 AND p.is_active
         "#,
-        a_user.user_id
+        a_user_id
     )
-    .fetch_optional(&mut *conn)
+    .fetch_optional(&mut *a_conn)
     .await?;
 
     let mut upcoming = Vec::new();
     let mut program_item = None;
     if let Some(program) = program
     {
-        let days = load_days(&mut conn, program.id).await?;
+        let days = load_days(a_conn, program.id).await?;
         let last_done = sqlx::query!(
             r#"
             SELECT day_id AS "day_id!", started_ts
@@ -347,10 +397,10 @@ pub async fn get_plan(
             ORDER BY started_ts DESC
             LIMIT 1
             "#,
-            a_user.user_id,
+            a_user_id,
             program.id
         )
-        .fetch_optional(&mut *conn)
+        .fetch_optional(&mut *a_conn)
         .await?;
 
         let index_of = |a_day_id: Uuid| days.iter().position(|day| day.id == a_day_id);
@@ -407,21 +457,18 @@ pub async fn get_plan(
 
     let active_session_id = sqlx::query_scalar!(
         "SELECT id FROM workout_sessions WHERE user_id = $1 AND finished_ts IS NULL",
-        a_user.user_id
+        a_user_id
     )
-    .fetch_optional(&mut *conn)
+    .fetch_optional(&mut *a_conn)
     .await?;
-    let last_session = load_summaries(&mut conn, a_user.user_id, 1, true)
-        .await?
-        .into_iter()
-        .next();
+    let last_session = load_summaries(a_conn, a_user_id, 1, true).await?.into_iter().next();
 
-    Ok(Json(TrainingPlanDto {
+    Ok(TrainingPlanDto {
         program: program_item,
         upcoming,
         active_session_id,
         last_session,
-    }))
+    })
 }
 
 pub async fn list_sessions(

@@ -220,6 +220,9 @@ class AccountDto
   final DateTime? balanceTs;
   final bool isActive;
   final bool isEditable;
+  final bool isOwn;
+  final String? ownerName;
+  final List<String> sharedFamilyIds;
 
   const AccountDto({
     required this.id,
@@ -237,9 +240,13 @@ class AccountDto
     this.balanceTs,
     required this.isActive,
     required this.isEditable,
+    this.isOwn = true,
+    this.ownerName,
+    this.sharedFamilyIds = const [],
   });
 
   bool get isPersonal => familyId == null;
+  bool get isOwnPersonal => isOwn && familyId == null;
   bool get isLinked => connId != null;
   bool get isCash => accountType == 'cash';
 
@@ -259,6 +266,9 @@ class AccountDto
         balanceTs: parseTsOrNull(aJson['balance_ts']),
         isActive: aJson['is_active'] as bool? ?? true,
         isEditable: aJson['is_editable'] as bool? ?? false,
+        isOwn: aJson['is_own'] as bool? ?? true,
+        ownerName: aJson['owner_name'] as String?,
+        sharedFamilyIds: (aJson['shared_family_ids'] as List? ?? const []).cast<String>(),
       );
 }
 

@@ -212,6 +212,21 @@ class TrainingPlan
       );
 }
 
+class PersonTraining
+{
+  final TrainingPlan plan;
+  final TrainingProgram? program;
+  final List<SessionSummary> sessions;
+
+  const PersonTraining({required this.plan, required this.program, required this.sessions});
+
+  factory PersonTraining.fromJson(Map<String, dynamic> aJson) => PersonTraining(
+        plan: TrainingPlan.fromJson(aJson['plan'] as Map<String, dynamic>),
+        program: aJson['program'] == null ? null : TrainingProgram.fromJson(aJson['program'] as Map<String, dynamic>),
+        sessions: (aJson['sessions'] as List<dynamic>).map((aItem) => SessionSummary.fromJson(aItem as Map<String, dynamic>)).toList(),
+      );
+}
+
 class SessionSet
 {
   int? reps;

@@ -49,6 +49,11 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/people/:id/metrics/:metric", get(profile_handlers::metric_history))
         .route("/people/:id/sharing/:family_id", put(profile_handlers::set_sharing))
+        .route("/people/:id/training", get(training_handlers::person_training))
+        .route(
+            "/people/:id/training/sessions/:session_id",
+            get(training_handlers::person_session),
+        )
         .route("/families/:id/children", post(profile_handlers::create_child))
         .route(
             "/training/programs",
@@ -227,6 +232,7 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(wallet_handlers::delete_wallet),
         )
         .route("/wallets/:id/archive", put(wallet_handlers::archive_wallet))
+        .route("/wallets/:id/shares/:family_id", put(wallet_handlers::share_wallet))
         .route("/geo/countries", get(geo_handlers::list_countries))
         .route(
             "/geo/countries/:id/cities",

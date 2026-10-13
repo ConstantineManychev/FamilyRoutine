@@ -39,6 +39,8 @@ struct ReceiptHead
     cash_account_id: Option<Uuid>,
     note: Option<String>,
     discount: Decimal,
+    is_editable: bool,
+    owner_name: Option<String>,
 }
 
 enum ItemRef
@@ -85,12 +87,18 @@ pub async fn list_receipts(
             COALESCE((SELECT SUM(i.amount) FROM receipt_items i WHERE i.receipt_id = r.id), 0) AS "items_total!",
             r.discount,
             (SELECT COUNT(*) FROM receipt_items i WHERE i.receipt_id = r.id) AS "item_count!",
-            (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id AND t.source <> 'receipt_cash') AS "tx_count!"
+            (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id AND t.source <> 'receipt_cash') AS "tx_count!",
+            CASE WHEN r.owner_id <> $1 THEN owner.first_name || ' ' || owner.last_name END AS owner_name
         FROM receipts r
+        JOIN users owner ON owner.id = r.owner_id
         JOIN currencies c ON c.id = r.curr_id
         LEFT JOIN merchants m ON m.id = r.merchant_id
         LEFT JOIN places p ON p.id = r.place_id
-        WHERE r.owner_id = $1
+        WHERE (r.owner_id = $1 OR EXISTS (
+                SELECT 1 FROM transactions t
+                JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
+                WHERE t.receipt_id = r.id
+              ))
           AND ($2::timestamptz IS NULL OR r.receipt_ts >= $2)
           AND ($3::timestamptz IS NULL OR r.receipt_ts < $3)
         ORDER BY r.receipt_ts DESC
@@ -619,15 +627,22 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
             c.code AS curr_code,
             r.cash_account_id,
             r.note,
-            r.discount
+            r.discount,
+            (r.owner_id = $2) AS "is_editable!",
+            CASE WHEN r.owner_id <> $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name
         FROM receipts r
+        JOIN users owner ON owner.id = r.owner_id
         JOIN currencies c ON c.id = r.curr_id
         LEFT JOIN merchants m ON m.id = r.merchant_id
         LEFT JOIN places p ON p.id = r.place_id
         LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id
         LEFT JOIN streets st ON st.id = pa.street_id
         LEFT JOIN cities ci ON ci.id = pa.city_id
-        WHERE r.id = $1 AND r.owner_id = $2
+        WHERE r.id = $1 AND (r.owner_id = $2 OR EXISTS (
+            SELECT 1 FROM transactions t
+            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
+            WHERE t.receipt_id = r.id
+        ))
         "#,
         a_id,
         a_user_id
@@ -689,5 +704,7 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
         paid_total: money(paid_total),
         rest_amount: money((paid_total - payable).max(Decimal::ZERO)),
         cash_amount: money((payable - paid_total).max(Decimal::ZERO)),
+        is_editable: head.is_editable,
+        owner_name: head.owner_name,
     })
 }

@@ -207,7 +207,13 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
           ),
           if (_isEdit && !_isEditable) ...[
             const SizedBox(height: 12),
-            Text('wallet.read_only'.tr(), style: const TextStyle(color: Colors.grey)),
+            Text(
+              [
+                if (_wallet?.ownerName != null) 'wallet.owned_by'.tr(args: [_wallet!.ownerName!]),
+                'wallet.read_only'.tr(),
+              ].join(' · '),
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
           const SizedBox(height: 24),
           if (!_isEdit && _fams.isNotEmpty) ...[

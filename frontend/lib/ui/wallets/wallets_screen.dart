@@ -230,6 +230,7 @@ class _WalletTile extends StatelessWidget
       if (wallet.mask != null) '•••• ${wallet.mask}' else 'wallet.type_${wallet.accountType}'.tr(),
       wallet.currCode,
       if (!wallet.isPersonal) 'wallet.shared'.tr(),
+      if (wallet.ownerName != null) 'wallet.owned_by'.tr(args: [wallet.ownerName!]),
       if (wallet.isLinked) 'wallet.bank_synced'.tr(),
     ].join(' · ');
 

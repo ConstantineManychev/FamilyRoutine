@@ -393,14 +393,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
                       await _load();
                     },
                     title: Text(session.dayName ?? 'training.free_workout'.tr(), style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text([
-                      DateFormat.yMMMd(aContext.locale.toLanguageTag()).add_Hm().format(session.startedTs),
-                      if (session.duration != null) formatSpan(session.duration!),
-                      if (session.finishedTs == null) 'training.not_finished'.tr(),
-                      'training.sets_done'.tr(args: ['${session.doneSets}']),
-                      if (session.volumeKg > 0) formatWeight(aContext, session.volumeKg),
-                      if (session.kcal != null) 'training.kcal'.tr(args: [formatNumber(aContext, session.kcal!)]),
-                    ].join(' · ')),
+                    subtitle: Text(sessionSubtitle(aContext, session)),
                     trailing: const Icon(AppIcons.chevronRight, size: 18),
                   ),
               ],

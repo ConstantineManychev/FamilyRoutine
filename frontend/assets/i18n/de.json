@@ -121,7 +121,8 @@
     "pwd_change": "Passwort ändern",
     "pwd_required": "Alle Passwortfelder ausfüllen",
     "pwd_mismatch": "Die neuen Passwörter stimmen nicht überein",
-    "pwd_changed": "Passwort geändert"
+    "pwd_changed": "Passwort geändert",
+    "share_training": "Trainings"
   },
   "dashboard": {
     "welcome": "Willkommen",
@@ -204,7 +205,10 @@
     "add_child_hint": "Ein Profil ohne Anmeldung: Messwerte und Daten des Kindes tragen der Ersteller des Profils und die Gruppenadmins ein. Gruppenmitglieder sehen sie wie die Daten anderer Mitglieder.",
     "add_child_required": "Vorname, Nachname, Geburtsdatum und Geschlecht ausfüllen",
     "child_profile": "Kinderprofil",
-    "remove_child_confirm": "{} aus der Gruppe entfernen? Ist das Kind in keiner anderen Gruppe, werden das Profil und alle Messwerte gelöscht."
+    "remove_child_confirm": "{} aus der Gruppe entfernen? Ist das Kind in keiner anderen Gruppe, werden das Profil und alle Messwerte gelöscht.",
+    "wallets_title": "Meine Konten in der Gruppe",
+    "wallets_hint": "Wählen Sie die Konten, die Gruppenmitglieder sehen dürfen – samt Transaktionen und verknüpften Belegen. Ändern können nur Sie sie.",
+    "wallets_empty": "Sie haben keine persönlichen Konten."
   },
   "common": {
     "save": "Speichern",
@@ -253,7 +257,8 @@
     "owner_personal": "Persönlich",
     "shared": "Gruppe",
     "read_only": "Nur der Eigentümer oder ein Gruppenadministrator kann diese Geldbörse bearbeiten.",
-    "linked_hint": "Dieses Konto wird mit der Bank synchronisiert: Buchungen und Saldo aktualisieren sich automatisch."
+    "linked_hint": "Dieses Konto wird mit der Bank synchronisiert: Buchungen und Saldo aktualisieren sich automatisch.",
+    "owned_by": "Inhaber: {}"
   },
   "places": {
     "add": "Ort hinzufügen",
@@ -546,7 +551,11 @@
     "receipt_discount": "Rabatt auf den ganzen Bon",
     "receipt_discount_hint": "Gutschein, Coupon oder Punkte für den ganzen Bon. Rabatte auf einzelne Artikel tragen Sie in deren Beträge ein.",
     "payable": "Zu zahlen",
-    "err_discount": "Der Rabatt darf die Summe der Positionen nicht übersteigen"
+    "err_discount": "Der Rabatt darf die Summe der Positionen nicht übersteigen",
+    "my_wallets": "Meine Konten",
+    "owner_wallets": "Konten: {}",
+    "receipt_read_only": "Nur Ansicht",
+    "receipt_shared_by": "Beleg von {} – nur Ansicht"
   },
   "items": {
     "title": "Waren und Dienstleistungen",

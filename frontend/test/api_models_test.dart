@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:family_routine/core/api_error.dart';
 import 'package:family_routine/domain/barcode.dart';
 import 'package:family_routine/domain/models.dart';
+import 'package:family_routine/ui/finance/wallet_scope.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DioException _dioError(int? aStatus, Object? aData)
@@ -379,6 +380,50 @@ void main()
       final unpaid = RecognizedReceipt.fromJson({'lines_total': '13.45', 'total': 8.45, 'lines': const []});
       expect(unpaid.discount, 0);
       expect(unpaid.isTotalMismatch, isTrue);
+    });
+
+    test('shared wallet keeps its owner and wallet scope encodes owner filters', ()
+    {
+      final wallet = AccountDto.fromJson({
+        'id': 'w2',
+        'user_id': 'u2',
+        'family_id': null,
+        'curr_id': 'c1',
+        'curr_code': 'EUR',
+        'account_type': 'card',
+        'name': 'AIB',
+        'is_active': true,
+        'is_editable': false,
+        'is_own': false,
+        'owner_name': 'Boris Petrov',
+        'shared_family_ids': const [],
+      });
+      expect(wallet.isOwn, isFalse);
+      expect(wallet.isOwnPersonal, isFalse);
+      expect(walletLabel(wallet), 'AIB · Boris');
+
+      final byOwner = WalletScope.of(aOwnerId: 'u2');
+      expect(byOwner.ownerId, 'u2');
+      expect(byOwner.accountId, isNull);
+      expect(byOwner.query, {'owner_id': 'u2'});
+      expect(WalletScope(byOwner.value).ownerId, 'u2');
+      expect(WalletScope.of(aAccountId: 'w2').query, {'account_id': 'w2'});
+      expect(const WalletScope(null).query, isEmpty);
+    });
+
+    test('shared receipt list item names its owner', ()
+    {
+      final receipt = ReceiptListItem.fromJson({
+        'id': 'r1',
+        'receipt_ts': '2026-10-10T10:00:00Z',
+        'curr_code': 'EUR',
+        'items_total': '10.00',
+        'discount': '0',
+        'item_count': 1,
+        'tx_count': 1,
+        'owner_name': 'Boris Petrov',
+      });
+      expect(receipt.ownerName, 'Boris Petrov');
     });
 
     test('place keeps existing address ids when saving', ()

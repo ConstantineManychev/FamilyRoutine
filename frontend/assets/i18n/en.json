@@ -121,7 +121,8 @@
     "pwd_change": "Change password",
     "pwd_required": "Fill in all password fields",
     "pwd_mismatch": "The new passwords do not match",
-    "pwd_changed": "Password changed"
+    "pwd_changed": "Password changed",
+    "share_training": "Workouts"
   },
   "dashboard": {
     "welcome": "Welcome",
@@ -204,7 +205,10 @@
     "add_child_hint": "A profile without sign-in: the profile creator and group admins enter the child's measurements and data. Group members see them just like other members' data.",
     "add_child_required": "Fill in the first name, last name, birth date and sex",
     "child_profile": "Child profile",
-    "remove_child_confirm": "Remove {} from the group? If the child is not in any other group, the profile and all measurements will be deleted."
+    "remove_child_confirm": "Remove {} from the group? If the child is not in any other group, the profile and all measurements will be deleted.",
+    "wallets_title": "My wallets in this group",
+    "wallets_hint": "Choose the wallets group members can see, with their transactions and linked receipts. Only you can change them.",
+    "wallets_empty": "You have no personal wallets."
   },
   "common": {
     "save": "Save",
@@ -253,7 +257,8 @@
     "owner_personal": "Personal",
     "shared": "group",
     "read_only": "Only the owner or a group administrator can edit this wallet.",
-    "linked_hint": "This wallet is synced with the bank: transactions and balance update automatically."
+    "linked_hint": "This wallet is synced with the bank: transactions and balance update automatically.",
+    "owned_by": "owner: {}"
   },
   "places": {
     "add": "Add place",
@@ -546,7 +551,11 @@
     "receipt_discount": "Discount on the whole receipt",
     "receipt_discount_hint": "A voucher, coupon or points applied to the whole receipt. Enter discounts on single items in their amounts.",
     "payable": "To pay",
-    "err_discount": "The discount cannot exceed the items total"
+    "err_discount": "The discount cannot exceed the items total",
+    "my_wallets": "My wallets",
+    "owner_wallets": "Wallets: {}",
+    "receipt_read_only": "View only",
+    "receipt_shared_by": "Receipt of {} — view only"
   },
   "items": {
     "title": "Goods and services",

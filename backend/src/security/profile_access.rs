@@ -11,6 +11,7 @@ pub struct ProfileAccess
     pub is_manager: bool,
     pub is_managed: bool,
     shared_groups: Vec<MetricGroup>,
+    is_training_shared: bool,
 }
 
 impl ProfileAccess
@@ -18,6 +19,23 @@ impl ProfileAccess
     pub fn can_see(&self, a_group: MetricGroup) -> bool
     {
         self.is_manager || self.shared_groups.contains(&a_group)
+    }
+
+    pub fn can_see_training(&self) -> bool
+    {
+        self.is_manager || self.is_training_shared
+    }
+
+    pub fn require_training(&self) -> Result<(), ApiError>
+    {
+        if self.can_see_training()
+        {
+            Ok(())
+        }
+        else
+        {
+            Err(ApiError::NotFound)
+        }
     }
 
     pub fn visible_groups(&self) -> Vec<MetricGroup>
@@ -88,7 +106,11 @@ pub async fn profile_access(
             EXISTS (
                 SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
                 WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_measures_shared
-            ) AS "is_measures!"
+            ) AS "is_measures!",
+            EXISTS (
+                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
+                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_training_shared
+            ) AS "is_training!"
         FROM users u
         WHERE u.id = $2
         "#,
@@ -118,5 +140,6 @@ pub async fn profile_access(
         is_manager: row.is_manager,
         is_managed: row.is_managed,
         shared_groups,
+        is_training_shared: row.is_training,
     })
 }

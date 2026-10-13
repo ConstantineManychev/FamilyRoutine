@@ -63,6 +63,7 @@ class _ReceiptTile extends StatelessWidget
   {
     final subtitle = [
       formatDateTime(aContext, receipt.receiptTs),
+      if (receipt.ownerName != null) receipt.ownerName!,
       if (receipt.placeName != null) receipt.placeName!,
       'finance.items_count'.tr(namedArgs: {'count': '${receipt.itemCount}'}),
       if (receipt.txCount > 0) 'finance.tx_count'.tr(namedArgs: {'count': '${receipt.txCount}'}),

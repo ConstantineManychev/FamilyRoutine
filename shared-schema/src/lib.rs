@@ -244,6 +244,15 @@ pub struct AccountDto
     pub balance_ts: Option<DateTime<Utc>>,
     pub is_active: bool,
     pub is_editable: bool,
+    pub is_own: bool,
+    pub owner_name: Option<String>,
+    pub shared_family_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletShareRequest
+{
+    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

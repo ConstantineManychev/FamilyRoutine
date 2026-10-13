@@ -361,9 +361,11 @@ class ApiSvc
     String? aQuery,
     TxCategory? aCategory,
     bool aIsUncategorized = false,
+    String? aOwnerId,
   }) async
   {
     final res = await _dio.get('/api/transactions', queryParameters: {
+      if (aOwnerId != null) 'owner_id': aOwnerId,
       if (aCategory != null) 'category': aCategory.name,
       if (aIsUncategorized) 'is_uncategorized': true,
       if (aAccountId != null) 'account_id': aAccountId,
@@ -522,11 +524,13 @@ class ApiSvc
     required DateTime aTo,
     required StatsBucket aBucket,
     String? aAccountId,
+    String? aOwnerId,
     FlowMode aMode = FlowMode.net,
     String? aConvertTo,
   }) async
   {
     final res = await _dio.get('/api/stats/cashflow', queryParameters: {
+      if (aOwnerId != null) 'owner_id': aOwnerId,
       'from': aFrom.toUtc().toIso8601String(),
       'to': aTo.toUtc().toIso8601String(),
       'bucket': aBucket.name,
@@ -542,11 +546,13 @@ class ApiSvc
     required DateTime aFrom,
     required DateTime aTo,
     String? aAccountId,
+    String? aOwnerId,
     FlowMode aMode = FlowMode.net,
     String? aConvertTo,
   }) async
   {
     final res = await _dio.get('/api/stats/categories', queryParameters: {
+      if (aOwnerId != null) 'owner_id': aOwnerId,
       'from': aFrom.toUtc().toIso8601String(),
       'to': aTo.toUtc().toIso8601String(),
       'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
@@ -741,6 +747,27 @@ class ApiSvc
       queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes, 'days': aDays},
     );
     return TrainingPlan.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<PersonTraining> getPersonTraining(String aPersonId) async
+  {
+    final res = await _dio.get(
+      '/api/people/$aPersonId/training',
+      queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes, 'days': 7},
+    );
+    return PersonTraining.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<WorkoutSession> getPersonSession(String aPersonId, String aSessionId) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/training/sessions/$aSessionId');
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<AccountDto> shareWallet(String aWalletId, String aFamilyId, bool aIsShared) async
+  {
+    final res = await _dio.put('/api/wallets/$aWalletId/shares/$aFamilyId', data: {'is_shared': aIsShared});
+    return AccountDto.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<List<SessionSummary>> getSessions({int aLimit = 20}) async

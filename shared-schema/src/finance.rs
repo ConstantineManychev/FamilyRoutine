@@ -193,6 +193,7 @@ pub struct TxDto
     pub place_addr_id: Option<Uuid>,
     pub branch: Option<String>,
     pub is_merchant_linked: bool,
+    pub account_owner_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -223,6 +224,8 @@ pub struct TxQuery
     pub category: Option<TxCategory>,
     #[serde(default)]
     pub is_uncategorized: Option<bool>,
+    #[serde(default)]
+    pub owner_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -440,6 +443,8 @@ pub struct ReceiptDto
     pub paid_total: Decimal,
     pub rest_amount: Decimal,
     pub cash_amount: Decimal,
+    pub is_editable: bool,
+    pub owner_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -454,6 +459,7 @@ pub struct ReceiptListItemDto
     pub discount: Decimal,
     pub item_count: i64,
     pub tx_count: i64,
+    pub owner_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -475,6 +481,8 @@ pub struct CashflowQuery
     pub tz_offset_min: i32,
     #[serde(default)]
     pub account_id: Option<Uuid>,
+    #[serde(default)]
+    pub owner_id: Option<Uuid>,
     #[serde(default)]
     pub mode: FlowMode,
     #[serde(default)]
@@ -515,6 +523,8 @@ pub struct CategoryQuery
     pub tz_offset_min: i32,
     #[serde(default)]
     pub account_id: Option<Uuid>,
+    #[serde(default)]
+    pub owner_id: Option<Uuid>,
     #[serde(default)]
     pub mode: FlowMode,
     #[serde(default)]

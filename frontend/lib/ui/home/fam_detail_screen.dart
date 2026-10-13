@@ -8,6 +8,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/money.dart';
 
 class FamDetailScreen extends ConsumerStatefulWidget
 {
@@ -264,6 +265,58 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
     await _runAction(() => ref.read(apiProv).setPriceSharing(widget.famId!, aIsShared));
   }
 
+  Future<void> _setWalletShare(AccountDto aWallet, bool aIsShared) async
+  {
+    await _runAction(() async
+    {
+      await ref.read(apiProv).shareWallet(aWallet.id, widget.famId!, aIsShared);
+      ref.invalidate(walletsProv);
+    }, aIsReloadNeeded: false);
+  }
+
+  Widget _buildWallets()
+  {
+    final wallets = (ref.watch(walletsProv).valueOrNull ?? const <AccountDto>[])
+        .where((aWallet) => aWallet.isOwnPersonal && aWallet.isActive)
+        .toList();
+
+    return Card(
+      elevation: 0,
+      semanticContainer: false,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('family.wallets_title'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('family.wallets_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+            const SizedBox(height: 8),
+            if (wallets.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('family.wallets_empty'.tr(), style: const TextStyle(color: inkMuted)),
+              )
+            else
+              for (final wallet in wallets)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(wallet.isCash ? AppIcons.banknote : AppIcons.creditCard),
+                  title: Text(wallet.name),
+                  subtitle: Text([wallet.currCode, if (wallet.mask != null) '•• ${wallet.mask}'].join(' · ')),
+                  value: wallet.sharedFamilyIds.contains(widget.famId),
+                  onChanged: _isSaving ? null : (aValue) => _setWalletShare(wallet, aValue),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _revokeInvite(FamInviteDto aInvite) async
   {
     await _runAction(() => ref.read(apiProv).revokeInvite(widget.famId!, aInvite.id));
@@ -338,6 +391,8 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _buildWallets(),
           const SizedBox(height: 32),
           ScreenHeader(
             title: 'family.members'.tr(),

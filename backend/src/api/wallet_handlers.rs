@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use shared_schema::{
     AccountDto, AccountType, ArchiveWalletRequest, BankProvider, BankType, CreateWalletRequest, CurrencyDto,
-    UpdateWalletRequest,
+    UpdateWalletRequest, WalletShareRequest,
 };
 use uuid::Uuid;
 
@@ -47,11 +47,18 @@ pub async fn list_wallets(State(a_state): State<AppState>, a_user: AuthUser)
             a.balance,
             a.balance_ts,
             a.is_active,
-            v.is_editor AS "is_editable!"
+            v.is_editor AS "is_editable!",
+            (a.user_id IS NOT DISTINCT FROM $1) AS "is_own!",
+            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,
+            CASE
+                WHEN a.user_id = $1 THEN ARRAY(SELECT s.family_id FROM account_shares s WHERE s.account_id = a.id)
+                ELSE ARRAY[]::uuid[]
+            END AS "shared_family_ids!"
         FROM accounts a
         JOIN account_viewers v ON v.account_id = a.id AND v.viewer_id = $1
         JOIN currencies c ON c.id = a.curr_id
         LEFT JOIN bank_conns bc ON bc.id = a.conn_id
+        LEFT JOIN users owner ON owner.id = a.user_id
         ORDER BY a.is_active DESC, a.name ASC
         "#,
         a_user.user_id
@@ -171,6 +178,49 @@ pub async fn delete_wallet(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn share_wallet(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_id, a_family_id)): ApiPath<(Uuid, Uuid)>,
+    ApiJson(a_req): ApiJson<WalletShareRequest>,
+) -> Result<Json<AccountDto>, ApiError>
+{
+    let owner = sqlx::query_scalar!("SELECT user_id FROM accounts WHERE id = $1", a_id)
+        .fetch_optional(&a_state.db)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    if owner != Some(a_user.user_id)
+    {
+        return Err(ApiError::NotFound);
+    }
+    require_member(&a_state.db, a_family_id, a_user.user_id)
+        .await
+        .map_err(|_| ApiError::Validation("family_id"))?;
+
+    if a_req.is_shared
+    {
+        sqlx::query!(
+            "INSERT INTO account_shares (account_id, family_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            a_id,
+            a_family_id
+        )
+        .execute(&a_state.db)
+        .await?;
+    }
+    else
+    {
+        sqlx::query!(
+            "DELETE FROM account_shares WHERE account_id = $1 AND family_id = $2",
+            a_id,
+            a_family_id
+        )
+        .execute(&a_state.db)
+        .await?;
+    }
+
+    load_wallet(&a_state, a_id, a_user.user_id).await.map(Json)
+}
+
 async fn load_wallet(a_state: &AppState, a_id: Uuid, a_user_id: Uuid) -> Result<AccountDto, ApiError>
 {
     sqlx::query_as!(
@@ -191,11 +241,18 @@ async fn load_wallet(a_state: &AppState, a_id: Uuid, a_user_id: Uuid) -> Result<
             a.balance,
             a.balance_ts,
             a.is_active,
-            v.is_editor AS "is_editable!"
+            v.is_editor AS "is_editable!",
+            (a.user_id IS NOT DISTINCT FROM $2) AS "is_own!",
+            CASE WHEN a.user_id IS DISTINCT FROM $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,
+            CASE
+                WHEN a.user_id = $2 THEN ARRAY(SELECT s.family_id FROM account_shares s WHERE s.account_id = a.id)
+                ELSE ARRAY[]::uuid[]
+            END AS "shared_family_ids!"
         FROM accounts a
         JOIN account_viewers v ON v.account_id = a.id AND v.viewer_id = $2
         JOIN currencies c ON c.id = a.curr_id
         LEFT JOIN bank_conns bc ON bc.id = a.conn_id
+        LEFT JOIN users owner ON owner.id = a.user_id
         WHERE a.id = $1
         "#,
         a_id,

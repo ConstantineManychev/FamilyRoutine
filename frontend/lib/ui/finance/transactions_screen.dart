@@ -10,6 +10,7 @@ import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import 'finance_dialogs.dart';
+import 'wallet_scope.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget
 {
@@ -18,6 +19,7 @@ class TransactionsScreen extends ConsumerStatefulWidget
   final DateTime? initialFrom;
   final DateTime? initialTo;
   final String? initialAccountId;
+  final String? initialOwnerId;
 
   const TransactionsScreen({
     super.key,
@@ -26,6 +28,7 @@ class TransactionsScreen extends ConsumerStatefulWidget
     this.initialFrom,
     this.initialTo,
     this.initialAccountId,
+    this.initialOwnerId,
   });
 
   factory TransactionsScreen.fromQuery(Map<String, String> aQuery, {Key? aKey}) => TransactionsScreen(
@@ -35,6 +38,7 @@ class TransactionsScreen extends ConsumerStatefulWidget
         initialFrom: DateTime.tryParse(aQuery['from'] ?? '')?.toLocal(),
         initialTo: DateTime.tryParse(aQuery['to'] ?? '')?.toLocal(),
         initialAccountId: aQuery['account_id'],
+        initialOwnerId: aQuery['owner_id'],
       );
 
   @override
@@ -47,7 +51,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   Timer? _debounce;
   List<TxDto> _items = const [];
   String? _cursor;
-  late String? _accountId = widget.initialAccountId;
+  late WalletScope _scope = WalletScope.of(aAccountId: widget.initialAccountId, aOwnerId: widget.initialOwnerId);
   late TxCategory? _category = widget.initialCategory;
   late bool _isUncategorized = widget.isUncategorized && widget.initialCategory == null;
   late DateTime? _from = widget.initialFrom;
@@ -85,7 +89,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     try
     {
       final page = await ref.read(apiProv).getTransactions(
-            aAccountId: _accountId,
+            aAccountId: _scope.accountId,
+            aOwnerId: _scope.ownerId,
             aCursor: aIsReset ? null : _cursor,
             aQuery: _searchCtrl.text,
             aCategory: _category,
@@ -171,20 +176,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
               SizedBox(
                 width: 260,
                 child: DropdownButtonFormField<String?>(
-                  initialValue: _accountId,
+                  initialValue: _scope.value,
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'finance.wallet'.tr(),
                     border: const OutlineInputBorder(),
                     isDense: true,
                   ),
-                  items: [
-                    DropdownMenuItem<String?>(value: null, child: Text('finance.all_wallets'.tr())),
-                    ...wallets.map((aWallet) => DropdownMenuItem<String?>(value: aWallet.id, child: Text(aWallet.name))),
-                  ],
+                  items: walletScopeItems(wallets, ref.watch(sessionUserIdProv)),
                   onChanged: (aValue)
                   {
-                    setState(() => _accountId = aValue);
+                    setState(() => _scope = WalletScope(aValue));
                     _reload();
                   },
                 ),
@@ -330,7 +332,7 @@ class TxTile extends StatelessWidget
   Widget build(BuildContext aContext)
   {
     final subtitle = [
-      tx.accountName,
+      tx.accountOwnerName == null ? tx.accountName : '${tx.accountName} · ${tx.accountOwnerName!.split(' ').first}',
       DateFormat.Hm(aContext.locale.toLanguageTag()).format(tx.txTs),
       if (tx.isTransfer)
         tx.peerAccountName == null ? 'finance.transfer'.tr() : 'finance.transfer_with'.tr(args: [tx.peerAccountName!])

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM account_shares s\n        USING accounts a\n        WHERE s.account_id = a.id AND s.family_id = $1 AND a.user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "76a78785ac54d52d71b30ade92d1982ee32358def494cc0aae2a1c422d4d1c8b"
+}

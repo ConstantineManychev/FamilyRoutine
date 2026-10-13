@@ -25,6 +25,7 @@ import '../ui/places/places_screen.dart';
 import '../ui/profile/metric_history_screen.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/settings/settings_screen.dart';
+import '../ui/training/person_session_screen.dart';
 import '../ui/training/program_editor_screen.dart';
 import '../ui/training/training_screen.dart';
 import '../ui/training/workout_session_screen.dart';
@@ -131,6 +132,14 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               GoRoute(
                 path: 'people/:id',
                 builder: (_, aState) => ProfileScreen(key: ValueKey(aState.pathParameters['id']), personId: aState.pathParameters['id']),
+              ),
+              GoRoute(
+                path: 'people/:id/sessions/:sid',
+                builder: (_, aState) => PersonSessionScreen(
+                  key: ValueKey(aState.uri.path),
+                  personId: aState.pathParameters['id']!,
+                  sessionId: aState.pathParameters['sid']!,
+                ),
               ),
               GoRoute(
                 path: 'people/:id/metrics/:metric',

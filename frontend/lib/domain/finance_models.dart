@@ -331,6 +331,7 @@ class TxDto
   final String? placeAddrId;
   final String? branch;
   final bool isMerchantLinked;
+  final String? accountOwnerName;
 
   const TxDto({
     required this.id,
@@ -364,6 +365,7 @@ class TxDto
     this.placeAddrId,
     this.branch,
     this.isMerchantLinked = false,
+    this.accountOwnerName,
   });
 
   bool get isTransfer => transferId != null;
@@ -407,6 +409,7 @@ class TxDto
         placeAddrId: aJson['place_addr_id'] as String?,
         branch: aJson['branch'] as String?,
         isMerchantLinked: aJson['is_merchant_linked'] as bool? ?? false,
+        accountOwnerName: aJson['account_owner_name'] as String?,
       );
 }
 
@@ -662,6 +665,8 @@ class ReceiptDto
   final double paidTotal;
   final double restAmount;
   final double cashAmount;
+  final bool isEditable;
+  final String? ownerName;
 
   const ReceiptDto({
     required this.id,
@@ -683,6 +688,8 @@ class ReceiptDto
     required this.paidTotal,
     required this.restAmount,
     required this.cashAmount,
+    this.isEditable = true,
+    this.ownerName,
   });
 
   factory ReceiptDto.fromJson(Map<String, dynamic> aJson) => ReceiptDto(
@@ -709,6 +716,8 @@ class ReceiptDto
         paidTotal: parseDecimal(aJson['paid_total']),
         restAmount: parseDecimal(aJson['rest_amount']),
         cashAmount: parseDecimal(aJson['cash_amount']),
+        isEditable: aJson['is_editable'] as bool? ?? true,
+        ownerName: aJson['owner_name'] as String?,
       );
 }
 
@@ -723,6 +732,7 @@ class ReceiptListItem
   final double discount;
   final int itemCount;
   final int txCount;
+  final String? ownerName;
 
   const ReceiptListItem({
     required this.id,
@@ -734,6 +744,7 @@ class ReceiptListItem
     this.discount = 0,
     required this.itemCount,
     required this.txCount,
+    this.ownerName,
   });
 
   factory ReceiptListItem.fromJson(Map<String, dynamic> aJson) => ReceiptListItem(
@@ -746,6 +757,7 @@ class ReceiptListItem
         discount: parseDecimal(aJson['discount']),
         itemCount: (aJson['item_count'] as num?)?.toInt() ?? 0,
         txCount: (aJson['tx_count'] as num?)?.toInt() ?? 0,
+        ownerName: aJson['owner_name'] as String?,
       );
 }
 

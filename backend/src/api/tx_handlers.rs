@@ -84,10 +84,12 @@ pub async fn list_transactions(
                 JOIN places lp ON lp.id = mp.place_id
                 WHERE mp.user_id = $1 AND mp.merchant_id = t.merchant_id
                   AND can_see_scoped(lp.owner_id, lp.family_id, $1)
-            ) AS "is_merchant_linked!"
+            ) AS "is_merchant_linked!",
+            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
         JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN users owner ON owner.id = a.user_id
         JOIN currencies c ON c.id = t.curr_id
         LEFT JOIN currencies oc ON oc.id = t.op_curr_id
         LEFT JOIN merchants m ON m.id = t.merchant_id
@@ -128,6 +130,7 @@ pub async fn list_transactions(
           AND ($7::timestamptz IS NULL OR (t.tx_ts, t.id) < ($7, $8::uuid))
           AND ($10::tx_cat_t IS NULL OR t.category = $10)
           AND (NOT $11 OR t.category IS NULL)
+          AND ($12::uuid IS NULL OR a.user_id = $12)
         ORDER BY t.tx_ts DESC, t.id DESC
         LIMIT $9
         "#,
@@ -141,7 +144,8 @@ pub async fn list_transactions(
         cursor.map(|(_, id)| id),
         limit + 1,
         a_query.category as Option<TxCategory>,
-        a_query.is_uncategorized.unwrap_or(false)
+        a_query.is_uncategorized.unwrap_or(false),
+        a_query.owner_id
     )
     .fetch_all(&a_state.db)
     .await?;
@@ -580,10 +584,12 @@ where
                 JOIN places lp ON lp.id = mp.place_id
                 WHERE mp.user_id = $2 AND mp.merchant_id = t.merchant_id
                   AND can_see_scoped(lp.owner_id, lp.family_id, $2)
-            ) AS "is_merchant_linked!"
+            ) AS "is_merchant_linked!",
+            CASE WHEN a.user_id IS DISTINCT FROM $2 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
         JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN users owner ON owner.id = a.user_id
         JOIN currencies c ON c.id = t.curr_id
         LEFT JOIN currencies oc ON oc.id = t.op_curr_id
         LEFT JOIN merchants m ON m.id = t.merchant_id

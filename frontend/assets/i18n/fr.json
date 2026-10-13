@@ -121,7 +121,8 @@
     "pwd_change": "Changer le mot de passe",
     "pwd_required": "Remplissez tous les champs du mot de passe",
     "pwd_mismatch": "Les nouveaux mots de passe ne correspondent pas",
-    "pwd_changed": "Mot de passe modifié"
+    "pwd_changed": "Mot de passe modifié",
+    "share_training": "Entraînements"
   },
   "dashboard": {
     "welcome": "Bienvenue",
@@ -204,7 +205,10 @@
     "add_child_hint": "Un profil sans connexion : le créateur du profil et les administrateurs du groupe saisissent les mesures et les données de l'enfant. Les membres du groupe les voient comme celles des autres membres.",
     "add_child_required": "Renseignez le prénom, le nom, la date de naissance et le sexe",
     "child_profile": "Profil enfant",
-    "remove_child_confirm": "Retirer {} du groupe ? Si l'enfant n'appartient à aucun autre groupe, son profil et toutes ses mesures seront supprimés."
+    "remove_child_confirm": "Retirer {} du groupe ? Si l'enfant n'appartient à aucun autre groupe, son profil et toutes ses mesures seront supprimés.",
+    "wallets_title": "Mes portefeuilles dans le groupe",
+    "wallets_hint": "Choisissez les portefeuilles visibles par les membres du groupe, avec leurs transactions et tickets liés. Vous seul pouvez les modifier.",
+    "wallets_empty": "Vous n’avez aucun portefeuille personnel."
   },
   "common": {
     "save": "Enregistrer",
@@ -253,7 +257,8 @@
     "owner_personal": "Personnel",
     "shared": "groupe",
     "read_only": "Seul le propriétaire ou un administrateur du groupe peut modifier ce portefeuille.",
-    "linked_hint": "Ce portefeuille est synchronisé avec la banque : opérations et solde se mettent à jour automatiquement."
+    "linked_hint": "Ce portefeuille est synchronisé avec la banque : opérations et solde se mettent à jour automatiquement.",
+    "owned_by": "propriétaire : {}"
   },
   "places": {
     "add": "Ajouter un lieu",
@@ -546,7 +551,11 @@
     "receipt_discount": "Remise sur tout le ticket",
     "receipt_discount_hint": "Bon d'achat, coupon ou points appliqués à tout le ticket. Saisissez les remises sur un article dans son montant.",
     "payable": "À payer",
-    "err_discount": "La remise ne peut pas dépasser le total des articles"
+    "err_discount": "La remise ne peut pas dépasser le total des articles",
+    "my_wallets": "Mes portefeuilles",
+    "owner_wallets": "Portefeuilles : {}",
+    "receipt_read_only": "Lecture seule",
+    "receipt_shared_by": "Ticket de {} — lecture seule"
   },
   "items": {
     "title": "Produits et services",

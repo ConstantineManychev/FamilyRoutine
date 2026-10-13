@@ -133,6 +133,7 @@ pub struct ProfileSharingDto
     pub is_body_shared: bool,
     pub is_composition_shared: bool,
     pub is_measures_shared: bool,
+    pub is_training_shared: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -150,6 +151,7 @@ pub struct ProfileDto
     pub is_managed: bool,
     pub can_edit: bool,
     pub visible_groups: Vec<MetricGroup>,
+    pub is_training_visible: bool,
     pub latest: Vec<MetricValueDto>,
     pub sharing: Vec<ProfileSharingDto>,
 }
@@ -222,6 +224,8 @@ pub struct ProfileSharingRequest
     pub is_body_shared: bool,
     pub is_composition_shared: bool,
     pub is_measures_shared: bool,
+    #[serde(default)]
+    pub is_training_shared: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -363,14 +363,16 @@ pub async fn set_sharing(
     let updated = sqlx::query!(
         r#"
         UPDATE family_mems
-        SET is_body_shared = $3, is_composition_shared = $4, is_measures_shared = $5
+        SET is_body_shared = $3, is_composition_shared = $4, is_measures_shared = $5,
+            is_training_shared = COALESCE($6, is_training_shared)
         WHERE family_id = $1 AND user_id = $2
         "#,
         a_family_id,
         a_person_id,
         a_req.is_body_shared,
         a_req.is_composition_shared,
-        a_req.is_measures_shared
+        a_req.is_measures_shared,
+        a_req.is_training_shared
     )
     .execute(&mut *conn)
     .await?;
@@ -489,7 +491,7 @@ async fn person_dto(
             ProfileSharingDto,
             r#"
             SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,
-                   fm.is_measures_shared
+                   fm.is_measures_shared, fm.is_training_shared
             FROM family_mems fm
             JOIN families f ON f.id = fm.family_id
             WHERE fm.user_id = $1
@@ -519,6 +521,7 @@ async fn person_dto(
         is_managed: a_access.is_managed,
         can_edit: a_access.is_manager,
         visible_groups: a_access.visible_groups(),
+        is_training_visible: a_access.can_see_training(),
         latest,
         sharing,
     })

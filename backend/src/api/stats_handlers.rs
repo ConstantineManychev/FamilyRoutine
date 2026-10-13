@@ -102,7 +102,8 @@ pub async fn cashflow(
             JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
             WHERE t.tx_ts >= $4 AND t.tx_ts < $5
               AND ($6::uuid IS NULL OR t.account_id = $6)
-              AND ($7 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category = 'cash')))
+              AND ($7 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category IS NOT DISTINCT FROM 'cash')))
+              AND ($9::uuid IS NULL OR t.account_id IN (SELECT id FROM accounts WHERE user_id = $9))
             GROUP BY 1, 2
         )
         SELECT
@@ -123,7 +124,8 @@ pub async fn cashflow(
         a_query.to,
         a_query.account_id,
         a_query.mode == FlowMode::Turnover,
-        target_id
+        target_id,
+        a_query.owner_id
     )
     .fetch_all(&a_state.db)
     .await?;
@@ -218,7 +220,8 @@ pub async fn categories(
             JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
             WHERE t.tx_ts >= $3 AND t.tx_ts < $4
               AND ($5::uuid IS NULL OR t.account_id = $5)
-              AND ($6 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category = 'cash')))
+              AND ($6 OR (t.tx_type <> 'transfer' AND NOT (t.source = 'bank' AND t.category IS NOT DISTINCT FROM 'cash')))
+              AND ($8::uuid IS NULL OR t.account_id IN (SELECT id FROM accounts WHERE user_id = $8))
             GROUP BY 1, 2, 3
         )
         SELECT
@@ -239,7 +242,8 @@ pub async fn categories(
         a_query.to,
         a_query.account_id,
         a_query.mode == FlowMode::Turnover,
-        target_id
+        target_id,
+        a_query.owner_id
     )
     .fetch_all(&a_state.db)
     .await?;

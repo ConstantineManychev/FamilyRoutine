@@ -89,3 +89,12 @@ String plannedDateLabel(BuildContext aContext, DateTime aDate)
   }
   return DateFormat.MMMEd(aContext.locale.toLanguageTag()).format(date);
 }
+
+String sessionSubtitle(BuildContext aContext, SessionSummary aSession) => [
+      DateFormat.yMMMd(aContext.locale.toLanguageTag()).add_Hm().format(aSession.startedTs),
+      if (aSession.duration != null) formatSpan(aSession.duration!),
+      if (aSession.finishedTs == null) 'training.not_finished'.tr(),
+      'training.sets_done'.tr(args: ['${aSession.doneSets}']),
+      if (aSession.volumeKg > 0) formatWeight(aContext, aSession.volumeKg),
+      if (aSession.kcal != null) 'training.kcal'.tr(args: [formatNumber(aContext, aSession.kcal!)]),
+    ].join(' · ');

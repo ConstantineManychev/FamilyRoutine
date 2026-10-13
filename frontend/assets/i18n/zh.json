@@ -121,7 +121,8 @@
     "pwd_change": "修改密码",
     "pwd_required": "请填写所有密码字段",
     "pwd_mismatch": "两次输入的新密码不一致",
-    "pwd_changed": "密码已修改"
+    "pwd_changed": "密码已修改",
+    "share_training": "训练"
   },
   "dashboard": {
     "welcome": "欢迎",
@@ -204,7 +205,10 @@
     "add_child_hint": "无需登录的资料：孩子的测量数据由资料创建者和群组管理员填写。群组成员看到的方式与其他成员的数据相同。",
     "add_child_required": "请填写名字、姓氏、出生日期和性别",
     "child_profile": "儿童资料",
-    "remove_child_confirm": "将{}移出群组？如果孩子不在其他群组中，其资料和所有测量数据都会被删除。"
+    "remove_child_confirm": "将{}移出群组？如果孩子不在其他群组中，其资料和所有测量数据都会被删除。",
+    "wallets_title": "我在本群组中的钱包",
+    "wallets_hint": "选择群组成员可以看到的钱包及其交易和关联小票。只有您可以修改它们。",
+    "wallets_empty": "您没有个人钱包。"
   },
   "common": {
     "save": "保存",
@@ -253,7 +257,8 @@
     "owner_personal": "个人",
     "shared": "群组",
     "read_only": "只有所有者或群组管理员可以编辑此钱包。",
-    "linked_hint": "该钱包与银行同步：交易和余额会自动更新。"
+    "linked_hint": "该钱包与银行同步：交易和余额会自动更新。",
+    "owned_by": "所有者：{}"
   },
   "places": {
     "add": "添加地点",
@@ -546,7 +551,11 @@
     "receipt_discount": "整张小票的折扣",
     "receipt_discount_hint": "用于整张小票的代金券、优惠券或积分。单个商品的折扣请计入该商品金额。",
     "payable": "应付",
-    "err_discount": "折扣不能超过商品合计"
+    "err_discount": "折扣不能超过商品合计",
+    "my_wallets": "我的钱包",
+    "owner_wallets": "钱包：{}",
+    "receipt_read_only": "仅查看",
+    "receipt_shared_by": "{} 的小票 — 仅查看"
   },
   "items": {
     "title": "商品和服务",

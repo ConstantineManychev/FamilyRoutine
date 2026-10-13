@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import '../training/person_training_card.dart';
 import 'body_entry_editor.dart';
 import 'metric_format.dart';
 
@@ -199,17 +200,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     });
   }
 
-  Future<void> _setSharing(ProfileSharing aSharing, MetricGroup aGroup, bool aIsShared) async
+  Future<void> _saveSharing(ProfileSharing aUpdated) async
   {
     final profile = _profile;
     if (profile == null)
     {
       return;
     }
-    final updated = aSharing.withGroup(aGroup, aIsShared);
     await _run(() async
     {
-      await ref.read(apiProv).setProfileSharing(profile.id, updated);
+      await ref.read(apiProv).setProfileSharing(profile.id, aUpdated);
       _apply(await ref.read(apiProv).getPerson(profile.id));
     });
   }
@@ -280,6 +280,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 _buildHeader(aContext, profile),
                 const SizedBox(height: 24),
                 _buildMetrics(aContext, profile),
+                if (!profile.isSelf && profile.isTrainingVisible) ...[
+                  const SizedBox(height: 24),
+                  PersonTrainingCard(personId: profile.id),
+                ],
                 if (profile.canEdit) ...[
                   const SizedBox(height: 24),
                   _buildPersonal(aContext, profile),
@@ -564,8 +568,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             dense: true,
             title: Text(metricGroupName(group)),
             value: sharing.isShared(group),
-            onChanged: _isBusy ? null : (aValue) => _setSharing(sharing, group, aValue),
+            onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withGroup(group, aValue)),
           ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('profile.share_training'.tr()),
+          value: sharing.isTrainingShared,
+          onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withTraining(aValue)),
+        ),
       ],
     ]);
   }

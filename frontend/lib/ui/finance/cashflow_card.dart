@@ -11,6 +11,7 @@ import '../common/feedback.dart';
 import '../common/money.dart';
 import 'cashflow_chart.dart';
 import 'category_breakdown.dart';
+import 'wallet_scope.dart';
 
 const String _modePref = 'finance.mode';
 const String _convertPref = 'finance.convert_to';
@@ -49,7 +50,7 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
   FlowMode _mode = FlowMode.net;
   bool _isConverting = false;
   String _convertCode = _defaultConvertCode;
-  String? _accountId;
+  WalletScope _scope = const WalletScope(null);
   String? _currCode;
   CashflowData? _cashflow;
   CategoryStats? _categories;
@@ -132,7 +133,8 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
               aFrom: from,
               aTo: to,
               aBucket: _period.bucket,
-              aAccountId: _accountId,
+              aAccountId: _scope.accountId,
+              aOwnerId: _scope.ownerId,
               aMode: _mode,
               aConvertTo: _convertTo,
             );
@@ -146,7 +148,8 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
         final data = await api.getCategoryStats(
               aFrom: from,
               aTo: to,
-              aAccountId: _accountId,
+              aAccountId: _scope.accountId,
+              aOwnerId: _scope.ownerId,
               aMode: _mode,
               aConvertTo: _convertTo,
             );
@@ -179,7 +182,7 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
       'from': from.toUtc().toIso8601String(),
       'to': to.toUtc().toIso8601String(),
       if (aCategory != null) 'category': aCategory.name else 'uncategorized': 'true',
-      if (_accountId != null) 'account_id': _accountId!,
+      ..._scope.query,
     };
     context.go(Uri(path: '/app/transactions', queryParameters: query).toString());
   }
@@ -256,14 +259,11 @@ class _CashflowCardState extends ConsumerState<CashflowCard>
               SizedBox(
                 width: 240,
                 child: DropdownButtonFormField<String?>(
-                  initialValue: _accountId,
+                  initialValue: _scope.value,
                   isExpanded: true,
                   decoration: InputDecoration(labelText: 'finance.wallet'.tr(), border: const OutlineInputBorder(), isDense: true),
-                  items: [
-                    DropdownMenuItem<String?>(value: null, child: Text('finance.all_wallets'.tr())),
-                    ...wallets.map((aWallet) => DropdownMenuItem<String?>(value: aWallet.id, child: Text(aWallet.name))),
-                  ],
-                  onChanged: (aValue) => _update(() => _accountId = aValue),
+                  items: walletScopeItems(wallets, ref.watch(sessionUserIdProv)),
+                  onChanged: (aValue) => _update(() => _scope = WalletScope(aValue)),
                 ),
               ),
               SegmentedButton<FlowMode>(

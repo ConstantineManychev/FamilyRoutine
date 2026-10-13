@@ -157,6 +157,7 @@ class ProfileSharing
   final bool isBodyShared;
   final bool isCompositionShared;
   final bool isMeasuresShared;
+  final bool isTrainingShared;
 
   const ProfileSharing({
     required this.familyId,
@@ -164,6 +165,7 @@ class ProfileSharing
     required this.isBodyShared,
     required this.isCompositionShared,
     required this.isMeasuresShared,
+    this.isTrainingShared = true,
   });
 
   factory ProfileSharing.fromJson(Map<String, dynamic> aJson) => ProfileSharing(
@@ -172,6 +174,7 @@ class ProfileSharing
         isBodyShared: aJson['is_body_shared'] as bool,
         isCompositionShared: aJson['is_composition_shared'] as bool,
         isMeasuresShared: aJson['is_measures_shared'] as bool,
+        isTrainingShared: aJson['is_training_shared'] as bool? ?? true,
       );
 
   bool isShared(MetricGroup aGroup) => switch (aGroup)
@@ -187,12 +190,23 @@ class ProfileSharing
         isBodyShared: aGroup == MetricGroup.body ? aIsShared : isBodyShared,
         isCompositionShared: aGroup == MetricGroup.composition ? aIsShared : isCompositionShared,
         isMeasuresShared: aGroup == MetricGroup.measures ? aIsShared : isMeasuresShared,
+        isTrainingShared: isTrainingShared,
+      );
+
+  ProfileSharing withTraining(bool aIsShared) => ProfileSharing(
+        familyId: familyId,
+        familyName: familyName,
+        isBodyShared: isBodyShared,
+        isCompositionShared: isCompositionShared,
+        isMeasuresShared: isMeasuresShared,
+        isTrainingShared: aIsShared,
       );
 
   Map<String, dynamic> toJson() => {
         'is_body_shared': isBodyShared,
         'is_composition_shared': isCompositionShared,
         'is_measures_shared': isMeasuresShared,
+        'is_training_shared': isTrainingShared,
       };
 }
 
@@ -210,6 +224,7 @@ class PersonProfile
   final bool isManaged;
   final bool canEdit;
   final List<MetricGroup> visibleGroups;
+  final bool isTrainingVisible;
   final List<MetricValue> latest;
   final List<ProfileSharing> sharing;
 
@@ -226,6 +241,7 @@ class PersonProfile
     required this.isManaged,
     required this.canEdit,
     required this.visibleGroups,
+    this.isTrainingVisible = false,
     required this.latest,
     required this.sharing,
   });
@@ -245,6 +261,7 @@ class PersonProfile
         isManaged: aJson['is_managed'] as bool,
         canEdit: aJson['can_edit'] as bool,
         visibleGroups: (aJson['visible_groups'] as List<dynamic>).map(MetricGroup.parse).whereType<MetricGroup>().toList(),
+        isTrainingVisible: aJson['is_training_visible'] as bool? ?? false,
         latest: (aJson['latest'] as List<dynamic>)
             .map((aItem) => MetricValue.fromJson(aItem as Map<String, dynamic>))
             .whereType<MetricValue>()
