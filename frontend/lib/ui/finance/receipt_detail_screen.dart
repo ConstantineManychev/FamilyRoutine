@@ -56,6 +56,7 @@ class _ItemRow
   final nameFocus = FocusNode();
   final qtyCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
+  final priceFocus = FocusNode();
   final amountCtrl = TextEditingController();
   final Key key = UniqueKey();
   String? itemId;
@@ -156,6 +157,7 @@ class _ItemRow
     nameFocus.dispose();
     qtyCtrl.dispose();
     priceCtrl.dispose();
+    priceFocus.dispose();
     amountCtrl.dispose();
   }
 }
@@ -1068,10 +1070,12 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     }
   }
 
+  bool _isPriceTaken(_ItemRow aRow) => aRow.priceFocus.hasFocus || aRow.priceCtrl.text.trim().isNotEmpty;
+
   Future<void> _prefillPrice(_ItemRow aRow) async
   {
     final itemId = aRow.itemId;
-    if (itemId == null || aRow.priceCtrl.text.trim().isNotEmpty || _currId == null)
+    if (itemId == null || _isPriceTaken(aRow) || _currId == null)
     {
       return;
     }
@@ -1079,7 +1083,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     try
     {
       final last = await ref.read(apiProv).getLastPrice(itemId, aPlaceId: _placeId, aCurrId: _currId);
-      if (last == null || !mounted || aRow.itemId != itemId || aRow.priceCtrl.text.trim().isNotEmpty)
+      if (last == null || !mounted || aRow.itemId != itemId || _isPriceTaken(aRow))
       {
         return;
       }
@@ -1184,6 +1188,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     );
     final price = TextField(
       controller: aRow.priceCtrl,
+      focusNode: aRow.priceFocus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: amountFormatters,
       onChanged: (_) => setState(()
