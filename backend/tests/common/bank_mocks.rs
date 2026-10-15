@@ -640,3 +640,70 @@ async fn serve(a_router: Router) -> String
     });
     format!("http://{addr}")
 }
+
+pub const OFF_PRODUCT: &str = "4820024700016";
+pub const OFF_MISSING: &str = "5901234123457";
+pub const OFF_BROKEN: &str = "96385074";
+
+#[derive(Clone, Default)]
+pub struct OffMock
+{
+    pub calls: Arc<Mutex<Vec<String>>>,
+}
+
+impl OffMock
+{
+    pub fn calls(&self) -> Vec<String>
+    {
+        self.calls.lock().unwrap().clone()
+    }
+}
+
+pub async fn spawn_off() -> (String, OffMock)
+{
+    let mock = OffMock::default();
+    let router = Router::new()
+        .route("/api/v2/product/:code", get(off_product))
+        .with_state(mock.clone());
+    (serve(router).await, mock)
+}
+
+async fn off_product(
+    State(a_mock): State<OffMock>,
+    Path(a_code): Path<String>,
+    Query(a_query): Query<HashMap<String, String>>,
+    a_headers: HeaderMap,
+) -> Response
+{
+    a_mock.calls.lock().unwrap().push(a_code.clone());
+    let fields = a_query.get("fields").cloned().unwrap_or_default();
+    let is_polite = header(&a_headers, "user-agent").as_deref() == Some("FamilyRoutine/1.0")
+        && fields.split(',').any(|field| field == "nutriments")
+        && !fields.contains("image");
+    if !is_polite
+    {
+        return (StatusCode::FORBIDDEN, "blocked").into_response();
+    }
+
+    match a_code.as_str()
+    {
+        OFF_PRODUCT => Json(json!({
+            "code": OFF_PRODUCT,
+            "status": 1,
+            "product": {
+                "product_name": "Кава мелена",
+                "product_name_en": "Ground coffee",
+                "brands": "Jacobs,Mondelez",
+                "quantity": "250 г",
+                "nutriments": { "energy-kcal_100g": 2, "proteins_100g": 0.2, "fat_100g": "0.1", "carbohydrates_100g": 0 }
+            }
+        }))
+        .into_response(),
+        OFF_BROKEN => (StatusCode::SERVICE_UNAVAILABLE, "maintenance").into_response(),
+        _ => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "status": 0, "status_verbose": "product not found" })),
+        )
+            .into_response(),
+    }
+}

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "barcode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "carb",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "37cea70aa00abb22c35b8dad3f7c3ce65bca5cad6c3ac374dc19c149ee411a9c"
+}

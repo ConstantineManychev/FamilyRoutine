@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH sharers AS (\n            SELECT DISTINCT theirs.user_id\n            FROM family_mems mine\n            JOIN family_mems theirs ON theirs.family_id = mine.family_id\n            WHERE mine.user_id = $2 AND theirs.user_id <> $2 AND theirs.is_prices_shared\n        ),\n        obs AS (\n            SELECT r.owner_id, r.place_id, r.place_addr_id, r.merchant_id, r.merchant_name, r.curr_id,\n                   ri.amount / ri.qty AS unit_price, ri.qty, r.receipt_ts AS ts, r.created_ts, 'receipt' AS source\n            FROM receipt_items ri\n            JOIN receipts r ON r.id = ri.receipt_id\n            WHERE ri.item_id = $1\n              AND (r.owner_id = $2 OR r.owner_id IN (SELECT user_id FROM sharers))\n            UNION ALL\n            SELECT ip.owner_id, ip.place_id, ip.place_addr_id, NULL::uuid, ip.merchant_name, ip.curr_id,\n                   ip.price / ip.qty, ip.qty, ip.seen_ts, ip.created_ts, 'manual'\n            FROM item_prices ip\n            WHERE ip.item_id = $1\n              AND (ip.owner_id = $2 OR ip.owner_id IN (SELECT user_id FROM sharers))\n        )\n        SELECT\n            o.ts AS \"ts!\",\n            ROUND(o.unit_price, 2) AS \"unit_price!\",\n            o.qty AS \"qty!\",\n            o.curr_id AS \"curr_id!\",\n            c.code AS curr_code,\n            o.place_id,\n            COALESCE(pl.name, m.name, o.merchant_name) AS store_name,\n            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,\n            o.source AS \"source!\",\n            (o.owner_id <> $2) AS \"is_shared!\"\n        FROM obs o\n        JOIN currencies c ON c.id = o.curr_id\n        LEFT JOIN places pl ON pl.id = o.place_id\n        LEFT JOIN place_addrs pa ON pa.id = o.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        LEFT JOIN merchants m ON m.id = o.merchant_id\n        WHERE $4::uuid IS NULL OR o.curr_id = $4\n        ORDER BY COALESCE(o.place_id = $3, FALSE) DESC, o.ts DESC, o.created_ts DESC\n        LIMIT $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ts!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "unit_price!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "qty!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "curr_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "curr_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "place_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "store_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "branch",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "source!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "is_shared!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d0d00f611b96be4626318605e2ecae155cf2e344731d2b4e14877ad23c6c5a38"
+}

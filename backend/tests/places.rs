@@ -282,14 +282,13 @@ async fn bank_merchants_link_to_places_privately(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn receipts_teach_places_and_new_items_go_to_the_family(a_db: PgPool)
+async fn receipts_teach_places_and_new_items_join_the_catalog(a_db: PgPool)
 {
     let app = TestApp::new(a_db.clone());
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
     let eve = app.user("eve@example.com").await;
     let home = app.family(&alice, "Home").await;
-    let foreign = app.family(&eve, "Other").await;
     app.join(&alice, &bob, &home, "standard").await;
 
     let card = wallet(&app, &alice, "Card").await;
@@ -298,27 +297,13 @@ async fn receipts_teach_places_and_new_items_go_to_the_family(a_db: PgPool)
     let eur = app.currency_by_code(&alice.token, "EUR").await;
     let place = post(&app, &alice, "/api/places", json!({ "name": "Tesco" })).await;
 
-    let foreign_item = app
-        .call(
-            Method::POST,
-            "/api/receipts",
-            Some(&alice.token),
-            Some(json!({
-                "receipt_ts": Utc::now(), "curr_id": eur,
-                "items": [{ "new_item": { "name": "Bread", "kind": "food", "unit": "piece", "family_id": foreign }, "amount": "2" }]
-            })),
-        )
-        .await;
-    assert_eq!(foreign_item.status, StatusCode::BAD_REQUEST);
-    assert_eq!(foreign_item.body["field"], "new_item.family_id");
-
     let saved = post(
         &app,
         &alice,
         "/api/receipts",
         json!({
             "receipt_ts": Utc::now(), "curr_id": eur, "place_id": place["id"], "tx_ids": [paid],
-            "items": [{ "new_item": { "name": "Milk", "kind": "food", "unit": "piece", "family_id": home }, "amount": "12.40" }]
+            "items": [{ "new_item": { "name": "Milk", "kind": "food", "unit": "piece" }, "amount": "12.40" }]
         }),
     )
     .await;
@@ -328,7 +313,28 @@ async fn receipts_teach_places_and_new_items_go_to_the_family(a_db: PgPool)
     assert_eq!(linked["is_merchant_linked"], true);
 
     let item_id = saved["items"][0]["item_id"].as_str().unwrap();
-    let milk = app
+    for (viewer, owner_kind, is_editable) in [(&alice, "me", true), (&bob, "user", false), (&eve, "user", false)]
+    {
+        let milk = app
+            .call(
+                Method::GET,
+                &format!("/api/dicts/items/{item_id}"),
+                Some(&viewer.token),
+                None,
+            )
+            .await;
+        assert_eq!(milk.status, StatusCode::OK, "{}", milk.body);
+        assert_eq!(milk.body["owner_kind"], owner_kind);
+        assert_eq!(milk.body["is_editable"], is_editable);
+    }
+    app.call(
+        Method::PUT,
+        &format!("/api/families/{home}/price-sharing"),
+        Some(&alice.token),
+        Some(json!({ "is_shared": true })),
+    )
+    .await;
+    let shared = app
         .call(
             Method::GET,
             &format!("/api/dicts/items/{item_id}"),
@@ -336,8 +342,17 @@ async fn receipts_teach_places_and_new_items_go_to_the_family(a_db: PgPool)
             None,
         )
         .await;
-    assert_eq!(milk.status, StatusCode::OK, "{}", milk.body);
-    assert_eq!(milk.body["family_id"], home.as_str());
+    assert_eq!(shared.body["owner_kind"], "member");
+    assert_eq!(shared.body["owner_name"], "Test alice");
+    let stranger = app
+        .call(
+            Method::GET,
+            &format!("/api/dicts/items/{item_id}"),
+            Some(&eve.token),
+            None,
+        )
+        .await;
+    assert_eq!(stranger.body["owner_name"], Value::Null);
 
     let later = bank_tx(&a_db, card, "-3.10", "VDP-TESCO STORES 3092", None).await;
     recategorize_pending(&a_db).await.unwrap();

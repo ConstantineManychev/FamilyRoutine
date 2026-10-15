@@ -6,8 +6,8 @@ use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
-    DictItemDto, ItemKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery, ItemUnit, ManualPriceDto,
-    MergeItemRequest, NewItemRequest, SaveItemRequest, SaveManualPriceRequest, ShareToFamilyRequest,
+    DictItemDto, ItemKind, ItemOwnerKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery, ItemUnit,
+    ManualPriceDto, MergeItemRequest, NewItemRequest, NutritionDto, SaveItemRequest, SaveManualPriceRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -18,7 +18,7 @@ use crate::domain::errors::ApiError;
 use crate::domain::validation::{
     check_money, check_qty, clean_barcode, clean_optional_text, clean_text, contains_pattern, money,
 };
-use crate::security::authz::require_member;
+use crate::security::authz::is_catalog_admin;
 use crate::state::AppState;
 
 pub const MAX_ITEM_NAME_LEN: usize = 200;
@@ -29,15 +29,51 @@ const MAX_PRICE_NOTE_LEN: usize = 200;
 const MAX_MANUAL_PRICES_PER_ITEM: i64 = 500;
 const MAX_OBSERVATIONS: i64 = 5000;
 const MAX_PRICE_AGE_DAYS: i64 = 3650;
+const MAX_KCAL: i64 = 1000;
+const MAX_GRAMS: i64 = 100;
+
+pub struct Viewer
+{
+    pub user_id: Uuid,
+    pub is_admin: bool,
+}
+
+struct ItemRow
+{
+    id: Uuid,
+    name: String,
+    kind: ItemKind,
+    unit: ItemUnit,
+    barcode: Option<String>,
+    kcal: Option<Decimal>,
+    prot: Option<Decimal>,
+    fat: Option<Decimal>,
+    carb: Option<Decimal>,
+    owner_kind: String,
+    owner_name: Option<String>,
+    is_editable: bool,
+    is_in_use: bool,
+}
+
+#[derive(Default)]
+struct ItemFilter<'a>
+{
+    id: Option<Uuid>,
+    pattern: Option<&'a str>,
+    prefix: Option<&'a str>,
+    query_barcode: Option<&'a str>,
+    barcode: Option<&'a str>,
+    is_mine: bool,
+}
 
 struct ItemScope
 {
     owner_id: Option<Uuid>,
-    family_id: Option<Uuid>,
-    barcode: Option<String>,
+    name: String,
+    kind: ItemKind,
     unit: ItemUnit,
-    is_visible: bool,
-    is_editable: bool,
+    barcode: Option<String>,
+    is_used_by_others: bool,
 }
 
 struct Observation
@@ -65,6 +101,31 @@ struct PriceAcc
     is_shared: bool,
 }
 
+impl From<ItemRow> for DictItemDto
+{
+    fn from(a_row: ItemRow) -> Self
+    {
+        let nutrition = NutritionDto {
+            kcal: a_row.kcal.map(|value| value.normalize()),
+            prot: a_row.prot.map(|value| value.normalize()),
+            fat: a_row.fat.map(|value| value.normalize()),
+            carb: a_row.carb.map(|value| value.normalize()),
+        };
+        Self {
+            id: a_row.id,
+            name: a_row.name,
+            kind: a_row.kind,
+            unit: a_row.unit,
+            barcode: a_row.barcode,
+            nutrition: (!nutrition.is_empty()).then_some(nutrition),
+            owner_kind: ItemOwnerKind::parse(&a_row.owner_kind),
+            owner_name: a_row.owner_name,
+            is_editable: a_row.is_editable,
+            is_in_use: a_row.is_in_use,
+        }
+    }
+}
+
 pub async fn list_items(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -79,43 +140,20 @@ pub async fn list_items(
     let barcode = clean_barcode(a_query.barcode.as_deref())?;
     let limit = a_query.limit.unwrap_or(DEFAULT_LIST_LIMIT).clamp(1, MAX_LIST_LIMIT);
 
-    let items = sqlx::query_as!(
-        DictItemDto,
-        r#"
-        SELECT
-            i.id,
-            i.name,
-            i.type AS "kind: ItemKind",
-            i.unit AS "unit: ItemUnit",
-            i.barcode,
-            (i.owner_id IS NOT NULL OR i.family_id IS NOT NULL) AS "is_custom!",
-            i.family_id,
-            f.name AS "family_name?",
-            can_edit_scoped(i.owner_id, i.family_id, i.created_by, $1) AS "is_editable!"
-        FROM items i
-        LEFT JOIN families f ON f.id = i.family_id
-        WHERE (i.owner_id = $1
-               OR (i.owner_id IS NULL AND i.family_id IS NULL)
-               OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
-          AND ($2::text IS NULL OR i.name ILIKE $2 OR i.barcode = $5)
-          AND ($6::text IS NULL OR i.barcode = $6)
-        ORDER BY (i.barcode IS NOT NULL AND i.barcode = $5) DESC,
-                 ($3::text IS NOT NULL AND i.name ILIKE $3) DESC,
-                 LOWER(i.name),
-                 f.name NULLS FIRST
-        LIMIT $4
-        "#,
-        a_user.user_id,
-        pattern,
-        prefix,
-        limit,
-        query_barcode,
-        barcode
-    )
-    .fetch_all(&a_state.db)
-    .await?;
+    let mut conn = a_state.db.acquire().await?;
+    let viewer = load_viewer(&a_state, &mut conn, a_user.user_id).await?;
+    let filter = ItemFilter {
+        pattern: pattern.as_deref(),
+        prefix: prefix.as_deref(),
+        query_barcode: query_barcode.as_deref(),
+        barcode: barcode.as_deref(),
+        is_mine: a_query.is_mine,
+        ..ItemFilter::default()
+    };
 
-    Ok(Json(items))
+    query_items(&a_state, &mut conn, &viewer, &filter, limit)
+        .await
+        .map(Json)
 }
 
 pub async fn get_item(
@@ -125,7 +163,8 @@ pub async fn get_item(
 ) -> Result<Json<DictItemDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_item(&mut conn, a_id, a_user.user_id).await.map(Json)
+    let viewer = load_viewer(&a_state, &mut conn, a_user.user_id).await?;
+    load_item(&a_state, &mut conn, &viewer, a_id).await.map(Json)
 }
 
 pub async fn create_item(
@@ -136,35 +175,33 @@ pub async fn create_item(
 {
     let name = clean_text(&a_req.name, 1, MAX_ITEM_NAME_LEN, "name")?;
     let barcode = clean_barcode(a_req.barcode.as_deref())?;
+    let nutrition = check_nutrition(a_req.nutrition.unwrap_or_default())?;
     let mut tx = a_state.db.begin().await?;
+    let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
 
-    if let Some(family_id) = a_req.family_id
-    {
-        require_member(&mut *tx, family_id, a_user.user_id)
-            .await
-            .map_err(|_| ApiError::Validation("family_id"))?;
-    }
-    let owner_id = a_req.family_id.is_none().then_some(a_user.user_id);
-    require_unique_barcode(&mut tx, barcode.as_deref(), a_user.user_id, a_req.family_id, None).await?;
+    require_unique_name(&mut tx, &name, None).await?;
+    require_unique_barcode(&mut tx, barcode.as_deref(), None).await?;
 
     let id = sqlx::query_scalar!(
         r#"
-        INSERT INTO items (owner_id, family_id, created_by, name, type, unit, barcode)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO items (owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb)
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
         "#,
-        owner_id,
-        a_req.family_id,
         a_user.user_id,
         name,
         a_req.kind as ItemKind,
         a_req.unit as ItemUnit,
-        barcode
+        barcode,
+        nutrition.kcal,
+        nutrition.prot,
+        nutrition.fat,
+        nutrition.carb
     )
     .fetch_one(&mut *tx)
     .await?;
 
-    let item = load_item(&mut tx, id, a_user.user_id).await?;
+    let item = load_item(&a_state, &mut tx, &viewer, id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(item)))
 }
@@ -178,22 +215,49 @@ pub async fn update_item(
 {
     let name = clean_text(&a_req.name, 1, MAX_ITEM_NAME_LEN, "name")?;
     let barcode = clean_barcode(a_req.barcode.as_deref())?;
+    let nutrition = check_nutrition(a_req.nutrition.unwrap_or_default())?;
     let mut tx = a_state.db.begin().await?;
-    let scope = require_editable(&mut tx, a_id, a_user.user_id).await?;
-    require_unique_barcode(&mut tx, barcode.as_deref(), a_user.user_id, scope.family_id, Some(a_id)).await?;
+    let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
+    let scope = require_editable(&mut tx, &viewer, a_id).await?;
+
+    let is_renamed = name.to_lowercase() != scope.name.to_lowercase();
+    let is_identity_changed = name != scope.name
+        || a_req.kind != scope.kind
+        || a_req.unit != scope.unit
+        || (scope.barcode.is_some() && barcode != scope.barcode);
+    if is_identity_changed && scope.is_used_by_others && !viewer.is_admin
+    {
+        return Err(ApiError::Conflict("ITEM_IN_USE"));
+    }
+    if is_renamed
+    {
+        require_unique_name(&mut tx, &name, Some(a_id)).await?;
+    }
+    if barcode != scope.barcode
+    {
+        require_unique_barcode(&mut tx, barcode.as_deref(), Some(a_id)).await?;
+    }
 
     sqlx::query!(
-        "UPDATE items SET name = $2, type = $3, unit = $4, barcode = $5 WHERE id = $1",
+        r#"
+        UPDATE items
+        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9
+        WHERE id = $1
+        "#,
         a_id,
         name,
         a_req.kind as ItemKind,
         a_req.unit as ItemUnit,
-        barcode
+        barcode,
+        nutrition.kcal,
+        nutrition.prot,
+        nutrition.fat,
+        nutrition.carb
     )
     .execute(&mut *tx)
     .await?;
 
-    let item = load_item(&mut tx, a_id, a_user.user_id).await?;
+    let item = load_item(&a_state, &mut tx, &viewer, a_id).await?;
     tx.commit().await?;
     Ok(Json(item))
 }
@@ -205,7 +269,12 @@ pub async fn delete_item(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    require_editable(&mut tx, a_id, a_user.user_id).await?;
+    let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
+    let scope = require_editable(&mut tx, &viewer, a_id).await?;
+    if scope.is_used_by_others
+    {
+        return Err(ApiError::Conflict("ITEM_IN_USE"));
+    }
 
     sqlx::query!("DELETE FROM items WHERE id = $1", a_id)
         .execute(&mut *tx)
@@ -218,45 +287,6 @@ pub async fn delete_item(
 
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn share_item(
-    State(a_state): State<AppState>,
-    a_user: AuthUser,
-    ApiPath(a_id): ApiPath<Uuid>,
-    ApiJson(a_req): ApiJson<ShareToFamilyRequest>,
-) -> Result<Json<DictItemDto>, ApiError>
-{
-    let mut tx = a_state.db.begin().await?;
-    let scope = require_editable(&mut tx, a_id, a_user.user_id).await?;
-    if scope.owner_id != Some(a_user.user_id)
-    {
-        return Err(ApiError::Validation("family_id"));
-    }
-
-    require_member(&mut *tx, a_req.family_id, a_user.user_id)
-        .await
-        .map_err(|_| ApiError::Validation("family_id"))?;
-    require_unique_barcode(
-        &mut tx,
-        scope.barcode.as_deref(),
-        a_user.user_id,
-        Some(a_req.family_id),
-        Some(a_id),
-    )
-    .await?;
-
-    sqlx::query!(
-        "UPDATE items SET owner_id = NULL, family_id = $2 WHERE id = $1",
-        a_id,
-        a_req.family_id
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    let item = load_item(&mut tx, a_id, a_user.user_id).await?;
-    tx.commit().await?;
-    Ok(Json(item))
 }
 
 pub async fn merge_item(
@@ -272,42 +302,18 @@ pub async fn merge_item(
     }
 
     let mut tx = a_state.db.begin().await?;
-    let source = require_editable(&mut tx, a_id, a_user.user_id).await?;
-    let target = item_scope(&mut tx, a_req.target_id, a_user.user_id)
+    let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
+    let source = require_editable(&mut tx, &viewer, a_id).await?;
+    if source.is_used_by_others && !viewer.is_admin
+    {
+        return Err(ApiError::Conflict("ITEM_IN_USE"));
+    }
+    let target = item_scope(&mut tx, a_req.target_id, viewer.user_id)
         .await?
-        .filter(|scope| scope.is_visible)
         .ok_or(ApiError::Validation("target_id"))?;
-
-    let is_same_scope = source.family_id.is_none() || source.family_id == target.family_id;
-    if source.unit != target.unit || !is_same_scope
+    if source.unit != target.unit
     {
         return Err(ApiError::Validation("target_id"));
-    }
-
-    let is_blocked = sqlx::query_scalar!(
-        r#"
-        WITH users_of_source AS (
-            SELECT r.owner_id AS user_id
-            FROM receipt_items ri JOIN receipts r ON r.id = ri.receipt_id
-            WHERE ri.item_id = $1
-            UNION
-            SELECT owner_id FROM item_prices WHERE item_id = $1
-        )
-        SELECT EXISTS (
-            SELECT 1 FROM users_of_source u, items t
-            WHERE t.id = $2
-              AND NOT (t.owner_id IS NULL AND t.family_id IS NULL)
-              AND NOT can_see_scoped(t.owner_id, t.family_id, u.user_id)
-        ) AS "is_blocked!"
-        "#,
-        a_id,
-        a_req.target_id
-    )
-    .fetch_one(&mut *tx)
-    .await?;
-    if is_blocked
-    {
-        return Err(ApiError::Conflict("IN_USE"));
     }
 
     sqlx::query!(
@@ -325,17 +331,52 @@ pub async fn merge_item(
     .execute(&mut *tx)
     .await?;
     sqlx::query!(
+        "UPDATE meal_items SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
         "UPDATE item_aliases SET item_id = $2 WHERE item_id = $1",
         a_id,
         a_req.target_id
     )
     .execute(&mut *tx)
     .await?;
-    sqlx::query!("DELETE FROM items WHERE id = $1", a_id)
+
+    let removed = sqlx::query!(
+        "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb",
+        a_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let is_target_editable = viewer.is_admin || target.owner_id == Some(viewer.user_id);
+    if is_target_editable
+    {
+        sqlx::query!(
+            r#"
+            UPDATE items
+            SET barcode = COALESCE(barcode, $2),
+                kcal = COALESCE(kcal, $3),
+                prot = COALESCE(prot, $4),
+                fat = COALESCE(fat, $5),
+                carb = COALESCE(carb, $6)
+            WHERE id = $1
+            "#,
+            a_req.target_id,
+            removed.barcode,
+            removed.kcal,
+            removed.prot,
+            removed.fat,
+            removed.carb
+        )
         .execute(&mut *tx)
         .await?;
+    }
 
-    let item = load_item(&mut tx, a_req.target_id, a_user.user_id).await?;
+    let item = load_item(&a_state, &mut tx, &viewer, a_req.target_id).await?;
     tx.commit().await?;
     Ok(Json(item))
 }
@@ -348,7 +389,7 @@ pub async fn item_prices(
 ) -> Result<Json<ItemPricesDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_item(&mut conn, a_id, a_user.user_id).await?;
+    require_item(&mut conn, a_id).await?;
 
     let target = match a_query.convert_to.as_deref()
     {
@@ -363,53 +404,28 @@ pub async fn item_prices(
     let target_id = target.as_ref().map(|currency| currency.id);
     let target_code = target.map(|currency| currency.code);
 
-    let matched_items = sqlx::query_scalar!(
-        r#"
-        SELECT COUNT(*) AS "count!"
-        FROM items i, items t
-        WHERE t.id = $1
-          AND (i.id = t.id OR (t.barcode IS NOT NULL AND i.barcode = t.barcode AND i.unit = t.unit))
-          AND ((i.owner_id IS NULL AND i.family_id IS NULL) OR can_see_scoped(i.owner_id, i.family_id, $2))
-        "#,
-        a_id,
-        a_user.user_id
-    )
-    .fetch_one(&mut *conn)
-    .await?;
-
     let observations = sqlx::query_as!(
         Observation,
         r#"
-        WITH target AS (
-            SELECT id, barcode, unit FROM items WHERE id = $1
-        ),
-        product AS (
-            SELECT i.id, i.family_id
-            FROM items i, target t
-            WHERE (i.id = t.id OR (t.barcode IS NOT NULL AND i.barcode = t.barcode AND i.unit = t.unit))
-              AND ((i.owner_id IS NULL AND i.family_id IS NULL) OR can_see_scoped(i.owner_id, i.family_id, $2))
-        ),
-        sharers AS (
-            SELECT fm.family_id, fm.user_id
-            FROM family_mems fm
-            WHERE fm.is_prices_shared
-              AND fm.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2)
+        WITH sharers AS (
+            SELECT DISTINCT theirs.user_id
+            FROM family_mems mine
+            JOIN family_mems theirs ON theirs.family_id = mine.family_id
+            WHERE mine.user_id = $2 AND theirs.user_id <> $2 AND theirs.is_prices_shared
         ),
         obs AS (
             SELECT r.owner_id, r.place_id, r.place_addr_id, r.merchant_id, r.merchant_name, r.curr_id,
                    ri.amount / ri.qty AS unit_price, r.receipt_ts AS ts
             FROM receipt_items ri
             JOIN receipts r ON r.id = ri.receipt_id
-            JOIN product p ON p.id = ri.item_id
-            WHERE r.owner_id = $2
-               OR EXISTS (SELECT 1 FROM sharers s WHERE s.family_id = p.family_id AND s.user_id = r.owner_id)
+            WHERE ri.item_id = $1
+              AND (r.owner_id = $2 OR r.owner_id IN (SELECT user_id FROM sharers))
             UNION ALL
             SELECT ip.owner_id, ip.place_id, ip.place_addr_id, NULL::uuid, ip.merchant_name, ip.curr_id,
                    ip.price / ip.qty, ip.seen_ts
             FROM item_prices ip
-            JOIN product p ON p.id = ip.item_id
-            WHERE ip.owner_id = $2
-               OR EXISTS (SELECT 1 FROM sharers s WHERE s.family_id = p.family_id AND s.user_id = ip.owner_id)
+            WHERE ip.item_id = $1
+              AND (ip.owner_id = $2 OR ip.owner_id IN (SELECT user_id FROM sharers))
         )
         SELECT
             CASE
@@ -448,11 +464,7 @@ pub async fn item_prices(
 
     let (prices, missing_rates) = aggregate_prices(observations, target_code.as_deref());
 
-    Ok(Json(ItemPricesDto {
-        prices,
-        missing_rates,
-        matched_items,
-    }))
+    Ok(Json(ItemPricesDto { prices, missing_rates }))
 }
 
 pub async fn list_manual_prices(
@@ -462,7 +474,7 @@ pub async fn list_manual_prices(
 ) -> Result<Json<Vec<ManualPriceDto>>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_item(&mut conn, a_id, a_user.user_id).await?;
+    require_item(&mut conn, a_id).await?;
     load_manual_prices(&mut conn, a_id, a_user.user_id, None)
         .await
         .map(Json)
@@ -496,7 +508,7 @@ pub async fn create_manual_price(
     }
 
     let mut tx = a_state.db.begin().await?;
-    load_item(&mut tx, a_id, a_user.user_id).await?;
+    require_item(&mut tx, a_id).await?;
     require_visible_place(&mut tx, a_req.place_id, a_req.place_addr_id, a_user.user_id, None).await?;
 
     let is_currency_known = sqlx::query_scalar!(
@@ -574,34 +586,17 @@ pub async fn delete_manual_price(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn require_visible_items(
-    a_conn: &mut PgConnection,
-    a_item_ids: &[Uuid],
-    a_user_id: Uuid,
-    a_receipt_id: Option<Uuid>,
-) -> Result<(), ApiError>
+pub async fn require_visible_items(a_conn: &mut PgConnection, a_item_ids: &[Uuid]) -> Result<(), ApiError>
 {
     let mut ids = a_item_ids.to_vec();
     ids.sort_unstable();
     ids.dedup();
 
-    let visible = sqlx::query_scalar!(
-        r#"
-        SELECT COUNT(*) AS "count!"
-        FROM items i
-        WHERE i.id = ANY($1)
-          AND ((i.owner_id IS NULL AND i.family_id IS NULL)
-               OR can_see_scoped(i.owner_id, i.family_id, $2)
-               OR EXISTS (SELECT 1 FROM receipt_items ri WHERE ri.receipt_id = $3 AND ri.item_id = i.id))
-        "#,
-        &ids,
-        a_user_id,
-        a_receipt_id
-    )
-    .fetch_one(&mut *a_conn)
-    .await?;
+    let found = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "count!" FROM items WHERE id = ANY($1)"#, &ids)
+        .fetch_one(&mut *a_conn)
+        .await?;
 
-    if visible as usize != ids.len()
+    if found as usize != ids.len()
     {
         return Err(ApiError::Validation("item_id"));
     }
@@ -615,14 +610,14 @@ pub async fn resolve_new_item(
     a_item: &NewItemRequest,
 ) -> Result<Uuid, ApiError>
 {
+    lock_key(a_conn, &name_lock(&a_item.name)).await?;
+
     let existing = sqlx::query_scalar!(
         r#"
         SELECT i.id
         FROM items i
-        WHERE (($2::text IS NOT NULL AND i.barcode = $2) OR LOWER(i.name) = LOWER($3))
-          AND (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)
-               OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
-        ORDER BY (i.barcode IS NOT DISTINCT FROM $2) DESC, (i.owner_id = $1) DESC
+        WHERE ($2::text IS NOT NULL AND i.barcode = $2) OR LOWER(i.name) = LOWER($3)
+        ORDER BY (i.barcode IS NOT DISTINCT FROM $2) DESC, (i.owner_id IS NOT DISTINCT FROM $1) DESC, i.created_ts
         LIMIT 1
         "#,
         a_user_id,
@@ -636,21 +631,13 @@ pub async fn resolve_new_item(
         return Ok(id);
     }
 
-    if let Some(family_id) = a_item.family_id
-    {
-        require_member(&mut *a_conn, family_id, a_user_id)
-            .await
-            .map_err(|_| ApiError::Validation("new_item.family_id"))?;
-    }
-    require_unique_barcode(a_conn, a_item.barcode.as_deref(), a_user_id, a_item.family_id, None).await?;
+    require_unique_barcode(a_conn, a_item.barcode.as_deref(), None).await?;
     sqlx::query_scalar!(
         r#"
-        INSERT INTO items (owner_id, family_id, created_by, name, type, unit, barcode)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO items (owner_id, created_by, name, type, unit, barcode)
+        VALUES ($1, $1, $2, $3, $4, $5)
         RETURNING id
         "#,
-        a_item.family_id.is_none().then_some(a_user_id),
-        a_item.family_id,
         a_user_id,
         a_item.name,
         a_item.kind as ItemKind,
@@ -665,8 +652,6 @@ pub async fn resolve_new_item(
 pub async fn require_unique_barcode(
     a_conn: &mut PgConnection,
     a_barcode: Option<&str>,
-    a_user_id: Uuid,
-    a_family_id: Option<Uuid>,
     a_except_id: Option<Uuid>,
 ) -> Result<(), ApiError>
 {
@@ -676,28 +661,14 @@ pub async fn require_unique_barcode(
         return Ok(());
     };
 
-    sqlx::query!(
-        "SELECT pg_advisory_xact_lock(hashtext($1::text))",
-        format!("barcode:{barcode}")
-    )
-    .execute(&mut *a_conn)
-    .await?;
-
+    lock_key(a_conn, &format!("barcode:{barcode}")).await?;
     let is_taken = sqlx::query_scalar!(
         r#"
         SELECT EXISTS (
-            SELECT 1 FROM items i
-            WHERE i.barcode = $1
-              AND ($4::uuid IS NULL OR i.id <> $4)
-              AND ((i.owner_id IS NULL AND i.family_id IS NULL)
-                   OR i.owner_id = $2
-                   OR i.family_id = $3
-                   OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))
+            SELECT 1 FROM items WHERE barcode = $1 AND ($2::uuid IS NULL OR id <> $2)
         ) AS "is_taken!"
         "#,
         barcode,
-        a_user_id,
-        a_family_id,
         a_except_id
     )
     .fetch_one(&mut *a_conn)
@@ -711,48 +682,204 @@ pub async fn require_unique_barcode(
     Ok(())
 }
 
-pub async fn detach_family_items(
-    a_conn: &mut PgConnection,
-    a_family_id: Uuid,
-    a_fallback_owner: Uuid,
-) -> Result<(), ApiError>
+pub async fn load_viewer(a_state: &AppState, a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<Viewer, ApiError>
 {
-    sqlx::query!(
+    Ok(Viewer {
+        user_id: a_user_id,
+        is_admin: is_catalog_admin(a_conn, &a_state.cfg.catalog.admin_emails, a_user_id).await?,
+    })
+}
+
+pub async fn require_item(a_conn: &mut PgConnection, a_id: Uuid) -> Result<(), ApiError>
+{
+    sqlx::query_scalar!("SELECT id FROM items WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .map(|_| ())
+        .ok_or(ApiError::NotFound)
+}
+
+async fn require_unique_name(a_conn: &mut PgConnection, a_name: &str, a_except_id: Option<Uuid>)
+    -> Result<(), ApiError>
+{
+    lock_key(a_conn, &name_lock(a_name)).await?;
+    let is_taken = sqlx::query_scalar!(
         r#"
-        WITH heirs AS (
-            SELECT
-                i.id,
-                CASE
-                    WHEN EXISTS (SELECT 1 FROM family_mems fm WHERE fm.family_id = $1 AND fm.user_id = i.created_by)
-                        THEN i.created_by
-                    ELSE $2
-                END AS heir_id
-            FROM items i
-            WHERE i.family_id = $1
-        )
-        UPDATE items i
-        SET owner_id = h.heir_id,
-            family_id = NULL,
-            name = CASE
-                WHEN EXISTS (SELECT 1 FROM items p WHERE p.owner_id = h.heir_id AND LOWER(p.name) = LOWER(i.name))
-                    THEN LEFT(i.name, 170) || ' (' || LEFT(f.name, 25) || ')'
-                ELSE i.name
-            END,
-            barcode = CASE
-                WHEN EXISTS (SELECT 1 FROM items p WHERE p.owner_id = h.heir_id AND p.barcode = i.barcode)
-                    THEN NULL
-                ELSE i.barcode
-            END
-        FROM heirs h, families f
-        WHERE i.id = h.id AND f.id = $1
+        SELECT EXISTS (
+            SELECT 1 FROM items WHERE LOWER(name) = LOWER($1) AND ($2::uuid IS NULL OR id <> $2)
+        ) AS "is_taken!"
         "#,
-        a_family_id,
-        a_fallback_owner
+        a_name,
+        a_except_id
     )
-    .execute(&mut *a_conn)
+    .fetch_one(&mut *a_conn)
     .await?;
 
+    if is_taken
+    {
+        return Err(ApiError::Conflict("ITEM_EXISTS"));
+    }
+
     Ok(())
+}
+
+fn name_lock(a_name: &str) -> String
+{
+    format!("item-name:{}", a_name.to_lowercase())
+}
+
+async fn lock_key(a_conn: &mut PgConnection, a_key: &str) -> Result<(), ApiError>
+{
+    sqlx::query!("SELECT pg_advisory_xact_lock(hashtext($1::text))", a_key)
+        .execute(&mut *a_conn)
+        .await?;
+    Ok(())
+}
+
+fn check_nutrition(a_nutrition: NutritionDto) -> Result<NutritionDto, ApiError>
+{
+    let bounded = |a_value: Option<Decimal>, a_max: i64, a_field: &'static str| match a_value
+    {
+        Some(value) if value < Decimal::ZERO || value > Decimal::from(a_max) => Err(ApiError::Validation(a_field)),
+        other => Ok(other.map(|value| value.round_dp(2).normalize())),
+    };
+
+    Ok(NutritionDto {
+        kcal: bounded(a_nutrition.kcal, MAX_KCAL, "nutrition.kcal")?,
+        prot: bounded(a_nutrition.prot, MAX_GRAMS, "nutrition.prot")?,
+        fat: bounded(a_nutrition.fat, MAX_GRAMS, "nutrition.fat")?,
+        carb: bounded(a_nutrition.carb, MAX_GRAMS, "nutrition.carb")?,
+    })
+}
+
+async fn query_items(
+    a_state: &AppState,
+    a_conn: &mut PgConnection,
+    a_viewer: &Viewer,
+    a_filter: &ItemFilter<'_>,
+    a_limit: i64,
+) -> Result<Vec<DictItemDto>, ApiError>
+{
+    let rows = sqlx::query_as!(
+        ItemRow,
+        r#"
+        WITH sharers AS (
+            SELECT DISTINCT theirs.user_id
+            FROM family_mems mine
+            JOIN family_mems theirs ON theirs.family_id = mine.family_id
+            WHERE mine.user_id = $1 AND theirs.user_id <> $1 AND theirs.is_prices_shared
+        )
+        SELECT
+            i.id,
+            i.name,
+            i.type AS "kind: ItemKind",
+            i.unit AS "unit: ItemUnit",
+            i.barcode,
+            i.kcal,
+            i.prot,
+            i.fat,
+            i.carb,
+            CASE
+                WHEN i.owner_id = $1 THEN 'me'
+                WHEN i.owner_id IS NULL OR LOWER(ou.email) = ANY($2) THEN 'catalog'
+                WHEN i.owner_id IN (SELECT user_id FROM sharers) THEN 'member'
+                ELSE 'user'
+            END AS "owner_kind!",
+            CASE
+                WHEN i.owner_id <> $1
+                     AND NOT COALESCE(LOWER(ou.email) = ANY($2), FALSE)
+                     AND i.owner_id IN (SELECT user_id FROM sharers)
+                    THEN ou.first_name || ' ' || ou.last_name
+            END AS owner_name,
+            (i.owner_id IS NOT DISTINCT FROM $1 OR $3) AS "is_editable!",
+            CASE
+                WHEN i.owner_id IS NOT DISTINCT FROM $1 OR $3 THEN item_used_by_others(i.id, $1)
+                ELSE FALSE
+            END AS "is_in_use!"
+        FROM items i
+        LEFT JOIN users ou ON ou.id = i.owner_id
+        WHERE ($4::uuid IS NULL OR i.id = $4)
+          AND ($5::text IS NULL OR i.name ILIKE $5 OR i.barcode = $6)
+          AND ($7::text IS NULL OR i.barcode = $7)
+          AND (NOT $8 OR i.owner_id IS NOT DISTINCT FROM $1)
+        ORDER BY (i.barcode IS NOT NULL AND i.barcode IS NOT DISTINCT FROM $6) DESC,
+                 ($9::text IS NOT NULL AND i.name ILIKE $9) DESC,
+                 (i.owner_id IS NOT DISTINCT FROM $1) DESC,
+                 LOWER(i.name),
+                 i.id
+        LIMIT $10
+        "#,
+        a_viewer.user_id,
+        &a_state.cfg.catalog.admin_emails,
+        a_viewer.is_admin,
+        a_filter.id,
+        a_filter.pattern,
+        a_filter.query_barcode,
+        a_filter.barcode,
+        a_filter.is_mine,
+        a_filter.prefix,
+        a_limit
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+
+    Ok(rows.into_iter().map(DictItemDto::from).collect())
+}
+
+async fn load_item(
+    a_state: &AppState,
+    a_conn: &mut PgConnection,
+    a_viewer: &Viewer,
+    a_id: Uuid,
+) -> Result<DictItemDto, ApiError>
+{
+    let filter = ItemFilter {
+        id: Some(a_id),
+        ..ItemFilter::default()
+    };
+    query_items(a_state, a_conn, a_viewer, &filter, 1)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(ApiError::NotFound)
+}
+
+async fn item_scope(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<Option<ItemScope>, ApiError>
+{
+    sqlx::query_as!(
+        ItemScope,
+        r#"
+        SELECT
+            owner_id,
+            name,
+            type AS "kind: ItemKind",
+            unit AS "unit: ItemUnit",
+            barcode,
+            item_used_by_others(id, $2) AS "is_used_by_others!"
+        FROM items
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+        a_id,
+        a_user_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await
+    .map_err(ApiError::from)
+}
+
+async fn require_editable(a_conn: &mut PgConnection, a_viewer: &Viewer, a_id: Uuid) -> Result<ItemScope, ApiError>
+{
+    let scope = item_scope(a_conn, a_id, a_viewer.user_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    if !a_viewer.is_admin && scope.owner_id != Some(a_viewer.user_id)
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    Ok(scope)
 }
 
 fn aggregate_prices(a_observations: Vec<Observation>, a_target_code: Option<&str>) -> (Vec<ItemPriceDto>, Vec<String>)
@@ -866,73 +993,6 @@ async fn load_manual_prices(
     .fetch_all(&mut *a_conn)
     .await
     .map_err(ApiError::from)
-}
-
-async fn item_scope(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<Option<ItemScope>, ApiError>
-{
-    sqlx::query_as!(
-        ItemScope,
-        r#"
-        SELECT
-            owner_id,
-            family_id,
-            barcode,
-            unit AS "unit: ItemUnit",
-            ((owner_id IS NULL AND family_id IS NULL) OR can_see_scoped(owner_id, family_id, $2)) AS "is_visible!",
-            can_edit_scoped(owner_id, family_id, created_by, $2) AS "is_editable!"
-        FROM items
-        WHERE id = $1
-        FOR UPDATE
-        "#,
-        a_id,
-        a_user_id
-    )
-    .fetch_optional(&mut *a_conn)
-    .await
-    .map_err(ApiError::from)
-}
-
-async fn require_editable(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<ItemScope, ApiError>
-{
-    let scope = item_scope(a_conn, a_id, a_user_id)
-        .await?
-        .filter(|scope| scope.is_visible)
-        .ok_or(ApiError::NotFound)?;
-
-    if !scope.is_editable
-    {
-        return Err(ApiError::Forbidden);
-    }
-
-    Ok(scope)
-}
-
-async fn load_item(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> Result<DictItemDto, ApiError>
-{
-    sqlx::query_as!(
-        DictItemDto,
-        r#"
-        SELECT
-            i.id,
-            i.name,
-            i.type AS "kind: ItemKind",
-            i.unit AS "unit: ItemUnit",
-            i.barcode,
-            (i.owner_id IS NOT NULL OR i.family_id IS NOT NULL) AS "is_custom!",
-            i.family_id,
-            f.name AS "family_name?",
-            can_edit_scoped(i.owner_id, i.family_id, i.created_by, $2) AS "is_editable!"
-        FROM items i
-        LEFT JOIN families f ON f.id = i.family_id
-        WHERE i.id = $1
-          AND ((i.owner_id IS NULL AND i.family_id IS NULL) OR can_see_scoped(i.owner_id, i.family_id, $2))
-        "#,
-        a_id,
-        a_user_id
-    )
-    .fetch_optional(&mut *a_conn)
-    .await?
-    .ok_or(ApiError::NotFound)
 }
 
 #[cfg(test)]

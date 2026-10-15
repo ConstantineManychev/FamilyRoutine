@@ -44,6 +44,8 @@ services:
       RECEIPT_AI_DAILY_LIMIT: ${RECEIPT_AI_DAILY_LIMIT:-30}
       RECEIPT_AI_MONTHLY_LIMIT: ${RECEIPT_AI_MONTHLY_LIMIT:-300}
       RECEIPT_AI_USER_KEYS: ${RECEIPT_AI_USER_KEYS:-true}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      OFF_ENABLED: ${OFF_ENABLED:-true}
     secrets:
       - enable_banking_key
     depends_on:

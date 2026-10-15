@@ -297,8 +297,6 @@ pub struct NewItemRequest
     pub unit: ItemUnit,
     #[serde(default)]
     pub barcode: Option<String>,
-    #[serde(default)]
-    pub family_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -572,6 +570,51 @@ pub struct MerchantDto
     pub mcc: Option<i16>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ItemOwnerKind
+{
+    Me,
+    Catalog,
+    Member,
+    User,
+}
+
+impl ItemOwnerKind
+{
+    pub fn parse(a_value: &str) -> Self
+    {
+        match a_value
+        {
+            "me" => Self::Me,
+            "catalog" => Self::Catalog,
+            "member" => Self::Member,
+            _ => Self::User,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NutritionDto
+{
+    #[serde(default)]
+    pub kcal: Option<Decimal>,
+    #[serde(default)]
+    pub prot: Option<Decimal>,
+    #[serde(default)]
+    pub fat: Option<Decimal>,
+    #[serde(default)]
+    pub carb: Option<Decimal>,
+}
+
+impl NutritionDto
+{
+    pub fn is_empty(&self) -> bool
+    {
+        self.kcal.is_none() && self.prot.is_none() && self.fat.is_none() && self.carb.is_none()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DictItemDto
 {
@@ -580,10 +623,11 @@ pub struct DictItemDto
     pub kind: ItemKind,
     pub unit: ItemUnit,
     pub barcode: Option<String>,
-    pub is_custom: bool,
-    pub family_id: Option<Uuid>,
-    pub family_name: Option<String>,
+    pub nutrition: Option<NutritionDto>,
+    pub owner_kind: ItemOwnerKind,
+    pub owner_name: Option<String>,
     pub is_editable: bool,
+    pub is_in_use: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -595,7 +639,7 @@ pub struct SaveItemRequest
     #[serde(default)]
     pub barcode: Option<String>,
     #[serde(default)]
-    pub family_id: Option<Uuid>,
+    pub nutrition: Option<NutritionDto>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -607,6 +651,89 @@ pub struct ItemQuery
     pub barcode: Option<String>,
     #[serde(default)]
     pub limit: Option<i64>,
+    #[serde(default)]
+    pub is_mine: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LookupStatus
+{
+    Found,
+    NotFound,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProductInfoDto
+{
+    pub kind: Option<ItemKind>,
+    pub name: Option<String>,
+    pub brand: Option<String>,
+    pub quantity: Option<String>,
+    pub suggested_name: Option<String>,
+    pub barcode: Option<String>,
+    pub nutrition: Option<NutritionDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProductLookupDto
+{
+    pub status: LookupStatus,
+    pub product: Option<ProductInfoDto>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ProductLookupQuery
+{
+    #[serde(default)]
+    pub lang: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RecognizeLabelRequest
+{
+    pub media_type: String,
+    pub image: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PriceHistoryQuery
+{
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct LastPriceQuery
+{
+    #[serde(default)]
+    pub place_id: Option<Uuid>,
+    #[serde(default)]
+    pub curr_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PriceSource
+{
+    Receipt,
+    Manual,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PricePointDto
+{
+    pub ts: DateTime<Utc>,
+    pub unit_price: Decimal,
+    pub qty: Decimal,
+    pub curr_id: Uuid,
+    pub curr_code: String,
+    pub place_id: Option<Uuid>,
+    pub store_name: Option<String>,
+    pub branch: Option<String>,
+    pub source: PriceSource,
+    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -647,7 +774,6 @@ pub struct ItemPricesDto
 {
     pub prices: Vec<ItemPriceDto>,
     pub missing_rates: Vec<String>,
-    pub matched_items: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

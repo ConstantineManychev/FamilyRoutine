@@ -8,7 +8,7 @@ use axum::Router;
 use axum_extra::extract::cookie::SameSite;
 use std::time::Duration;
 
-use backend::config::{AiEndpoints, AppConfig, BankConfig, ReceiptAiConfig, ServerAiConfig};
+use backend::config::{AiEndpoints, AppConfig, BankConfig, CatalogConfig, ReceiptAiConfig, ServerAiConfig};
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -46,6 +46,14 @@ pub fn ai_config(a_api_url: &str, a_server: Option<ServerAiConfig>) -> ReceiptAi
     }
 }
 
+pub fn catalog_config(a_admins: &[&str], a_off_url: Option<&str>) -> CatalogConfig
+{
+    CatalogConfig {
+        admin_emails: a_admins.iter().map(|email| email.to_string()).collect(),
+        off_api_url: a_off_url.map(str::to_string),
+    }
+}
+
 pub struct TestApp
 {
     pub router: Router,
@@ -74,7 +82,17 @@ impl TestApp
 
     pub fn with_banks(a_db: PgPool, a_banks: BankConfig) -> Self
     {
-        Self::build(a_db, a_banks, ai_config("http://127.0.0.1:9", None))
+        Self::build(
+            a_db,
+            a_banks,
+            ai_config("http://127.0.0.1:9", None),
+            catalog_config(&[], None),
+        )
+    }
+
+    pub fn with_catalog(a_db: PgPool, a_catalog: CatalogConfig, a_receipt_ai: ReceiptAiConfig) -> Self
+    {
+        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai, a_catalog)
     }
 
     pub fn with_receipt_ai(a_db: PgPool, a_api_url: &str, a_daily_limit: i32) -> Self
@@ -91,10 +109,15 @@ impl TestApp
 
     pub fn with_ai(a_db: PgPool, a_receipt_ai: ReceiptAiConfig) -> Self
     {
-        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai)
+        Self::build(
+            a_db,
+            bank_config("http://127.0.0.1:9"),
+            a_receipt_ai,
+            catalog_config(&[], None),
+        )
     }
 
-    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: ReceiptAiConfig) -> Self
+    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: ReceiptAiConfig, a_catalog: CatalogConfig) -> Self
     {
         let cfg = AppConfig {
             database_url: String::new(),
@@ -107,6 +130,7 @@ impl TestApp
             password_pepper: vec![3u8; 32],
             banks: a_banks,
             receipt_ai: a_receipt_ai,
+            catalog: a_catalog,
         };
 
         let state = AppState::new(a_db, cfg).unwrap();

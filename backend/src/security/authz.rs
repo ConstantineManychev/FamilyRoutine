@@ -97,3 +97,22 @@ pub async fn lock_family(a_conn: &mut PgConnection, a_fam_id: Uuid) -> Result<()
 
     Ok(())
 }
+
+pub async fn is_catalog_admin(
+    a_conn: &mut PgConnection,
+    a_admin_emails: &[String],
+    a_user_id: Uuid,
+) -> Result<bool, ApiError>
+{
+    if a_admin_emails.is_empty()
+    {
+        return Ok(false);
+    }
+
+    let email = sqlx::query_scalar!("SELECT LOWER(email) FROM users WHERE id = $1", a_user_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .flatten();
+
+    Ok(email.is_some_and(|email| a_admin_emails.contains(&email)))
+}

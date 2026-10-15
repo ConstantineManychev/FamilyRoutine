@@ -93,6 +93,63 @@ enum ItemUnit
   }
 }
 
+enum ItemOwnerKind
+{
+  me,
+  catalog,
+  member,
+  user;
+
+  static ItemOwnerKind parse(Object? aValue)
+  {
+    for (final kind in ItemOwnerKind.values)
+    {
+      if (kind.name == aValue)
+      {
+        return kind;
+      }
+    }
+    return ItemOwnerKind.user;
+  }
+}
+
+class NutritionData
+{
+  final double? kcal;
+  final double? prot;
+  final double? fat;
+  final double? carb;
+
+  const NutritionData({this.kcal, this.prot, this.fat, this.carb});
+
+  static const NutritionData empty = NutritionData();
+
+  bool get isEmpty => kcal == null && prot == null && fat == null && carb == null;
+
+  factory NutritionData.fromJson(Object? aJson)
+  {
+    if (aJson is! Map<String, dynamic>)
+    {
+      return empty;
+    }
+    return NutritionData(
+      kcal: parseDecimalOrNull(aJson['kcal']),
+      prot: parseDecimalOrNull(aJson['prot']),
+      fat: parseDecimalOrNull(aJson['fat']),
+      carb: parseDecimalOrNull(aJson['carb']),
+    );
+  }
+
+  static String? _wire(double? aValue) => aValue?.toString();
+
+  Map<String, dynamic> toJson() => {
+        'kcal': _wire(kcal),
+        'prot': _wire(prot),
+        'fat': _wire(fat),
+        'carb': _wire(carb),
+      };
+}
+
 class DictItemDto
 {
   final String id;
@@ -100,10 +157,11 @@ class DictItemDto
   final ItemKind kind;
   final ItemUnit unit;
   final String? barcode;
-  final bool isCustom;
-  final String? familyId;
-  final String? familyName;
+  final NutritionData nutrition;
+  final ItemOwnerKind ownerKind;
+  final String? ownerName;
   final bool isEditable;
+  final bool isInUse;
 
   const DictItemDto({
     required this.id,
@@ -111,13 +169,22 @@ class DictItemDto
     required this.kind,
     required this.unit,
     this.barcode,
-    required this.isCustom,
-    this.familyId,
-    this.familyName,
+    this.nutrition = NutritionData.empty,
+    this.ownerKind = ItemOwnerKind.user,
+    this.ownerName,
     this.isEditable = false,
+    this.isInUse = false,
   });
 
-  bool get isPersonal => isCustom && familyId == null;
+  bool get isMine => ownerKind == ItemOwnerKind.me;
+
+  bool get isAdminEdit => isEditable && !isMine;
+
+  bool get canEditIdentity => isEditable && (!isInUse || isAdminEdit);
+
+  bool get canDelete => isEditable && !isInUse;
+
+  bool get canMerge => canEditIdentity;
 
   factory DictItemDto.fromJson(Map<String, dynamic> aJson) => DictItemDto(
         id: aJson['id'] as String,
@@ -125,10 +192,11 @@ class DictItemDto
         kind: ItemKind.parse(aJson['kind']),
         unit: ItemUnit.parse(aJson['unit']),
         barcode: aJson['barcode'] as String?,
-        isCustom: aJson['is_custom'] as bool? ?? false,
-        familyId: aJson['family_id'] as String?,
-        familyName: aJson['family_name'] as String?,
+        nutrition: NutritionData.fromJson(aJson['nutrition']),
+        ownerKind: ItemOwnerKind.parse(aJson['owner_kind']),
+        ownerName: aJson['owner_name'] as String?,
         isEditable: aJson['is_editable'] as bool? ?? false,
+        isInUse: aJson['is_in_use'] as bool? ?? false,
       );
 
   static Map<String, dynamic> payload(
@@ -137,15 +205,115 @@ class DictItemDto
     ItemUnit aUnit,
     {
       String? aBarcode,
-      String? aFamilyId,
+      NutritionData aNutrition = NutritionData.empty,
     }
   ) => {
         'name': aName,
         'kind': aKind.name,
         'unit': aUnit.wire,
         if (aBarcode != null && aBarcode.trim().isNotEmpty) 'barcode': aBarcode.trim(),
-        if (aFamilyId != null) 'family_id': aFamilyId,
+        if (!aNutrition.isEmpty) 'nutrition': aNutrition.toJson(),
       };
+}
+
+enum LookupStatus
+{
+  found,
+  notFound,
+  unavailable;
+
+  static LookupStatus parse(Object? aValue) => switch (aValue)
+  {
+    'found' => LookupStatus.found,
+    'not_found' => LookupStatus.notFound,
+    _ => LookupStatus.unavailable,
+  };
+}
+
+class ProductInfo
+{
+  final ItemKind? kind;
+  final String? name;
+  final String? brand;
+  final String? quantity;
+  final String? suggestedName;
+  final String? barcode;
+  final NutritionData nutrition;
+
+  const ProductInfo({
+    this.kind,
+    this.name,
+    this.brand,
+    this.quantity,
+    this.suggestedName,
+    this.barcode,
+    this.nutrition = NutritionData.empty,
+  });
+
+  String? get bestName => suggestedName ?? name;
+
+  factory ProductInfo.fromJson(Map<String, dynamic> aJson) => ProductInfo(
+        kind: aJson['kind'] == null ? null : ItemKind.parse(aJson['kind']),
+        name: aJson['name'] as String?,
+        brand: aJson['brand'] as String?,
+        quantity: aJson['quantity'] as String?,
+        suggestedName: aJson['suggested_name'] as String?,
+        barcode: aJson['barcode'] as String?,
+        nutrition: NutritionData.fromJson(aJson['nutrition']),
+      );
+}
+
+class ProductLookup
+{
+  final LookupStatus status;
+  final ProductInfo? product;
+
+  const ProductLookup({required this.status, this.product});
+
+  factory ProductLookup.fromJson(Map<String, dynamic> aJson) => ProductLookup(
+        status: LookupStatus.parse(aJson['status']),
+        product: aJson['product'] is Map<String, dynamic> ? ProductInfo.fromJson(aJson['product'] as Map<String, dynamic>) : null,
+      );
+}
+
+class PricePoint
+{
+  final DateTime ts;
+  final double unitPrice;
+  final double qty;
+  final String currId;
+  final String currCode;
+  final String? placeId;
+  final String? storeName;
+  final String? branch;
+  final bool isManual;
+  final bool isShared;
+
+  const PricePoint({
+    required this.ts,
+    required this.unitPrice,
+    required this.qty,
+    required this.currId,
+    required this.currCode,
+    this.placeId,
+    this.storeName,
+    this.branch,
+    this.isManual = false,
+    this.isShared = false,
+  });
+
+  factory PricePoint.fromJson(Map<String, dynamic> aJson) => PricePoint(
+        ts: parseTs(aJson['ts']),
+        unitPrice: parseDecimal(aJson['unit_price']),
+        qty: parseDecimal(aJson['qty']),
+        currId: aJson['curr_id'] as String,
+        currCode: aJson['curr_code'] as String,
+        placeId: aJson['place_id'] as String?,
+        storeName: aJson['store_name'] as String?,
+        branch: aJson['branch'] as String?,
+        isManual: aJson['source'] == 'manual',
+        isShared: aJson['is_shared'] as bool? ?? false,
+      );
 }
 
 class ItemPriceDto
@@ -189,16 +357,14 @@ class ItemPricesData
 {
   final List<ItemPriceDto> prices;
   final List<String> missingRates;
-  final int matchedItems;
 
-  const ItemPricesData({required this.prices, this.missingRates = const [], this.matchedItems = 1});
+  const ItemPricesData({required this.prices, this.missingRates = const []});
 
   factory ItemPricesData.fromJson(Map<String, dynamic> aJson) => ItemPricesData(
         prices: (aJson['prices'] as List? ?? const [])
             .map((aItem) => ItemPriceDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),
         missingRates: (aJson['missing_rates'] as List? ?? const []).cast<String>(),
-        matchedItems: (aJson['matched_items'] as num?)?.toInt() ?? 1,
       );
 }
 

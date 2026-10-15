@@ -97,7 +97,7 @@ pub async fn recognize_receipt(
     ApiJson(a_req): ApiJson<RecognizeReceiptRequest>,
 ) -> Result<Json<RecognizedReceiptDto>, ApiError>
 {
-    let image = check_image(&a_req.media_type, &a_req.image)?;
+    let image = check_image(&a_req.media_type, &a_req.image, MAX_IMAGE_BYTES)?;
 
     let mut conn = a_state.db.acquire().await?;
     let resolved = resolve_ai(&a_state, &mut conn, a_user.user_id)
@@ -144,7 +144,7 @@ pub fn alias_key(a_text: &str) -> Option<String>
     (!key.is_empty()).then_some(key)
 }
 
-fn check_image(a_media_type: &str, a_data: &str) -> Result<ReceiptImage, ApiError>
+pub fn check_image(a_media_type: &str, a_data: &str, a_max_bytes: usize) -> Result<ReceiptImage, ApiError>
 {
     let media_type = match a_media_type
     {
@@ -163,7 +163,7 @@ fn check_image(a_media_type: &str, a_data: &str) -> Result<ReceiptImage, ApiErro
         "image/png" => bytes.starts_with(&[0x89, b'P', b'N', b'G']),
         _ => bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
     };
-    if !(MIN_IMAGE_BYTES..=MAX_IMAGE_BYTES).contains(&bytes.len()) || !is_signature_valid
+    if !(MIN_IMAGE_BYTES..=a_max_bytes).contains(&bytes.len()) || !is_signature_valid
     {
         return Err(ApiError::Validation("image"));
     }
@@ -447,13 +447,8 @@ async fn match_item(
             r#"
             SELECT i.id, i.name, i.unit AS "unit: ItemUnit"
             FROM items i
-            WHERE i.barcode = $2
-              AND (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)
-                   OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
-            ORDER BY (i.owner_id = $1) DESC
-            LIMIT 1
+            WHERE i.barcode = $1
             "#,
-            a_user_id,
             barcode
         )
         .fetch_optional(&mut *a_conn)
@@ -473,8 +468,6 @@ async fn match_item(
             FROM item_aliases a
             JOIN items i ON i.id = a.item_id
             WHERE a.user_id = $1 AND a.alias_key = $2
-              AND (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)
-                   OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
             "#,
             a_user_id,
             key
@@ -496,10 +489,8 @@ async fn match_item(
             i.unit AS "unit: ItemUnit",
             GREATEST(similarity(LOWER(i.name), $2), similarity(LOWER(i.name), $3))::float8 AS "score!"
         FROM items i
-        WHERE (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)
-               OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))
-          AND (LOWER(i.name) % $2 OR LOWER(i.name) % $3)
-        ORDER BY 4 DESC, (i.owner_id = $1) DESC
+        WHERE LOWER(i.name) % $2 OR LOWER(i.name) % $3
+        ORDER BY 4 DESC, (i.owner_id IS NOT DISTINCT FROM $1) DESC
         LIMIT 1
         "#,
         a_user_id,

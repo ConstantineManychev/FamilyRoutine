@@ -1,16 +1,13 @@
-import 'dart:convert';
-
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../common/ai_photo.dart';
 import '../common/app_icons.dart';
 import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
@@ -68,6 +65,7 @@ class _ItemRow
   NewItemDraft? newItem;
   String? sourceText;
   LineMatch? match;
+  bool isPricePrefilled = false;
 
   _ItemRow();
 
@@ -116,6 +114,11 @@ class _ItemRow
 
   void select(DictItemDto aItem)
   {
+    if (itemId != aItem.id && isPricePrefilled)
+    {
+      priceCtrl.clear();
+      isPricePrefilled = false;
+    }
     itemId = aItem.id;
     newItem = null;
     match = null;
@@ -369,7 +372,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       {
         line
           ..remove('item_id')
-          ..['new_item'] = {...newItem!.toJson(), 'family_id': familyId};
+          ..['new_item'] = newItem!.toJson();
       }
       if (row.sourceText != null)
       {
@@ -816,160 +819,31 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     return 'receipt.new_place'.tr(args: [description]);
   }
 
-  Future<SharedPreferences?> _prefs() async
-  {
-    try
-    {
-      return await SharedPreferences.getInstance();
-    }
-    on Exception
-    {
-      return null;
-    }
-  }
-
-  Future<bool> _confirmAiConsent() async
-  {
-    final provider = ref.read(aiFeaturesProv).valueOrNull?.provider;
-    if (provider == null)
-    {
-      return false;
-    }
-
-    final consentPref = '$_aiConsentPref.${provider.name}';
-    final prefs = await _prefs();
-    if (prefs?.getBool(consentPref) ?? false)
-    {
-      return true;
-    }
-    if (!mounted)
-    {
-      return false;
-    }
-
-    final isAccepted = await confirmAction(
-      context,
-      aTitle: 'receipt.ai_title'.tr(),
-      aMessage: 'receipt.ai_consent'.tr(args: [provider.company, provider.product]),
-      aIsDestructive: false,
-    );
-    if (isAccepted)
-    {
-      await prefs?.setBool(consentPref, true);
-    }
-    return isAccepted;
-  }
-
-  String? _mediaType(Uint8List aBytes)
-  {
-    bool hasPrefix(List<int> aPrefix, [int aOffset = 0])
-    {
-      if (aBytes.length < aOffset + aPrefix.length)
-      {
-        return false;
-      }
-      for (var index = 0; index < aPrefix.length; index++)
-      {
-        if (aBytes[aOffset + index] != aPrefix[index])
-        {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    if (hasPrefix([0xFF, 0xD8, 0xFF]))
-    {
-      return 'image/jpeg';
-    }
-    if (hasPrefix([0x89, 0x50, 0x4E, 0x47]))
-    {
-      return 'image/png';
-    }
-    if (hasPrefix('RIFF'.codeUnits) && hasPrefix('WEBP'.codeUnits, 8))
-    {
-      return 'image/webp';
-    }
-    return null;
-  }
-
   Future<void> _recognize(ImageSource aSource) async
   {
-    if (!await _confirmAiConsent())
-    {
-      return;
-    }
-
-    final XFile? photo;
-    try
-    {
-      photo = await ImagePicker().pickImage(
-        source: aSource,
-        maxWidth: _photoMaxSide,
-        maxHeight: _photoMaxSide,
-        imageQuality: _photoQuality,
-      );
-    }
-    on PlatformException
-    {
-      if (mounted)
-      {
-        showInfoSnack(context, 'scanner.err_permission'.tr());
-      }
-      return;
-    }
-    if (photo == null)
-    {
-      return;
-    }
-
-    final bytes = await photo.readAsBytes();
-    final mediaType = _mediaType(bytes);
-    if (!mounted)
-    {
-      return;
-    }
-    if (mediaType == null)
-    {
-      showInfoSnack(context, 'receipt.err_image_type'.tr());
-      return;
-    }
-
-    final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          content: Row(
-            children: [
-              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3)),
-              const SizedBox(width: 16),
-              Expanded(child: Text('receipt.recognizing'.tr())),
-            ],
-          ),
-        ),
-      ),
+    final isAccepted = await confirmAiConsent(
+      context,
+      ref,
+      aPrefKey: _aiConsentPref,
+      aTitleKey: 'receipt.ai_title',
+      aMessageKey: 'receipt.ai_consent',
     );
-
-    RecognizedReceipt? draft;
-    try
+    if (!isAccepted || !mounted)
     {
-      draft = await ref.read(apiProv).recognizeReceipt(base64Encode(bytes), mediaType);
-    }
-    catch (aError)
-    {
-      if (mounted)
-      {
-        showErrorSnack(context, aError);
-      }
-    }
-    finally
-    {
-      navigator.pop();
+      return;
     }
 
+    final photo = await pickAiPhoto(context, aSource, aMaxSide: _photoMaxSide, aQuality: _photoQuality);
+    if (photo == null || !mounted)
+    {
+      return;
+    }
+
+    final draft = await runWithProgress(
+      context,
+      'receipt.recognizing'.tr(),
+      () => ref.read(apiProv).recognizeReceipt(photo.base64, photo.mediaType),
+    );
     if (draft != null && mounted)
     {
       _applyDraft(draft);
@@ -1052,6 +926,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         return 'scanner.skipped'.tr();
       }
 
+      _ItemRow? added;
       setState(()
       {
         final filled = _rows.where((aRow) => !aRow.isBlank).toList();
@@ -1070,7 +945,13 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         }
         target.select(item);
         target.qtyCtrl.text = '1';
+        added = target;
       });
+      final row = added;
+      if (row != null)
+      {
+        await _prefillPrice(row);
+      }
       return 'scanner.added'.tr(args: [item.name]);
     }
     catch (aError)
@@ -1093,6 +974,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       if (item != null && mounted)
       {
         setState(() => aRow.select(item));
+        await _prefillPrice(aRow);
       }
     }
     catch (aError)
@@ -1106,34 +988,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
   Future<void> _chooseRecognitionSource() async
   {
-    final isPhone = kIsWeb || defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
-    if (!isPhone)
-    {
-      await _recognize(ImageSource.gallery);
-      return;
-    }
-
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      useRootNavigator: true,
-      builder: (aSheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(AppIcons.camera),
-              title: Text('receipt.take_photo'.tr()),
-              onTap: () => Navigator.of(aSheetContext).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(AppIcons.image),
-              title: Text('receipt.pick_photo'.tr()),
-              onTap: () => Navigator.of(aSheetContext).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
+    final source = await choosePhotoSource(context, 'receipt.take_photo'.tr());
     if (source != null)
     {
       await _recognize(source);
@@ -1209,6 +1064,35 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     if (item != null && mounted)
     {
       setState(() => aRow.select(item));
+      await _prefillPrice(aRow);
+    }
+  }
+
+  Future<void> _prefillPrice(_ItemRow aRow) async
+  {
+    final itemId = aRow.itemId;
+    if (itemId == null || aRow.priceCtrl.text.trim().isNotEmpty || _currId == null)
+    {
+      return;
+    }
+
+    try
+    {
+      final last = await ref.read(apiProv).getLastPrice(itemId, aPlaceId: _placeId, aCurrId: _currId);
+      if (last == null || !mounted || aRow.itemId != itemId || aRow.priceCtrl.text.trim().isNotEmpty)
+      {
+        return;
+      }
+      setState(()
+      {
+        aRow.priceCtrl.text = last.unitPrice.toStringAsFixed(2);
+        aRow.isPricePrefilled = true;
+        aRow.recalc();
+      });
+    }
+    catch (_)
+    {
+      return;
     }
   }
 
@@ -1302,8 +1186,19 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       controller: aRow.priceCtrl,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: amountFormatters,
-      onChanged: (_) => setState(aRow.recalc),
-      decoration: decoration('finance.price'.tr()),
+      onChanged: (_) => setState(()
+      {
+        aRow.isPricePrefilled = false;
+        aRow.recalc();
+      }),
+      decoration: decoration('finance.price'.tr()).copyWith(
+        suffixIcon: aRow.isPricePrefilled
+            ? Tooltip(
+                message: 'items.price_prefilled'.tr(),
+                child: Icon(AppIcons.history, size: 16, color: context.palette.inkMuted),
+              )
+            : null,
+      ),
     );
     final amount = TextField(
       controller: aRow.amountCtrl,
@@ -1462,7 +1357,7 @@ class _ItemChoiceTile extends StatelessWidget
               itemKindLabel(item.kind),
               itemUnitShort(item.unit),
               if (item.barcode != null) item.barcode!,
-              if (item.familyName != null) item.familyName!,
+              itemOwnerLabel(item),
             ].join(' · ')),
       onTap: onTap,
     );

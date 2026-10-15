@@ -408,7 +408,8 @@ async fn unknown_shop_is_created_from_the_receipt(a_db: PgPool)
     )
     .await;
     assert_eq!(bob_draft["place_id"], Value::Null);
-    assert_eq!(bob_draft["lines"][0]["match_kind"], "new");
+    assert_eq!(bob_draft["lines"][0]["match_kind"], "name");
+    assert_eq!(bob_draft["lines"][0]["item_id"], saved["items"][0]["item_id"]);
 }
 
 #[sqlx::test(migrations = "./migrations")]

@@ -12,17 +12,18 @@ import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import 'item_form.dart';
-import 'scope_widgets.dart';
 import '../common/app_theme.dart';
 
-final AutoDisposeFutureProviderFamily<List<DictItemDto>, String> itemsProv =
-    FutureProvider.autoDispose.family<List<DictItemDto>, String>((aRef, aQuery) async
+typedef ItemsFilter = ({String query, bool isMine});
+
+final AutoDisposeFutureProviderFamily<List<DictItemDto>, ItemsFilter> itemsProv =
+    FutureProvider.autoDispose.family<List<DictItemDto>, ItemsFilter>((aRef, aFilter) async
 {
   if (aRef.watch(sessionUserIdProv) == null)
   {
     return const [];
   }
-  return aRef.read(apiProv).getItems(aQuery: aQuery);
+  return aRef.read(apiProv).getItems(aQuery: aFilter.query, aIsMine: aFilter.isMine);
 });
 
 class ItemsScreen extends ConsumerStatefulWidget
@@ -39,6 +40,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
 
   Timer? _searchTimer;
   String _query = '';
+  bool _isMine = false;
+
+  ItemsFilter get _filter => (query: _query, isMine: _isMine);
 
   @override
   void dispose()
@@ -90,7 +94,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
   Widget build(BuildContext aContext)
   {
     aContext.locale;
-    final itemsAsync = ref.watch(itemsProv(_query));
+    final itemsAsync = ref.watch(itemsProv(_filter));
 
     return ListPage(
       title: 'items.title'.tr(),
@@ -101,17 +105,35 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
       actions: [
         IconButton(tooltip: 'scanner.title'.tr(), icon: const Icon(AppIcons.scanBarcode), onPressed: _scan),
       ],
-      child: itemsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(itemsProv(_query))),
-        data: (aItems) => aItems.isEmpty
-            ? Center(child: Text(_query.isEmpty ? 'items.empty'.tr() : 'common.no_data'.tr()))
-            : ListView.builder(
-                key: const PageStorageKey('list.items'),
-                padding: screenPadding(aContext),
-                itemCount: aItems.length,
-                itemBuilder: (_, aIndex) => _ItemTile(item: aItems[aIndex]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FilterChip(
+                label: Text('items.only_mine'.tr()),
+                selected: _isMine,
+                onSelected: (aValue) => setState(() => _isMine = aValue),
               ),
+            ),
+          ),
+          Expanded(
+            child: itemsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(itemsProv(_filter))),
+              data: (aItems) => aItems.isEmpty
+                  ? Center(child: Text(_query.isEmpty && !_isMine ? 'items.empty'.tr() : 'common.no_data'.tr()))
+                  : ListView.builder(
+                      key: const PageStorageKey('list.items'),
+                      padding: screenPadding(aContext),
+                      itemCount: aItems.length,
+                      itemBuilder: (_, aIndex) => _ItemTile(item: aItems[aIndex]),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -130,25 +152,16 @@ class _ItemTile extends StatelessWidget
       itemKindLabel(item.kind),
       itemUnitShort(item.unit),
       if (item.barcode != null) item.barcode!,
-      if (!item.isCustom) 'items.shared'.tr(),
+      itemOwnerLabel(item),
     ].join(' · ');
+    final nutrition = nutritionSummary(item.nutrition);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(itemKindIcon(item.kind), color: aContext.colors.primary),
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(item.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-            if (item.familyName != null) ...[
-              const SizedBox(width: 8),
-              FamilyBadge(name: item.familyName!),
-            ],
-          ],
-        ),
-        subtitle: Text(details),
+        title: Text(item.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(nutrition == null ? details : '$details\n$nutrition'),
         trailing: const Icon(AppIcons.chevronRight),
         onTap: () => aContext.push('/app/items/${item.id}'),
       ),

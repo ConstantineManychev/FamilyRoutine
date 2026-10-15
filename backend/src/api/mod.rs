@@ -2,6 +2,7 @@ pub mod ai_handlers;
 pub mod auth_handlers;
 pub mod balance_handlers;
 pub mod bank_handlers;
+pub mod catalog_handlers;
 pub mod dashboard_handlers;
 pub mod ex_handlers;
 pub mod extract;

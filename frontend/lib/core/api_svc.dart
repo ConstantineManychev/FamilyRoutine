@@ -427,14 +427,46 @@ class ApiSvc
 
   Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
 
-  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode}) async
+  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode, bool aIsMine = false}) async
   {
     final res = await _dio.get('/api/dicts/items', queryParameters: {
       if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
       if (aLimit != null) 'limit': aLimit,
       if (aBarcode != null) 'barcode': aBarcode,
+      if (aIsMine) 'is_mine': true,
     });
     return _list(res.data, DictItemDto.fromJson);
+  }
+
+  Future<ProductLookup> lookupProduct(String aBarcode, String aLang) async
+  {
+    final res = await _dio.get('/api/dicts/products/lookup/$aBarcode', queryParameters: {'lang': aLang});
+    return ProductLookup.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<ProductInfo> recognizeLabel(String aImageBase64, String aMediaType) async
+  {
+    final res = await _dio.post(
+      '/api/dicts/products/label',
+      data: {'image': aImageBase64, 'media_type': aMediaType},
+      options: Options(receiveTimeout: const Duration(seconds: 150), sendTimeout: const Duration(seconds: 60)),
+    );
+    return ProductInfo.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<PricePoint>> getPriceHistory(String aItemId, {int aLimit = 30}) async
+  {
+    final res = await _dio.get('/api/dicts/items/$aItemId/price-history', queryParameters: {'limit': aLimit});
+    return _list(res.data, PricePoint.fromJson);
+  }
+
+  Future<PricePoint?> getLastPrice(String aItemId, {String? aPlaceId, String? aCurrId}) async
+  {
+    final res = await _dio.get('/api/dicts/items/$aItemId/last-price', queryParameters: {
+      if (aPlaceId != null) 'place_id': aPlaceId,
+      if (aCurrId != null) 'curr_id': aCurrId,
+    });
+    return res.data is Map<String, dynamic> ? PricePoint.fromJson(res.data as Map<String, dynamic>) : null;
   }
 
   Future<DictItemDto> getItem(String aId) async
@@ -459,12 +491,6 @@ class ApiSvc
       if (aConvertTo != null) 'convert_to': aConvertTo,
     });
     return ItemPricesData.fromJson(res.data as Map<String, dynamic>);
-  }
-
-  Future<DictItemDto> shareItem(String aId, String aFamilyId) async
-  {
-    final res = await _dio.put('/api/dicts/items/$aId/family', data: {'family_id': aFamilyId});
-    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<DictItemDto> mergeItem(String aId, String aTargetId) async

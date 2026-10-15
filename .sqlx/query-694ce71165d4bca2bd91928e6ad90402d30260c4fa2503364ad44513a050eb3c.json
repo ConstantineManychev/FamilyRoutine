@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT i.id\n        FROM items i\n        WHERE ($2::text IS NOT NULL AND i.barcode = $2) OR LOWER(i.name) = LOWER($3)\n        ORDER BY (i.barcode IS NOT DISTINCT FROM $2) DESC, (i.owner_id IS NOT DISTINCT FROM $1) DESC, i.created_ts\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "694ce71165d4bca2bd91928e6ad90402d30260c4fa2503364ad44513a050eb3c"
+}

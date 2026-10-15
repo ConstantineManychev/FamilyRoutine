@@ -2,7 +2,7 @@ mod common;
 
 use axum::http::{Method, StatusCode};
 use chrono::{Duration, Utc};
-use common::{TestApp, TestUser};
+use common::{ai_config, catalog_config, TestApp, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
@@ -90,6 +90,13 @@ async fn prices(a_app: &TestApp, a_user: &TestUser, a_item: &str, a_convert: Opt
     reply.body
 }
 
+async fn get(a_app: &TestApp, a_user: &TestUser, a_uri: &str) -> Value
+{
+    let reply = a_app.call(Method::GET, a_uri, Some(&a_user.token), None).await;
+    assert_eq!(reply.status, StatusCode::OK, "{a_uri}: {}", reply.body);
+    reply.body
+}
+
 async fn set_price_sharing(a_app: &TestApp, a_user: &TestUser, a_family: &str, a_is_shared: bool)
 {
     let reply = a_app
@@ -104,7 +111,7 @@ async fn set_price_sharing(a_app: &TestApp, a_user: &TestUser, a_family: &str, a
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
+async fn catalog_prices_are_shared_only_with_consent(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let alice = app.user("alice@example.com").await;
@@ -117,31 +124,16 @@ async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
     let milk = item(
         &app,
         &alice,
-        json!({ "name": "Молоко", "kind": "product", "unit": "liter", "family_id": home }),
+        json!({ "name": "Молоко", "kind": "product", "unit": "liter" }),
     )
     .await;
-    let bob_view = app
-        .call(Method::GET, &format!("/api/dicts/items/{milk}"), Some(&bob.token), None)
-        .await;
-    assert_eq!(bob_view.status, StatusCode::OK);
-    assert_eq!(bob_view.body["family_name"], "Home");
-    assert_eq!(bob_view.body["is_editable"], false);
-    assert_eq!(
-        app.call(Method::GET, &format!("/api/dicts/items/{milk}"), Some(&eve.token), None)
-            .await
-            .status,
-        StatusCode::NOT_FOUND
-    );
-
-    let eve_family_item = app
-        .call(
-            Method::POST,
-            "/api/dicts/items",
-            Some(&eve.token),
-            Some(json!({ "name": "Чужое", "kind": "product", "unit": "piece", "family_id": home })),
-        )
-        .await;
-    assert_eq!(eve_family_item.body["field"], "family_id");
+    for viewer in [&bob, &eve]
+    {
+        let view = get(&app, viewer, &format!("/api/dicts/items/{milk}")).await;
+        assert_eq!(view["owner_kind"], "user");
+        assert_eq!(view["owner_name"], Value::Null);
+        assert_eq!(view["is_editable"], false);
+    }
 
     let bob_edit = app
         .call(
@@ -185,15 +177,19 @@ async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
     )
     .await;
     assert_eq!(eve_place["field"], "place_id");
-    let (_, eve_item) = receipt(
+    let (eve_status, _) = receipt(
         &app,
         &eve,
         json!({ "receipt_ts": Utc::now(), "curr_id": uah, "items": [{ "item_id": milk, "amount": "1" }] }),
     )
     .await;
-    assert_eq!(eve_item["field"], "item_id");
+    assert_eq!(eve_status, StatusCode::CREATED);
 
     assert_eq!(prices(&app, &alice, &milk, None).await["prices"], json!([]));
+    assert_eq!(
+        get(&app, &alice, &format!("/api/dicts/items/{milk}/price-history")).await,
+        json!([])
+    );
 
     set_price_sharing(&app, &bob, &home, true).await;
     let shared = prices(&app, &alice, &milk, None).await;
@@ -202,11 +198,22 @@ async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
     assert_eq!(shared["prices"][0]["branch"], "Київ, Хрещатик 5");
     assert_eq!(shared["prices"][0]["last_price"], "40.00");
     assert_eq!(shared["prices"][0]["is_shared"], true);
+    let history = get(&app, &alice, &format!("/api/dicts/items/{milk}/price-history")).await;
+    assert_eq!(history.as_array().unwrap().len(), 1, "{history}");
+    assert_eq!(history[0]["unit_price"], "40.00");
+    assert_eq!(history[0]["is_shared"], true);
 
-    let detail = app
-        .call(Method::GET, &format!("/api/families/{home}"), Some(&bob.token), None)
-        .await;
-    assert_eq!(detail.body["is_prices_shared"], true);
+    set_price_sharing(&app, &alice, &home, true).await;
+    let as_member = get(&app, &bob, &format!("/api/dicts/items/{milk}")).await;
+    assert_eq!(as_member["owner_kind"], "member");
+    assert_eq!(as_member["owner_name"], "Test alice");
+    assert_eq!(
+        get(&app, &eve, &format!("/api/dicts/items/{milk}")).await["owner_name"],
+        Value::Null
+    );
+
+    let detail = get(&app, &bob, &format!("/api/families/{home}")).await;
+    assert_eq!(detail["is_prices_shared"], true);
     assert_eq!(
         app.call(
             Method::PUT,
@@ -229,6 +236,10 @@ async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
         .await;
     assert!(left.status.is_success());
     assert_eq!(prices(&app, &alice, &milk, None).await["prices"], json!([]));
+    assert_eq!(
+        get(&app, &bob, &format!("/api/dicts/items/{milk}")).await["owner_kind"],
+        "user"
+    );
 
     let receipt_id = bought["id"].as_str().unwrap();
     let resaved = app
@@ -258,15 +269,15 @@ async fn family_catalog_shares_prices_only_with_consent(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
+async fn barcodes_are_global_and_price_history_follows_receipt_dates(a_db: PgPool)
 {
     let app = TestApp::new(a_db.clone());
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
     let carol = app.user("carol@example.com").await;
-    let home = app.family(&alice, "Home").await;
     let uah = app.currency_by_code(&alice.token, "UAH").await;
     let eur = app.currency_by_code(&alice.token, "EUR").await;
+    let pln = app.currency_by_code(&alice.token, "PLN").await;
 
     let invalid = app
         .call(
@@ -284,13 +295,15 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         json!({ "name": "Кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
     )
     .await;
-    for body in [
-        json!({ "name": "Кава Lavazza", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE, "family_id": home }),
-        json!({ "name": "Інша кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
-    ]
+    for (user, name) in [(&alice, "Інша кава"), (&carol, "Моя кава")]
     {
         let taken = app
-            .call(Method::POST, "/api/dicts/items", Some(&alice.token), Some(body))
+            .call(
+                Method::POST,
+                "/api/dicts/items",
+                Some(&user.token),
+                Some(json!({ "name": name, "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE })),
+            )
             .await;
         assert_eq!(taken.status, StatusCode::CONFLICT);
         assert_eq!(taken.body["code"], "BARCODE_TAKEN");
@@ -299,12 +312,6 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         &app,
         &alice,
         json!({ "name": "Чай", "kind": "product", "unit": "piece" }),
-    )
-    .await;
-    item(
-        &app,
-        &alice,
-        json!({ "name": "Цукор", "kind": "product", "unit": "piece" }),
     )
     .await;
     let tea_with_coffee_code = app
@@ -317,48 +324,12 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         .await;
     assert_eq!(tea_with_coffee_code.body["code"], "BARCODE_TAKEN");
 
-    app.join(&alice, &bob, &home, "standard").await;
-    let family_coffee = item(
-        &app,
-        &bob,
-        json!({ "name": "Кава Lavazza", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE, "family_id": home }),
-    )
-    .await;
-    let bob_duplicate = app
-        .call(
-            Method::POST,
-            "/api/dicts/items",
-            Some(&bob.token),
-            Some(json!({ "name": "Кава 2", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE })),
-        )
-        .await;
-    assert_eq!(bob_duplicate.body["code"], "BARCODE_TAKEN");
-    item(
-        &app,
-        &carol,
-        json!({ "name": "Моя кава", "kind": "product", "unit": "piece", "barcode": COFFEE_BARCODE }),
-    )
-    .await;
-
-    let search = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items?q={COFFEE_BARCODE}"),
-            Some(&alice.token),
-            None,
-        )
-        .await;
-    assert_eq!(search.body.as_array().unwrap().len(), 2, "{}", search.body);
-    let exact = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items?barcode={COFFEE_BARCODE}"),
-            Some(&carol.token),
-            None,
-        )
-        .await;
-    assert_eq!(exact.body.as_array().unwrap().len(), 1);
-    assert_eq!(exact.body[0]["name"], "Моя кава");
+    let search = get(&app, &alice, &format!("/api/dicts/items?q={COFFEE_BARCODE}")).await;
+    assert_eq!(search.as_array().unwrap().len(), 1, "{search}");
+    let exact = get(&app, &carol, &format!("/api/dicts/items?barcode={COFFEE_BARCODE}")).await;
+    assert_eq!(exact.as_array().unwrap().len(), 1);
+    assert_eq!(exact[0]["name"], "Кава");
+    assert_eq!(exact[0]["owner_kind"], "user");
 
     let (status, _) = receipt(
         &app,
@@ -376,7 +347,7 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
     let manual = post(
         &app,
         &alice,
-        &format!("/api/dicts/items/{family_coffee}/manual-prices"),
+        &format!("/api/dicts/items/{coffee}/manual-prices"),
         json!({ "merchant_name": "Tesco", "curr_id": eur, "qty": "2", "price": "10", "seen_ts": Utc::now() - Duration::days(1) }),
     )
     .await;
@@ -391,13 +362,69 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
         .await;
     assert_eq!(no_store.body["field"], "place_id");
 
+    let (silpo, silpo_branch) = shop(&app, &alice, "Сільпо", None).await;
+    let (status, _) = receipt(
+        &app,
+        &alice,
+        json!({
+            "receipt_ts": Utc::now() - Duration::days(10),
+            "curr_id": uah,
+            "place_id": silpo,
+            "place_addr_id": silpo_branch,
+            "items": [{ "item_id": coffee, "qty": "2", "amount": "360" }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let history = get(&app, &alice, &format!("/api/dicts/items/{coffee}/price-history")).await;
+    let points = history.as_array().unwrap();
+    assert_eq!(points.len(), 3, "{history}");
+    assert_eq!(points[0]["store_name"], "Tesco");
+    assert_eq!(points[0]["source"], "manual");
+    assert_eq!(points[0]["curr_code"], "EUR");
+    assert_eq!(points[0]["unit_price"], "5.00");
+    assert_eq!(points[1]["store_name"], "АТБ");
+    assert_eq!(points[1]["unit_price"], "200.00");
+    assert_eq!(points[2]["store_name"], "Сільпо");
+    assert_eq!(points[2]["branch"], "Київ, Хрещатик 5");
+    assert_eq!(points[2]["unit_price"], "180.00");
+    assert_eq!(points[2]["source"], "receipt");
+
+    let latest_uah = get(
+        &app,
+        &alice,
+        &format!("/api/dicts/items/{coffee}/last-price?curr_id={uah}"),
+    )
+    .await;
+    assert_eq!(latest_uah["store_name"], "АТБ");
+    let same_shop = get(
+        &app,
+        &alice,
+        &format!("/api/dicts/items/{coffee}/last-price?curr_id={uah}&place_id={silpo}"),
+    )
+    .await;
+    assert_eq!(same_shop["unit_price"], "180.00");
+    assert_eq!(
+        get(
+            &app,
+            &alice,
+            &format!("/api/dicts/items/{coffee}/last-price?curr_id={pln}")
+        )
+        .await,
+        Value::Null
+    );
+    assert_eq!(
+        get(&app, &carol, &format!("/api/dicts/items/{coffee}/last-price")).await,
+        Value::Null
+    );
+
     let by_currency = prices(&app, &alice, &coffee, None).await;
-    assert_eq!(by_currency["matched_items"], 2);
-    assert_eq!(by_currency["prices"].as_array().unwrap().len(), 2, "{by_currency}");
+    assert_eq!(by_currency["prices"].as_array().unwrap().len(), 3, "{by_currency}");
 
     let without_rates = prices(&app, &alice, &coffee, Some("UAH")).await;
     assert_eq!(without_rates["missing_rates"], json!(["EUR"]));
-    assert_eq!(without_rates["prices"].as_array().unwrap().len(), 1);
+    assert_eq!(without_rates["prices"].as_array().unwrap().len(), 2);
 
     sqlx::query(
         r#"
@@ -414,15 +441,16 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
     let converted = prices(&app, &alice, &coffee, Some("uah")).await;
     assert_eq!(converted["missing_rates"], json!([]));
     let rows = converted["prices"].as_array().unwrap();
-    assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0]["store_name"], "АТБ");
-    assert_eq!(rows[0]["last_price"], "200.00");
-    assert_eq!(rows[1]["store_name"], "Tesco");
-    assert_eq!(rows[1]["curr_code"], "UAH");
-    assert_eq!(rows[1]["last_price"], "225.00");
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0]["store_name"], "Сільпо");
+    assert_eq!(rows[1]["store_name"], "АТБ");
+    assert_eq!(rows[1]["last_price"], "200.00");
+    assert_eq!(rows[2]["store_name"], "Tesco");
+    assert_eq!(rows[2]["curr_code"], "UAH");
+    assert_eq!(rows[2]["last_price"], "225.00");
 
     let manual_id = manual["id"].as_str().unwrap();
-    let manual_uri = format!("/api/dicts/items/{family_coffee}/manual-prices/{manual_id}");
+    let manual_uri = format!("/api/dicts/items/{coffee}/manual-prices/{manual_id}");
     assert_eq!(
         app.call(Method::DELETE, &manual_uri, Some(&bob.token), None)
             .await
@@ -438,11 +466,16 @@ async fn barcodes_merge_products_and_prices_convert_currencies(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn sharing_merging_and_family_removal_keep_receipts_valid(a_db: PgPool)
+async fn admins_curate_the_catalog_without_breaking_receipts(a_db: PgPool)
 {
-    let app = TestApp::new(a_db);
+    let app = TestApp::with_catalog(
+        a_db.clone(),
+        catalog_config(&["admin@example.com"], None),
+        ai_config("http://127.0.0.1:9", None),
+    );
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
+    let admin = app.user("Admin@Example.com").await;
     let home = app.family(&alice, "Home").await;
     app.join(&alice, &bob, &home, "standard").await;
     let uah = app.currency_by_code(&alice.token, "UAH").await;
@@ -478,38 +511,6 @@ async fn sharing_merging_and_family_removal_keep_receipts_valid(a_db: PgPool)
     .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let foreign_share = app
-        .call(
-            Method::PUT,
-            &format!("/api/dicts/items/{cheese}/family"),
-            Some(&bob.token),
-            Some(json!({ "family_id": home })),
-        )
-        .await;
-    assert_eq!(foreign_share.status, StatusCode::NOT_FOUND);
-
-    let shared = app
-        .call(
-            Method::PUT,
-            &format!("/api/dicts/items/{cheese}/family"),
-            Some(&alice.token),
-            Some(json!({ "family_id": home })),
-        )
-        .await;
-    assert_eq!(shared.status, StatusCode::OK, "{}", shared.body);
-    assert_eq!(shared.body["family_name"], "Home");
-    assert_eq!(
-        app.call(
-            Method::GET,
-            &format!("/api/dicts/items/{cheese}"),
-            Some(&bob.token),
-            None
-        )
-        .await
-        .status,
-        StatusCode::OK
-    );
-
     let wrong_unit = app
         .call(
             Method::POST,
@@ -541,28 +542,9 @@ async fn sharing_merging_and_family_removal_keep_receipts_valid(a_db: PgPool)
         StatusCode::NOT_FOUND
     );
     let receipt_id = bought["id"].as_str().unwrap();
-    let reloaded = app
-        .call(
-            Method::GET,
-            &format!("/api/receipts/{receipt_id}"),
-            Some(&alice.token),
-            None,
-        )
-        .await;
-    assert_eq!(reloaded.body["items"][0]["item_id"], cheese.as_str());
+    let reloaded = get(&app, &alice, &format!("/api/receipts/{receipt_id}")).await;
+    assert_eq!(reloaded["items"][0]["item_id"], cheese.as_str());
 
-    let bob_flour = item(
-        &app,
-        &bob,
-        json!({ "name": "Борошно", "kind": "product", "unit": "kilogram", "family_id": home }),
-    )
-    .await;
-    item(
-        &app,
-        &alice,
-        json!({ "name": "сир", "kind": "product", "unit": "kilogram" }),
-    )
-    .await;
     let (status, bob_receipt) = receipt(
         &app,
         &bob,
@@ -570,11 +552,90 @@ async fn sharing_merging_and_family_removal_keep_receipts_valid(a_db: PgPool)
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        get(&app, &alice, &format!("/api/dicts/items/{cheese}")).await["is_in_use"],
+        true
+    );
 
+    for (method, uri, body) in [
+        (Method::DELETE, format!("/api/dicts/items/{cheese}"), None),
+        (
+            Method::PUT,
+            format!("/api/dicts/items/{cheese}"),
+            Some(json!({ "name": "Сир кисломолочний", "kind": "product", "unit": "kilogram" })),
+        ),
+        (
+            Method::POST,
+            format!("/api/dicts/items/{cheese}/merge"),
+            Some(
+                json!({ "target_id": item(&app, &alice, json!({ "name": "Бринза", "kind": "food", "unit": "kilogram" })).await }),
+            ),
+        ),
+    ]
+    {
+        let reply = app.call(method, &uri, Some(&alice.token), body).await;
+        assert_eq!(reply.status, StatusCode::CONFLICT, "{uri}");
+        assert_eq!(reply.body["code"], "ITEM_IN_USE");
+    }
+
+    let admin_view = get(&app, &admin, &format!("/api/dicts/items/{cheese}")).await;
+    assert_eq!(admin_view["is_editable"], true);
+    assert_eq!(admin_view["is_in_use"], true);
+    let renamed = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{cheese}"),
+            Some(&admin.token),
+            Some(json!({ "name": "Сир кисломолочний", "kind": "food", "unit": "kilogram" })),
+        )
+        .await;
+    assert_eq!(renamed.status, StatusCode::OK, "{}", renamed.body);
+    let admin_delete = app
+        .call(
+            Method::DELETE,
+            &format!("/api/dicts/items/{cheese}"),
+            Some(&admin.token),
+            None,
+        )
+        .await;
+    assert_eq!(admin_delete.body["code"], "ITEM_IN_USE");
+
+    let gouda = item(
+        &app,
+        &admin,
+        json!({ "name": "Сир Гауда", "kind": "food", "unit": "kilogram", "barcode": COFFEE_BARCODE }),
+    )
+    .await;
+    assert_eq!(
+        get(&app, &alice, &format!("/api/dicts/items/{gouda}")).await["owner_kind"],
+        "catalog"
+    );
+    let curated = app
+        .call(
+            Method::POST,
+            &format!("/api/dicts/items/{cheese}/merge"),
+            Some(&admin.token),
+            Some(json!({ "target_id": gouda })),
+        )
+        .await;
+    assert_eq!(curated.status, StatusCode::OK, "{}", curated.body);
+    let bob_receipt_id = bob_receipt["id"].as_str().unwrap();
+    let bob_reloaded = get(&app, &bob, &format!("/api/receipts/{bob_receipt_id}")).await;
+    assert_eq!(bob_reloaded["items"][0]["name"], "Сир Гауда");
+    assert_eq!(
+        get(&app, &alice, &format!("/api/receipts/{receipt_id}")).await["items"][0]["item_id"],
+        gouda.as_str()
+    );
+
+    let bob_flour = item(
+        &app,
+        &bob,
+        json!({ "name": "Борошно", "kind": "product", "unit": "kilogram" }),
+    )
+    .await;
     let (bob_shop, _) = shop(&app, &bob, "Ринок", Some(&home)).await;
-    let alice_places = app.call(Method::GET, "/api/places", Some(&alice.token), None).await;
-    assert_eq!(alice_places.body[0]["id"], bob_shop.as_str());
-    assert_eq!(alice_places.body[0]["is_editable"], true);
+    let alice_places = get(&app, &alice, "/api/places").await;
+    assert_eq!(alice_places[0]["id"], bob_shop.as_str());
 
     let deleted = app
         .call(
@@ -585,43 +646,24 @@ async fn sharing_merging_and_family_removal_keep_receipts_valid(a_db: PgPool)
         )
         .await;
     assert_eq!(deleted.status, StatusCode::NO_CONTENT, "{}", deleted.body);
+    assert_eq!(
+        get(&app, &bob, &format!("/api/dicts/items/{bob_flour}")).await["is_editable"],
+        true
+    );
+    let bob_places = get(&app, &bob, "/api/places").await;
+    assert_eq!(bob_places[0]["family_id"], Value::Null);
+    assert_eq!(get(&app, &alice, "/api/places").await, json!([]));
 
-    let alice_cheese = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items/{cheese}"),
-            Some(&alice.token),
-            None,
-        )
-        .await;
-    assert_eq!(alice_cheese.body["name"], "Сир (Home)");
-    assert_eq!(alice_cheese.body["family_id"], Value::Null);
-    assert_eq!(alice_cheese.body["is_editable"], true);
-    let bob_flour_view = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items/{bob_flour}"),
-            Some(&bob.token),
-            None,
-        )
-        .await;
-    assert_eq!(bob_flour_view.body["is_editable"], true);
-
-    let bob_places = app.call(Method::GET, "/api/places", Some(&bob.token), None).await;
-    assert_eq!(bob_places.body[0]["family_id"], Value::Null);
-    assert_eq!(bob_places.body[0]["is_editable"], true);
-    let alice_places = app.call(Method::GET, "/api/places", Some(&alice.token), None).await;
-    assert_eq!(alice_places.body, json!([]));
-
-    let bob_receipt_id = bob_receipt["id"].as_str().unwrap();
-    let bob_reloaded = app
-        .call(
-            Method::GET,
-            &format!("/api/receipts/{bob_receipt_id}"),
-            Some(&bob.token),
-            None,
-        )
-        .await;
-    assert_eq!(bob_reloaded.status, StatusCode::OK);
-    assert_eq!(bob_reloaded.body["items"][0]["name"], "Сир (Home)");
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(bob.id)
+        .execute(&a_db)
+        .await
+        .unwrap();
+    let orphan = get(&app, &alice, &format!("/api/dicts/items/{bob_flour}")).await;
+    assert_eq!(orphan["owner_kind"], "catalog");
+    assert_eq!(orphan["is_editable"], false);
+    assert_eq!(
+        get(&app, &admin, &format!("/api/dicts/items/{bob_flour}")).await["is_editable"],
+        true
+    );
 }

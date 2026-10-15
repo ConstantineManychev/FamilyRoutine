@@ -210,7 +210,7 @@ async fn save_receipt(
             ItemRef::New(_) => None,
         })
         .collect();
-    require_visible_items(&mut tx, &item_ids, a_user_id, a_id).await?;
+    require_visible_items(&mut tx, &item_ids).await?;
 
     let is_currency_known = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM currencies WHERE id = $1) AS "exists!""#,
@@ -433,7 +433,6 @@ fn clean_items(a_items: &[SaveReceiptItemRequest]) -> Result<Vec<CleanItem>, Api
                     kind: new_item.kind,
                     unit: new_item.unit,
                     barcode: clean_barcode(new_item.barcode.as_deref())?,
-                    family_id: new_item.family_id,
                 }),
                 _ => return Err(ApiError::Validation("item_id")),
             };

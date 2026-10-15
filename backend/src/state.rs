@@ -3,6 +3,7 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::banking::BankClients;
+use crate::catalog::off::OffClient;
 use crate::config::AppConfig;
 use crate::receipt_ai::ReceiptReader;
 use crate::security::crypto::SecretBox;
@@ -19,6 +20,7 @@ pub struct AppState
     pub limiter: Arc<RateLimiter>,
     pub banks: Arc<BankClients>,
     pub receipt_ai: Arc<ReceiptReader>,
+    pub off: Arc<OffClient>,
 }
 
 impl AppState
@@ -29,6 +31,7 @@ impl AppState
         let passwords = PasswordService::new(a_cfg.password_pepper.clone());
         let banks = BankClients::new(&a_cfg.banks)?;
         let receipt_ai = Arc::new(ReceiptReader::new(&a_cfg.receipt_ai.endpoints)?);
+        let off = Arc::new(OffClient::new(a_cfg.catalog.off_api_url.as_deref())?);
 
         Ok(Self {
             db: a_db,
@@ -38,6 +41,7 @@ impl AppState
             limiter: Arc::new(RateLimiter::default()),
             banks: Arc::new(banks),
             receipt_ai,
+            off,
         })
     }
 }

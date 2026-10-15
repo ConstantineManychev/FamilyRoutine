@@ -2,9 +2,7 @@ use reqwest::RequestBuilder;
 use serde_json::{json, Map, Value};
 use shared_schema::AiModelDto;
 
-use super::{
-    is_version, receipt_schema, AiTarget, ReadError, ReceiptImage, Usage, MAX_OUTPUT_TOKENS, SYSTEM_PROMPT, USER_PROMPT,
-};
+use super::{is_version, AiTarget, ReadError, ReceiptImage, Usage, VisionTask, MAX_OUTPUT_TOKENS};
 
 const KEY_HEADER: &str = "x-goog-api-key";
 const MODEL_PREFIX: &str = "models/";
@@ -27,6 +25,7 @@ pub fn read_request(
     a_base: &str,
     a_target: &AiTarget,
     a_image: &ReceiptImage,
+    a_task: &VisionTask,
 ) -> RequestBuilder
 {
     a_http
@@ -36,7 +35,7 @@ pub fn read_request(
             a_target.model
         ))
         .header(KEY_HEADER, &a_target.api_key)
-        .json(&request_body(a_image))
+        .json(&request_body(a_image, a_task))
 }
 
 pub fn models_request(a_http: &reqwest::Client, a_base: &str, a_api_key: &str) -> RequestBuilder
@@ -141,20 +140,20 @@ fn is_stable_tier(a_model: &str, a_tier: &str) -> bool
         .is_some_and(is_version)
 }
 
-fn request_body(a_image: &ReceiptImage) -> Value
+fn request_body(a_image: &ReceiptImage, a_task: &VisionTask) -> Value
 {
     json!({
-        "systemInstruction": { "parts": [{ "text": SYSTEM_PROMPT }] },
+        "systemInstruction": { "parts": [{ "text": a_task.system }] },
         "contents": [{
             "role": "user",
             "parts": [
                 { "inlineData": { "mimeType": a_image.media_type, "data": a_image.data_base64 } },
-                { "text": USER_PROMPT }
+                { "text": a_task.prompt }
             ]
         }],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "responseSchema": to_gemini_schema(&receipt_schema()),
+            "responseSchema": to_gemini_schema(&(a_task.schema)()),
             "maxOutputTokens": MAX_OUTPUT_TOKENS
         }
     })
@@ -227,6 +226,7 @@ fn to_gemini_schema(a_schema: &Value) -> Value
 mod tests
 {
     use super::*;
+    use crate::receipt_ai::{label_schema, receipt_schema};
 
     #[test]
     fn schema_is_converted_to_the_openapi_subset()
@@ -244,6 +244,17 @@ mod tests
         assert_eq!(line["properties"]["kind"]["format"], "enum");
         assert_eq!(line["properties"]["unit_price"]["type"], "NUMBER");
         assert_eq!(line["properties"]["unit_price"]["nullable"], true);
+        assert!(!schema.to_string().contains("anyOf"));
+    }
+
+    #[test]
+    fn label_schema_keeps_nullable_enums()
+    {
+        let schema = to_gemini_schema(&label_schema());
+
+        assert_eq!(schema["properties"]["kind"]["format"], "enum");
+        assert_eq!(schema["properties"]["kind"]["nullable"], true);
+        assert_eq!(schema["properties"]["kcal"]["type"], "NUMBER");
         assert!(!schema.to_string().contains("anyOf"));
     }
 

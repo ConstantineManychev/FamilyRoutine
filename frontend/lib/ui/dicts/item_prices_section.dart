@@ -29,6 +29,7 @@ class ItemPricesSection extends ConsumerStatefulWidget
 class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
 {
   ItemPricesData? _data;
+  List<PricePoint>? _history;
   List<ManualPriceDto> _manual = const [];
   List<CurrencyDto> _currencies = const [];
   List<PlaceDto> _places = const [];
@@ -90,12 +91,14 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
     {
       final api = ref.read(apiProv);
       final data = await api.getItemPrices(widget.item.id, aConvertTo: _isConverting ? _convertCode : null);
+      final history = await api.getPriceHistory(widget.item.id);
       final manual = await api.getManualPrices(widget.item.id);
       if (mounted)
       {
         setState(()
         {
           _data = data;
+          _history = history;
           _manual = manual;
           _error = null;
         });
@@ -177,9 +180,15 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
     final unit = widget.item.unit;
     final codes = {_defaultConvertCode, 'EUR', 'USD', ..._currencies.map((aCurrency) => aCurrency.code)}.toList()..sort();
 
+    final history = _history;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (history != null) ...[
+          _PriceHistory(points: history, unit: unit),
+          const SizedBox(height: 28),
+        ],
         Text('items.prices'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text('items.prices_hint'.tr(args: [itemUnitShort(unit)]), style: TextStyle(color: context.palette.inkSecondary)),
@@ -213,14 +222,8 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
             ),
           ],
         ),
-        if (data != null && data.matchedItems > 1) ...[
-          const SizedBox(height: 8),
-          _Note(icon: AppIcons.scanBarcode, text: 'items.matched_by_barcode'.tr(args: ['${data.matchedItems}'])),
-        ],
-        if (widget.item.familyId != null) ...[
-          const SizedBox(height: 8),
-          _Note(icon: AppIcons.users, text: 'items.family_prices_hint'.tr()),
-        ],
+        const SizedBox(height: 8),
+        _Note(icon: AppIcons.users, text: 'items.family_prices_hint'.tr()),
         if (data != null && data.missingRates.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
@@ -275,6 +278,99 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
       final isCheapest = (storeCounts[aPrice.currCode] ?? 0) > 1 && aPrice.lastPrice == cheapest[aPrice.currCode];
       return _PriceRow(price: aPrice, unit: widget.item.unit, isCheapest: isCheapest);
     }).toList();
+  }
+}
+
+class _PriceHistory extends StatelessWidget
+{
+  static const int _visibleCount = 12;
+
+  final List<PricePoint> points;
+  final ItemUnit unit;
+
+  const _PriceHistory({required this.points, required this.unit});
+
+  String _place(PricePoint aPoint) => [
+        aPoint.storeName ?? 'items.no_merchant'.tr(),
+        if (aPoint.branch != null) aPoint.branch!,
+      ].join(' · ');
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final perUnit = ' / ${itemUnitShort(unit)}';
+    final latest = points.firstOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('items.price_latest'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        if (latest == null)
+          Text('items.price_history_empty'.tr(), style: TextStyle(color: palette.inkMuted))
+        else ...[
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${formatMoney(aContext, latest.unitPrice, latest.currCode)}$perUnit',
+                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: palette.inkPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${formatDate(aContext, latest.ts)} · ${_place(latest)}',
+                            style: TextStyle(color: palette.inkSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(latest.isManual ? AppIcons.tag : AppIcons.receipt, color: palette.inkMuted),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (points.length > 1) ...[
+            const SizedBox(height: 16),
+            Text('items.price_history'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Column(
+                children: [
+                  for (final point in points.take(_visibleCount))
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(point.isManual ? AppIcons.tag : AppIcons.receipt, size: 18, color: palette.inkMuted),
+                      title: Text(_place(point), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text([
+                        formatDate(aContext, point.ts),
+                        if (point.isManual) 'items.price_manual'.tr(),
+                        if (point.isShared) 'items.price_shared'.tr(),
+                      ].join(' · ')),
+                      trailing: Text(
+                        '${formatMoney(aContext, point.unitPrice, point.currCode)}$perUnit',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkPrimary, fontFeatures: const [FontFeature.tabularFigures()]),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
   }
 }
 

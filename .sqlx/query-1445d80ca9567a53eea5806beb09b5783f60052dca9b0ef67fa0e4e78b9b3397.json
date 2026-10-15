@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            i.id,\n            i.name,\n            i.unit AS \"unit: ItemUnit\",\n            GREATEST(similarity(LOWER(i.name), $2), similarity(LOWER(i.name), $3))::float8 AS \"score!\"\n        FROM items i\n        WHERE (i.owner_id = $1 OR (i.owner_id IS NULL AND i.family_id IS NULL)\n               OR i.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n          AND (LOWER(i.name) % $2 OR LOWER(i.name) % $3)\n        ORDER BY 4 DESC, (i.owner_id = $1) DESC\n        LIMIT 1\n        ",
+  "query": "\n            SELECT i.id, i.name, i.unit AS \"unit: ItemUnit\"\n            FROM item_aliases a\n            JOIN items i ON i.id = a.item_id\n            WHERE a.user_id = $1 AND a.alias_key = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -31,26 +31,19 @@
             }
           }
         }
-      },
-      {
-        "ordinal": 3,
-        "name": "score!",
-        "type_info": "Float8"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
         "Text"
       ]
     },
     "nullable": [
       false,
       false,
-      false,
-      null
+      false
     ]
   },
-  "hash": "0afe52afbb10e42120f81746b17a1fdf07645079a4a28f2bb374a78ccb064f09"
+  "hash": "1445d80ca9567a53eea5806beb09b5783f60052dca9b0ef67fa0e4e78b9b3397"
 }

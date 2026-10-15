@@ -22,6 +22,7 @@ const DEFAULT_ANTHROPIC_API: &str = "https://api.anthropic.com";
 const DEFAULT_OPENAI_API: &str = "https://api.openai.com";
 const DEFAULT_GEMINI_API: &str = "https://generativelanguage.googleapis.com";
 const DEFAULT_ANTHROPIC_MODEL: &str = "claude-opus-5-5";
+const DEFAULT_OFF_API: &str = "https://world.openfoodfacts.org";
 
 pub struct BankConfig
 {
@@ -206,6 +207,24 @@ impl ReceiptAiConfig
     }
 }
 
+pub struct CatalogConfig
+{
+    pub admin_emails: Vec<String>,
+    pub off_api_url: Option<String>,
+}
+
+impl CatalogConfig
+{
+    fn from_env() -> Result<Self, String>
+    {
+        Ok(Self {
+            admin_emails: parse_admin_emails(&optional("ADMIN_EMAILS").unwrap_or_default())?,
+            off_api_url: parse_bool("OFF_ENABLED", true)?
+                .then(|| optional("OFF_API_URL").unwrap_or_else(|| DEFAULT_OFF_API.into())),
+        })
+    }
+}
+
 pub struct AppConfig
 {
     pub database_url: String,
@@ -218,6 +237,7 @@ pub struct AppConfig
     pub password_pepper: Vec<u8>,
     pub banks: BankConfig,
     pub receipt_ai: ReceiptAiConfig,
+    pub catalog: CatalogConfig,
 }
 
 impl AppConfig
@@ -255,6 +275,7 @@ impl AppConfig
             password_pepper,
             banks: BankConfig::from_env(a_env_dir)?,
             receipt_ai: ReceiptAiConfig::from_env()?,
+            catalog: CatalogConfig::from_env()?,
         })
     }
 }
@@ -284,6 +305,30 @@ pub fn decode_pepper(a_encoded: &str) -> Result<Vec<u8>, String>
     }
 
     Ok(bytes)
+}
+
+pub fn parse_admin_emails(a_value: &str) -> Result<Vec<String>, String>
+{
+    let mut emails: Vec<String> = a_value
+        .split(',')
+        .map(str::trim)
+        .filter(|email| !email.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+
+    let is_email = |email: &String| {
+        email.split_once('@').is_some_and(|(local, domain)| {
+            !local.is_empty() && !domain.is_empty() && !domain.contains('@') && !email.contains(char::is_whitespace)
+        })
+    };
+    if !emails.iter().all(is_email)
+    {
+        return Err("ADMIN_EMAILS must be a comma-separated list of e-mail addresses".into());
+    }
+
+    emails.sort_unstable();
+    emails.dedup();
+    Ok(emails)
 }
 
 fn resolve_path(a_base_dir: Option<&Path>, a_path: &str) -> PathBuf
@@ -376,4 +421,27 @@ fn parse_origins(a_value: &str) -> Result<Vec<HeaderValue>, String>
             HeaderValue::from_str(origin.trim_end_matches('/')).map_err(|_| format!("invalid origin {origin}"))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+
+    #[test]
+    fn admin_emails_are_trimmed_lowercased_and_deduplicated()
+    {
+        let emails = parse_admin_emails(" Admin@Example.com, ops@example.org ,,admin@example.com ").unwrap();
+        assert_eq!(emails, ["admin@example.com", "ops@example.org"]);
+        assert!(parse_admin_emails("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn malformed_admin_emails_are_rejected()
+    {
+        assert!(parse_admin_emails("admin").is_err());
+        assert!(parse_admin_emails("admin@").is_err());
+        assert!(parse_admin_emails("a@b@c").is_err());
+        assert!(parse_admin_emails("ad min@example.com").is_err());
+    }
 }

@@ -11,8 +11,8 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    ai_handlers, auth_handlers, balance_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers,
-    geo_handlers, item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers,
+    ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
+    fam_handlers, geo_handlers, item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers,
     routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
@@ -23,6 +23,7 @@ const MAX_BODY_BYTES: usize = 64 * 1024;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const RECOGNITION_BODY_BYTES: usize = 8 * 1024 * 1024;
 const RECOGNITION_TIMEOUT: Duration = Duration::from_secs(150);
+const LABEL_BODY_BYTES: usize = 3 * 1024 * 1024;
 
 pub fn build_router(a_state: AppState) -> Router
 {
@@ -117,8 +118,10 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(item_handlers::delete_item),
         )
         .route("/dicts/items/:id/prices", get(item_handlers::item_prices))
-        .route("/dicts/items/:id/family", put(item_handlers::share_item))
         .route("/dicts/items/:id/merge", post(item_handlers::merge_item))
+        .route("/dicts/items/:id/price-history", get(catalog_handlers::price_history))
+        .route("/dicts/items/:id/last-price", get(catalog_handlers::last_price))
+        .route("/dicts/products/lookup/:barcode", get(catalog_handlers::lookup_product))
         .route(
             "/dicts/items/:id/manual-prices",
             get(item_handlers::list_manual_prices).post(item_handlers::create_manual_price),
@@ -277,7 +280,15 @@ pub fn build_router(a_state: AppState) -> Router
         .layer(DefaultBodyLimit::max(RECOGNITION_BODY_BYTES))
         .layer(TimeoutLayer::new(RECOGNITION_TIMEOUT));
 
-    let api = api.merge(recognition).fallback(|| async { ApiError::NotFound });
+    let labels = Router::new()
+        .route("/dicts/products/label", post(catalog_handlers::recognize_label))
+        .layer(DefaultBodyLimit::max(LABEL_BODY_BYTES))
+        .layer(TimeoutLayer::new(RECOGNITION_TIMEOUT));
+
+    let api = api
+        .merge(recognition)
+        .merge(labels)
+        .fallback(|| async { ApiError::NotFound });
 
     let router = Router::new()
         .route("/", get(|| async { "FamilyRoutine API" }))

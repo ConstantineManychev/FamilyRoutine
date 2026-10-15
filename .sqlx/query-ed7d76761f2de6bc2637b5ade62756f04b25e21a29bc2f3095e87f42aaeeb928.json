@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT product AS \"product: DbJson<OffProduct>\", fetched_ts FROM off_products WHERE barcode = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product: DbJson<OffProduct>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "fetched_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "ed7d76761f2de6bc2637b5ade62756f04b25e21a29bc2f3095e87f42aaeeb928"
+}

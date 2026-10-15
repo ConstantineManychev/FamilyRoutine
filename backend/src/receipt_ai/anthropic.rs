@@ -2,7 +2,7 @@ use reqwest::RequestBuilder;
 use serde_json::{json, Value};
 use shared_schema::AiModelDto;
 
-use super::{receipt_schema, AiTarget, ReadError, ReceiptImage, Usage, MAX_OUTPUT_TOKENS, SYSTEM_PROMPT, USER_PROMPT};
+use super::{AiTarget, ReadError, ReceiptImage, Usage, VisionTask, MAX_OUTPUT_TOKENS};
 
 const API_VERSION: &str = "2023-06-01";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
@@ -17,13 +17,14 @@ pub fn read_request(
     a_base: &str,
     a_target: &AiTarget,
     a_image: &ReceiptImage,
+    a_task: &VisionTask,
 ) -> RequestBuilder
 {
     let mut request = a_http
         .post(format!("{}/v1/messages", a_base.trim_end_matches('/')))
         .header("x-api-key", &a_target.api_key)
         .header("anthropic-version", API_VERSION)
-        .json(&request_body(&a_target.model, a_image));
+        .json(&request_body(&a_target.model, a_image, a_task));
     if is_fallback_supported(&a_target.model)
     {
         request = request.header("anthropic-beta", FALLBACK_BETA);
@@ -103,9 +104,9 @@ fn is_fallback_supported(a_model: &str) -> bool
     is_current_generation(a_model) && !a_model.starts_with("claude-haiku")
 }
 
-fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
+fn request_body(a_model: &str, a_image: &ReceiptImage, a_task: &VisionTask) -> Value
 {
-    let mut output_config = json!({ "format": { "type": "json_schema", "schema": receipt_schema() } });
+    let mut output_config = json!({ "format": { "type": "json_schema", "schema": (a_task.schema)() } });
     if is_current_generation(a_model)
     {
         output_config["effort"] = json!(EFFORT);
@@ -114,7 +115,7 @@ fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
     let mut body = json!({
         "model": a_model,
         "max_tokens": MAX_OUTPUT_TOKENS,
-        "system": SYSTEM_PROMPT,
+        "system": a_task.system,
         "output_config": output_config,
         "messages": [{
             "role": "user",
@@ -123,7 +124,7 @@ fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
                     "type": "image",
                     "source": { "type": "base64", "media_type": a_image.media_type, "data": a_image.data_base64 }
                 },
-                { "type": "text", "text": USER_PROMPT }
+                { "type": "text", "text": a_task.prompt }
             ]
         }]
     });
@@ -138,6 +139,7 @@ fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
 mod tests
 {
     use super::*;
+    use crate::receipt_ai::{LABEL_TASK, RECEIPT_TASK};
 
     fn image() -> ReceiptImage
     {
@@ -178,16 +180,16 @@ mod tests
     #[test]
     fn current_models_get_effort_and_fallbacks_older_ones_do_not()
     {
-        let opus = request_body("claude-opus-5-5", &image());
+        let opus = request_body("claude-opus-5-5", &image(), &RECEIPT_TASK);
         assert_eq!(opus["fallbacks"], "default");
         assert_eq!(opus["output_config"]["effort"], "medium");
         assert_eq!(opus["messages"][0]["content"][0]["source"]["media_type"], "image/jpeg");
 
-        let haiku = request_body("claude-haiku-5-5", &image());
+        let haiku = request_body("claude-haiku-5-5", &image(), &LABEL_TASK);
         assert!(haiku.get("fallbacks").is_none());
         assert_eq!(haiku["output_config"]["effort"], "medium");
 
-        let sonnet_four = request_body("claude-sonnet-4-5", &image());
+        let sonnet_four = request_body("claude-sonnet-4-5", &image(), &RECEIPT_TASK);
         assert!(sonnet_four.get("fallbacks").is_none());
         assert!(sonnet_four["output_config"].get("effort").is_none());
         assert_eq!(sonnet_four["output_config"]["format"]["type"], "json_schema");

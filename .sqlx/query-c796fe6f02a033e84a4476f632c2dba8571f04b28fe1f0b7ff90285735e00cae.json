@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM items WHERE barcode = $1 AND ($2::uuid IS NULL OR id <> $2)\n        ) AS \"is_taken!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_taken!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c796fe6f02a033e84a4476f632c2dba8571f04b28fe1f0b7ff90285735e00cae"
+}

@@ -193,7 +193,7 @@ void main()
       expect(dashboard.widgets.single.isAvailable, isFalse);
     });
 
-    test('dictionary item, family scope and price comparison parse', ()
+    test('dictionary item, owner, nutrition and price comparison parse', ()
     {
       final item = DictItemDto.fromJson({
         'id': 'i1',
@@ -201,19 +201,83 @@ void main()
         'kind': 'product',
         'unit': 'square_meter',
         'barcode': '4820024700016',
-        'is_custom': true,
-        'family_id': 'f1',
-        'family_name': 'Home',
+        'nutrition': null,
+        'owner_kind': 'member',
+        'owner_name': 'Анна Коваль',
         'is_editable': false,
+        'is_in_use': false,
       });
       expect(item.unit, ItemUnit.squareMeter);
-      expect(item.isPersonal, isFalse);
-      expect(item.familyName, 'Home');
+      expect(item.ownerKind, ItemOwnerKind.member);
+      expect(item.ownerName, 'Анна Коваль');
+      expect(item.nutrition.isEmpty, isTrue);
+      expect(item.canEditIdentity, isFalse);
+
+      final locked = DictItemDto.fromJson({
+        'id': 'i2',
+        'name': 'Молоко',
+        'kind': 'food',
+        'unit': 'liter',
+        'nutrition': {'kcal': '52', 'prot': '2.8', 'fat': null, 'carb': '4.7'},
+        'owner_kind': 'me',
+        'is_editable': true,
+        'is_in_use': true,
+      });
+      expect(locked.nutrition.kcal, 52);
+      expect(locked.nutrition.fat, isNull);
+      expect(locked.canEditIdentity, isFalse);
+      expect(locked.canDelete, isFalse);
+      final adminView = DictItemDto.fromJson({...{'id': 'i3', 'name': 'Сир', 'kind': 'food', 'unit': 'kilogram'}, 'owner_kind': 'user', 'is_editable': true, 'is_in_use': true});
+      expect(adminView.isAdminEdit, isTrue);
+      expect(adminView.canEditIdentity, isTrue);
+      expect(adminView.canDelete, isFalse);
+
       expect(DictItemDto.payload('Плитка', ItemKind.service, ItemUnit.hour), {'name': 'Плитка', 'kind': 'service', 'unit': 'hour'});
       expect(
-        DictItemDto.payload('Кава', ItemKind.product, ItemUnit.piece, aBarcode: ' 4820024700016 ', aFamilyId: 'f1'),
-        {'name': 'Кава', 'kind': 'product', 'unit': 'piece', 'barcode': '4820024700016', 'family_id': 'f1'},
+        DictItemDto.payload(
+          'Кава',
+          ItemKind.food,
+          ItemUnit.piece,
+          aBarcode: ' 4820024700016 ',
+          aNutrition: const NutritionData(kcal: 2, fat: 0.1),
+        ),
+        {
+          'name': 'Кава',
+          'kind': 'food',
+          'unit': 'piece',
+          'barcode': '4820024700016',
+          'nutrition': {'kcal': '2.0', 'prot': null, 'fat': '0.1', 'carb': null},
+        },
       );
+
+      final lookup = ProductLookup.fromJson({
+        'status': 'found',
+        'product': {
+          'kind': 'food',
+          'name': 'Кава мелена',
+          'suggested_name': 'Кава мелена Jacobs 250 г',
+          'barcode': '4820024700016',
+          'nutrition': {'kcal': '2'},
+        },
+      });
+      expect(lookup.status, LookupStatus.found);
+      expect(lookup.product!.bestName, 'Кава мелена Jacobs 250 г');
+      expect(ProductLookup.fromJson({'status': 'not_found', 'product': null}).status, LookupStatus.notFound);
+
+      final point = PricePoint.fromJson({
+        'ts': '2026-10-01T10:00:00Z',
+        'unit_price': '180.00',
+        'qty': '2',
+        'curr_id': 'c1',
+        'curr_code': 'UAH',
+        'place_id': 'p1',
+        'store_name': 'Сільпо',
+        'branch': 'Київ, Хрещатик 5',
+        'source': 'manual',
+        'is_shared': false,
+      });
+      expect(point.unitPrice, 180);
+      expect(point.isManual, isTrue);
 
       final data = ItemPricesData.fromJson({
         'prices': [
@@ -230,7 +294,6 @@ void main()
           },
         ],
         'missing_rates': ['EUR'],
-        'matched_items': 2,
       });
       final price = data.prices.single;
       expect(price.branch, 'Київ, Хрещатик 5');
@@ -238,7 +301,6 @@ void main()
       expect(price.count, 2);
       expect(price.isShared, isTrue);
       expect(data.missingRates, ['EUR']);
-      expect(data.matchedItems, 2);
 
       final manual = ManualPriceDto.fromJson({
         'id': 'p1',

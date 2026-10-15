@@ -620,7 +620,7 @@ async fn buy(
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
+async fn items_dictionary_is_shared_but_prices_stay_private(a_db: PgPool)
 {
     let app = TestApp::new(a_db.clone());
     let alice = app.user("alice@example.com").await;
@@ -632,17 +632,18 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         .call(
             Method::POST,
             "/api/dicts/items",
-            Some(&alice.token),
+            Some(&bob.token),
             Some(json!({ "name": "  молоко 2.5% ", "kind": "product", "unit": "piece" })),
         )
         .await;
     assert_eq!(duplicate.status, StatusCode::CONFLICT);
+    assert_eq!(duplicate.body["code"], "ITEM_EXISTS");
 
     let system_id: Uuid = sqlx::query_scalar("INSERT INTO items (name, type) VALUES ('Хліб', 'product') RETURNING id")
         .fetch_one(&a_db)
         .await
         .unwrap();
-    let bob_milk = create_item(&app, &bob, "Молоко 2.5%", "product", "piece").await;
+    let kefir = create_item(&app, &bob, "Кефір", "food", "piece").await;
 
     let bob_list = app.call(Method::GET, "/api/dicts/items", Some(&bob.token), None).await;
     let bob_ids: Vec<&str> = bob_list
@@ -652,31 +653,47 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         .iter()
         .map(|item| item["id"].as_str().unwrap())
         .collect();
-    assert!(bob_ids.contains(&bob_milk.as_str()));
+    assert!(bob_ids.contains(&kefir.as_str()));
     assert!(bob_ids.contains(&system_id.to_string().as_str()));
-    assert!(!bob_ids.contains(&milk.as_str()));
+    assert!(bob_ids.contains(&milk.as_str()));
+    assert_eq!(bob_list.body[0]["id"], kefir.as_str());
 
-    for (method, uri) in [
-        (Method::GET, format!("/api/dicts/items/{milk}")),
-        (Method::GET, format!("/api/dicts/items/{milk}/prices")),
-        (Method::DELETE, format!("/api/dicts/items/{milk}")),
-    ]
-    {
-        assert_eq!(
-            app.call(method, &uri, Some(&bob.token), None).await.status,
-            StatusCode::NOT_FOUND
-        );
-    }
+    let bob_mine = app
+        .call(Method::GET, "/api/dicts/items?is_mine=true", Some(&bob.token), None)
+        .await;
+    assert_eq!(bob_mine.body.as_array().unwrap().len(), 1);
 
-    let foreign_item = app
+    let bob_view = app
+        .call(Method::GET, &format!("/api/dicts/items/{milk}"), Some(&bob.token), None)
+        .await;
+    assert_eq!(bob_view.status, StatusCode::OK);
+    assert_eq!(bob_view.body["owner_kind"], "user");
+    assert_eq!(bob_view.body["owner_name"], Value::Null);
+    assert_eq!(bob_view.body["is_editable"], false);
+    assert_eq!(bob_view.body["is_in_use"], false);
+    let system_view = app
         .call(
-            Method::POST,
-            "/api/receipts",
+            Method::GET,
+            &format!("/api/dicts/items/{system_id}"),
             Some(&bob.token),
-            Some(json!({ "receipt_ts": Utc::now(), "curr_id": uah, "items": [{ "item_id": milk, "amount": "1" }] })),
+            None,
         )
         .await;
-    assert_eq!(foreign_item.body["field"], "item_id");
+    assert_eq!(system_view.body["owner_kind"], "catalog");
+
+    for (method, body) in [
+        (
+            Method::PUT,
+            Some(json!({ "name": "Чуже", "kind": "product", "unit": "piece" })),
+        ),
+        (Method::DELETE, None),
+    ]
+    {
+        let reply = app
+            .call(method, &format!("/api/dicts/items/{milk}"), Some(&bob.token), body)
+            .await;
+        assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    }
 
     let system_edit = app
         .call(
@@ -721,7 +738,7 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         &uah,
         "Сільпо",
         1,
-        json!([{ "item_id": bob_milk, "amount": "1" }]),
+        json!([{ "item_id": milk, "amount": "1" }]),
     )
     .await;
 
@@ -755,6 +772,41 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         .await;
     assert_eq!(search.body.as_array().unwrap().len(), 1);
     assert_eq!(search.body[0]["id"], milk.as_str());
+    assert_eq!(search.body[0]["is_in_use"], true);
+
+    let rename = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{milk}"),
+            Some(&alice.token),
+            Some(json!({ "name": "Сік", "kind": "product", "unit": "piece" })),
+        )
+        .await;
+    assert_eq!(rename.status, StatusCode::CONFLICT);
+    assert_eq!(rename.body["code"], "ITEM_IN_USE");
+    let enrich = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{milk}"),
+            Some(&alice.token),
+            Some(json!({
+                "name": "Молоко 2.5%", "kind": "product", "unit": "piece", "barcode": "4820024700016",
+                "nutrition": { "kcal": "52", "prot": 2.8, "fat": "2.5", "carb": null }
+            })),
+        )
+        .await;
+    assert_eq!(enrich.status, StatusCode::OK, "{}", enrich.body);
+    assert_eq!(enrich.body["nutrition"]["kcal"], "52");
+    assert_eq!(enrich.body["barcode"], "4820024700016");
+    let impossible = app
+        .call(
+            Method::PUT,
+            &format!("/api/dicts/items/{milk}"),
+            Some(&alice.token),
+            Some(json!({ "name": "Молоко 2.5%", "kind": "product", "unit": "piece", "nutrition": { "fat": 120 } })),
+        )
+        .await;
+    assert_eq!(impossible.body["field"], "nutrition.fat");
 
     let in_use = app
         .call(
@@ -765,6 +817,7 @@ async fn items_dictionary_is_private_and_compares_prices(a_db: PgPool)
         )
         .await;
     assert_eq!(in_use.status, StatusCode::CONFLICT);
+    assert_eq!(in_use.body["code"], "ITEM_IN_USE");
     let unused = create_item(&app, &alice, "Пакет", "product", "piece").await;
     let removed = app
         .call(

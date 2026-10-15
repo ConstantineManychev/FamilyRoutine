@@ -1,5 +1,6 @@
 pub mod api;
 pub mod banking;
+pub mod catalog;
 pub mod config;
 pub mod domain;
 pub mod infrastructure;

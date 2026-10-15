@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO off_products (barcode, product, fetched_ts)\n        VALUES ($1, $2, NOW())\n        ON CONFLICT (barcode) DO UPDATE SET product = EXCLUDED.product, fetched_ts = EXCLUDED.fetched_ts\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9504db1b9cb33c50198690e869d8c271010b6a0a0d27684ccbbc96e8737a9eac"
+}

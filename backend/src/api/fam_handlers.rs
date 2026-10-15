@@ -11,7 +11,6 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, AuthUser, ClientIp};
-use crate::api::item_handlers::detach_family_items;
 use crate::api::place_handlers::detach_family_places;
 use crate::api::profile_handlers::delete_orphan_children;
 use crate::domain::errors::ApiError;
@@ -569,7 +568,6 @@ pub async fn set_price_sharing(
 
 async fn remove_family(a_conn: &mut PgConnection, a_fam_id: Uuid, a_owner_id: Uuid) -> Result<(), ApiError>
 {
-    detach_family_items(a_conn, a_fam_id, a_owner_id).await?;
     detach_family_places(a_conn, a_fam_id, a_owner_id).await?;
 
     sqlx::query!("DELETE FROM families WHERE id = $1", a_fam_id)

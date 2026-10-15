@@ -13,10 +13,7 @@ import '../common/page_frames.dart';
 import 'item_form.dart';
 import 'item_prices_section.dart';
 import 'items_screen.dart';
-import 'scope_widgets.dart';
 import '../common/app_theme.dart';
-
-enum _ItemAction { share, merge }
 
 class ItemDetailScreen extends ConsumerStatefulWidget
 {
@@ -31,22 +28,13 @@ class ItemDetailScreen extends ConsumerStatefulWidget
 
 class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
 {
-  final _nameCtrl = TextEditingController();
-  final _barcodeCtrl = TextEditingController();
-  ItemKind _kind = ItemKind.product;
-  ItemUnit _unit = ItemUnit.piece;
+  late final ItemDraft _draft = ItemDraft(aBarcode: widget.initialBarcode);
   DictItemDto? _item;
-  String? _familyId;
-  bool _isScopeChosen = false;
-
-  String? _scopeOf(List<FamDto>? aFams) => _isScopeChosen ? _familyId : defaultFamilyId(aFams);
   bool _isLoading = false;
   bool _isSaving = false;
   Object? _loadError;
 
   bool get _isEdit => widget.itemId != null;
-
-  bool get _isEditable => !_isEdit || (_item?.isEditable ?? false);
 
   @override
   void initState()
@@ -56,17 +44,12 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     {
       _load();
     }
-    else
-    {
-      _barcodeCtrl.text = widget.initialBarcode ?? '';
-    }
   }
 
   @override
   void dispose()
   {
-    _nameCtrl.dispose();
-    _barcodeCtrl.dispose();
+    _draft.dispose();
     super.dispose();
   }
 
@@ -107,10 +90,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
   void _apply(DictItemDto aItem)
   {
     _item = aItem;
-    _nameCtrl.text = aItem.name;
-    _barcodeCtrl.text = aItem.barcode ?? '';
-    _kind = aItem.kind;
-    _unit = aItem.unit;
+    _draft.load(aItem);
   }
 
   Future<void> _run(Future<void> Function() aAction) async
@@ -138,30 +118,17 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
 
   Future<void> _save() async
   {
-    final name = _nameCtrl.text.trim();
-    if (name.isEmpty)
+    final error = _draft.validate();
+    if (error != null)
     {
-      showInfoSnack(context, 'items.err_name'.tr());
-      return;
-    }
-    if (!isBarcodeAcceptable(_barcodeCtrl.text))
-    {
-      showInfoSnack(context, 'items.barcode_invalid'.tr());
+      showInfoSnack(context, error);
       return;
     }
 
-    await _run(() async
+    setState(() => _isSaving = true);
+    try
     {
-      final saved = await ref.read(apiProv).saveItem(
-            widget.itemId,
-            DictItemDto.payload(
-              name,
-              _kind,
-              _unit,
-              aBarcode: _barcodeCtrl.text,
-              aFamilyId: _isEdit ? null : _scopeOf(ref.read(famsProv).valueOrNull),
-            ),
-          );
+      final saved = await ref.read(apiProv).saveItem(widget.itemId, _draft.payload());
       ref.invalidate(itemsProv);
       if (!mounted)
       {
@@ -175,9 +142,36 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
       }
       else
       {
-        context.go('/app/items/${saved.id}');
+        context.pushReplacement('/app/items/${saved.id}');
       }
-    });
+    }
+    catch (aError)
+    {
+      final existing = _isEdit ? null : await findDuplicateItem(ref, aError, _draft).catchError((_) => null);
+      if (!mounted)
+      {
+        return;
+      }
+      if (existing != null && await confirmUseExisting(context, existing))
+      {
+        if (mounted)
+        {
+          context.pushReplacement('/app/items/${existing.id}');
+        }
+        return;
+      }
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    finally
+    {
+      if (mounted)
+      {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Future<void> _delete() async
@@ -204,26 +198,6 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     });
   }
 
-  Future<void> _share() async
-  {
-    final fams = ref.read(famsProv).valueOrNull ?? const <FamDto>[];
-    final familyId = await showShareToFamilyDialog(context, fams, 'catalog.share_item'.tr());
-    if (familyId == null || !mounted)
-    {
-      return;
-    }
-
-    await _run(() async
-    {
-      final shared = await ref.read(apiProv).shareItem(widget.itemId!, familyId);
-      ref.invalidate(itemsProv);
-      if (mounted)
-      {
-        setState(() => _apply(shared));
-      }
-    });
-  }
-
   Future<void> _merge() async
   {
     final source = _item;
@@ -245,9 +219,24 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
       if (mounted)
       {
         showInfoSnack(context, 'items.merged'.tr(args: [merged.name]));
-        context.go('/app/items/${merged.id}');
+        context.pushReplacement('/app/items/${merged.id}');
       }
     });
+  }
+
+  Widget _hint(IconData aIcon, String aText, Color aColor)
+  {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(aIcon, size: 18, color: aColor),
+          const SizedBox(width: 8),
+          Expanded(child: Text(aText, style: TextStyle(color: context.palette.inkSecondary))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -266,9 +255,9 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     }
 
     final item = _item;
-    final fams = ref.watch(famsProv).valueOrNull ?? const <FamDto>[];
-    final canShare = item != null && item.isPersonal && fams.isNotEmpty;
-    final canMerge = item != null && item.isEditable;
+    final palette = aContext.palette;
+    final isEditable = !_isEdit || (item?.isEditable ?? false);
+    final isIdentityEnabled = !_isEdit || (item?.canEditIdentity ?? false);
 
     return ListView(
       padding: screenPadding(aContext),
@@ -276,33 +265,20 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
         ScreenHeader(
           title: _isEdit ? 'items.item'.tr() : 'items.new'.tr(),
           actions: [
-            if (canShare || canMerge)
-              PopupMenuButton<_ItemAction>(
-                tooltip: 'common.actions'.tr(),
-                icon: const Icon(AppIcons.moreVertical),
-                enabled: !_isSaving,
-                onSelected: (aAction) => aAction == _ItemAction.share ? _share() : _merge(),
-                itemBuilder: (_) => [
-                  if (canShare)
-                    PopupMenuItem(
-                      value: _ItemAction.share,
-                      child: ListTile(leading: const Icon(AppIcons.users, size: 18), title: Text('catalog.share_item'.tr())),
-                    ),
-                  if (canMerge)
-                    PopupMenuItem(
-                      value: _ItemAction.merge,
-                      child: ListTile(leading: const Icon(AppIcons.merge, size: 18), title: Text('items.merge'.tr())),
-                    ),
-                ],
+            if (item != null && item.canMerge)
+              IconButton(
+                tooltip: 'items.merge'.tr(),
+                icon: const Icon(AppIcons.merge),
+                onPressed: _isSaving ? null : _merge,
               ),
-            if (_isEdit && _isEditable)
+            if (item != null && item.canDelete)
               OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: context.palette.danger),
+                style: OutlinedButton.styleFrom(foregroundColor: palette.danger),
                 onPressed: _isSaving ? null : _delete,
                 icon: const Icon(AppIcons.trash2, size: 18),
                 label: Text('common.delete'.tr()),
               ),
-            if (_isEditable)
+            if (isEditable)
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _save,
                 icon: const Icon(AppIcons.save, size: 18),
@@ -311,45 +287,33 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
           ],
         ),
         const SizedBox(height: 16),
-        if (item?.familyName != null) ...[
-          Align(alignment: Alignment.centerLeft, child: FamilyBadge(name: item!.familyName!)),
-          const SizedBox(height: 12),
-        ],
-        if (!_isEditable) ...[
-          Row(
-            children: [
-              Icon(AppIcons.lock, size: 18, color: context.palette.inkMuted),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item?.familyId != null ? 'items.family_readonly_hint'.tr() : 'items.system_hint'.tr(),
-                  style: TextStyle(color: context.palette.inkSecondary),
-                ),
-              ),
-            ],
+        if (item != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(itemOwnerIcon(item.ownerKind), size: 16, color: palette.inkMuted),
+                const SizedBox(width: 6),
+                Text('items.owner_label'.tr(args: [itemOwnerLabel(item)]), style: TextStyle(color: palette.inkSecondary)),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-        ],
+        if (item != null && !item.isEditable)
+          _hint(AppIcons.lock, 'items.readonly_hint'.tr(), palette.inkMuted)
+        else if (item != null && item.isAdminEdit)
+          _hint(AppIcons.shieldCheck, 'items.admin_hint'.tr(), palette.warning)
+        else if (item != null && item.isInUse)
+          _hint(AppIcons.lock, 'items.in_use_hint'.tr(), palette.warning)
+        else if (!_isEdit)
+          _hint(AppIcons.globe, 'items.public_hint'.tr(), palette.inkMuted),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
           child: ItemFormFields(
-            nameCtrl: _nameCtrl,
-            barcodeCtrl: _barcodeCtrl,
-            kind: _kind,
-            unit: _unit,
-            isEnabled: _isEditable,
-            scopeFams: _isEdit ? null : fams,
-            scopeFamilyId: _scopeOf(fams),
-            onScopeChanged: _isEdit
-                ? null
-                : (aValue) => setState(()
-                    {
-                      _familyId = aValue;
-                      _isScopeChosen = true;
-                    }),
-            onScanBarcode: () => scanIntoBarcodeField(context, ref, _barcodeCtrl, aCurrentItemId: widget.itemId),
-            onKindChanged: (aKind) => setState(() => _kind = aKind),
-            onUnitChanged: (aUnit) => setState(() => _unit = aUnit),
+            draft: _draft,
+            isIdentityEnabled: isIdentityEnabled,
+            isNutritionEnabled: isEditable,
+            isAutoLookup: !_isEdit,
+            currentItemId: widget.itemId,
           ),
         ),
         if (item != null) ...[
@@ -393,12 +357,7 @@ class _MergeDialogState extends ConsumerState<_MergeDialog>
     super.dispose();
   }
 
-  bool _isCompatible(DictItemDto aItem)
-  {
-    final source = widget.source;
-    final isSameScope = source.familyId == null || aItem.familyId == source.familyId;
-    return aItem.id != source.id && aItem.unit == source.unit && isSameScope;
-  }
+  bool _isCompatible(DictItemDto aItem) => aItem.id != widget.source.id && aItem.unit == widget.source.unit;
 
   void _onChanged(String aValue)
   {
@@ -466,7 +425,7 @@ class _MergeDialogState extends ConsumerState<_MergeDialog>
                                   subtitle: Text([
                                     itemUnitShort(aItem.unit),
                                     if (aItem.barcode != null) aItem.barcode!,
-                                    if (aItem.familyName != null) aItem.familyName!,
+                                    itemOwnerLabel(aItem),
                                   ].join(' · ')),
                                 ))
                             .toList(),

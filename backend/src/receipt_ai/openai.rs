@@ -2,12 +2,8 @@ use reqwest::RequestBuilder;
 use serde_json::{json, Value};
 use shared_schema::AiModelDto;
 
-use super::{
-    has_date_suffix, is_version, receipt_schema, AiTarget, ReadError, ReceiptImage, Usage, MAX_OUTPUT_TOKENS,
-    SYSTEM_PROMPT, USER_PROMPT,
-};
+use super::{has_date_suffix, is_version, AiTarget, ReadError, ReceiptImage, Usage, VisionTask, MAX_OUTPUT_TOKENS};
 
-const SCHEMA_NAME: &str = "receipt";
 const IMAGE_DETAIL: &str = "high";
 const CHAT_PREFIX: &str = "gpt-";
 const UNSUITABLE_PARTS: [&str; 14] = [
@@ -33,12 +29,13 @@ pub fn read_request(
     a_base: &str,
     a_target: &AiTarget,
     a_image: &ReceiptImage,
+    a_task: &VisionTask,
 ) -> RequestBuilder
 {
     a_http
         .post(format!("{}/v1/responses", a_base.trim_end_matches('/')))
         .bearer_auth(&a_target.api_key)
-        .json(&request_body(&a_target.model, a_image))
+        .json(&request_body(&a_target.model, a_image, a_task))
 }
 
 pub fn models_request(a_http: &reqwest::Client, a_base: &str, a_api_key: &str) -> RequestBuilder
@@ -135,11 +132,11 @@ fn is_suitable(a_model: &str) -> bool
         && !has_date_suffix(a_model)
 }
 
-fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
+fn request_body(a_model: &str, a_image: &ReceiptImage, a_task: &VisionTask) -> Value
 {
     json!({
         "model": a_model,
-        "instructions": SYSTEM_PROMPT,
+        "instructions": a_task.system,
         "input": [{
             "role": "user",
             "content": [
@@ -148,10 +145,10 @@ fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
                     "image_url": format!("data:{};base64,{}", a_image.media_type, a_image.data_base64),
                     "detail": IMAGE_DETAIL
                 },
-                { "type": "input_text", "text": USER_PROMPT }
+                { "type": "input_text", "text": a_task.prompt }
             ]
         }],
-        "text": { "format": { "type": "json_schema", "name": SCHEMA_NAME, "strict": true, "schema": receipt_schema() } },
+        "text": { "format": { "type": "json_schema", "name": a_task.name, "strict": true, "schema": (a_task.schema)() } },
         "max_output_tokens": MAX_OUTPUT_TOKENS,
         "store": false
     })
@@ -161,6 +158,7 @@ fn request_body(a_model: &str, a_image: &ReceiptImage) -> Value
 mod tests
 {
     use super::*;
+    use crate::receipt_ai::LABEL_TASK;
 
     #[test]
     fn request_is_stateless_and_strict()
@@ -169,10 +167,11 @@ mod tests
             media_type: "image/png",
             data_base64: "AAAA".into(),
         };
-        let body = request_body("gpt-5.5", &image);
+        let body = request_body("gpt-5.5", &image, &LABEL_TASK);
 
         assert_eq!(body["store"], false);
         assert_eq!(body["text"]["format"]["strict"], true);
+        assert_eq!(body["text"]["format"]["name"], "label");
         assert_eq!(
             body["input"][0]["content"][0]["image_url"],
             "data:image/png;base64,AAAA"
