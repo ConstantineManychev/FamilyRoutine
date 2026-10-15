@@ -7,7 +7,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import '../dicts/scope_widgets.dart';
+import '../common/app_theme.dart';
 
 final AutoDisposeFutureProvider<List<PlaceDto>> placesProv = FutureProvider.autoDispose<List<PlaceDto>>((aRef) async
 {
@@ -48,62 +50,56 @@ class PlacesScreen extends ConsumerWidget
     aContext.locale;
     final placesAsync = aRef.watch(placesProv);
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(
-            title: 'sidebar.places'.tr(),
-            actions: [
-              ElevatedButton.icon(
-                onPressed: () => aContext.go('/app/places/new'),
-                icon: const Icon(AppIcons.plus, size: 18),
-                label: Text('places.add'.tr()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: placesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(placesProv)),
-              data: (aPlaces) => aPlaces.isEmpty
-                  ? Center(child: Text('common.no_data'.tr()))
-                  : ListView.builder(
-                      itemCount: aPlaces.length,
-                      itemBuilder: (_, aIndex)
-                      {
-                        final place = aPlaces[aIndex];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: const Icon(AppIcons.mapPin, color: Colors.blue),
-                            title: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    place.name,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                if (place.familyName != null) ...[
-                                  const SizedBox(width: 8),
-                                  FamilyBadge(name: place.familyName!),
-                                ],
-                              ],
-                            ),
-                            subtitle: Text(_subtitle(place)),
-                            trailing: const Icon(AppIcons.chevronRight),
-                            onTap: () => aContext.go('/app/places/${place.id}'),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
+    return ListPage(
+      title: 'sidebar.places'.tr(),
+      onAdd: () => aContext.push('/app/places/new'),
+      addTooltip: 'places.add'.tr(),
+      builder: (_, aQuery) => placesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(placesProv)),
+        data: (aPlaces)
+        {
+          final shown = aPlaces
+              .where((aPlace) => aQuery.isEmpty || '${aPlace.name} ${_subtitle(aPlace)}'.toLowerCase().contains(aQuery))
+              .toList();
+          if (shown.isEmpty)
+          {
+            return Center(child: Text('common.no_data'.tr()));
+          }
+          return ListView.builder(
+            key: const PageStorageKey('list.places'),
+            padding: screenPadding(aContext),
+            itemCount: shown.length,
+            itemBuilder: (_, aIndex)
+            {
+              final place = shown[aIndex];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: Icon(AppIcons.mapPin, color: aContext.colors.primary),
+                  title: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          place.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (place.familyName != null) ...[
+                        const SizedBox(width: 8),
+                        FamilyBadge(name: place.familyName!),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(_subtitle(place)),
+                  trailing: const Icon(AppIcons.chevronRight),
+                  onTap: () => aContext.push('/app/places/${place.id}'),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

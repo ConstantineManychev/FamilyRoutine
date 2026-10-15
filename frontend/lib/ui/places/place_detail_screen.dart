@@ -2,16 +2,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
+import '../common/page_frames.dart';
 import '../dicts/scope_widgets.dart';
 import '../widgets/smart_geo_input.dart';
 import 'places_screen.dart';
+import '../common/app_theme.dart';
 
 class _AddrDraft
 {
@@ -431,7 +431,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       ref.invalidate(placesProv);
       if (mounted)
       {
-        context.go('/app/places');
+        finishPage(context, '/app/places');
       }
     });
   }
@@ -520,7 +520,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       ref.invalidate(placesProv);
       if (mounted)
       {
-        context.go('/app/places');
+        finishPage(context, '/app/places');
       }
     });
   }
@@ -571,7 +571,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
             if (_isEdit && isEnabled)
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : _delete,
-                icon: const Icon(AppIcons.trash, color: Colors.red, size: 18),
+                icon: Icon(AppIcons.trash, color: context.palette.danger, size: 18),
                 label: Text('common.delete'.tr()),
               ),
             if (isEnabled)
@@ -590,9 +590,9 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
         if (!isEnabled) ...[
           Row(
             children: [
-              const Icon(AppIcons.lock, size: 18, color: inkMuted),
+              Icon(AppIcons.lock, size: 18, color: context.palette.inkMuted),
               const SizedBox(width: 8),
-              Expanded(child: Text('places.family_readonly_hint'.tr(), style: const TextStyle(color: inkSecondary))),
+              Expanded(child: Text('places.family_readonly_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary))),
             ],
           ),
           const SizedBox(height: 16),
@@ -619,7 +619,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
         const SizedBox(height: 24),
         Text('places.branches'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text('places.branches_hint'.tr(), style: const TextStyle(fontSize: 12, color: inkSecondary)),
+        Text('places.branches_hint'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkSecondary)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -656,7 +656,7 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
                   label: Text('places.make_main'.tr()),
                 ),
               TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: Colors.red.shade800),
+                style: TextButton.styleFrom(foregroundColor: context.palette.danger),
                 onPressed: _removeBranch,
                 icon: const Icon(AppIcons.trash2, size: 16),
                 label: Text('places.remove_branch'.tr()),
@@ -675,10 +675,10 @@ class _PlaceDetailScreenState extends ConsumerState<PlaceDetailScreen>
       const SizedBox(height: 24),
       Text('places.bank_names'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
       const SizedBox(height: 4),
-      Text('places.bank_names_hint'.tr(), style: const TextStyle(fontSize: 12, color: inkSecondary)),
+      Text('places.bank_names_hint'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkSecondary)),
       const SizedBox(height: 12),
       if (aPlace.merchants.isEmpty)
-        Text('places.bank_names_empty'.tr(), style: const TextStyle(color: inkMuted))
+        Text('places.bank_names_empty'.tr(), style: TextStyle(color: context.palette.inkMuted))
       else
         Wrap(
           spacing: 8,

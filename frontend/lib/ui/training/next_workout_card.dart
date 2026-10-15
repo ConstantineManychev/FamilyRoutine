@@ -7,10 +7,10 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import '../routine/dash_card.dart';
 import 'training_format.dart';
 import 'training_revision.dart';
+import '../common/app_theme.dart';
 
 class NextWorkoutCard extends ConsumerStatefulWidget
 {
@@ -114,7 +114,7 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
     if (plan == null)
     {
       return _error != null
-          ? Text(errorText(_error!), style: const TextStyle(color: inkMuted))
+          ? Text(errorText(_error!), style: TextStyle(color: context.palette.inkMuted))
           : const LinearProgressIndicator();
     }
 
@@ -135,7 +135,7 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
     final next = plan.next;
     if (next == null)
     {
-      return Text('training.no_program_hint'.tr(), style: const TextStyle(color: inkMuted));
+      return Text('training.no_program_hint'.tr(), style: TextStyle(color: context.palette.inkMuted));
     }
 
     final date = next.date;
@@ -149,14 +149,14 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
           isToday ? 'training.next_today'.tr(args: [next.dayName]) : 'training.next_on'.tr(args: [next.dayName, plannedDateLabel(aContext, date)]),
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
-        if (plan.program != null) Text(plan.program!.name, style: const TextStyle(color: inkSecondary)),
+        if (plan.program != null) Text(plan.program!.name, style: TextStyle(color: context.palette.inkSecondary)),
         if (last != null)
           Text(
             'training.last_workout'.tr(args: [
               last.dayName ?? 'training.free_workout'.tr(),
               DateFormat.MMMd(aContext.locale.toLanguageTag()).format(last.startedTs),
             ]),
-            style: const TextStyle(color: inkMuted, fontSize: 13),
+            style: TextStyle(color: context.palette.inkMuted, fontSize: 13),
           ),
         if (isToday) ...[
           const SizedBox(height: 12),

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import '../domain/models.dart';
 import '../providers/auth_provider.dart';
 import '../ui/auth/auth_screen.dart';
 import '../ui/auth/splash_screen.dart';
+import '../ui/common/page_frames.dart';
 import '../ui/dicts/cities_dict_screen.dart';
 import '../ui/dicts/exercise_detail_screen.dart';
 import '../ui/dicts/exercises_screen.dart';
@@ -16,10 +16,10 @@ import '../ui/dicts/streets_dict_screen.dart';
 import '../ui/finance/receipt_detail_screen.dart';
 import '../ui/finance/receipts_screen.dart';
 import '../ui/finance/transactions_screen.dart';
-import '../ui/home/dashboard_screen.dart';
+import '../ui/home/app_frame.dart';
 import '../ui/home/fam_detail_screen.dart';
 import '../ui/home/fam_groups_screen.dart';
-import '../ui/home/main_screen.dart';
+import '../ui/home/home_screen.dart';
 import '../ui/places/place_detail_screen.dart';
 import '../ui/places/places_screen.dart';
 import '../ui/profile/metric_history_screen.dart';
@@ -30,14 +30,28 @@ import '../ui/training/program_editor_screen.dart';
 import '../ui/training/training_screen.dart';
 import '../ui/training/workout_session_screen.dart';
 import '../ui/wallets/bank_callback_screen.dart';
+import '../ui/wallets/banks_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
 import '../ui/wallets/wallets_screen.dart';
 import 'route_guard.dart';
+
+GoRoute _sub(String aPath, Widget Function(GoRouterState aState) aBuild, {List<RouteBase> aRoutes = const []})
+{
+  return GoRoute(path: aPath, builder: (_, aState) => SubPage(child: aBuild(aState)), routes: aRoutes);
+}
+
+GoRoute _own(String aPath, Widget Function(GoRouterState aState) aBuild)
+{
+  return GoRoute(path: aPath, builder: (_, aState) => aBuild(aState));
+}
+
+String? _param(GoRouterState aState, String aName) => aState.pathParameters[aName];
 
 final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
 {
   final authState = ValueNotifier<AuthState>(aRef.read(authProv));
   aRef.listen<AuthState>(authProv, (_, aNext) => authState.value = aNext);
+  GoRouter.optionURLReflectsImperativeAPIs = true;
 
   final router = GoRouter(
     initialLocation: homePath,
@@ -47,117 +61,76 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
       GoRoute(path: splashPath, builder: (_, __) => const SplashScreen()),
       GoRoute(path: authPath, builder: (_, __) => const AuthScreen()),
       ShellRoute(
-        builder: (_, __, aChild) => MainScreen(child: aChild),
+        builder: (_, __, aChild) => AppFrame(child: aChild),
         routes: [
           GoRoute(
             path: homePath,
-            builder: (_, __) => const DashboardScreen(),
+            builder: (_, aState) => HomeScreen(initialTab: aState.uri.queryParameters['tab']),
             routes: [
-              GoRoute(path: 'families', builder: (_, __) => const FamGroupsScreen()),
-              GoRoute(path: 'families/new', builder: (_, __) => const FamDetailScreen()),
-              GoRoute(
-                path: 'families/:id',
-                builder: (_, aState) => FamDetailScreen(famId: aState.pathParameters['id']),
-              ),
-              GoRoute(path: 'wallets', builder: (_, __) => const WalletsScreen()),
-              GoRoute(path: 'wallets/new', builder: (_, __) => const WalletDetailScreen()),
-              GoRoute(
-                path: 'wallets/:id',
-                builder: (_, aState) => WalletDetailScreen(walletId: aState.pathParameters['id']),
-              ),
-              GoRoute(
-                path: 'bank-callback',
-                builder: (_, aState) => BankCallbackScreen(
+              _own('families', (_) => const FamGroupsScreen()),
+              _sub('families/new', (_) => const FamDetailScreen()),
+              _sub('families/:id', (aState) => FamDetailScreen(famId: _param(aState, 'id'))),
+              _own('wallets', (_) => const WalletsScreen()),
+              _sub('wallets/new', (_) => const WalletDetailScreen()),
+              _sub('wallets/:id', (aState) => WalletDetailScreen(walletId: _param(aState, 'id'))),
+              _own('banks', (_) => const BanksScreen()),
+              _sub(
+                'bank-callback',
+                (aState) => BankCallbackScreen(
                   code: aState.uri.queryParameters['code'],
                   state: aState.uri.queryParameters['state'],
                   error: aState.uri.queryParameters['error'],
                 ),
               ),
-              GoRoute(
-                path: 'transactions',
-                builder: (_, aState) => TransactionsScreen.fromQuery(
-                  aState.uri.queryParameters,
-                  aKey: ValueKey(aState.uri.query),
-                ),
-              ),
-              GoRoute(path: 'receipts', builder: (_, __) => const ReceiptsScreen()),
-              GoRoute(
-                path: 'receipts/new',
-                builder: (_, aState) => ReceiptDetailScreen(
+              _own('transactions', (aState) => TransactionsScreen.fromQuery(aState.uri.queryParameters, aKey: ValueKey(aState.uri.query))),
+              _own('receipts', (_) => const ReceiptsScreen()),
+              _sub(
+                'receipts/new',
+                (aState) => ReceiptDetailScreen(
                   initialTx: aState.extra is TxDto ? aState.extra as TxDto : null,
                   prefill: aState.extra is ReceiptPrefill ? aState.extra as ReceiptPrefill : null,
                 ),
               ),
-              GoRoute(
-                path: 'receipts/:id',
-                builder: (_, aState) => ReceiptDetailScreen(
-                  key: ValueKey(aState.pathParameters['id']),
-                  receiptId: aState.pathParameters['id'],
-                ),
-              ),
-              GoRoute(path: 'cities', builder: (_, __) => const CitiesDictScreen()),
-              GoRoute(path: 'streets', builder: (_, __) => const StreetsDictScreen()),
-              GoRoute(path: 'places', builder: (_, __) => const PlacesScreen()),
-              GoRoute(path: 'places/new', builder: (_, __) => const PlaceDetailScreen()),
-              GoRoute(
-                path: 'places/:id',
-                builder: (_, aState) => PlaceDetailScreen(placeId: aState.pathParameters['id']),
-              ),
-              GoRoute(path: 'items', builder: (_, __) => const ItemsScreen()),
-              GoRoute(
-                path: 'items/new',
-                builder: (_, aState) => ItemDetailScreen(initialBarcode: aState.uri.queryParameters['barcode']),
-              ),
-              GoRoute(
-                path: 'items/:id',
-                builder: (_, aState) => ItemDetailScreen(
-                  key: ValueKey(aState.pathParameters['id']),
-                  itemId: aState.pathParameters['id'],
-                ),
-              ),
-              GoRoute(path: 'settings', builder: (_, __) => const SettingsScreen()),
-              GoRoute(
-                path: 'training',
-                builder: (_, __) => const TrainingScreen(),
-                routes: [
-                  GoRoute(path: 'programs/new', builder: (_, __) => const ProgramEditorScreen()),
-                  GoRoute(
-                    path: 'programs/:id',
-                    builder: (_, aState) => ProgramEditorScreen(key: ValueKey(aState.pathParameters['id']), programId: aState.pathParameters['id']),
-                  ),
-                  GoRoute(
-                    path: 'sessions/:id',
-                    builder: (_, aState) => WorkoutSessionScreen(key: ValueKey(aState.pathParameters['id']), sessionId: aState.pathParameters['id']!),
-                  ),
+              _sub('receipts/:id', (aState) => ReceiptDetailScreen(key: ValueKey(_param(aState, 'id')), receiptId: _param(aState, 'id'))),
+              _own('cities', (_) => const CitiesDictScreen()),
+              _own('streets', (_) => const StreetsDictScreen()),
+              _own('places', (_) => const PlacesScreen()),
+              _sub('places/new', (_) => const PlaceDetailScreen()),
+              _sub('places/:id', (aState) => PlaceDetailScreen(placeId: _param(aState, 'id'))),
+              _own('items', (_) => const ItemsScreen()),
+              _sub('items/new', (aState) => ItemDetailScreen(initialBarcode: aState.uri.queryParameters['barcode'])),
+              _sub('items/:id', (aState) => ItemDetailScreen(key: ValueKey(_param(aState, 'id')), itemId: _param(aState, 'id'))),
+              _sub('settings', (_) => const SettingsScreen()),
+              _sub(
+                'training',
+                (_) => const TrainingScreen(),
+                aRoutes: [
+                  _sub('programs/new', (_) => const ProgramEditorScreen()),
+                  _sub('programs/:id', (aState) => ProgramEditorScreen(key: ValueKey(_param(aState, 'id')), programId: _param(aState, 'id'))),
+                  _sub('sessions/:id', (aState) => WorkoutSessionScreen(key: ValueKey(_param(aState, 'id')), sessionId: _param(aState, 'id')!)),
                 ],
               ),
-              GoRoute(path: 'profile', builder: (_, __) => const ProfileScreen()),
-              GoRoute(
-                path: 'people/:id',
-                builder: (_, aState) => ProfileScreen(key: ValueKey(aState.pathParameters['id']), personId: aState.pathParameters['id']),
-              ),
-              GoRoute(
-                path: 'people/:id/sessions/:sid',
-                builder: (_, aState) => PersonSessionScreen(
+              _sub('profile', (_) => const ProfileScreen()),
+              _sub('people/:id', (aState) => ProfileScreen(key: ValueKey(_param(aState, 'id')), personId: _param(aState, 'id'))),
+              _sub(
+                'people/:id/sessions/:sid',
+                (aState) => PersonSessionScreen(
                   key: ValueKey(aState.uri.path),
-                  personId: aState.pathParameters['id']!,
-                  sessionId: aState.pathParameters['sid']!,
+                  personId: _param(aState, 'id')!,
+                  sessionId: _param(aState, 'sid')!,
                 ),
               ),
-              GoRoute(
-                path: 'people/:id/metrics/:metric',
-                builder: (_, aState) => MetricHistoryScreen(
+              _sub(
+                'people/:id/metrics/:metric',
+                (aState) => MetricHistoryScreen(
                   key: ValueKey(aState.uri.path),
-                  personId: aState.pathParameters['id']!,
-                  metric: BodyMetric.parse(aState.pathParameters['metric']) ?? BodyMetric.weight,
+                  personId: _param(aState, 'id')!,
+                  metric: BodyMetric.parse(_param(aState, 'metric')) ?? BodyMetric.weight,
                 ),
               ),
-              GoRoute(path: 'exercises', builder: (_, __) => const ExercisesScreen()),
-              GoRoute(path: 'exercises/new', builder: (_, __) => const ExerciseDetailScreen()),
-              GoRoute(
-                path: 'exercises/:id',
-                builder: (_, aState) => ExerciseDetailScreen(exId: aState.pathParameters['id']),
-              ),
+              _own('exercises', (_) => const ExercisesScreen()),
+              _sub('exercises/new', (_) => const ExerciseDetailScreen()),
+              _sub('exercises/:id', (aState) => ExerciseDetailScreen(exId: _param(aState, 'id'))),
             ],
           ),
         ],

@@ -208,7 +208,17 @@
     "remove_child_confirm": "将{}移出群组？如果孩子不在其他群组中，其资料和所有测量数据都会被删除。",
     "wallets_title": "我在本群组中的钱包",
     "wallets_hint": "选择群组成员可以看到的钱包及其交易和关联小票。只有您可以修改它们。",
-    "wallets_empty": "您没有个人钱包。"
+    "wallets_empty": "您没有个人钱包。",
+    "member_count": {
+      "zero": "{} 名成员",
+      "one": "{} 名成员",
+      "two": "{} 名成员",
+      "few": "{} 名成员",
+      "many": "{} 名成员",
+      "other": "{} 名成员"
+    },
+    "my_groups": "我的群组",
+    "no_groups": "还没有群组。创建一个或使用邀请码加入。"
   },
   "common": {
     "save": "保存",
@@ -226,7 +236,13 @@
     "soon": "即将推出",
     "no_data": "暂无数据",
     "delete_confirm": "确定要删除吗？",
-    "back": "返回"
+    "back": "返回",
+    "add": "添加",
+    "close": "关闭",
+    "close_search": "关闭搜索",
+    "done": "完成",
+    "search": "搜索",
+    "show_all": "全部显示"
   },
   "wallet": {
     "title": "钱包",
@@ -258,7 +274,8 @@
     "shared": "群组",
     "read_only": "只有所有者或群组管理员可以编辑此钱包。",
     "linked_hint": "该钱包与银行同步：交易和余额会自动更新。",
-    "owned_by": "所有者：{}"
+    "owned_by": "所有者：{}",
+    "empty": "还没有钱包。"
   },
   "places": {
     "add": "添加地点",
@@ -555,7 +572,20 @@
     "my_wallets": "我的钱包",
     "owner_wallets": "钱包：{}",
     "receipt_read_only": "仅查看",
-    "receipt_shared_by": "{} 的小票 — 仅查看"
+    "receipt_shared_by": "{} 的小票 — 仅查看",
+    "cards": "卡片和钱包",
+    "categories": "分类",
+    "convert_short": "换算为 {}",
+    "currency": "货币",
+    "filters": "筛选",
+    "mode": "转账",
+    "no_conversion": "不换算",
+    "preset_custom": "自定义时段",
+    "preset_week": "7 天",
+    "preset_month": "30 天",
+    "preset_monthToDate": "本月",
+    "preset_quarter": "90 天",
+    "view_list": "列表"
   },
   "items": {
     "title": "商品和服务",
@@ -700,7 +730,13 @@
     "err_image_type": "支持 JPEG、PNG 和 WebP 照片。"
   },
   "settings": {
-    "title": "设置"
+    "title": "设置",
+    "theme": "主题",
+    "theme_system": "跟随系统",
+    "theme_light": "浅色",
+    "theme_dark": "深色",
+    "theme_violet": "紫色",
+    "language": "语言"
   },
   "ai": {
     "title": "小票识别",
@@ -930,5 +966,11 @@
     "err_write_off": "金额必须大于零且不超过 {}",
     "err_write_off_date": "日期必须晚于上一条记录且不晚于本记录",
     "tx_marker": "余额记录入账"
+  },
+  "home": {
+    "open_profile": "打开个人资料",
+    "tab_finance": "财务",
+    "tab_groups": "群组",
+    "tab_routine": "日常"
   }
 }

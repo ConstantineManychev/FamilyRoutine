@@ -8,7 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../domain/barcode.dart';
 import 'app_icons.dart';
-import 'money.dart';
+import 'app_theme.dart';
 
 const String _webReaderScript = 'vendor/zxing-wasm/reader.js';
 const List<BarcodeFormat> _productFormats = [BarcodeFormat.ean13, BarcodeFormat.ean8, BarcodeFormat.upcA];
@@ -223,7 +223,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
                     Text(
                       _message ?? 'scanner.hint'.tr(),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: _message == null ? inkSecondary : inkPrimary, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: _message == null ? context.palette.inkSecondary : context.palette.inkPrimary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
                     Row(

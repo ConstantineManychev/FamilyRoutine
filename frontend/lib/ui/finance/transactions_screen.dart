@@ -9,8 +9,10 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import '../common/page_frames.dart';
 import 'finance_dialogs.dart';
 import 'wallet_scope.dart';
+import '../common/app_theme.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget
 {
@@ -47,7 +49,7 @@ class TransactionsScreen extends ConsumerStatefulWidget
 
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
 {
-  final _searchCtrl = TextEditingController();
+  String _query = '';
   Timer? _debounce;
   List<TxDto> _items = const [];
   String? _cursor;
@@ -72,7 +74,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   void dispose()
   {
     _debounce?.cancel();
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -92,7 +93,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             aAccountId: _scope.accountId,
             aOwnerId: _scope.ownerId,
             aCursor: aIsReset ? null : _cursor,
-            aQuery: _searchCtrl.text,
+            aQuery: _query,
             aCategory: _category,
             aIsUncategorized: _isUncategorized,
             aFrom: _from,
@@ -126,8 +127,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     }
   }
 
-  void _onSearchChanged(String _)
+  void _onSearchChanged(String aQuery)
   {
+    _query = aQuery;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _reload);
   }
@@ -148,112 +150,98 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     aContext.locale;
     final wallets = ref.watch(walletsProv).valueOrNull ?? const <AccountDto>[];
 
-    return Padding(
-      padding: screenPadding(aContext),
+    final padding = screenPadding(aContext);
+
+    return ListPage(
+      title: 'finance.transactions'.tr(),
+      onAdd: () => _openDialog(const CashEntryDialog(isIncome: true)),
+      addTooltip: 'finance.cash_entry'.tr(),
+      onSearch: _onSearchChanged,
+      actions: [
+        IconButton(
+          tooltip: 'finance.to_cash'.tr(),
+          icon: const Icon(AppIcons.arrowLeftRight),
+          onPressed: () => _openDialog(const TransferDialog()),
+        ),
+      ],
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ScreenHeader(
-            title: 'finance.transactions'.tr(),
-            actions: [
-              OutlinedButton.icon(
-                onPressed: () => _openDialog(const TransferDialog()),
-                icon: const Icon(AppIcons.arrowLeftRight, size: 18),
-                label: Text('finance.to_cash'.tr()),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _openDialog(const CashEntryDialog(isIncome: true)),
-                icon: const Icon(AppIcons.banknote, size: 18),
-                label: Text('finance.cash_entry'.tr()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: 260,
-                child: DropdownButtonFormField<String?>(
-                  initialValue: _scope.value,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: 'finance.wallet'.tr(),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: walletScopeItems(wallets, ref.watch(sessionUserIdProv)),
-                  onChanged: (aValue)
-                  {
-                    setState(() => _scope = WalletScope(aValue));
-                    _reload();
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 220,
-                child: DropdownButtonFormField<String?>(
-                  initialValue: _isUncategorized ? _uncategorizedValue : _category?.name,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: 'finance.category'.tr(),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: [
-                    DropdownMenuItem<String?>(value: null, child: Text('finance.all_categories'.tr())),
-                    ...TxCategory.values.map((aCategory) => DropdownMenuItem<String?>(
-                          value: aCategory.name,
-                          child: Row(children: [
-                            Icon(categoryIcon(aCategory), size: 16),
-                            const SizedBox(width: 8),
-                            Flexible(child: Text(categoryLabel(aCategory), overflow: TextOverflow.ellipsis)),
-                          ]),
-                        )),
-                    DropdownMenuItem<String?>(value: _uncategorizedValue, child: Text(categoryLabel(null))),
-                  ],
-                  onChanged: (aValue)
-                  {
-                    setState(()
+          Padding(
+            padding: EdgeInsets.fromLTRB(padding.left, 8, padding.right, 0),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: 260,
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _scope.value,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'finance.wallet'.tr(),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: walletScopeItems(wallets, ref.watch(sessionUserIdProv)),
+                    onChanged: (aValue)
                     {
-                      _isUncategorized = aValue == _uncategorizedValue;
-                      _category = TxCategory.parse(aValue);
-                    });
-                    _reload();
-                  },
-                ),
-              ),
-              if (_from != null || _to != null)
-                InputChip(
-                  avatar: const Icon(AppIcons.calendar, size: 16),
-                  label: Text(_periodLabel(aContext)),
-                  onDeleted: ()
-                  {
-                    setState(()
-                    {
-                      _from = null;
-                      _to = null;
-                    });
-                    _reload();
-                  },
-                ),
-              SizedBox(
-                width: 260,
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    labelText: 'finance.search'.tr(),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                    prefixIcon: const Icon(AppIcons.search, size: 18),
+                      setState(() => _scope = WalletScope(aValue));
+                      _reload();
+                    },
                   ),
                 ),
-              ),
-            ],
+                SizedBox(
+                  width: 220,
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _isUncategorized ? _uncategorizedValue : _category?.name,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'finance.category'.tr(),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(value: null, child: Text('finance.all_categories'.tr())),
+                      ...TxCategory.values.map((aCategory) => DropdownMenuItem<String?>(
+                            value: aCategory.name,
+                            child: Row(children: [
+                              Icon(categoryIcon(aCategory), size: 16),
+                              const SizedBox(width: 8),
+                              Flexible(child: Text(categoryLabel(aCategory), overflow: TextOverflow.ellipsis)),
+                            ]),
+                          )),
+                      DropdownMenuItem<String?>(value: _uncategorizedValue, child: Text(categoryLabel(null))),
+                    ],
+                    onChanged: (aValue)
+                    {
+                      setState(()
+                      {
+                        _isUncategorized = aValue == _uncategorizedValue;
+                        _category = TxCategory.parse(aValue);
+                      });
+                      _reload();
+                    },
+                  ),
+                ),
+                if (_from != null || _to != null)
+                  InputChip(
+                    avatar: const Icon(AppIcons.calendar, size: 16),
+                    label: Text(_periodLabel(aContext)),
+                    onDeleted: ()
+                    {
+                      setState(()
+                      {
+                        _from = null;
+                        _to = null;
+                      });
+                      _reload();
+                    },
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Expanded(child: _buildList(aContext)),
         ],
       ),
@@ -280,7 +268,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     {
       return _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Center(child: Text('finance.no_transactions'.tr(), style: const TextStyle(color: inkMuted)));
+          : Center(child: Text('finance.no_transactions'.tr(), style: TextStyle(color: context.palette.inkMuted)));
     }
 
     final rows = <Widget>[];
@@ -296,7 +284,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
           padding: const EdgeInsets.only(top: 16, bottom: 6, left: 4),
           child: Text(
             formatDay(aContext, day),
-            style: const TextStyle(color: inkSecondary, fontWeight: FontWeight.w600),
+            style: TextStyle(color: context.palette.inkSecondary, fontWeight: FontWeight.w600),
           ),
         ));
       }
@@ -316,7 +304,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       ));
     }
 
-    return RefreshIndicator(onRefresh: _reload, child: ListView(children: rows));
+    final padding = screenPadding(aContext);
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView(key: const PageStorageKey('list.transactions'), padding: padding.copyWith(top: 0), children: rows),
+    );
   }
 }
 
@@ -325,8 +317,9 @@ class TxTile extends StatelessWidget
   final TxDto tx;
   final VoidCallback? onTap;
   final Widget? trailing;
+  final bool isFlat;
 
-  const TxTile({super.key, required this.tx, this.onTap, this.trailing});
+  const TxTile({super.key, required this.tx, this.onTap, this.trailing, this.isFlat = false});
 
   @override
   Widget build(BuildContext aContext)
@@ -343,40 +336,47 @@ class TxTile extends StatelessWidget
     ].join(' · ');
 
     final amountColor = tx.isTransfer
-        ? inkMuted
+        ? aContext.palette.inkMuted
         : tx.amount > 0
-            ? Colors.green.shade700
-            : inkPrimary;
+            ? aContext.palette.positive
+            : aContext.palette.inkPrimary;
+
+    final tile = ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: aContext.palette.surfaceMuted,
+        child: Icon(tx.isTransfer ? AppIcons.arrowLeftRight : categoryIcon(tx.category), size: 18, color: aContext.palette.inkSecondary),
+      ),
+      title: Row(
+        children: [
+          Flexible(child: Text(tx.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          if (tx.receiptId != null) ...[
+            const SizedBox(width: 6),
+            Icon(AppIcons.receipt, size: 14, color: aContext.palette.inkMuted),
+          ],
+        ],
+      ),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: trailing ??
+          Text(
+            formatMoney(aContext, tx.amount, tx.currCode, aIsSigned: true),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: amountColor),
+          ),
+    );
+
+    if (isFlat)
+    {
+      return tile;
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        side: BorderSide(color: aContext.palette.border),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFFF3F4F6),
-          child: Icon(tx.isTransfer ? AppIcons.arrowLeftRight : categoryIcon(tx.category), size: 18, color: inkSecondary),
-        ),
-        title: Row(
-          children: [
-            Flexible(child: Text(tx.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
-            if (tx.receiptId != null) ...[
-              const SizedBox(width: 6),
-              const Icon(AppIcons.receipt, size: 14, color: inkMuted),
-            ],
-          ],
-        ),
-        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: trailing ??
-            Text(
-              formatMoney(aContext, tx.amount, tx.currCode, aIsSigned: true),
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: amountColor),
-            ),
-      ),
+      child: tile,
     );
   }
 }

@@ -208,7 +208,17 @@
     "remove_child_confirm": "Retirer {} du groupe ? Si l'enfant n'appartient à aucun autre groupe, son profil et toutes ses mesures seront supprimés.",
     "wallets_title": "Mes portefeuilles dans le groupe",
     "wallets_hint": "Choisissez les portefeuilles visibles par les membres du groupe, avec leurs transactions et tickets liés. Vous seul pouvez les modifier.",
-    "wallets_empty": "Vous n’avez aucun portefeuille personnel."
+    "wallets_empty": "Vous n’avez aucun portefeuille personnel.",
+    "member_count": {
+      "zero": "{} membre",
+      "one": "{} membre",
+      "two": "{} membres",
+      "few": "{} membres",
+      "many": "{} membres",
+      "other": "{} membres"
+    },
+    "my_groups": "Mes groupes",
+    "no_groups": "Aucun groupe pour le moment. Créez-en un ou rejoignez-en un avec un code d’invitation."
   },
   "common": {
     "save": "Enregistrer",
@@ -226,7 +236,13 @@
     "soon": "Bientôt",
     "no_data": "Aucune donnée pour l'instant",
     "delete_confirm": "Voulez-vous vraiment supprimer ?",
-    "back": "Retour"
+    "back": "Retour",
+    "add": "Ajouter",
+    "close": "Fermer",
+    "close_search": "Fermer la recherche",
+    "done": "Terminé",
+    "search": "Rechercher",
+    "show_all": "Tout afficher"
   },
   "wallet": {
     "title": "Portefeuilles",
@@ -258,7 +274,8 @@
     "shared": "groupe",
     "read_only": "Seul le propriétaire ou un administrateur du groupe peut modifier ce portefeuille.",
     "linked_hint": "Ce portefeuille est synchronisé avec la banque : opérations et solde se mettent à jour automatiquement.",
-    "owned_by": "propriétaire : {}"
+    "owned_by": "propriétaire : {}",
+    "empty": "Aucun portefeuille pour le moment."
   },
   "places": {
     "add": "Ajouter un lieu",
@@ -555,7 +572,20 @@
     "my_wallets": "Mes portefeuilles",
     "owner_wallets": "Portefeuilles : {}",
     "receipt_read_only": "Lecture seule",
-    "receipt_shared_by": "Ticket de {} — lecture seule"
+    "receipt_shared_by": "Ticket de {} — lecture seule",
+    "cards": "Cartes et portefeuilles",
+    "categories": "Catégories",
+    "convert_short": "en {}",
+    "currency": "Devise",
+    "filters": "Filtres",
+    "mode": "Virements",
+    "no_conversion": "Sans conversion",
+    "preset_custom": "Période libre",
+    "preset_week": "7 jours",
+    "preset_month": "30 jours",
+    "preset_monthToDate": "Ce mois-ci",
+    "preset_quarter": "90 jours",
+    "view_list": "Liste"
   },
   "items": {
     "title": "Produits et services",
@@ -700,7 +730,13 @@
     "err_image_type": "Les photos JPEG, PNG et WebP sont prises en charge."
   },
   "settings": {
-    "title": "Paramètres"
+    "title": "Paramètres",
+    "theme": "Thème",
+    "theme_system": "Comme le système",
+    "theme_light": "Clair",
+    "theme_dark": "Sombre",
+    "theme_violet": "Violet",
+    "language": "Langue"
   },
   "ai": {
     "title": "Reconnaissance des tickets",
@@ -930,5 +966,11 @@
     "err_write_off": "Le montant doit être supérieur à zéro et au plus {}",
     "err_write_off_date": "La date doit être postérieure au relevé précédent et au plus tard celle de ce relevé",
     "tx_marker": "écriture de solde"
+  },
+  "home": {
+    "open_profile": "Ouvrir le profil",
+    "tab_finance": "Finances",
+    "tab_groups": "Groupes",
+    "tab_routine": "Routine"
   }
 }

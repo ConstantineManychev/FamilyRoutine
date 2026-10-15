@@ -4,23 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
+import '../common/app_theme.dart';
 
 final StateProvider<int> routineRevisionProv = StateProvider<int>((aRef) => 0);
 
 extension RoutineStatusStyle on RoutineStatus
 {
-  Color get color => switch (this)
-  {
-    RoutineStatus.work => const Color(0xFF2A78D6),
-    RoutineStatus.meal => const Color(0xFFEB6834),
-    RoutineStatus.home => const Color(0xFF1BAF7A),
-    RoutineStatus.transit => const Color(0xFFEDA100),
-    RoutineStatus.leisure => const Color(0xFFE87BA4),
-    RoutineStatus.gym => const Color(0xFF008300),
-    RoutineStatus.sleep => const Color(0xFF6250D6),
-    RoutineStatus.school => const Color(0xFFE34948),
-    RoutineStatus.other => const Color(0xFF898781),
-  };
+  Color colorOf(BuildContext aContext) => aContext.palette.seriesAt(index);
 
   IconData get icon => switch (this)
   {
@@ -75,19 +65,19 @@ class StatusBadge extends StatelessWidget
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: status.color.withValues(alpha: 0.12),
+        color: status.colorOf(aContext).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(status.icon, size: 14, color: status.color),
+          Icon(status.icon, size: 14, color: status.colorOf(aContext)),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               caption == null ? status.label : '${status.label} · $caption',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: aContext.palette.inkPrimary),
             ),
           ),
         ],

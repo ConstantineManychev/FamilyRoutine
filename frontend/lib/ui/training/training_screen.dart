@@ -7,12 +7,11 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'training_format.dart';
 import 'training_revision.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
-const Color _borderColor = Color(0xFFE5E7EB);
 const int _upcomingLimit = 10;
 
 class TrainingScreen extends ConsumerStatefulWidget
@@ -124,7 +123,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text('training.choose_today_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+              child: Text('training.choose_today_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
             ),
             for (final day in full.days)
               SimpleDialogOption(
@@ -215,7 +214,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: aChildren),
@@ -253,7 +252,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
       return _card([
         Text('training.no_program'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text('training.no_program_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+        Text('training.no_program_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -277,16 +276,16 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
         : 'training.next_on'.tr(args: [next.dayName, plannedDateLabel(aContext, date)]);
 
     return _card([
-      Text(program.name, style: const TextStyle(color: inkSecondary)),
+      Text(program.name, style: TextStyle(color: context.palette.inkSecondary)),
       const SizedBox(height: 4),
       Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       if (next.isOverdue) ...[
         const SizedBox(height: 4),
-        Text('training.overdue'.tr(), style: TextStyle(color: Colors.orange.shade800)),
+        Text('training.overdue'.tr(), style: TextStyle(color: context.palette.warning)),
       ],
       if (!isToday) ...[
         const SizedBox(height: 4),
-        Text('training.rest_today'.tr(), style: const TextStyle(color: inkSecondary)),
+        Text('training.rest_today'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
       ],
       const SizedBox(height: 12),
       Wrap(
@@ -314,7 +313,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
       Text('training.upcoming'.tr(), style: const TextStyle(fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
       if (isQueue)
-        Text(items.map((aItem) => aItem.dayName).join(' → '), style: const TextStyle(color: inkSecondary))
+        Text(items.map((aItem) => aItem.dayName).join(' → '), style: TextStyle(color: context.palette.inkSecondary))
       else
         Wrap(
           spacing: 8,
@@ -338,19 +337,19 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
         Text('training.programs'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         if (_programs.isEmpty)
-          Text('training.no_programs'.tr(), style: const TextStyle(color: inkMuted))
+          Text('training.no_programs'.tr(), style: TextStyle(color: context.palette.inkMuted))
         else
           Card(
             elevation: 0,
             margin: EdgeInsets.zero,
             semanticContainer: false,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
             child: Column(
               children: [
                 for (final program in _programs)
                   ListTile(
                     onTap: () => _openEditor(program.id),
-                    leading: Icon(program.isActive ? AppIcons.checkCircle : AppIcons.dumbbell, color: program.isActive ? Colors.green : inkMuted),
+                    leading: Icon(program.isActive ? AppIcons.checkCircle : AppIcons.dumbbell, color: program.isActive ? context.palette.positive : context.palette.inkMuted),
                     title: Text(program.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text([
                       'training.mode_${program.mode.name}'.tr(),
@@ -376,13 +375,13 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
         Text('training.history'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         if (_sessions.isEmpty)
-          Text('training.no_history'.tr(), style: const TextStyle(color: inkMuted))
+          Text('training.no_history'.tr(), style: TextStyle(color: context.palette.inkMuted))
         else
           Card(
             elevation: 0,
             margin: EdgeInsets.zero,
             semanticContainer: false,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
             child: Column(
               children: [
                 for (final session in _sessions)

@@ -10,9 +10,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'dash_card.dart';
 import 'routine_style.dart';
+import '../common/app_theme.dart';
 
 const Duration _pollInterval = Duration(seconds: 30);
 const double _rowHeight = 48;
@@ -188,7 +188,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(AppIcons.calendarClock, size: 20, color: inkSecondary),
+          Icon(AppIcons.calendarClock, size: 20, color: context.palette.inkSecondary),
           const SizedBox(width: 8),
           Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
         ],
@@ -202,7 +202,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
               icon: const Icon(AppIcons.chevronLeft, size: 18),
               onPressed: () => _shiftDay(-1),
             ),
-            Text(_dayLabel(aContext), style: const TextStyle(fontWeight: FontWeight.w600, color: inkSecondary)),
+            Text(_dayLabel(aContext), style: TextStyle(fontWeight: FontWeight.w600, color: context.palette.inkSecondary)),
             IconButton(
               tooltip: 'routine.next_day'.tr(),
               icon: const Icon(AppIcons.chevronRight, size: 18),
@@ -243,7 +243,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
         ),
         const SizedBox(height: 12),
         if (!hasMarks)
-          Text('routine.empty'.tr(), style: const TextStyle(color: inkMuted))
+          Text('routine.empty'.tr(), style: TextStyle(color: context.palette.inkMuted))
         else
           Wrap(
             spacing: 16,
@@ -256,7 +256,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(errorText(_error!), style: TextStyle(fontSize: 12, color: Colors.red.shade800)),
+            child: Text(errorText(_error!), style: TextStyle(fontSize: 12, color: context.palette.danger)),
           ),
       ],
     );
@@ -325,7 +325,7 @@ class _TimelineGrid extends StatelessWidget
                         left: trackWidth * hour / 24,
                         top: _axisHeight,
                         bottom: 0,
-                        child: Container(width: 1, color: gridColor),
+                        child: Container(width: 1, color: aContext.palette.grid),
                       ),
                       Positioned(
                         left: (trackWidth * hour / 24 - 20).clamp(-4.0, trackWidth - 36),
@@ -334,7 +334,7 @@ class _TimelineGrid extends StatelessWidget
                         child: Text(
                           '${hour.toString().padLeft(2, '0')}:00',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 11, color: inkMuted),
+                          style: TextStyle(fontSize: 11, color: aContext.palette.inkMuted),
                         ),
                       ),
                     ],
@@ -359,7 +359,7 @@ class _TimelineGrid extends StatelessWidget
                         top: _axisHeight - 4,
                         bottom: 0,
                         child: IgnorePointer(
-                          child: Container(width: 2, color: inkPrimary),
+                          child: Container(width: 2, color: aContext.palette.inkPrimary),
                         ),
                       ),
                   ],
@@ -395,21 +395,21 @@ class _MemberLabel extends StatelessWidget
           name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontWeight: member.isMe ? FontWeight.bold : FontWeight.w600, color: inkPrimary),
+          style: TextStyle(fontWeight: member.isMe ? FontWeight.bold : FontWeight.w600, color: aContext.palette.inkPrimary),
         ),
         if (current != null)
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Row(
               children: [
-                Icon(current.status.icon, size: 12, color: current.status.color),
+                Icon(current.status.icon, size: 12, color: current.status.colorOf(aContext)),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
                     current.status.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: inkSecondary),
+                    style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary),
                   ),
                 ),
               ],
@@ -469,7 +469,7 @@ class _MemberTrack extends StatelessWidget
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F4F1),
+        color: aContext.palette.surfaceMuted,
         borderRadius: BorderRadius.circular(_blockRadius),
       ),
       child: Stack(children: blocks),
@@ -496,8 +496,8 @@ class _MarkBlock extends StatelessWidget
   @override
   Widget build(BuildContext aContext)
   {
-    final color = mark.status.color;
-    final iconColor = color.computeLuminance() > 0.3 ? inkPrimary : Colors.white;
+    final color = mark.status.colorOf(aContext);
+    final iconColor = color.computeLuminance() > 0.3 ? aContext.palette.inkPrimary : Colors.white;
     final lines = [
       '$memberName — ${mark.status.label}',
       '${formatSpan(aContext, mark)} · ${formatDuration(duration)}',
@@ -544,12 +544,12 @@ class _LegendItem extends StatelessWidget
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(color: status.color, borderRadius: BorderRadius.circular(3)),
+          decoration: BoxDecoration(color: status.colorOf(aContext), borderRadius: BorderRadius.circular(3)),
         ),
         const SizedBox(width: 6),
-        Icon(status.icon, size: 14, color: inkSecondary),
+        Icon(status.icon, size: 14, color: aContext.palette.inkSecondary),
         const SizedBox(width: 4),
-        Text(status.label, style: const TextStyle(fontSize: 12, color: inkSecondary)),
+        Text(status.label, style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary)),
       ],
     );
   }
@@ -590,6 +590,7 @@ class _MarkEditDialogState extends State<_MarkEditDialog>
   Widget build(BuildContext aContext)
   {
     return AlertDialog(
+      scrollable: true,
       title: Text('routine.edit_mark'.tr()),
       content: SizedBox(
         width: 420,
@@ -597,14 +598,14 @@ class _MarkEditDialogState extends State<_MarkEditDialog>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(formatSpan(aContext, widget.mark), style: const TextStyle(color: inkSecondary)),
+            Text(formatSpan(aContext, widget.mark), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: RoutineStatus.values
                   .map((aStatus) => ChoiceChip(
-                        avatar: Icon(aStatus.icon, size: 16, color: aStatus.color),
+                        avatar: Icon(aStatus.icon, size: 16, color: aStatus.colorOf(context)),
                         label: Text(aStatus.label),
                         selected: aStatus == _status,
                         onSelected: (_) => setState(() => _status = aStatus),
@@ -622,7 +623,7 @@ class _MarkEditDialogState extends State<_MarkEditDialog>
       ),
       actions: [
         TextButton.icon(
-          style: TextButton.styleFrom(foregroundColor: Colors.red.shade800),
+          style: TextButton.styleFrom(foregroundColor: context.palette.danger),
           onPressed: () => Navigator.of(aContext).pop(_MarkEdit(status: _status, isDelete: true)),
           icon: const Icon(AppIcons.trash2, size: 16),
           label: Text('common.delete'.tr()),

@@ -2,14 +2,15 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../training/training_format.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import 'exercises_screen.dart';
+import '../common/app_theme.dart';
 
 const List<String> exerciseTypes = ['cardio', 'strength', 'flexibility', 'mixed'];
 const List<String> weightTypes = ['external', 'hybrid', 'bodyweight'];
@@ -162,7 +163,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
       ref.invalidate(exercisesProv);
       if (mounted)
       {
-        context.go('/app/exercises');
+        finishPage(context, '/app/exercises');
       }
     }
     catch (aError)
@@ -253,7 +254,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
       ref.invalidate(exercisesProv);
       if (mounted)
       {
-        context.go('/app/exercises');
+        finishPage(context, '/app/exercises');
       }
     }
     catch (aError)
@@ -303,7 +304,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
             if (_isEdit && _isEditable)
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : _delete,
-                icon: const Icon(AppIcons.trash, color: Colors.red, size: 18),
+                icon: Icon(AppIcons.trash, color: context.palette.danger, size: 18),
                 label: Text('common.delete'.tr()),
               ),
             if (_isEditable)
@@ -316,7 +317,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
         ),
         if (!_isEditable) ...[
           const SizedBox(height: 12),
-          Text('exercises.system_read_only'.tr(), style: const TextStyle(color: Colors.grey)),
+          Text('exercises.system_read_only'.tr(), style: TextStyle(color: context.palette.inkMuted)),
         ],
         const SizedBox(height: 24),
         TextField(
@@ -445,7 +446,7 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
           if (_isEditable)
             IconButton(
               tooltip: 'common.delete'.tr(),
-              icon: const Icon(AppIcons.trash, color: Colors.red),
+              icon: Icon(AppIcons.trash, color: context.palette.danger),
               onPressed: () => _removeMuscleRow(aRow),
             ),
         ],

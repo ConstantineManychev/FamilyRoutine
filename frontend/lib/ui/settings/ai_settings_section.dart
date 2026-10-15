@@ -8,12 +8,11 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
+import '../common/app_theme.dart';
 
 const int _maxDailyLimit = 1000;
 const int _maxMonthlyLimit = 30000;
 const double _contentMaxWidth = 760;
-const Color _borderColor = Color(0xFFE5E7EB);
 
 class AiSettingsSection extends ConsumerStatefulWidget
 {
@@ -224,7 +223,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
           children: [
             Text('ai.title'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('ai.intro'.tr(), style: const TextStyle(color: inkSecondary)),
+            Text('ai.intro'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 16),
             _buildSourceCard(settings),
             const SizedBox(height: 24),
@@ -232,7 +231,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
             const SizedBox(height: 4),
             Text(
               settings.isOwnKeysAllowed ? 'ai.keys_hint'.tr() : 'ai.own_disabled'.tr(),
-              style: const TextStyle(color: inkSecondary),
+              style: TextStyle(color: context.palette.inkSecondary),
             ),
             const SizedBox(height: 12),
             if (settings.isOwnKeysAllowed)
@@ -257,7 +256,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
       semanticContainer: false,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: _borderColor),
+        side: BorderSide(color: context.palette.border),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -332,7 +331,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('ai.hint_${aProvider.name}'.tr(), style: const TextStyle(color: inkSecondary, fontSize: 13)),
+            Text('ai.hint_${aProvider.name}'.tr(), style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
             const SizedBox(height: 12),
             if (isEditing) _buildKeyInput(aProvider, aKey) else _buildModelPicker(aProvider, aKey),
           ],
@@ -416,7 +415,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
           child: Text('ai.replace_key'.tr()),
         ),
         TextButton(
-          style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+          style: TextButton.styleFrom(foregroundColor: context.palette.danger),
           onPressed: _isBusy ? null : () => _deleteKey(aProvider),
           child: Text('ai.delete_key'.tr()),
         ),
@@ -448,7 +447,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
           children: [
             Text('ai.limits_title'.tr(), style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('ai.limits_hint'.tr(), style: const TextStyle(color: inkSecondary, fontSize: 13)),
+            Text('ai.limits_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -471,7 +470,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection>
               const SizedBox(height: 4),
               Text(
                 'ai.tokens'.tr(args: [numbers.format(usage.monthInputTokens), numbers.format(usage.monthOutputTokens)]),
-                style: const TextStyle(color: inkSecondary, fontSize: 13),
+                style: TextStyle(color: context.palette.inkSecondary, fontSize: 13),
               ),
             ],
           ],

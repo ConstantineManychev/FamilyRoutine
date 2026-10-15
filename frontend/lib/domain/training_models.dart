@@ -127,8 +127,16 @@ class ProgramListItem
   final ScheduleMode mode;
   final bool isActive;
   final int dayCount;
+  final DateTime? updatedTs;
 
-  const ProgramListItem({required this.id, required this.name, required this.mode, required this.isActive, required this.dayCount});
+  const ProgramListItem({
+    required this.id,
+    required this.name,
+    required this.mode,
+    required this.isActive,
+    required this.dayCount,
+    this.updatedTs,
+  });
 
   factory ProgramListItem.fromJson(Map<String, dynamic> aJson) => ProgramListItem(
         id: aJson['id'] as String,
@@ -136,6 +144,7 @@ class ProgramListItem
         mode: ScheduleMode.parse(aJson['schedule_mode']),
         isActive: aJson['is_active'] as bool,
         dayCount: aJson['day_count'] as int,
+        updatedTs: aJson['updated_ts'] == null ? null : DateTime.parse(aJson['updated_ts'] as String).toLocal(),
       );
 }
 

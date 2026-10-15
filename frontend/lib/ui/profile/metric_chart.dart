@@ -4,16 +4,14 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
-import '../common/money.dart';
 import 'metric_format.dart';
+import '../common/app_theme.dart';
 
 const double _chartHeight = 240;
 const double _axisWidth = 52;
 const double _labelHeight = 22;
 const double _pointRadius = 4;
 const double _hitRadius = 28;
-const Color measureColor = Color(0xFF2A78D6);
-const Color trendColor = Color(0xFFE8833A);
 
 class MetricChart extends StatefulWidget
 {
@@ -67,8 +65,8 @@ class _MetricChartState extends State<MetricChart>
               spacing: 20,
               runSpacing: 6,
               children: [
-                _LegendEntry(color: measureColor, label: 'metrics.series_measured'.tr(), isDot: true),
-                _LegendEntry(color: trendColor, label: 'metrics.series_trend'.tr(), isDot: false),
+                _LegendEntry(color: context.palette.seriesAt(0), label: 'metrics.series_measured'.tr(), isDot: true),
+                _LegendEntry(color: context.palette.seriesAt(1), label: 'metrics.series_trend'.tr(), isDot: false),
               ],
             ),
           ),
@@ -94,6 +92,7 @@ class _MetricChartState extends State<MetricChart>
                       Positioned.fill(
                         child: CustomPaint(
                           painter: _MetricPainter(
+                        palette: aContext.palette,
                             points: widget.points,
                             trend: trend,
                             hoverIndex: _hoverIndex,
@@ -134,23 +133,23 @@ class _MetricChartState extends State<MetricChart>
         child: Material(
           elevation: 3,
           borderRadius: BorderRadius.circular(8),
-          color: Colors.white,
+          color: context.colors.surface,
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(formatMeasuredTs(aContext, aPoint.measuredTs), style: const TextStyle(color: inkSecondary, fontSize: 12)),
+                Text(formatMeasuredTs(aContext, aPoint.measuredTs), style: TextStyle(color: context.palette.inkSecondary, fontSize: 12)),
                 const SizedBox(height: 6),
                 _TooltipRow(
-                  color: measureColor,
+                  color: context.palette.seriesAt(0),
                   label: 'metrics.series_measured'.tr(),
                   value: formatMetric(aContext, widget.metric, aPoint.value),
                 ),
                 if (trend != null)
                   _TooltipRow(
-                    color: trendColor,
+                    color: context.palette.seriesAt(1),
                     label: 'metrics.series_trend'.tr(),
                     value: formatMetric(aContext, widget.metric, double.parse(trend[_hoverIndex!].toStringAsFixed(2))),
                   ),
@@ -209,6 +208,7 @@ class _ChartLayout
 
 class _MetricPainter extends CustomPainter
 {
+  final AppPalette palette;
   final List<MetricPoint> points;
   final List<double>? trend;
   final int? hoverIndex;
@@ -216,6 +216,7 @@ class _MetricPainter extends CustomPainter
   final String Function(DateTime, Duration) dateLabel;
 
   _MetricPainter({
+    required this.palette,
     required this.points,
     required this.trend,
     required this.hoverIndex,
@@ -226,7 +227,7 @@ class _MetricPainter extends CustomPainter
   void _paintText(Canvas aCanvas, String aText, Offset aAnchor, TextAlign aAlign, double aMaxWidth)
   {
     final painter = TextPainter(
-      text: TextSpan(text: aText, style: const TextStyle(color: inkMuted, fontSize: 11)),
+      text: TextSpan(text: aText, style: TextStyle(color: palette.inkMuted, fontSize: 11)),
       textDirection: TextDirection.ltr,
       maxLines: 1,
       ellipsis: '…',
@@ -250,7 +251,7 @@ class _MetricPainter extends CustomPainter
 
     final layout = _ChartLayout(points, trend, aSize);
     final gridPaint = Paint()
-      ..color = gridColor
+      ..color = palette.grid
       ..strokeWidth = 1;
     for (var step = 0; step <= 3; step++)
     {
@@ -263,7 +264,7 @@ class _MetricPainter extends CustomPainter
     if (hoverIndex != null)
     {
       final x = layout.xOf(points[hoverIndex!].measuredTs);
-      aCanvas.drawLine(Offset(x, 0), Offset(x, layout.plotHeight), Paint()..color = baselineColor..strokeWidth = 1);
+      aCanvas.drawLine(Offset(x, 0), Offset(x, layout.plotHeight), Paint()..color = palette.baseline..strokeWidth = 1);
     }
 
     final measured = Path();
@@ -275,7 +276,7 @@ class _MetricPainter extends CustomPainter
     aCanvas.drawPath(
       measured,
       Paint()
-        ..color = measureColor.withValues(alpha: trend == null ? 1 : 0.35)
+        ..color = palette.seriesAt(0).withValues(alpha: trend == null ? 1 : 0.35)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
@@ -292,7 +293,7 @@ class _MetricPainter extends CustomPainter
       aCanvas.drawPath(
         trendPath,
         Paint()
-          ..color = trendColor
+          ..color = palette.seriesAt(1)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
@@ -302,8 +303,8 @@ class _MetricPainter extends CustomPainter
     {
       final center = Offset(layout.xOf(points[index].measuredTs), layout.yOf(points[index].value));
       final radius = index == hoverIndex ? _pointRadius + 2 : _pointRadius;
-      aCanvas.drawCircle(center, radius + 2, Paint()..color = Colors.white);
-      aCanvas.drawCircle(center, radius, Paint()..color = measureColor);
+      aCanvas.drawCircle(center, radius + 2, Paint()..color = palette.surface);
+      aCanvas.drawCircle(center, radius, Paint()..color = palette.seriesAt(0));
     }
 
     final labelCount = math.max(2, ((layout.plotRight - layout.plotLeft) / 90).floor());
@@ -342,7 +343,7 @@ class _LegendEntry extends StatelessWidget
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(isDot ? 5 : 2)),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: inkSecondary)),
+        Text(label, style: TextStyle(color: aContext.palette.inkSecondary)),
       ],
     );
   }
@@ -365,8 +366,8 @@ class _TooltipRow extends StatelessWidget
         children: [
           Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4))),
           const SizedBox(width: 6),
-          Expanded(child: Text(label, style: const TextStyle(color: inkSecondary, fontSize: 13))),
-          Text(value, style: const TextStyle(color: inkPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+          Expanded(child: Text(label, style: TextStyle(color: aContext.palette.inkSecondary, fontSize: 13))),
+          Text(value, style: TextStyle(color: aContext.palette.inkPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );

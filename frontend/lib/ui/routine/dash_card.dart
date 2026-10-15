@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../common/money.dart';
+import '../common/app_theme.dart';
 
 class DashCard extends StatelessWidget
 {
@@ -18,9 +18,9 @@ class DashCard extends StatelessWidget
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 16, 16, 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: aContext.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: aContext.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +35,7 @@ class DashCard extends StatelessWidget
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     DefaultTextStyle.merge(
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: inkPrimary),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: aContext.palette.inkPrimary),
                       child: title,
                     ),
                     ...actions,

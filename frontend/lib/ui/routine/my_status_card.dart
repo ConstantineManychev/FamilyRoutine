@@ -7,9 +7,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'dash_card.dart';
 import 'routine_style.dart';
+import '../common/app_theme.dart';
 
 const List<int> _offsetMinutes = [0, 15, 30, 60];
 
@@ -155,7 +155,7 @@ class _MyStatusCardState extends ConsumerState<MyStatusCard>
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text(errorText(_error!), style: TextStyle(color: Colors.red.shade800)),
+              child: Text(errorText(_error!), style: TextStyle(color: context.palette.danger)),
             ),
           Wrap(
             spacing: 8,
@@ -172,7 +172,7 @@ class _MyStatusCardState extends ConsumerState<MyStatusCard>
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('routine.started'.tr(), style: const TextStyle(color: inkSecondary)),
+              Text('routine.started'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
               ..._offsetMinutes.map((aMinutes) => ChoiceChip(
                     showCheckmark: false,
                     label: Text(aMinutes == 0 ? 'routine.now'.tr() : 'routine.ago'.tr(args: [formatDuration(Duration(minutes: aMinutes))])),
@@ -224,12 +224,12 @@ class _StatusButton extends StatelessWidget
     return OutlinedButton.icon(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: inkPrimary,
-        backgroundColor: isActive ? status.color.withValues(alpha: 0.14) : null,
-        side: BorderSide(color: isActive ? status.color : const Color(0xFFE5E7EB), width: isActive ? 2 : 1),
+        foregroundColor: aContext.palette.inkPrimary,
+        backgroundColor: isActive ? status.colorOf(aContext).withValues(alpha: 0.14) : null,
+        side: BorderSide(color: isActive ? status.colorOf(aContext) : aContext.palette.border, width: isActive ? 2 : 1),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
-      icon: Icon(status.icon, size: 18, color: status.color),
+      icon: Icon(status.icon, size: 18, color: status.colorOf(aContext)),
       label: Text(status.label),
     );
   }

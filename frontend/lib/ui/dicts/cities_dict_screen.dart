@@ -6,7 +6,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import 'geo_tree.dart';
+import '../common/app_theme.dart';
 
 class CitiesDictScreen extends ConsumerStatefulWidget
 {
@@ -65,22 +67,16 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTre
   {
     aContext.locale;
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(title: 'geo.cities_dict'.tr()),
-          const SizedBox(height: 24),
-          Expanded(child: buildTree(aCountryBody: _buildCities)),
-        ],
-      ),
+    return ListPage(
+      title: 'geo.cities_dict'.tr(),
+      onSearch: (aQuery) => setState(() => geoQuery = aQuery.trim().toLowerCase()),
+      child: buildTree(aCountryBody: _buildCities),
     );
   }
 
   Widget _buildCities(CountryDto aCountry)
   {
-    final cities = citiesCache[aCountry.id] ?? const <CityDto>[];
+    final cities = visibleCities(aCountry);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +94,7 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTre
           Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: context.palette.border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -133,11 +129,11 @@ class _CitiesDictScreenState extends ConsumerState<CitiesDictScreen> with GeoTre
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: Colors.grey.shade50,
+      color: context.palette.surfaceMuted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('geo.streets_in_city'.tr(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          Text('geo.streets_in_city'.tr(), style: TextStyle(fontWeight: FontWeight.bold, color: context.palette.inkMuted)),
           const SizedBox(height: 8),
           if (streets.isEmpty)
             Text('geo.no_streets'.tr(), style: const TextStyle(fontStyle: FontStyle.italic))

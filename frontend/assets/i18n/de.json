@@ -208,7 +208,17 @@
     "remove_child_confirm": "{} aus der Gruppe entfernen? Ist das Kind in keiner anderen Gruppe, werden das Profil und alle Messwerte gelöscht.",
     "wallets_title": "Meine Konten in der Gruppe",
     "wallets_hint": "Wählen Sie die Konten, die Gruppenmitglieder sehen dürfen – samt Transaktionen und verknüpften Belegen. Ändern können nur Sie sie.",
-    "wallets_empty": "Sie haben keine persönlichen Konten."
+    "wallets_empty": "Sie haben keine persönlichen Konten.",
+    "member_count": {
+      "zero": "{} Mitglieder",
+      "one": "{} Mitglied",
+      "two": "{} Mitglieder",
+      "few": "{} Mitglieder",
+      "many": "{} Mitglieder",
+      "other": "{} Mitglieder"
+    },
+    "my_groups": "Meine Gruppen",
+    "no_groups": "Noch keine Gruppen. Erstellen Sie eine oder treten Sie mit einem Einladungscode bei."
   },
   "common": {
     "save": "Speichern",
@@ -226,7 +236,13 @@
     "soon": "Demnächst",
     "no_data": "Noch keine Daten",
     "delete_confirm": "Möchten Sie das wirklich löschen?",
-    "back": "Zurück"
+    "back": "Zurück",
+    "add": "Hinzufügen",
+    "close": "Schließen",
+    "close_search": "Suche schließen",
+    "done": "Fertig",
+    "search": "Suchen",
+    "show_all": "Alle anzeigen"
   },
   "wallet": {
     "title": "Geldbörsen",
@@ -258,7 +274,8 @@
     "shared": "Gruppe",
     "read_only": "Nur der Eigentümer oder ein Gruppenadministrator kann diese Geldbörse bearbeiten.",
     "linked_hint": "Dieses Konto wird mit der Bank synchronisiert: Buchungen und Saldo aktualisieren sich automatisch.",
-    "owned_by": "Inhaber: {}"
+    "owned_by": "Inhaber: {}",
+    "empty": "Noch keine Konten."
   },
   "places": {
     "add": "Ort hinzufügen",
@@ -555,7 +572,20 @@
     "my_wallets": "Meine Konten",
     "owner_wallets": "Konten: {}",
     "receipt_read_only": "Nur Ansicht",
-    "receipt_shared_by": "Beleg von {} – nur Ansicht"
+    "receipt_shared_by": "Beleg von {} – nur Ansicht",
+    "cards": "Karten und Konten",
+    "categories": "Kategorien",
+    "convert_short": "in {}",
+    "currency": "Währung",
+    "filters": "Filter",
+    "mode": "Überweisungen",
+    "no_conversion": "Ohne Umrechnung",
+    "preset_custom": "Eigener Zeitraum",
+    "preset_week": "7 Tage",
+    "preset_month": "30 Tage",
+    "preset_monthToDate": "Dieser Monat",
+    "preset_quarter": "90 Tage",
+    "view_list": "Liste"
   },
   "items": {
     "title": "Waren und Dienstleistungen",
@@ -700,7 +730,13 @@
     "err_image_type": "Unterstützt werden JPEG-, PNG- und WebP-Fotos."
   },
   "settings": {
-    "title": "Einstellungen"
+    "title": "Einstellungen",
+    "theme": "Design",
+    "theme_system": "Wie im System",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "theme_violet": "Violett",
+    "language": "Sprache"
   },
   "ai": {
     "title": "Belegerkennung",
@@ -930,5 +966,11 @@
     "err_write_off": "Der Betrag muss größer als null und höchstens {} sein",
     "err_write_off_date": "Das Datum muss nach der vorherigen Erfassung und spätestens bei dieser liegen",
     "tx_marker": "Ausbuchung zum Kontostand"
+  },
+  "home": {
+    "open_profile": "Profil öffnen",
+    "tab_finance": "Finanzen",
+    "tab_groups": "Gruppen",
+    "tab_routine": "Alltag"
   }
 }

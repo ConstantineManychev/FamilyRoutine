@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
-import '../common/money.dart';
+import '../common/app_theme.dart';
 
 export '../../domain/barcode.dart';
 
@@ -21,19 +21,19 @@ class FamilyBadge extends StatelessWidget
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: aContext.colors.primaryContainer,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(AppIcons.users, size: 12, color: Color(0xFF1D4ED8)),
+          Icon(AppIcons.users, size: 12, color: aContext.colors.primary),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: aContext.colors.primary),
             ),
           ),
         ],
@@ -101,6 +101,7 @@ class _ShareDialogState extends State<_ShareDialog>
   Widget build(BuildContext aContext)
   {
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.title),
       content: SizedBox(
         width: 420,
@@ -118,7 +119,7 @@ class _ShareDialogState extends State<_ShareDialog>
               onChanged: (aValue) => setState(() => _familyId = aValue),
             ),
             const SizedBox(height: 12),
-            Text('catalog.share_warning'.tr(), style: const TextStyle(color: inkSecondary)),
+            Text('catalog.share_warning'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
           ],
         ),
       ),

@@ -8,13 +8,12 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'exercise_picker.dart';
 import 'training_format.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
 const double _numberFieldWidth = 104;
-const Color _borderColor = Color(0xFFE5E7EB);
 const int _maxDays = 14;
 const int _maxDayExercises = 30;
 const int _maxRestDays = 14;
@@ -382,7 +381,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
                   actions: [
                     if (_isEdit)
                       TextButton(
-                        style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                        style: TextButton.styleFrom(foregroundColor: context.palette.danger),
                         onPressed: _isBusy ? null : _delete,
                         child: Text('training.delete_program'.tr()),
                       ),
@@ -395,7 +394,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
                 ),
                 if (_isActive) ...[
                   const SizedBox(height: 4),
-                  Text('training.active_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+                  Text('training.active_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
                 ],
                 const SizedBox(height: 20),
                 ConstrainedBox(
@@ -424,7 +423,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text('training.mode_${_mode.name}_hint'.tr(), style: const TextStyle(color: inkSecondary, fontSize: 13)),
+                Text('training.mode_${_mode.name}_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
                 const SizedBox(height: 20),
                 for (var index = 0; index < _days.length; index++) ...[
                   _buildDay(aContext, index),
@@ -455,7 +454,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -483,7 +482,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
                 IconButton(
                   tooltip: 'training.remove_day'.tr(),
                   onPressed: _days.length == 1 ? null : () => _removeDay(aIndex),
-                  icon: const Icon(AppIcons.trash2, size: 18, color: Colors.red),
+                  icon: Icon(AppIcons.trash2, size: 18, color: context.palette.danger),
                 ),
               ],
             ),
@@ -491,7 +490,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
             if (_mode == ScheduleMode.intervals)
               Row(
                 children: [
-                  Expanded(child: Text('training.rest_after'.tr(), style: const TextStyle(color: inkSecondary))),
+                  Expanded(child: Text('training.rest_after'.tr(), style: TextStyle(color: context.palette.inkSecondary))),
                   IconButton(
                     tooltip: 'training.less'.tr(),
                     onPressed: day.restDaysAfter <= 0 ? null : () => setState(() => day.restDaysAfter--),
@@ -560,7 +559,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.only(top: 12),
-      decoration: const BoxDecoration(border: Border(top: BorderSide(color: _borderColor))),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: context.palette.border))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

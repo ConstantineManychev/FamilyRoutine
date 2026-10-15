@@ -11,16 +11,17 @@ import '../../providers/api_prov.dart';
 import '../../providers/auth_provider.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
+import '../settings/ai_settings_section.dart';
+import '../settings/app_settings_section.dart';
 import '../training/person_training_card.dart';
 import 'body_entry_editor.dart';
 import 'metric_format.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
 const double _tileWidth = 200;
 const double _tileSpacing = 12;
 const int _minTileColumns = 2;
-const Color _borderColor = Color(0xFFE5E7EB);
 
 String personPath(String aPersonId, bool aIsSelf) => aIsSelf ? '/app/profile' : '/app/people/$aPersonId';
 
@@ -295,6 +296,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 if (profile.isSelf) ...[
                   const SizedBox(height: 24),
                   _buildPassword(),
+                  const SizedBox(height: 24),
+                  const AppSettingsSection(),
+                  const SizedBox(height: 24),
+                  const AiSettingsSection(),
                 ],
                 if (_isBusy) const Padding(padding: EdgeInsets.only(top: 16), child: LinearProgressIndicator()),
               ],
@@ -311,7 +316,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: aChildren),
@@ -341,7 +346,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: context.colors.primary,
               child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
             ),
             const SizedBox(width: 16),
@@ -350,7 +355,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(aProfile.fullName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  if (details.isNotEmpty) Text(details.join(' · '), style: const TextStyle(color: inkSecondary)),
+                  if (details.isNotEmpty) Text(details.join(' · '), style: TextStyle(color: context.palette.inkSecondary)),
                   if (aProfile.isManaged)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -379,14 +384,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   {
     if (aProfile.visibleGroups.isEmpty)
     {
-      return Text('metrics.hidden'.tr(), style: const TextStyle(color: inkSecondary));
+      return Text('metrics.hidden'.tr(), style: TextStyle(color: context.palette.inkSecondary));
     }
 
     final groups = aProfile.visibleGroups.where((aGroup) => aProfile.canEdit || aProfile.latest.any((aValue) => aValue.metric.group == aGroup));
     if (aProfile.latest.isEmpty)
     {
       return _card([
-        Text('metrics.empty'.tr(), style: const TextStyle(color: inkSecondary)),
+        Text('metrics.empty'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
       ]);
     }
 
@@ -408,7 +413,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final values = BodyMetric.ofGroup(aGroup).map(aProfile.latestOf).whereType<MetricValue>().toList();
     if (values.isEmpty)
     {
-      return Text('metrics.group_empty'.tr(), style: const TextStyle(color: inkMuted));
+      return Text('metrics.group_empty'.tr(), style: TextStyle(color: context.palette.inkMuted));
     }
 
     return LayoutBuilder(
@@ -432,8 +437,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return SizedBox(
       width: aWidth,
       child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+        color: context.colors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () => _openHistory(aValue.metric),
@@ -442,21 +447,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(metricName(aValue.metric), style: const TextStyle(color: inkSecondary, fontSize: 13)),
+                Text(metricName(aValue.metric), style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
                 const SizedBox(height: 4),
                 Text(
                   formatMetric(aContext, aValue.metric, aValue.value),
-                  style: const TextStyle(color: inkPrimary, fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: context.palette.inkPrimary, fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                Text(formatMeasuredDate(aContext, aValue.measuredTs), style: const TextStyle(color: inkMuted, fontSize: 12)),
+                Text(formatMeasuredDate(aContext, aValue.measuredTs), style: TextStyle(color: context.palette.inkMuted, fontSize: 12)),
                 if (delta != null && aValue.prevTs != null)
                   Text(
                     'metrics.delta_since'.tr(args: [
                       formatMetric(aContext, aValue.metric, delta, aIsSigned: true),
                       formatMeasuredDate(aContext, aValue.prevTs!),
                     ]),
-                    style: const TextStyle(color: inkSecondary, fontSize: 12),
+                    style: TextStyle(color: context.palette.inkSecondary, fontSize: 12),
                   ),
               ],
             ),
@@ -520,7 +525,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         ),
       ),
       const SizedBox(height: 4),
-      Text('profile.sex_hint'.tr(), style: const TextStyle(color: inkMuted, fontSize: 12)),
+      Text('profile.sex_hint'.tr(), style: TextStyle(color: context.palette.inkMuted, fontSize: 12)),
       const SizedBox(height: 16),
       ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 540),
@@ -541,7 +546,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         ),
       ),
       const SizedBox(height: 4),
-      Text('profile.activity_hint'.tr(), style: const TextStyle(color: inkMuted, fontSize: 12)),
+      Text('profile.activity_hint'.tr(), style: TextStyle(color: context.palette.inkMuted, fontSize: 12)),
       const SizedBox(height: 16),
       Align(
         alignment: Alignment.centerLeft,
@@ -557,7 +562,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       const SizedBox(height: 4),
       Text(
         aProfile.isSelf ? 'profile.sharing_hint'.tr() : 'profile.sharing_hint_child'.tr(),
-        style: const TextStyle(color: inkSecondary),
+        style: TextStyle(color: context.palette.inkSecondary),
       ),
       for (final sharing in aProfile.sharing) ...[
         const SizedBox(height: 12),
@@ -598,7 +603,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return _card([
       _sectionTitle('profile.password'.tr()),
       const SizedBox(height: 4),
-      Text('profile.pwd_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+      Text('profile.pwd_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
       const SizedBox(height: 12),
       Wrap(
         spacing: 12,
@@ -613,7 +618,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       ),
       if (_passwordError != null) ...[
         const SizedBox(height: 8),
-        Text(_passwordError!, style: TextStyle(color: Colors.red.shade700)),
+        Text(_passwordError!, style: TextStyle(color: context.palette.danger)),
       ],
     ]);
   }

@@ -6,6 +6,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/app_theme.dart';
 
 mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
 {
@@ -17,6 +18,15 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
   String? expandedCityId;
   Object? loadError;
   bool isLoading = true;
+  String geoQuery = '';
+
+  bool matchesGeo(String aName) => geoQuery.isEmpty || aName.toLowerCase().contains(geoQuery);
+
+  List<CityDto> visibleCities(CountryDto aCountry)
+  {
+    final cities = citiesCache[aCountry.id] ?? const <CityDto>[];
+    return matchesGeo(aCountry.name) ? cities : cities.where((aCity) => matchesGeo(aCity.name)).toList();
+  }
 
   @override
   void initState()
@@ -167,11 +177,17 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
       return ErrorRetry(error: loadError!, onRetry: loadCountries);
     }
 
+    final shown = countries
+        .where((aCountry) => matchesGeo(aCountry.name) || (citiesCache[aCountry.id] ?? const <CityDto>[]).any((aCity) => matchesGeo(aCity.name)))
+        .toList();
+
     return ListView.builder(
-      itemCount: countries.length,
+      key: PageStorageKey('geo.${T.toString()}'),
+      padding: screenPadding(context),
+      itemCount: shown.length,
       itemBuilder: (_, aIndex)
       {
-        final country = countries[aIndex];
+        final country = shown[aIndex];
         final isExpanded = expandedCountryId == country.id;
 
         return Card(
@@ -182,7 +198,7 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
                 title: Text(country.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 trailing: Icon(isExpanded ? AppIcons.chevronUp : AppIcons.chevronDown),
                 onTap: () => toggleCountry(country.id),
-                tileColor: isExpanded ? Colors.blue.shade50 : null,
+                tileColor: isExpanded ? context.colors.primaryContainer : null,
               ),
               if (isExpanded) Padding(padding: const EdgeInsets.all(16), child: aCountryBody(country)),
             ],
@@ -202,7 +218,7 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
     {
       return Tooltip(
         message: 'geo.read_only'.tr(),
-        child: const Icon(AppIcons.lock, size: 16, color: Colors.grey),
+        child: Icon(AppIcons.lock, size: 16, color: context.palette.inkMuted),
       );
     }
 
@@ -216,7 +232,7 @@ mixin GeoTreeState<T extends ConsumerStatefulWidget> on ConsumerState<T>
         ),
         IconButton(
           tooltip: 'common.delete'.tr(),
-          icon: const Icon(AppIcons.trash, size: 18, color: Colors.red),
+          icon: Icon(AppIcons.trash, size: 18, color: context.palette.danger),
           onPressed: aOnDelete,
         ),
       ],
@@ -253,6 +269,7 @@ class _GeoNameDialogState extends State<GeoNameDialog>
     final isEmpty = _ctrl.text.trim().isEmpty;
 
     return AlertDialog(
+      scrollable: true,
       title: Text(widget.title),
       content: TextField(
         controller: _ctrl,

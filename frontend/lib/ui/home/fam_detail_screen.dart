@@ -8,7 +8,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
+import '../common/app_theme.dart';
 
 class FamDetailScreen extends ConsumerStatefulWidget
 {
@@ -285,7 +285,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
       semanticContainer: false,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        side: BorderSide(color: context.palette.border),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -294,12 +294,12 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
           children: [
             Text('family.wallets_title'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('family.wallets_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+            Text('family.wallets_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 8),
             if (wallets.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('family.wallets_empty'.tr(), style: const TextStyle(color: inkMuted)),
+                child: Text('family.wallets_empty'.tr(), style: TextStyle(color: context.palette.inkMuted)),
               )
             else
               for (final wallet in wallets)
@@ -361,7 +361,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
         ),
         if (!_isEdit) ...[
           const SizedBox(height: 16),
-          Text('family.create_hint'.tr(), style: const TextStyle(color: Colors.grey)),
+          Text('family.create_hint'.tr(), style: TextStyle(color: context.palette.inkMuted)),
         ],
         if (_isEdit) ...[
           const SizedBox(height: 16),
@@ -369,7 +369,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFE5E7EB)),
+              side: BorderSide(color: context.palette.border),
             ),
             child: Column(
               children: [
@@ -443,7 +443,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
                         : member.isOwner
                             ? 'family.roles.owner'.tr()
                             : 'family.roles.${member.role.name}'.tr(),
-                    style: TextStyle(color: member.isAdmin ? Colors.blue : Colors.grey),
+                    style: TextStyle(color: member.isAdmin ? context.colors.primary : context.palette.inkMuted),
                   ),
                 ],
               ),
@@ -491,7 +491,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
         if (isRemovable)
           PopupMenuItem(
             value: 'remove',
-            child: Text('family.remove_member'.tr(), style: const TextStyle(color: Colors.red)),
+            child: Text('family.remove_member'.tr(), style: TextStyle(color: context.palette.danger)),
           ),
       ],
     );
@@ -515,7 +515,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
           ],
         ),
         const SizedBox(height: 8),
-        Text('family.invite_hint'.tr(), style: const TextStyle(color: Colors.grey)),
+        Text('family.invite_hint'.tr(), style: TextStyle(color: context.palette.inkMuted)),
         const SizedBox(height: 12),
         if (_invites.isEmpty)
           Text('family.no_invites'.tr(), style: const TextStyle(fontStyle: FontStyle.italic))
@@ -534,7 +534,7 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
                     ),
                     trailing: IconButton(
                       tooltip: 'family.invite_revoke'.tr(),
-                      icon: const Icon(AppIcons.x, color: Colors.red),
+                      icon: Icon(AppIcons.x, color: context.palette.danger),
                       onPressed: _isSaving ? null : () => _revokeInvite(invite),
                     ),
                   ),
@@ -580,6 +580,7 @@ class _InviteDialogState extends State<_InviteDialog>
   Widget build(BuildContext aContext)
   {
     return AlertDialog(
+      scrollable: true,
       title: Text('family.invite_create'.tr()),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -632,6 +633,7 @@ class _InviteCodeDialog extends StatelessWidget
     final expires = DateFormat.yMMMd(aContext.locale.toLanguageTag()).add_Hm().format(invite.expiresTs);
 
     return AlertDialog(
+      scrollable: true,
       title: Text('family.invite_code_title'.tr()),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -644,7 +646,7 @@ class _InviteCodeDialog extends StatelessWidget
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2, fontFamily: 'monospace'),
           ),
           const SizedBox(height: 8),
-          Text('family.invite_expires'.tr(namedArgs: {'date': expires}), style: const TextStyle(color: Colors.grey)),
+          Text('family.invite_expires'.tr(namedArgs: {'date': expires}), style: TextStyle(color: aContext.palette.inkMuted)),
         ],
       ),
       actions: [
@@ -741,7 +743,7 @@ class _ChildDialogState extends State<_ChildDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('family.add_child_hint'.tr(), style: const TextStyle(color: Colors.grey)),
+              Text('family.add_child_hint'.tr(), style: TextStyle(color: context.palette.inkMuted)),
               const SizedBox(height: 16),
               TextField(
                 controller: _firstNameCtrl,
@@ -778,7 +780,7 @@ class _ChildDialogState extends State<_ChildDialog>
               ),
               if (_isSubmitted && !_isValid) ...[
                 const SizedBox(height: 12),
-                Text('family.add_child_required'.tr(), style: TextStyle(color: Colors.red.shade700)),
+                Text('family.add_child_required'.tr(), style: TextStyle(color: context.palette.danger)),
               ],
             ],
           ),

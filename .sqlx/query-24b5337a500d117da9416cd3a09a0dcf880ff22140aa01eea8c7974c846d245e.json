@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT p.id, p.name, p.schedule_mode AS \"schedule_mode: ScheduleMode\", p.is_active,\n               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS \"day_count!\"\n        FROM training_programs p\n        WHERE p.user_id = $1\n        ORDER BY p.is_active DESC, p.name\n        ",
+  "query": "\n        SELECT p.id, p.name, p.schedule_mode AS \"schedule_mode: ScheduleMode\", p.is_active,\n               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS \"day_count!\",\n               p.updated_ts\n        FROM training_programs p\n        WHERE p.user_id = $1\n        ORDER BY p.is_active DESC, p.name\n        ",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,11 @@
         "ordinal": 4,
         "name": "day_count!",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_ts",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -50,8 +55,9 @@
       false,
       false,
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "5bf11728f04c1f1b7ce35647b15e0ca53e4414041951d9f04a28d915240ac8a5"
+  "hash": "24b5337a500d117da9416cd3a09a0dcf880ff22140aa01eea8c7974c846d245e"
 }

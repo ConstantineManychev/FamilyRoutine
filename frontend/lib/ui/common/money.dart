@@ -4,17 +4,10 @@ import 'package:flutter/material.dart';
 import '../../domain/models.dart';
 import 'app_icons.dart';
 
-const Color incomeColor = Color(0xFF2A78D6);
-const Color expenseColor = Color(0xFFE34948);
-const Color inkPrimary = Color(0xFF111827);
-const Color inkSecondary = Color(0xFF52514E);
-const Color inkMuted = Color(0xFF898781);
-const Color gridColor = Color(0xFFE1E0D9);
-const Color baselineColor = Color(0xFFC3C2B7);
 
 String formatMoney(BuildContext aContext, double aAmount, String aCurrCode, {bool aIsSigned = false})
 {
-  final format = NumberFormat.simpleCurrency(locale: aContext.locale.toLanguageTag(), name: aCurrCode, decimalDigits: 2);
+  final format = NumberFormat.simpleCurrency(locale: Localizations.localeOf(aContext).toLanguageTag(), name: aCurrCode, decimalDigits: 2);
   final text = format.format(aAmount.abs());
 
   if (aAmount < 0)
@@ -27,7 +20,7 @@ String formatMoney(BuildContext aContext, double aAmount, String aCurrCode, {boo
 
 String formatCompact(BuildContext aContext, double aAmount)
 {
-  return NumberFormat.compact(locale: aContext.locale.toLanguageTag()).format(aAmount);
+  return NumberFormat.compact(locale: Localizations.localeOf(aContext).toLanguageTag()).format(aAmount);
 }
 
 double? parseAmountInput(String aText)
@@ -45,17 +38,17 @@ double? parseAmountInput(String aText)
 
 String formatDateTime(BuildContext aContext, DateTime aTs)
 {
-  return DateFormat.yMMMd(aContext.locale.toLanguageTag()).add_Hm().format(aTs);
+  return DateFormat.yMMMd(Localizations.localeOf(aContext).toLanguageTag()).add_Hm().format(aTs);
 }
 
 String formatDate(BuildContext aContext, DateTime aTs)
 {
-  return DateFormat.yMMMd(aContext.locale.toLanguageTag()).format(aTs);
+  return DateFormat.yMMMd(Localizations.localeOf(aContext).toLanguageTag()).format(aTs);
 }
 
 String formatDay(BuildContext aContext, DateTime aTs)
 {
-  return DateFormat.yMMMMEEEEd(aContext.locale.toLanguageTag()).format(aTs);
+  return DateFormat.yMMMMEEEEd(Localizations.localeOf(aContext).toLanguageTag()).format(aTs);
 }
 
 IconData categoryIcon(TxCategory? aCategory)

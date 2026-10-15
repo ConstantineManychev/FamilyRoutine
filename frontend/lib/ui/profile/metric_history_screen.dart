@@ -7,14 +7,13 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'body_entry_editor.dart';
 import 'metric_chart.dart';
 import 'metric_format.dart';
 import 'profile_screen.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
-const Color _borderColor = Color(0xFFE5E7EB);
 
 class MetricHistoryScreen extends ConsumerStatefulWidget
 {
@@ -190,7 +189,7 @@ class _MetricHistoryScreenState extends ConsumerState<MetricHistoryScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(metricName(widget.metric), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text(profile.fullName, style: const TextStyle(color: inkSecondary)),
+                          Text(profile.fullName, style: TextStyle(color: context.palette.inkSecondary)),
                         ],
                       ),
                     ),
@@ -198,14 +197,14 @@ class _MetricHistoryScreenState extends ConsumerState<MetricHistoryScreen>
                 ),
                 const SizedBox(height: 16),
                 if (points.isEmpty)
-                  Text('metrics.no_history'.tr(), style: const TextStyle(color: inkSecondary))
+                  Text('metrics.no_history'.tr(), style: TextStyle(color: context.palette.inkSecondary))
                 else ...[
                   _buildSummary(aContext, points),
                   const SizedBox(height: 16),
                   MetricChart(metric: widget.metric, points: points, trend: trend),
                   if (trend != null) ...[
                     const SizedBox(height: 8),
-                    Text('metrics.trend_hint'.tr(), style: const TextStyle(color: inkMuted, fontSize: 12)),
+                    Text('metrics.trend_hint'.tr(), style: TextStyle(color: context.palette.inkMuted, fontSize: 12)),
                   ],
                   const SizedBox(height: 24),
                   Text('metrics.history_list'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -232,8 +231,8 @@ class _MetricHistoryScreenState extends ConsumerState<MetricHistoryScreen>
     Widget stat(String aLabel, String aValue) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(aLabel, style: const TextStyle(color: inkSecondary, fontSize: 13)),
-            Text(aValue, style: const TextStyle(color: inkPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(aLabel, style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
+            Text(aValue, style: TextStyle(color: context.palette.inkPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
           ],
         );
 
@@ -279,7 +278,7 @@ class _MetricHistoryScreenState extends ConsumerState<MetricHistoryScreen>
                   IconButton(
                     tooltip: 'metrics.delete_entry'.tr(),
                     onPressed: _isBusy ? null : () => _delete(point),
-                    icon: const Icon(AppIcons.trash2, size: 18, color: Colors.red),
+                    icon: Icon(AppIcons.trash2, size: 18, color: context.palette.danger),
                   ),
                 ],
               )
@@ -295,7 +294,7 @@ class _MetricHistoryScreenState extends ConsumerState<MetricHistoryScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Column(children: rows),
     );
   }

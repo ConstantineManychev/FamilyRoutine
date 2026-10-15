@@ -10,8 +10,8 @@ import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import '../finance/finance_dialogs.dart';
+import '../common/app_theme.dart';
 
-const Color _borderColor = Color(0xFFE5E7EB);
 const double _dialogWidth = 420;
 
 final List<TextInputFormatter> _signedAmountFormatters = [
@@ -94,6 +94,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
     final isConfirmed = await showDialog<bool>(
       context: context,
       builder: (aContext) => AlertDialog(
+        scrollable: true,
         title: Text('balance.delete_title'.tr()),
         content: Text(
           aDoc.writeOffs.isEmpty
@@ -103,7 +104,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
         actions: [
           TextButton(onPressed: () => Navigator.of(aContext).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: context.palette.danger),
             onPressed: () => Navigator.of(aContext).pop(true),
             child: Text('common.delete'.tr()),
           ),
@@ -165,7 +166,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -185,7 +186,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
                     const SizedBox(height: 4),
                     Text(
                       formatMoney(aContext, balance, _wallet.currCode),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: inkPrimary),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: context.palette.inkPrimary),
                     ),
                   ],
                 ),
@@ -198,14 +199,14 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
               ],
             ),
             const SizedBox(height: 8),
-            Text('balance.hint'.tr(), style: const TextStyle(color: inkSecondary)),
+            Text('balance.hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 12),
             if (_error != null)
               ErrorRetry(error: _error!, onRetry: _load)
             else if (docs == null)
               const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
             else if (docs.isEmpty)
-              Text('balance.empty'.tr(), style: const TextStyle(color: inkMuted))
+              Text('balance.empty'.tr(), style: TextStyle(color: context.palette.inkMuted))
             else
               for (final doc in docs) _buildDoc(aContext, doc),
           ],
@@ -221,15 +222,15 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
     final Widget status;
     if (aDoc.isInitial)
     {
-      status = Text('balance.initial'.tr(), style: const TextStyle(color: inkSecondary));
+      status = Text('balance.initial'.tr(), style: TextStyle(color: context.palette.inkSecondary));
     }
     else if (!aDoc.hasDelta)
     {
       status = Row(
         children: [
-          Icon(AppIcons.checkCircle, size: 16, color: Colors.green.shade700),
+          Icon(AppIcons.checkCircle, size: 16, color: context.palette.positive),
           const SizedBox(width: 6),
-          Expanded(child: Text('balance.matches'.tr(), style: TextStyle(color: Colors.green.shade800))),
+          Expanded(child: Text('balance.matches'.tr(), style: TextStyle(color: context.palette.positive))),
         ],
       );
     }
@@ -237,7 +238,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
     {
       status = Row(
         children: [
-          Icon(AppIcons.alertCircle, size: 16, color: Colors.orange.shade800),
+          Icon(AppIcons.alertCircle, size: 16, color: context.palette.warning),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -245,7 +246,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
                 formatMoney(aContext, delta, currCode, aIsSigned: true),
                 formatMoney(aContext, aDoc.expected ?? 0, currCode),
               ]),
-              style: TextStyle(color: Colors.orange.shade900),
+              style: TextStyle(color: context.palette.warning),
             ),
           ),
         ],
@@ -255,7 +256,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _borderColor)),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: context.palette.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -267,11 +268,11 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
                   children: [
                     Text(
                       formatMoney(aContext, aDoc.amount, currCode),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: inkPrimary),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.palette.inkPrimary),
                     ),
                     Text(
                       [formatDateTime(aContext, aDoc.balanceTs), if (aDoc.note != null) aDoc.note!].join(' · '),
-                      style: const TextStyle(color: inkSecondary),
+                      style: TextStyle(color: context.palette.inkSecondary),
                     ),
                   ],
                 ),
@@ -283,7 +284,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
                   onSelected: (aValue) => aValue == 'edit' ? _editDoc(aDoc) : _deleteDoc(aDoc),
                   itemBuilder: (_) => [
                     PopupMenuItem(value: 'edit', child: Text('balance.edit'.tr())),
-                    PopupMenuItem(value: 'delete', child: Text('common.delete'.tr(), style: const TextStyle(color: Colors.red))),
+                    PopupMenuItem(value: 'delete', child: Text('common.delete'.tr(), style: TextStyle(color: context.palette.danger))),
                   ],
                 ),
             ],
@@ -300,7 +301,7 @@ class _BalanceDocsCardState extends ConsumerState<BalanceDocsCard>
                   formatDateTime(aContext, writeOff.txTs),
                   if (writeOff.note != null) writeOff.note!,
                 ].join(' · '),
-                style: const TextStyle(color: inkSecondary, fontSize: 13),
+                style: TextStyle(color: context.palette.inkSecondary, fontSize: 13),
               ),
             ),
           if (_wallet.isEditable && aDoc.hasDelta)
@@ -408,7 +409,7 @@ class _BalanceDocDialogState extends ConsumerState<_BalanceDocDialog>
             children: [
               Text(
                 'balance.current_hint'.tr(args: [formatMoney(aContext, widget.wallet.balance ?? 0, widget.wallet.currCode)]),
-                style: const TextStyle(color: inkSecondary),
+                style: TextStyle(color: context.palette.inkSecondary),
               ),
               const SizedBox(height: 16),
               Semantics(
@@ -533,7 +534,7 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog>
                   if (prevTs != null) formatDateTime(aContext, prevTs) else '—',
                   formatDateTime(aContext, widget.doc.balanceTs),
                 ]),
-                style: const TextStyle(color: inkSecondary),
+                style: TextStyle(color: context.palette.inkSecondary),
               ),
               const SizedBox(height: 16),
               Semantics(

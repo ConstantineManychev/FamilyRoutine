@@ -7,8 +7,8 @@ import '../common/feedback.dart';
 import '../common/money.dart';
 import '../dicts/item_form.dart';
 import 'transactions_screen.dart';
+import '../common/app_theme.dart';
 
-const Color _borderColor = Color(0xFFE5E7EB);
 const double _contentMaxWidth = 720;
 
 class ReceiptView extends StatelessWidget
@@ -42,14 +42,14 @@ class ReceiptView extends StatelessWidget
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(AppIcons.eye, size: 16, color: inkMuted),
+                    Icon(AppIcons.eye, size: 16, color: aContext.palette.inkMuted),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         receipt.ownerName == null
                             ? 'finance.receipt_read_only'.tr()
                             : 'finance.receipt_shared_by'.tr(args: [receipt.ownerName!]),
-                        style: const TextStyle(color: inkSecondary),
+                        style: TextStyle(color: aContext.palette.inkSecondary),
                       ),
                     ),
                   ],
@@ -57,7 +57,7 @@ class ReceiptView extends StatelessWidget
                 const SizedBox(height: 8),
                 Text(
                   [formatDateTime(aContext, receipt.receiptTs), if (place.isNotEmpty) place].join(' · '),
-                  style: const TextStyle(color: inkSecondary),
+                  style: TextStyle(color: aContext.palette.inkSecondary),
                 ),
                 const SizedBox(height: 16),
                 _buildItems(aContext),
@@ -78,7 +78,7 @@ class ReceiptView extends StatelessWidget
                 ],
                 if (receipt.note != null && receipt.note!.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text(receipt.note!, style: const TextStyle(color: inkSecondary)),
+                  Text(receipt.note!, style: TextStyle(color: aContext.palette.inkSecondary)),
                 ],
               ],
             ),
@@ -91,7 +91,7 @@ class ReceiptView extends StatelessWidget
   Widget _buildItems(BuildContext aContext)
   {
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: _borderColor)),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: aContext.palette.border)),
       child: Column(
         children: [
           for (final item in receipt.items)
@@ -106,7 +106,7 @@ class ReceiptView extends StatelessWidget
               ),
               trailing: Text(
                 formatMoney(aContext, item.amount, receipt.currCode),
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: inkPrimary),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: aContext.palette.inkPrimary),
               ),
             ),
         ],
@@ -120,10 +120,10 @@ class ReceiptView extends StatelessWidget
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Row(
             children: [
-              Expanded(child: Text(aLabel, style: const TextStyle(color: inkSecondary))),
+              Expanded(child: Text(aLabel, style: TextStyle(color: aContext.palette.inkSecondary))),
               Text(
                 formatMoney(aContext, aValue, receipt.currCode),
-                style: TextStyle(fontWeight: aIsBold ? FontWeight.bold : FontWeight.w500, color: inkPrimary),
+                style: TextStyle(fontWeight: aIsBold ? FontWeight.bold : FontWeight.w500, color: aContext.palette.inkPrimary),
               ),
             ],
           ),
@@ -132,7 +132,7 @@ class ReceiptView extends StatelessWidget
     return Container(
       constraints: const BoxConstraints(maxWidth: 420),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: _borderColor)),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: aContext.palette.border)),
       child: Column(
         children: [
           line('finance.items_total'.tr(), receipt.itemsTotal),

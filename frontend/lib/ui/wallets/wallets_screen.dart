@@ -7,8 +7,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import '../common/money.dart';
-import 'bank_conns_section.dart';
+import '../common/app_theme.dart';
 
 class WalletsScreen extends ConsumerStatefulWidget
 {
@@ -21,6 +22,7 @@ class WalletsScreen extends ConsumerStatefulWidget
 class _WalletsScreenState extends ConsumerState<WalletsScreen>
 {
   bool _isArchivedVisible = false;
+  String _query = '';
 
   Future<void> _toggleArchive(AccountDto aWallet) async
   {
@@ -82,33 +84,24 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
     aContext.locale;
     final walletsAsync = ref.watch(walletsProv);
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(
-            title: 'wallet.title'.tr(),
-            actions: [
-              ElevatedButton.icon(
-                onPressed: () => aContext.go('/app/wallets/new'),
-                icon: const Icon(AppIcons.plus, size: 18),
-                label: Text('wallet.add'.tr()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: walletsAsync.when(
-              data: (aWallets) => _buildList(aContext, aWallets),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(walletsProv)),
-            ),
-          ),
-        ],
+    return ListPage(
+      title: 'wallet.title'.tr(),
+      onAdd: () => aContext.push('/app/wallets/new'),
+      addTooltip: 'wallet.add'.tr(),
+      onSearch: (aQuery) => setState(() => _query = aQuery.trim().toLowerCase()),
+      child: walletsAsync.when(
+        data: (aWallets) => _buildList(aContext, aWallets.where(_matches).toList()),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(walletsProv)),
       ),
     );
   }
+
+  bool _matches(AccountDto aWallet) =>
+      _query.isEmpty ||
+      aWallet.name.toLowerCase().contains(_query) ||
+      (aWallet.mask ?? '').contains(_query) ||
+      (aWallet.ownerName ?? '').toLowerCase().contains(_query);
 
   Widget _buildList(BuildContext aContext, List<AccountDto> aWallets)
   {
@@ -117,15 +110,16 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
 
     Widget tile(AccountDto aWallet) => _WalletTile(
           wallet: aWallet,
-          onOpen: () => aContext.go('/app/wallets/${aWallet.id}'),
+          onOpen: () => aContext.push('/app/wallets/${aWallet.id}'),
           onToggleArchive: () => _toggleArchive(aWallet),
           onDelete: () => _handleDelete(aWallet),
         );
 
     return ListView(
+      key: const PageStorageKey('list.wallets'),
+      padding: screenPadding(aContext),
       children: [
-        const BankConnsSection(),
-        const SizedBox(height: 24),
+        if (aWallets.isEmpty) BlockEmpty('wallet.empty'.tr()),
         ...active.map(tile),
         if (archived.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -169,6 +163,7 @@ class _DeleteCaptchaDialogState extends State<_DeleteCaptchaDialog>
     final isMatch = _ctrl.text == widget.targetWord;
 
     return AlertDialog(
+      scrollable: true,
       title: Text('wallet.delete'.tr()),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -187,7 +182,7 @@ class _DeleteCaptchaDialogState extends State<_DeleteCaptchaDialog>
       actions: [
         TextButton(onPressed: () => Navigator.of(aContext).pop(false), child: Text('common.no'.tr())),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          style: ElevatedButton.styleFrom(backgroundColor: context.palette.danger, foregroundColor: Colors.white),
           onPressed: isMatch ? () => Navigator.of(aContext).pop(true) : null,
           child: Text('wallet.delete'.tr()),
         ),
@@ -210,29 +205,12 @@ class _WalletTile extends StatelessWidget
     required this.onDelete,
   });
 
-  IconData get _icon
-  {
-    switch (wallet.accountType)
-    {
-      case 'cash':
-        return AppIcons.banknote;
-      case 'card':
-        return AppIcons.creditCard;
-      default:
-        return AppIcons.landmark;
-    }
-  }
+  IconData get _icon => walletIcon(wallet);
 
   @override
   Widget build(BuildContext aContext)
   {
-    final subtitle = [
-      if (wallet.mask != null) '•••• ${wallet.mask}' else 'wallet.type_${wallet.accountType}'.tr(),
-      wallet.currCode,
-      if (!wallet.isPersonal) 'wallet.shared'.tr(),
-      if (wallet.ownerName != null) 'wallet.owned_by'.tr(args: [wallet.ownerName!]),
-      if (wallet.isLinked) 'wallet.bank_synced'.tr(),
-    ].join(' · ');
+    final subtitle = walletSubtitle(wallet);
 
     return Card(
       elevation: 2,
@@ -242,12 +220,12 @@ class _WalletTile extends StatelessWidget
         onTap: onOpen,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: wallet.isActive ? Colors.blue.shade50 : Colors.grey.shade200,
-          child: Icon(_icon, color: wallet.isActive ? Colors.blue.shade700 : Colors.grey),
+          backgroundColor: wallet.isActive ? aContext.colors.primaryContainer : aContext.palette.surfaceMuted,
+          child: Icon(_icon, color: wallet.isActive ? aContext.colors.primary : aContext.palette.inkMuted),
         ),
         title: Text(
           wallet.name,
-          style: TextStyle(fontWeight: FontWeight.w600, color: wallet.isActive ? Colors.black87 : Colors.grey),
+          style: TextStyle(fontWeight: FontWeight.w600, color: wallet.isActive ? aContext.palette.inkPrimary : aContext.palette.inkMuted),
         ),
         subtitle: Text(
           wallet.balance == null ? subtitle : '$subtitle · ${formatMoney(aContext, wallet.balance!, wallet.currCode)}',
@@ -276,12 +254,57 @@ class _WalletTile extends StatelessWidget
                   if (!wallet.isLinked)
                     PopupMenuItem(
                       value: 'delete',
-                      child: Text('wallet.delete'.tr(), style: const TextStyle(color: Colors.red)),
+                      child: Text('wallet.delete'.tr(), style: TextStyle(color: aContext.palette.danger)),
                     ),
                 ],
               )
-            : const Icon(AppIcons.eye, color: Colors.grey),
+            : Icon(AppIcons.eye, color: aContext.palette.inkMuted),
       ),
+    );
+  }
+}
+
+IconData walletIcon(AccountDto aWallet) => switch (aWallet.accountType)
+{
+  'cash' => AppIcons.banknote,
+  'card' => AppIcons.creditCard,
+  _ => AppIcons.landmark,
+};
+
+String walletSubtitle(AccountDto aWallet) => [
+      if (aWallet.mask != null) '•••• ${aWallet.mask}' else 'wallet.type_${aWallet.accountType}'.tr(),
+      aWallet.currCode,
+      if (!aWallet.isPersonal) 'wallet.shared'.tr(),
+      if (aWallet.ownerName != null) 'wallet.owned_by'.tr(args: [aWallet.ownerName!]),
+      if (aWallet.isLinked) 'wallet.bank_synced'.tr(),
+    ].join(' · ');
+
+class WalletRow extends StatelessWidget
+{
+  final AccountDto wallet;
+  final VoidCallback onTap;
+
+  const WalletRow({super.key, required this.wallet, required this.onTap});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final balance = wallet.balance;
+
+    return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: aContext.colors.primaryContainer,
+        child: Icon(walletIcon(wallet), size: 18, color: aContext.colors.onPrimaryContainer),
+      ),
+      title: Text(wallet.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(walletSubtitle(wallet), maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: balance == null
+          ? null
+          : Text(
+              formatMoney(aContext, balance, wallet.currCode),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: aContext.palette.inkPrimary),
+            ),
     );
   }
 }

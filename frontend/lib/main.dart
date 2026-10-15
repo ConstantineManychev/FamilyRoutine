@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'core/app_router.dart';
+import 'providers/theme_prov.dart';
 import 'ui/common/barcode_scanner.dart';
 
 const List<Locale> supportedLocales = [
@@ -16,8 +17,6 @@ const List<Locale> supportedLocales = [
   Locale('zh'),
   Locale('ja'),
 ];
-
-const Color brandColor = Color(0xFF2563EB);
 
 Future<void> main() async
 {
@@ -54,6 +53,8 @@ class AppRoot extends ConsumerWidget
   @override
   Widget build(BuildContext aContext, WidgetRef aRef)
   {
+    final themes = ThemeSetup.of(aRef.watch(themeKindProv));
+
     return MaterialApp.router(
       title: 'Family Routine',
       debugShowCheckedModeBanner: false,
@@ -61,11 +62,9 @@ class AppRoot extends ConsumerWidget
       supportedLocales: aContext.supportedLocales,
       locale: aContext.locale,
       routerConfig: aRef.watch(routerProv),
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: brandColor),
-        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
-      ),
+      theme: themes.light,
+      darkTheme: themes.dark,
+      themeMode: themes.mode,
     );
   }
 }

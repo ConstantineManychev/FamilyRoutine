@@ -19,8 +19,10 @@ abstract final class AppIcons
   static const IconData bus = IconData(0xe1d4, fontFamily: _family);
   static const IconData calendar = IconData(0xe063, fontFamily: _family);
   static const IconData calendarClock = IconData(0xe304, fontFamily: _family);
+  static const IconData calendarRange = IconData(0xe2bd, fontFamily: _family);
   static const IconData camera = IconData(0xe064, fontFamily: _family);
   static const IconData chartColumn = IconData(0xe2a3, fontFamily: _family);
+  static const IconData chartPie = IconData(0xe06b, fontFamily: _family);
   static const IconData check = IconData(0xe06c, fontFamily: _family);
   static const IconData checkCircle = IconData(0xe226, fontFamily: _family);
   static const IconData chevronDown = IconData(0xe06d, fontFamily: _family);
@@ -49,8 +51,11 @@ abstract final class AppIcons
   static const IconData key = IconData(0xe0fd, fontFamily: _family);
   static const IconData keyRound = IconData(0xe4a3, fontFamily: _family);
   static const IconData landmark = IconData(0xe23a, fontFamily: _family);
+  static const IconData languages = IconData(0xe0fe, fontFamily: _family);
   static const IconData layoutDashboard = IconData(0xe1c1, fontFamily: _family);
+  static const IconData library = IconData(0xe100, fontFamily: _family);
   static const IconData link = IconData(0xe102, fontFamily: _family);
+  static const IconData list = IconData(0xe106, fontFamily: _family);
   static const IconData listChecks = IconData(0xe1d0, fontFamily: _family);
   static const IconData lock = IconData(0xe10b, fontFamily: _family);
   static const IconData logOut = IconData(0xe10e, fontFamily: _family);
@@ -60,6 +65,7 @@ abstract final class AppIcons
   static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
   static const IconData navigation = IconData(0xe123, fontFamily: _family);
   static const IconData package = IconData(0xe129, fontFamily: _family);
+  static const IconData palette = IconData(0xe1dd, fontFamily: _family);
   static const IconData pencil = IconData(0xe1f9, fontFamily: _family);
   static const IconData plane = IconData(0xe1de, fontFamily: _family);
   static const IconData plug = IconData(0xe37f, fontFamily: _family);
@@ -76,7 +82,11 @@ abstract final class AppIcons
   static const IconData shieldOff = IconData(0xe15a, fontFamily: _family);
   static const IconData shoppingBag = IconData(0xe15b, fontFamily: _family);
   static const IconData shoppingCart = IconData(0xe15c, fontFamily: _family);
+  static const IconData slidersHorizontal = IconData(0xe29a, fontFamily: _family);
+  static const IconData sparkles = IconData(0xe412, fontFamily: _family);
   static const IconData store = IconData(0xe3e4, fontFamily: _family);
+  static const IconData sun = IconData(0xe178, fontFamily: _family);
+  static const IconData sunMoon = IconData(0xe2b2, fontFamily: _family);
   static const IconData table = IconData(0xe17d, fontFamily: _family);
   static const IconData tag = IconData(0xe17f, fontFamily: _family);
   static const IconData ticket = IconData(0xe20f, fontFamily: _family);

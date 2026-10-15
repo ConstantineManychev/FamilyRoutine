@@ -7,10 +7,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'training_format.dart';
+import '../common/app_theme.dart';
 
-const Color _borderColor = Color(0xFFE5E7EB);
 const int _shownSessions = 5;
 
 class PersonTrainingCard extends ConsumerStatefulWidget
@@ -69,7 +68,7 @@ class _PersonTrainingCardState extends ConsumerState<PersonTrainingCard>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -98,7 +97,7 @@ class _PersonTrainingCardState extends ConsumerState<PersonTrainingCard>
 
     return [
       if (program == null)
-        Text('training.no_program'.tr(), style: const TextStyle(color: inkMuted))
+        Text('training.no_program'.tr(), style: TextStyle(color: context.palette.inkMuted))
       else ...[
         Text(program.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         Text(
@@ -107,13 +106,13 @@ class _PersonTrainingCardState extends ConsumerState<PersonTrainingCard>
             'training.days_count'.plural(program.days.length),
             program.days.map((aDay) => aDay.name).join(', '),
           ].join(' · '),
-          style: const TextStyle(color: inkSecondary),
+          style: TextStyle(color: context.palette.inkSecondary),
         ),
       ],
       if (plan.activeSessionId != null)
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(AppIcons.activity, color: Colors.green),
+          leading: Icon(AppIcons.activity, color: context.palette.positive),
           title: Text('training.in_progress'.tr()),
           trailing: const Icon(AppIcons.chevronRight, size: 18),
           onTap: () => _open(plan.activeSessionId!),
@@ -130,7 +129,7 @@ class _PersonTrainingCardState extends ConsumerState<PersonTrainingCard>
       const SizedBox(height: 12),
       Text('training.history'.tr(), style: const TextStyle(fontWeight: FontWeight.w600)),
       if (sessions.isEmpty)
-        Text('training.no_history'.tr(), style: const TextStyle(color: inkMuted))
+        Text('training.no_history'.tr(), style: TextStyle(color: context.palette.inkMuted))
       else
         for (final session in sessions)
           ListTile(

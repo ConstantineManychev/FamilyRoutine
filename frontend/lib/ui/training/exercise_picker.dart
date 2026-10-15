@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
-import '../common/money.dart';
 import 'training_format.dart';
+import '../common/app_theme.dart';
+import '../common/page_frames.dart';
 
 Future<DictExDto?> showExercisePicker(BuildContext aContext, List<DictExDto> aCatalog)
 {
@@ -47,7 +48,7 @@ class _ExercisePickerState extends State<_ExercisePicker>
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       content: SizedBox(
         width: 460,
-        height: 480,
+        height: dialogListHeight(aContext, 480),
         child: Column(
           children: [
             TextField(
@@ -64,7 +65,7 @@ class _ExercisePickerState extends State<_ExercisePicker>
             const SizedBox(height: 8),
             Expanded(
               child: items.isEmpty
-                  ? Center(child: Text('training.no_exercises_found'.tr(), style: const TextStyle(color: inkMuted)))
+                  ? Center(child: Text('training.no_exercises_found'.tr(), style: TextStyle(color: context.palette.inkMuted)))
                   : ListView.builder(
                       itemCount: items.length,
                       itemBuilder: (_, aIndex) => ListTile(

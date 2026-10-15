@@ -9,8 +9,8 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'metric_format.dart';
+import '../common/app_theme.dart';
 
 const double _fieldWidth = 220;
 const double _fieldSpacing = 12;
@@ -278,7 +278,7 @@ class _BodyEntryEditorState extends ConsumerState<BodyEntryEditor>
         child: ListView(
           padding: screenPadding(aContext),
           children: [
-            Text(widget.personName, style: const TextStyle(color: inkSecondary)),
+            Text(widget.personName, style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -301,10 +301,10 @@ class _BodyEntryEditorState extends ConsumerState<BodyEntryEditor>
               ],
             ),
             const SizedBox(height: 8),
-            Text('metrics.entry_hint'.tr(), style: const TextStyle(color: inkSecondary, fontSize: 13)),
+            Text('metrics.entry_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary, fontSize: 13)),
             if (_formError != null) ...[
               const SizedBox(height: 8),
-              Text(_formError!, style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600)),
+              Text(_formError!, style: TextStyle(color: context.palette.danger, fontWeight: FontWeight.w600)),
             ],
             const SizedBox(height: 16),
             _buildGroup(MetricGroup.body),

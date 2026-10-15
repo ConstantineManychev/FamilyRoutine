@@ -7,46 +7,58 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import '../common/money.dart';
+import '../common/app_theme.dart';
 
-class ReceiptsScreen extends ConsumerWidget
+class ReceiptsScreen extends ConsumerStatefulWidget
 {
   const ReceiptsScreen({super.key});
 
   @override
-  Widget build(BuildContext aContext, WidgetRef aRef)
+  ConsumerState<ReceiptsScreen> createState() => _ReceiptsScreenState();
+}
+
+class _ReceiptsScreenState extends ConsumerState<ReceiptsScreen>
+{
+  String _query = '';
+
+  bool _matches(ReceiptListItem aReceipt) =>
+      _query.isEmpty ||
+      (aReceipt.merchantName ?? '').toLowerCase().contains(_query) ||
+      (aReceipt.placeName ?? '').toLowerCase().contains(_query) ||
+      (aReceipt.ownerName ?? '').toLowerCase().contains(_query);
+
+  @override
+  Widget build(BuildContext aContext)
   {
     aContext.locale;
-    final receiptsAsync = aRef.watch(receiptsProv);
+    final receiptsAsync = ref.watch(receiptsProv);
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(
-            title: 'finance.receipts'.tr(),
-            actions: [
-              ElevatedButton.icon(
-                onPressed: () => aContext.go('/app/receipts/new'),
-                icon: const Icon(AppIcons.plus, size: 18),
-                label: Text('finance.new_receipt'.tr()),
-              ),
+    return ListPage(
+      title: 'finance.receipts'.tr(),
+      onAdd: () => aContext.push('/app/receipts/new'),
+      addTooltip: 'finance.new_receipt'.tr(),
+      onSearch: (aQuery) => setState(() => _query = aQuery.trim().toLowerCase()),
+      child: receiptsAsync.when(
+        data: (aReceipts)
+        {
+          final shown = aReceipts.where(_matches).toList();
+          return ListView(
+            key: const PageStorageKey('list.receipts'),
+            padding: screenPadding(aContext),
+            children: [
+              Text('finance.receipts_hint'.tr(), style: TextStyle(color: aContext.palette.inkSecondary)),
+              const SizedBox(height: 16),
+              if (shown.isEmpty)
+                Text('finance.no_receipts'.tr(), style: TextStyle(color: aContext.palette.inkMuted))
+              else
+                ...shown.map((aReceipt) => _ReceiptTile(receipt: aReceipt)),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text('finance.receipts_hint'.tr(), style: const TextStyle(color: inkSecondary)),
-          const SizedBox(height: 16),
-          Expanded(
-            child: receiptsAsync.when(
-              data: (aReceipts) => aReceipts.isEmpty
-                  ? Center(child: Text('finance.no_receipts'.tr(), style: const TextStyle(color: inkMuted)))
-                  : ListView(children: aReceipts.map((aReceipt) => _ReceiptTile(receipt: aReceipt)).toList()),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(receiptsProv)),
-            ),
-          ),
-        ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(receiptsProv)),
       ),
     );
   }
@@ -74,19 +86,19 @@ class _ReceiptTile extends StatelessWidget
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        side: BorderSide(color: aContext.palette.border),
       ),
       child: ListTile(
-        onTap: () => aContext.go('/app/receipts/${receipt.id}'),
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFFF3F4F6),
-          child: Icon(AppIcons.receipt, size: 18, color: inkSecondary),
+        onTap: () => aContext.push('/app/receipts/${receipt.id}'),
+        leading: CircleAvatar(
+          backgroundColor: aContext.palette.surfaceMuted,
+          child: Icon(AppIcons.receipt, size: 18, color: aContext.palette.inkSecondary),
         ),
         title: Text(receipt.merchantName ?? 'finance.receipt_untitled'.tr()),
         subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: Text(
           formatMoney(aContext, receipt.itemsTotal - receipt.discount, receipt.currCode),
-          style: const TextStyle(fontWeight: FontWeight.w600, color: inkPrimary),
+          style: TextStyle(fontWeight: FontWeight.w600, color: aContext.palette.inkPrimary),
         ),
       ),
     );

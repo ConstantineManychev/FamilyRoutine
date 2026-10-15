@@ -208,7 +208,17 @@
     "remove_child_confirm": "{}をグループから外しますか？ほかのグループに属していない場合、プロフィールとすべての測定値が削除されます。",
     "wallets_title": "グループに表示する自分のウォレット",
     "wallets_hint": "グループのメンバーに表示するウォレットを選びます。取引と関連レシートも表示されます。変更できるのはあなただけです。",
-    "wallets_empty": "個人のウォレットがありません。"
+    "wallets_empty": "個人のウォレットがありません。",
+    "member_count": {
+      "zero": "{} 人",
+      "one": "{} 人",
+      "two": "{} 人",
+      "few": "{} 人",
+      "many": "{} 人",
+      "other": "{} 人"
+    },
+    "my_groups": "自分のグループ",
+    "no_groups": "まだグループがありません。作成するか、招待コードで参加してください。"
   },
   "common": {
     "save": "保存",
@@ -226,7 +236,13 @@
     "soon": "近日公開",
     "no_data": "データはまだありません",
     "delete_confirm": "本当に削除しますか？",
-    "back": "戻る"
+    "back": "戻る",
+    "add": "追加",
+    "close": "閉じる",
+    "close_search": "検索を閉じる",
+    "done": "完了",
+    "search": "検索",
+    "show_all": "すべて表示"
   },
   "wallet": {
     "title": "ウォレット",
@@ -258,7 +274,8 @@
     "shared": "グループ",
     "read_only": "このウォレットを編集できるのは所有者またはグループ管理者のみです。",
     "linked_hint": "このウォレットは銀行と同期しています。取引と残高は自動で更新されます。",
-    "owned_by": "所有者: {}"
+    "owned_by": "所有者: {}",
+    "empty": "ウォレットはまだありません。"
   },
   "places": {
     "add": "場所を追加",
@@ -555,7 +572,20 @@
     "my_wallets": "自分のウォレット",
     "owner_wallets": "ウォレット: {}",
     "receipt_read_only": "閲覧のみ",
-    "receipt_shared_by": "{} のレシート — 閲覧のみ"
+    "receipt_shared_by": "{} のレシート — 閲覧のみ",
+    "cards": "カードとウォレット",
+    "categories": "カテゴリ",
+    "convert_short": "{} 換算",
+    "currency": "通貨",
+    "filters": "フィルター",
+    "mode": "振替",
+    "no_conversion": "換算なし",
+    "preset_custom": "期間を指定",
+    "preset_week": "7日間",
+    "preset_month": "30日間",
+    "preset_monthToDate": "今月",
+    "preset_quarter": "90日間",
+    "view_list": "リスト"
   },
   "items": {
     "title": "商品とサービス",
@@ -700,7 +730,13 @@
     "err_image_type": "JPEG、PNG、WebP の写真に対応しています。"
   },
   "settings": {
-    "title": "設定"
+    "title": "設定",
+    "theme": "テーマ",
+    "theme_system": "システムに合わせる",
+    "theme_light": "ライト",
+    "theme_dark": "ダーク",
+    "theme_violet": "バイオレット",
+    "language": "言語"
   },
   "ai": {
     "title": "レシート認識",
@@ -930,5 +966,11 @@
     "err_write_off": "金額は0より大きく {} 以下にしてください",
     "err_write_off_date": "日付は前の記録より後、この記録以前にしてください",
     "tx_marker": "残高記録からの計上"
+  },
+  "home": {
+    "open_profile": "プロフィールを開く",
+    "tab_finance": "家計",
+    "tab_groups": "グループ",
+    "tab_routine": "ルーティン"
   }
 }

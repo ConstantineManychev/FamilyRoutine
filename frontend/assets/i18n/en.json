@@ -208,7 +208,17 @@
     "remove_child_confirm": "Remove {} from the group? If the child is not in any other group, the profile and all measurements will be deleted.",
     "wallets_title": "My wallets in this group",
     "wallets_hint": "Choose the wallets group members can see, with their transactions and linked receipts. Only you can change them.",
-    "wallets_empty": "You have no personal wallets."
+    "wallets_empty": "You have no personal wallets.",
+    "member_count": {
+      "zero": "{} members",
+      "one": "{} member",
+      "two": "{} members",
+      "few": "{} members",
+      "many": "{} members",
+      "other": "{} members"
+    },
+    "my_groups": "My groups",
+    "no_groups": "No groups yet. Create one or join with an invite code."
   },
   "common": {
     "save": "Save",
@@ -226,7 +236,13 @@
     "soon": "Coming soon",
     "no_data": "No data yet",
     "delete_confirm": "Are you sure you want to delete this?",
-    "back": "Back"
+    "back": "Back",
+    "add": "Add",
+    "close": "Close",
+    "close_search": "Close search",
+    "done": "Done",
+    "search": "Search",
+    "show_all": "Show all"
   },
   "wallet": {
     "title": "Wallets",
@@ -258,7 +274,8 @@
     "shared": "group",
     "read_only": "Only the owner or a group administrator can edit this wallet.",
     "linked_hint": "This wallet is synced with the bank: transactions and balance update automatically.",
-    "owned_by": "owner: {}"
+    "owned_by": "owner: {}",
+    "empty": "No wallets yet."
   },
   "places": {
     "add": "Add place",
@@ -555,7 +572,20 @@
     "my_wallets": "My wallets",
     "owner_wallets": "Wallets: {}",
     "receipt_read_only": "View only",
-    "receipt_shared_by": "Receipt of {} — view only"
+    "receipt_shared_by": "Receipt of {} — view only",
+    "cards": "Cards and wallets",
+    "categories": "Categories",
+    "convert_short": "in {}",
+    "currency": "Currency",
+    "filters": "Filters",
+    "mode": "Transfers",
+    "no_conversion": "No conversion",
+    "preset_custom": "Custom range",
+    "preset_week": "7 days",
+    "preset_month": "30 days",
+    "preset_monthToDate": "This month",
+    "preset_quarter": "90 days",
+    "view_list": "List"
   },
   "items": {
     "title": "Goods and services",
@@ -700,7 +730,13 @@
     "err_image_type": "JPEG, PNG and WebP photos are supported."
   },
   "settings": {
-    "title": "Settings"
+    "title": "Settings",
+    "theme": "Theme",
+    "theme_system": "System",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_violet": "Violet",
+    "language": "Language"
   },
   "ai": {
     "title": "Receipt recognition",
@@ -930,5 +966,11 @@
     "err_write_off": "The amount must be above zero and at most {}",
     "err_write_off_date": "The date must be after the previous record and no later than this one",
     "tx_marker": "balance write-off"
+  },
+  "home": {
+    "open_profile": "Open profile",
+    "tab_finance": "Finance",
+    "tab_groups": "Groups",
+    "tab_routine": "Routine"
   }
 }

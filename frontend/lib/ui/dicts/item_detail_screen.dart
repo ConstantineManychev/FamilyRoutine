@@ -9,11 +9,12 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
+import '../common/page_frames.dart';
 import 'item_form.dart';
 import 'item_prices_section.dart';
 import 'items_screen.dart';
 import 'scope_widgets.dart';
+import '../common/app_theme.dart';
 
 enum _ItemAction { share, merge }
 
@@ -198,7 +199,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
       ref.invalidate(itemsProv);
       if (mounted)
       {
-        context.go('/app/items');
+        finishPage(context, '/app/items');
       }
     });
   }
@@ -296,7 +297,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
               ),
             if (_isEdit && _isEditable)
               OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                style: OutlinedButton.styleFrom(foregroundColor: context.palette.danger),
                 onPressed: _isSaving ? null : _delete,
                 icon: const Icon(AppIcons.trash2, size: 18),
                 label: Text('common.delete'.tr()),
@@ -317,12 +318,12 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
         if (!_isEditable) ...[
           Row(
             children: [
-              const Icon(AppIcons.lock, size: 18, color: inkMuted),
+              Icon(AppIcons.lock, size: 18, color: context.palette.inkMuted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   item?.familyId != null ? 'items.family_readonly_hint'.tr() : 'items.system_hint'.tr(),
-                  style: const TextStyle(color: inkSecondary),
+                  style: TextStyle(color: context.palette.inkSecondary),
                 ),
               ),
             ],
@@ -430,6 +431,7 @@ class _MergeDialogState extends ConsumerState<_MergeDialog>
     final target = _target;
 
     return AlertDialog(
+      scrollable: true,
       title: Text('items.merge'.tr()),
       content: SizedBox(
         width: 460,
@@ -437,7 +439,7 @@ class _MergeDialogState extends ConsumerState<_MergeDialog>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('items.merge_hint'.tr(args: [widget.source.name]), style: const TextStyle(color: inkSecondary)),
+            Text('items.merge_hint'.tr(args: [widget.source.name]), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 12),
             TextField(
               autofocus: true,
@@ -452,7 +454,7 @@ class _MergeDialogState extends ConsumerState<_MergeDialog>
             const SizedBox(height: 8),
             Expanded(
               child: _options.isEmpty
-                  ? Center(child: Text('common.no_data'.tr(), style: const TextStyle(color: inkMuted)))
+                  ? Center(child: Text('common.no_data'.tr(), style: TextStyle(color: context.palette.inkMuted)))
                   : RadioGroup<String>(
                       groupValue: target?.id,
                       onChanged: (aId) => setState(() => _target = _options.where((aItem) => aItem.id == aId).firstOrNull),

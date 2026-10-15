@@ -7,11 +7,10 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'training_format.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
-const Color _borderColor = Color(0xFFE5E7EB);
 
 class PersonSessionScreen extends ConsumerStatefulWidget
 {
@@ -114,7 +113,7 @@ class _PersonSessionScreenState extends ConsumerState<PersonSessionScreen>
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 52),
-                  child: Text(meta.join(' · '), style: const TextStyle(color: inkSecondary)),
+                  child: Text(meta.join(' · '), style: TextStyle(color: context.palette.inkSecondary)),
                 ),
                 const SizedBox(height: 16),
                 for (final exercise in session.exercises) ...[
@@ -122,7 +121,7 @@ class _PersonSessionScreenState extends ConsumerState<PersonSessionScreen>
                   const SizedBox(height: 12),
                 ],
                 if (session.note != null && session.note!.isNotEmpty)
-                  Text(session.note!, style: const TextStyle(color: inkSecondary)),
+                  Text(session.note!, style: TextStyle(color: context.palette.inkSecondary)),
               ],
             ),
           ),
@@ -139,7 +138,7 @@ class _PersonSessionScreenState extends ConsumerState<PersonSessionScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -149,7 +148,7 @@ class _PersonSessionScreenState extends ConsumerState<PersonSessionScreen>
             const SizedBox(height: 4),
             Text(
               done.isEmpty ? 'training.sets_done'.tr(args: ['0']) : describeSets(aContext, done),
-              style: const TextStyle(color: inkSecondary),
+              style: TextStyle(color: context.palette.inkSecondary),
             ),
           ],
         ),

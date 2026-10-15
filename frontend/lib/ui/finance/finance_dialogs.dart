@@ -11,6 +11,8 @@ import '../common/feedback.dart';
 import '../common/money.dart';
 import 'merchant_place_dialog.dart';
 import 'transactions_screen.dart';
+import '../common/app_theme.dart';
+import '../common/page_frames.dart';
 
 final List<TextInputFormatter> amountFormatters = [
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\s]')),
@@ -135,6 +137,7 @@ class _CashEntryDialogState extends ConsumerState<CashEntryDialog>
       ..sort((aLeft, aRight) => (aRight.isCash ? 1 : 0) - (aLeft.isCash ? 1 : 0));
 
     return AlertDialog(
+      scrollable: true,
       title: Text('finance.cash_entry'.tr()),
       content: SizedBox(
         width: 420,
@@ -330,7 +333,7 @@ class _TransferDialogState extends ConsumerState<TransferDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('finance.to_cash_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+              Text('finance.to_cash_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _fromId,
@@ -488,7 +491,7 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
   {
     final router = GoRouter.of(aContext);
     Navigator.of(aContext).pop(false);
-    router.go(aPath, extra: aExtra);
+    router.push(aPath, extra: aExtra);
   }
 
   Future<void> _toCash() async
@@ -548,14 +551,14 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: tx.isTransfer ? inkSecondary : (tx.amount > 0 ? incomeColor : inkPrimary),
+                  color: tx.isTransfer ? context.palette.inkSecondary : (tx.amount > 0 ? context.palette.income : context.palette.inkPrimary),
                 ),
               ),
               const SizedBox(height: 4),
-              Text('${tx.accountName} · ${formatDateTime(aContext, tx.txTs)}', style: const TextStyle(color: inkSecondary)),
+              Text('${tx.accountName} · ${formatDateTime(aContext, tx.txTs)}', style: TextStyle(color: context.palette.inkSecondary)),
               if (details.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(details.join(' · '), style: const TextStyle(color: inkMuted)),
+                Text(details.join(' · '), style: TextStyle(color: context.palette.inkMuted)),
               ],
               if (tx.merchantId != null || tx.placeId != null) ...[
                 const SizedBox(height: 12),
@@ -635,7 +638,7 @@ class _TxDetailDialogState extends ConsumerState<TxDetailDialog>
                     ),
                   if (tx.isManual && !tx.isTransfer && tx.isEditable)
                     OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      style: OutlinedButton.styleFrom(foregroundColor: context.palette.danger),
                       onPressed: _isBusy ? null : () => _run(() => api.deleteTransaction(tx.id)),
                       icon: const Icon(AppIcons.trash2, size: 18),
                       label: Text('common.delete'.tr()),
@@ -684,13 +687,13 @@ class _PlaceInfo extends StatelessWidget
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: aContext.palette.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: aContext.palette.border),
       ),
       child: Row(
         children: [
-          Icon(placeLabel == null ? AppIcons.mapPin : AppIcons.store, size: 18, color: inkSecondary),
+          Icon(placeLabel == null ? AppIcons.mapPin : AppIcons.store, size: 18, color: aContext.palette.inkSecondary),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -698,12 +701,12 @@ class _PlaceInfo extends StatelessWidget
               children: [
                 Text(
                   placeLabel ?? 'finance.place_none'.tr(),
-                  style: TextStyle(fontWeight: FontWeight.w600, color: placeLabel == null ? inkMuted : inkPrimary),
+                  style: TextStyle(fontWeight: FontWeight.w600, color: placeLabel == null ? aContext.palette.inkMuted : aContext.palette.inkPrimary),
                 ),
                 if (tx.merchantName != null)
                   Text(
                     'finance.bank_merchant'.tr(args: [tx.merchantName!]),
-                    style: const TextStyle(fontSize: 12, color: inkSecondary),
+                    style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary),
                   ),
               ],
             ),
@@ -739,26 +742,26 @@ class _TransferInfo extends StatelessWidget
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: aContext.palette.surfaceMuted,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: aContext.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(AppIcons.arrowLeftRight, size: 16, color: inkSecondary),
+              Icon(AppIcons.arrowLeftRight, size: 16, color: aContext.palette.inkSecondary),
               const SizedBox(width: 8),
               Expanded(child: Text('finance.transfer_between'.tr(), style: const TextStyle(fontWeight: FontWeight.w600))),
               if (tx.isAutoTransfer)
-                Text('finance.transfer_auto'.tr(), style: const TextStyle(fontSize: 12, color: inkMuted)),
+                Text('finance.transfer_auto'.tr(), style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted)),
             ],
           ),
           const SizedBox(height: 4),
-          Text(peer, style: const TextStyle(color: inkSecondary)),
+          Text(peer, style: TextStyle(color: aContext.palette.inkSecondary)),
           const SizedBox(height: 4),
-          Text('finance.transfer_excluded'.tr(), style: const TextStyle(fontSize: 12, color: inkMuted)),
+          Text('finance.transfer_excluded'.tr(), style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted)),
         ],
       ),
     );
@@ -866,11 +869,11 @@ class _LinkTransferDialogState extends ConsumerState<LinkTransferDialog>
       title: Text('finance.link_transfer'.tr()),
       content: SizedBox(
         width: 520,
-        height: 420,
+        height: dialogListHeight(aContext, 420),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('finance.link_transfer_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+            Text('finance.link_transfer_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
             const SizedBox(height: 12),
             Expanded(
               child: _error != null
@@ -878,7 +881,7 @@ class _LinkTransferDialogState extends ConsumerState<LinkTransferDialog>
                   : candidates == null
                       ? const Center(child: CircularProgressIndicator())
                       : candidates.isEmpty
-                          ? Center(child: Text('finance.no_candidates'.tr(), style: const TextStyle(color: inkMuted)))
+                          ? Center(child: Text('finance.no_candidates'.tr(), style: TextStyle(color: context.palette.inkMuted)))
                           : ListView(
                               children: candidates
                                   .map((aItem) => TxTile(tx: aItem, onTap: _isSaving ? null : () => _link(aItem)))

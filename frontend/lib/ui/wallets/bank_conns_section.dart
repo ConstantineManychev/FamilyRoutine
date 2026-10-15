@@ -9,6 +9,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
+import '../common/app_theme.dart';
 
 const String monobankTokenUrl = 'https://api.monobank.ua/';
 const String defaultAspspCountry = 'IE';
@@ -27,9 +28,23 @@ String? preferredAspsp(List<AspspDto> aAspsps)
   return aAspsps.firstOrNull?.name;
 }
 
+Future<void> connectBank(BuildContext aContext, WidgetRef aRef) async
+{
+  final isConnected = await showDialog<bool>(context: aContext, builder: (_) => const ConnectBankDialog());
+  if (isConnected == true)
+  {
+    aRef
+      ..invalidate(bankConnsProv)
+      ..invalidate(walletsProv);
+  }
+}
+
 class BankConnsSection extends ConsumerWidget
 {
-  const BankConnsSection({super.key});
+  final String query;
+  final bool isHeaderVisible;
+
+  const BankConnsSection({super.key, this.query = '', this.isHeaderVisible = true});
 
   Future<void> _sync(BuildContext aContext, WidgetRef aRef, BankConnDto aConn) async
   {
@@ -82,36 +97,32 @@ class BankConnsSection extends ConsumerWidget
   @override
   Widget build(BuildContext aContext, WidgetRef aRef)
   {
-    final conns = aRef.watch(bankConnsProv).valueOrNull ?? const <BankConnDto>[];
+    final conns = (aRef.watch(bankConnsProv).valueOrNull ?? const <BankConnDto>[])
+        .where((aConn) => query.isEmpty || (aConn.aspspName ?? aConn.provider).toLowerCase().contains(query.toLowerCase()))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text('bank.connections'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            OutlinedButton.icon(
-              onPressed: () async
-              {
-                final isConnected = await showDialog<bool>(context: aContext, builder: (_) => const ConnectBankDialog());
-                if (isConnected == true)
-                {
-                  aRef.invalidate(bankConnsProv);
-                  aRef.invalidate(walletsProv);
-                }
-              },
-              icon: const Icon(AppIcons.plug, size: 18),
-              label: Text('bank.connect'.tr()),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+        if (isHeaderVisible) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text('bank.connections'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => connectBank(aContext, aRef),
+                icon: const Icon(AppIcons.plug, size: 18),
+                label: Text('bank.connect'.tr()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         if (conns.isEmpty)
-          Text('bank.none'.tr(), style: const TextStyle(color: inkMuted))
+          Text('bank.none'.tr(), style: TextStyle(color: aContext.palette.inkMuted))
         else
-          ...conns.map((aConn) => _ConnTile(
+          ...conns.map((aConn) => BankConnTile(
                 conn: aConn,
                 onSync: () => _sync(aContext, aRef, aConn),
                 onDisconnect: () => _disconnect(aContext, aRef, aConn),
@@ -121,13 +132,14 @@ class BankConnsSection extends ConsumerWidget
   }
 }
 
-class _ConnTile extends StatelessWidget
+class BankConnTile extends StatelessWidget
 {
   final BankConnDto conn;
-  final VoidCallback onSync;
-  final VoidCallback onDisconnect;
+  final VoidCallback? onSync;
+  final VoidCallback? onDisconnect;
+  final VoidCallback? onTap;
 
-  const _ConnTile({required this.conn, required this.onSync, required this.onDisconnect});
+  const BankConnTile({super.key, required this.conn, this.onSync, this.onDisconnect, this.onTap});
 
   @override
   Widget build(BuildContext aContext)
@@ -140,31 +152,43 @@ class _ConnTile extends StatelessWidget
       if (conn.lastError != null) 'bank.error_${conn.lastError}'.tr(),
     ].join(' · ');
 
-    final statusColor = conn.isActive && conn.lastError == null ? Colors.green.shade700 : Colors.orange.shade800;
+    final statusColor = conn.isActive && conn.lastError == null ? aContext.palette.positive : aContext.palette.warning;
+
+    final hasActions = onSync != null || onDisconnect != null;
+    final tile = ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: aContext.palette.surfaceMuted,
+        child: Icon(AppIcons.landmark, size: 18, color: statusColor),
+      ),
+      title: Text(conn.aspspName ?? 'bank.provider_${conn.provider}'.tr()),
+      subtitle: Text(details, maxLines: hasActions ? null : 2, overflow: hasActions ? null : TextOverflow.ellipsis),
+      trailing: hasActions
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (conn.isActive && onSync != null)
+                  IconButton(tooltip: 'bank.sync_now'.tr(), icon: const Icon(AppIcons.refreshCw, size: 18), onPressed: onSync),
+                if (onDisconnect != null)
+                  IconButton(tooltip: 'bank.disconnect'.tr(), icon: const Icon(AppIcons.unlink, size: 18), onPressed: onDisconnect),
+              ],
+            )
+          : const Icon(AppIcons.chevronRight, size: 18),
+    );
+
+    if (!hasActions)
+    {
+      return tile;
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        side: BorderSide(color: aContext.palette.border),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFFF3F4F6),
-          child: Icon(AppIcons.landmark, size: 18, color: statusColor),
-        ),
-        title: Text(conn.aspspName ?? 'bank.provider_${conn.provider}'.tr()),
-        subtitle: Text(details),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (conn.isActive)
-              IconButton(tooltip: 'bank.sync_now'.tr(), icon: const Icon(AppIcons.refreshCw, size: 18), onPressed: onSync),
-            IconButton(tooltip: 'bank.disconnect'.tr(), icon: const Icon(AppIcons.unlink, size: 18), onPressed: onDisconnect),
-          ],
-        ),
-      ),
+      child: tile,
     );
   }
 }
@@ -287,6 +311,7 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
   Widget build(BuildContext aContext)
   {
     return AlertDialog(
+      scrollable: true,
       title: Text('bank.connect'.tr()),
       content: SizedBox(
         width: 460,
@@ -304,7 +329,7 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
             ),
             const SizedBox(height: 16),
             if (_provider == 'monobank') ...[
-              Text('bank.mono_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+              Text('bank.mono_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
               TextButton(
                 onPressed: () => launchUrl(Uri.parse(monobankTokenUrl)),
                 child: const Text(monobankTokenUrl),
@@ -325,7 +350,7 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
               ),
             ]
             else ...[
-              Text('bank.eb_hint'.tr(), style: const TextStyle(color: inkSecondary)),
+              Text('bank.eb_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
               const SizedBox(height: 16),
               _buildAspspPicker(),
             ],
@@ -353,9 +378,9 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
     {
       return Row(
         children: [
-          const Icon(AppIcons.alertCircle, size: 18, color: Colors.red),
+          Icon(AppIcons.alertCircle, size: 18, color: context.palette.danger),
           const SizedBox(width: 8),
-          Expanded(child: Text(errorText(error), style: TextStyle(color: Colors.red.shade800))),
+          Expanded(child: Text(errorText(error), style: TextStyle(color: context.palette.danger))),
           TextButton(onPressed: _loadAspsps, child: Text('common.retry'.tr())),
         ],
       );
@@ -368,7 +393,7 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
 
     if (aspsps.isEmpty)
     {
-      return Text('bank.no_aspsps'.tr(), style: TextStyle(color: Colors.red.shade800));
+      return Text('bank.no_aspsps'.tr(), style: TextStyle(color: context.palette.danger));
     }
 
     return DropdownButtonFormField<String>(

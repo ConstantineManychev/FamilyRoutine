@@ -7,9 +7,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import '../dicts/scope_widgets.dart';
 import '../places/places_screen.dart';
+import '../common/app_theme.dart';
 
 const int _minWordLength = 3;
 
@@ -229,7 +229,7 @@ class _MerchantPlaceDialogState extends ConsumerState<_MerchantPlaceDialog>
                       children: [
                         Text(
                           'finance.place_link_hint'.tr(args: [_merchantName]),
-                          style: const TextStyle(color: inkSecondary),
+                          style: TextStyle(color: context.palette.inkSecondary),
                         ),
                         const SizedBox(height: 12),
                         SegmentedButton<bool>(
@@ -249,7 +249,7 @@ class _MerchantPlaceDialogState extends ConsumerState<_MerchantPlaceDialog>
       actions: [
         if (widget.tx.isMerchantLinked)
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+            style: TextButton.styleFrom(foregroundColor: context.palette.danger),
             onPressed: _isBusy ? null : () => _run(() => ref.read(apiProv).unlinkMerchant(widget.tx.merchantId!)),
             child: Text('finance.place_unlink'.tr()),
           ),
@@ -283,7 +283,7 @@ class _MerchantPlaceDialogState extends ConsumerState<_MerchantPlaceDialog>
         ),
       ],
       const SizedBox(height: 8),
-      Text('finance.place_new_hint'.tr(), style: const TextStyle(fontSize: 12, color: inkMuted)),
+      Text('finance.place_new_hint'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkMuted)),
     ];
   }
 
@@ -312,7 +312,7 @@ class _MerchantPlaceDialogState extends ConsumerState<_MerchantPlaceDialog>
         child: visible.isEmpty
             ? Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text('finance.place_none_found'.tr(), style: const TextStyle(color: inkMuted)),
+                child: Text('finance.place_none_found'.tr(), style: TextStyle(color: context.palette.inkMuted)),
               )
             : ListView(
                 shrinkWrap: true,

@@ -44,6 +44,7 @@ Future<bool> confirmAction(
   final isConfirmed = await showDialog<bool>(
     context: aContext,
     builder: (aDialogContext) => AlertDialog(
+      scrollable: true,
       title: Text(aTitle),
       content: Text(aMessage),
       actions: [
@@ -114,5 +115,6 @@ class ErrorRetry extends StatelessWidget
 EdgeInsets screenPadding(BuildContext aContext)
 {
   final isCompact = MediaQuery.sizeOf(aContext).width < 600;
-  return EdgeInsets.all(isCompact ? 16 : 32);
+  final side = isCompact ? 16.0 : 32.0;
+  return EdgeInsets.fromLTRB(side, side, side, side + 72);
 }

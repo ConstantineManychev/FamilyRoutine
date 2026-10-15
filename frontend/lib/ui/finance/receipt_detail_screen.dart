@@ -14,12 +14,14 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import '../common/money.dart';
 import '../dicts/item_form.dart';
 import '../dicts/scope_widgets.dart';
 import 'finance_dialogs.dart';
 import 'receipt_view.dart';
 import 'transactions_screen.dart';
+import '../common/app_theme.dart';
 
 class ReceiptDetailScreen extends ConsumerStatefulWidget
 {
@@ -465,7 +467,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       ref.invalidate(receiptsProv);
       if (mounted)
       {
-        context.go('/app/receipts');
+        finishPage(context, '/app/receipts');
       }
     }
     catch (aError)
@@ -521,7 +523,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
               ),
             if (_isEdit)
               OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                style: OutlinedButton.styleFrom(foregroundColor: context.palette.danger),
                 onPressed: _isSaving ? null : _delete,
                 icon: const Icon(AppIcons.trash2, size: 18),
                 label: Text('common.delete'.tr()),
@@ -614,12 +616,12 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: context.colors.primaryContainer, borderRadius: BorderRadius.circular(8)),
             child: Row(
               children: [
-                const Icon(AppIcons.checkCircle, size: 18, color: Color(0xFF1D4ED8)),
+                Icon(AppIcons.checkCircle, size: 18, color: context.colors.primary),
                 const SizedBox(width: 8),
-                Expanded(child: Text(_recognitionNote!, style: const TextStyle(color: inkPrimary))),
+                Expanded(child: Text(_recognitionNote!, style: TextStyle(color: context.palette.inkPrimary))),
                 IconButton(
                   tooltip: 'common.cancel'.tr(),
                   icon: const Icon(AppIcons.x, size: 16),
@@ -701,7 +703,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(AppIcons.banknote, color: inkSecondary),
+              Icon(AppIcons.banknote, color: context.palette.inkSecondary),
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String?>(
@@ -1113,6 +1115,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
 
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      useRootNavigator: true,
       builder: (aSheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1216,16 +1219,16 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     {
       _ItemRow(isPicked: true, match: LineMatch.similar) => Tooltip(
           message: 'receipt.similar_hint'.tr(args: [aRow.sourceText ?? '']),
-          child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
+          child: Icon(AppIcons.alertCircle, size: 18, color: context.palette.warning),
         ),
-      _ItemRow(isPicked: true) => Icon(itemKindIcon(aRow.kind), size: 18, color: Colors.blue.shade700),
+      _ItemRow(isPicked: true) => Icon(itemKindIcon(aRow.kind), size: 18, color: context.colors.primary),
       _ItemRow(isNew: true) => Tooltip(
           message: 'receipt.new_item_hint'.tr(),
-          child: const Icon(AppIcons.plusCircle, size: 18, color: Color(0xFF15803D)),
+          child: Icon(AppIcons.plusCircle, size: 18, color: context.palette.positive),
         ),
       _ when hasText => Tooltip(
           message: 'items.pick_hint'.tr(),
-          child: const Icon(AppIcons.alertCircle, size: 18, color: Color(0xFFB45309)),
+          child: Icon(AppIcons.alertCircle, size: 18, color: context.palette.warning),
         ),
       _ => null,
     };
@@ -1342,7 +1345,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           }
 
           return DecoratedBox(
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.palette.border))),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Column(
@@ -1376,16 +1379,16 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       margin: const EdgeInsets.only(bottom: 8, right: 48),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: context.palette.surfaceMuted,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: context.palette.border),
       ),
       child: Row(
         children: [
-          Icon(aIcon, size: 16, color: inkMuted),
+          Icon(aIcon, size: 16, color: context.palette.inkMuted),
           const SizedBox(width: 8),
-          Expanded(child: Text(aLabel, style: const TextStyle(fontStyle: FontStyle.italic, color: inkSecondary))),
-          Text(formatMoney(aContext, aAmount, _currCode), style: const TextStyle(color: inkSecondary)),
+          Expanded(child: Text(aLabel, style: TextStyle(fontStyle: FontStyle.italic, color: context.palette.inkSecondary))),
+          Text(formatMoney(aContext, aAmount, _currCode), style: TextStyle(color: context.palette.inkSecondary)),
         ],
       ),
     );
@@ -1397,10 +1400,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Row(
             children: [
-              Expanded(child: Text(aLabel, style: const TextStyle(color: inkSecondary))),
+              Expanded(child: Text(aLabel, style: TextStyle(color: context.palette.inkSecondary))),
               Text(
                 formatMoney(aContext, aValue, _currCode),
-                style: TextStyle(fontWeight: aIsBold ? FontWeight.bold : FontWeight.w500, color: inkPrimary),
+                style: TextStyle(fontWeight: aIsBold ? FontWeight.bold : FontWeight.w500, color: context.palette.inkPrimary),
               ),
             ],
           ),
@@ -1413,9 +1416,9 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       constraints: const BoxConstraints(maxWidth: 420),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: context.palette.border),
       ),
       child: Column(
         children: [
@@ -1450,7 +1453,7 @@ class _ItemChoiceTile extends StatelessWidget
 
     return ListTile(
       dense: true,
-      tileColor: isHighlighted ? Colors.blue.shade50 : null,
+      tileColor: isHighlighted ? aContext.colors.primaryContainer : null,
       leading: Icon(item == null ? AppIcons.plusCircle : itemKindIcon(item.kind), size: 18),
       title: Text(item?.name ?? 'items.create_option'.tr(args: [choice.newName])),
       subtitle: item == null
@@ -1526,13 +1529,13 @@ class _TxPickerDialogState extends ConsumerState<_TxPickerDialog>
       title: Text('finance.link_tx'.tr()),
       content: SizedBox(
         width: 520,
-        height: 420,
+        height: dialogListHeight(aContext, 420),
         child: _error != null
             ? Center(child: Text(errorText(_error!)))
             : items == null
                 ? const Center(child: CircularProgressIndicator())
                 : items.isEmpty
-                    ? Center(child: Text('finance.no_candidates'.tr(), style: const TextStyle(color: inkMuted)))
+                    ? Center(child: Text('finance.no_candidates'.tr(), style: TextStyle(color: context.palette.inkMuted)))
                     : ListView(
                         children: items
                             .map((aTx) => TxTile(tx: aTx, onTap: () => Navigator.of(aContext).pop(aTx)))

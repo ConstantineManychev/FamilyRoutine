@@ -11,13 +11,12 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
-import '../common/money.dart';
 import 'exercise_picker.dart';
 import 'training_format.dart';
 import 'training_revision.dart';
+import '../common/app_theme.dart';
 
 const double _contentMaxWidth = 960;
-const Color _borderColor = Color(0xFFE5E7EB);
 const Duration _saveDelay = Duration(milliseconds: 1200);
 const int _maxSets = 30;
 const int _defaultIntensity = 6;
@@ -339,7 +338,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
                             label: Text('training.finish'.tr()),
                           ),
                         TextButton(
-                          style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                          style: TextButton.styleFrom(foregroundColor: context.palette.danger),
                           onPressed: _isBusy ? null : _delete,
                           child: Text('training.delete_workout'.tr()),
                         ),
@@ -359,7 +358,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
             bottom: 16,
             child: Material(
               elevation: 4,
-              color: const Color(0xFF1F2937),
+              color: context.palette.inkPrimary,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -411,13 +410,13 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(aSession.dayName ?? 'training.free_workout'.tr(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              if (aSession.programName != null) Text(aSession.programName!, style: const TextStyle(color: inkSecondary)),
+              if (aSession.programName != null) Text(aSession.programName!, style: TextStyle(color: context.palette.inkSecondary)),
               const SizedBox(height: 4),
-              Text(details.join(' · '), style: const TextStyle(color: inkSecondary)),
+              Text(details.join(' · '), style: TextStyle(color: context.palette.inkSecondary)),
               const SizedBox(height: 4),
               Text(
                 aSession.isFinished ? 'training.finished_label'.tr() : (_isSaving ? 'training.saving'.tr() : (_isDirty ? 'training.unsaved'.tr() : 'training.saved'.tr())),
-                style: TextStyle(color: aSession.isFinished ? Colors.green.shade700 : inkMuted, fontSize: 12),
+                style: TextStyle(color: aSession.isFinished ? context.palette.positive : context.palette.inkMuted, fontSize: 12),
               ),
             ],
           ),
@@ -444,7 +443,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
       elevation: 0,
       margin: EdgeInsets.zero,
       semanticContainer: false,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _borderColor)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: context.palette.border)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -470,7 +469,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
                 ),
               ],
             ),
-            Text(target, style: const TextStyle(color: inkSecondary)),
+            Text(target, style: TextStyle(color: context.palette.inkSecondary)),
             if (exercise.previous.isNotEmpty && previousTs != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -479,7 +478,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
                     DateFormat.MMMd(aContext.locale.toLanguageTag()).format(previousTs),
                     describeSets(aContext, exercise.previous),
                   ]),
-                  style: const TextStyle(color: inkMuted, fontSize: 13),
+                  style: TextStyle(color: context.palette.inkMuted, fontSize: 13),
                 ),
               ),
             const SizedBox(height: 8),
@@ -537,7 +536,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
         children: [
           SizedBox(
             width: 28,
-            child: Text('${aSetIndex + 1}', style: const TextStyle(color: inkSecondary, fontWeight: FontWeight.w600)),
+            child: Text('${aSetIndex + 1}', style: TextStyle(color: context.palette.inkSecondary, fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Wrap(
@@ -566,7 +565,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
               _generation++;
               _changed();
             },
-            icon: const Icon(AppIcons.x, size: 16, color: inkMuted),
+            icon: Icon(AppIcons.x, size: 16, color: context.palette.inkMuted),
           ),
         ],
       ),
@@ -598,6 +597,7 @@ class _IntensityDialogState extends State<_IntensityDialog>
   Widget build(BuildContext aContext)
   {
     return AlertDialog(
+      scrollable: true,
       title: Text('training.finish'.tr()),
       content: SizedBox(
         width: 400,
@@ -616,7 +616,7 @@ class _IntensityDialogState extends State<_IntensityDialog>
               semanticFormatterCallback: (aValue) => '${aValue.round()} · $_label',
               onChanged: (aValue) => setState(() => _value = aValue.round()),
             ),
-            Text('training.intensity_hint'.tr(), style: const TextStyle(color: inkMuted, fontSize: 12)),
+            Text('training.intensity_hint'.tr(), style: TextStyle(color: context.palette.inkMuted, fontSize: 12)),
           ],
         ),
       ),

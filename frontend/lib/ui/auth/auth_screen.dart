@@ -8,6 +8,7 @@ import '../../providers/api_prov.dart';
 import '../../providers/auth_provider.dart';
 import '../common/feedback.dart';
 import '../widgets/lang_selector.dart';
+import '../common/app_theme.dart';
 
 const int maxPasswordLength = 128;
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -166,7 +167,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             constraints: const BoxConstraints(maxWidth: 380),
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 20)],
             ),
@@ -203,7 +204,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       child: ElevatedButton(
                         onPressed: _isBusy ? null : _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
+                          backgroundColor: context.colors.primary,
                           foregroundColor: Colors.white,
                         ),
                         child: _isBusy

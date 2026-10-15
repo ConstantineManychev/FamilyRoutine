@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../common/feedback.dart';
 import 'ai_settings_section.dart';
+import 'app_settings_section.dart';
 
 class SettingsScreen extends StatelessWidget
 {
@@ -15,10 +16,10 @@ class SettingsScreen extends StatelessWidget
 
     return ListView(
       padding: screenPadding(aContext),
-      children: [
-        ScreenHeader(title: 'settings.title'.tr()),
-        const SizedBox(height: 24),
-        const AiSettingsSection(),
+      children: const [
+        AppSettingsSection(),
+        SizedBox(height: 24),
+        AiSettingsSection(),
       ],
     );
   }

@@ -10,8 +10,10 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import 'item_form.dart';
 import 'scope_widgets.dart';
+import '../common/app_theme.dart';
 
 final AutoDisposeFutureProviderFamily<List<DictItemDto>, String> itemsProv =
     FutureProvider.autoDispose.family<List<DictItemDto>, String>((aRef, aQuery) async
@@ -35,7 +37,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
 {
   static const Duration _searchDelay = Duration(milliseconds: 300);
 
-  final _searchCtrl = TextEditingController();
   Timer? _searchTimer;
   String _query = '';
 
@@ -43,7 +44,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
   void dispose()
   {
     _searchTimer?.cancel();
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -63,7 +63,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
         return;
       }
       final item = found.firstOrNull;
-      context.go(item == null ? Uri(path: '/app/items/new', queryParameters: {'barcode': code}).toString() : '/app/items/${item.id}');
+      context.push(item == null ? Uri(path: '/app/items/new', queryParameters: {'barcode': code}).toString() : '/app/items/${item.id}');
     }
     catch (aError)
     {
@@ -92,54 +92,26 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     aContext.locale;
     final itemsAsync = ref.watch(itemsProv(_query));
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(
-            title: 'items.title'.tr(),
-            actions: [
-              ElevatedButton.icon(
-                onPressed: () => aContext.go('/app/items/new'),
-                icon: const Icon(AppIcons.plus, size: 18),
-                label: Text('items.add'.tr()),
+    return ListPage(
+      title: 'items.title'.tr(),
+      onAdd: () => aContext.push('/app/items/new'),
+      addTooltip: 'items.add'.tr(),
+      onSearch: _onSearchChanged,
+      searchHint: 'items.search_barcode'.tr(),
+      actions: [
+        IconButton(tooltip: 'scanner.title'.tr(), icon: const Icon(AppIcons.scanBarcode), onPressed: _scan),
+      ],
+      child: itemsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(itemsProv(_query))),
+        data: (aItems) => aItems.isEmpty
+            ? Center(child: Text(_query.isEmpty ? 'items.empty'.tr() : 'common.no_data'.tr()))
+            : ListView.builder(
+                key: const PageStorageKey('list.items'),
+                padding: screenPadding(aContext),
+                itemCount: aItems.length,
+                itemBuilder: (_, aIndex) => _ItemTile(item: aItems[aIndex]),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'items.search_barcode'.tr(),
-                prefixIcon: const Icon(AppIcons.search, size: 18),
-                suffixIcon: IconButton(
-                  tooltip: 'scanner.title'.tr(),
-                  icon: const Icon(AppIcons.scanBarcode, size: 18),
-                  onPressed: _scan,
-                ),
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: itemsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => ref.invalidate(itemsProv(_query))),
-              data: (aItems) => aItems.isEmpty
-                  ? Center(child: Text(_query.isEmpty ? 'items.empty'.tr() : 'common.no_data'.tr()))
-                  : ListView.builder(
-                      itemCount: aItems.length,
-                      itemBuilder: (_, aIndex) => _ItemTile(item: aItems[aIndex]),
-                    ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -164,7 +136,7 @@ class _ItemTile extends StatelessWidget
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(itemKindIcon(item.kind), color: Colors.blue.shade700),
+        leading: Icon(itemKindIcon(item.kind), color: aContext.colors.primary),
         title: Row(
           children: [
             Flexible(
@@ -178,7 +150,7 @@ class _ItemTile extends StatelessWidget
         ),
         subtitle: Text(details),
         trailing: const Icon(AppIcons.chevronRight),
-        onTap: () => aContext.go('/app/items/${item.id}'),
+        onTap: () => aContext.push('/app/items/${item.id}'),
       ),
     );
   }

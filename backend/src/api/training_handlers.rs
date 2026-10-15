@@ -127,7 +127,8 @@ pub async fn list_programs(
         ProgramListItemDto,
         r#"
         SELECT p.id, p.name, p.schedule_mode AS "schedule_mode: ScheduleMode", p.is_active,
-               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!"
+               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!",
+               p.updated_ts
         FROM training_programs p
         WHERE p.user_id = $1
         ORDER BY p.is_active DESC, p.name
@@ -375,7 +376,8 @@ async fn build_plan(
     let program = sqlx::query!(
         r#"
         SELECT p.id, p.name, p.schedule_mode AS "schedule_mode: ScheduleMode", p.anchor_day_id, p.anchor_date, p.anchor_ts,
-               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!"
+               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!",
+               p.updated_ts
         FROM training_programs p
         WHERE p.user_id = $1 AND p.is_active
         "#,
@@ -452,6 +454,7 @@ async fn build_plan(
             schedule_mode: program.schedule_mode,
             is_active: true,
             day_count: program.day_count,
+            updated_ts: program.updated_ts,
         });
     }
 

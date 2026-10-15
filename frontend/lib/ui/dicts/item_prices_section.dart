@@ -10,8 +10,8 @@ import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import 'item_form.dart';
+import '../common/app_theme.dart';
 
-const Color _cheapestColor = Color(0xFF15803D);
 const String _isConvertPref = 'items.is_convert';
 const String _convertToPref = 'items.convert_to';
 const String _defaultConvertCode = 'UAH';
@@ -182,7 +182,7 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
       children: [
         Text('items.prices'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('items.prices_hint'.tr(args: [itemUnitShort(unit)]), style: const TextStyle(color: inkSecondary)),
+        Text('items.prices_hint'.tr(args: [itemUnitShort(unit)]), style: TextStyle(color: context.palette.inkSecondary)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -225,7 +225,7 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
           const SizedBox(height: 8),
           Text(
             'finance.missing_rates'.tr(args: [data.missingRates.join(', ')]),
-            style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+            style: TextStyle(fontSize: 12, color: context.palette.warning),
           ),
         ],
         const SizedBox(height: 12),
@@ -234,7 +234,7 @@ class _ItemPricesSectionState extends ConsumerState<ItemPricesSection>
         else if (data == null)
           const LinearProgressIndicator()
         else if (data.prices.isEmpty)
-          Text('items.no_prices'.tr(), style: const TextStyle(color: inkMuted))
+          Text('items.no_prices'.tr(), style: TextStyle(color: context.palette.inkMuted))
         else
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -291,9 +291,9 @@ class _Note extends StatelessWidget
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: inkMuted),
+        Icon(icon, size: 16, color: aContext.palette.inkMuted),
         const SizedBox(width: 6),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: inkSecondary))),
+        Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary))),
       ],
     );
   }
@@ -323,10 +323,10 @@ class _PriceRow extends StatelessWidget
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isCheapest ? const BorderSide(color: _cheapestColor) : BorderSide.none,
+        side: isCheapest ? BorderSide(color: aContext.palette.positive) : BorderSide.none,
       ),
       child: ListTile(
-        leading: const Icon(AppIcons.store, color: inkSecondary),
+        leading: Icon(AppIcons.store, color: aContext.palette.inkSecondary),
         title: Row(
           children: [
             Flexible(
@@ -340,7 +340,7 @@ class _PriceRow extends StatelessWidget
               const SizedBox(width: 8),
               Tooltip(
                 message: 'items.shared_prices_hint'.tr(),
-                child: const Icon(AppIcons.users, size: 14, color: inkMuted),
+                child: Icon(AppIcons.users, size: 14, color: aContext.palette.inkMuted),
               ),
             ],
           ],
@@ -352,15 +352,15 @@ class _PriceRow extends StatelessWidget
           children: [
             Text(
               '${formatMoney(aContext, price.lastPrice, price.currCode)}$perUnit',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: inkPrimary),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: aContext.palette.inkPrimary),
             ),
             if (isCheapest)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(AppIcons.checkCircle, size: 14, color: _cheapestColor),
+                  Icon(AppIcons.checkCircle, size: 14, color: aContext.palette.positive),
                   const SizedBox(width: 4),
-                  Text('items.cheapest'.tr(), style: const TextStyle(fontSize: 12, color: _cheapestColor)),
+                  Text('items.cheapest'.tr(), style: TextStyle(fontSize: 12, color: aContext.palette.positive)),
                 ],
               ),
           ],
@@ -391,7 +391,7 @@ class _ManualPriceTile extends StatelessWidget
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(AppIcons.tag, color: inkMuted),
+      leading: Icon(AppIcons.tag, color: aContext.palette.inkMuted),
       title: Text(price.storeName ?? 'items.no_merchant'.tr()),
       subtitle: Text(details),
       trailing: IconButton(

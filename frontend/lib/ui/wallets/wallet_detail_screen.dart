@@ -2,13 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import 'balance_docs_card.dart';
+import '../common/app_theme.dart';
 
 const List<String> accountTypes = ['cash', 'card', 'bank_acc'];
 const List<String> bankTypes = ['monobank', 'aib', 'other'];
@@ -156,7 +157,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
 
       if (mounted)
       {
-        context.go('/app/wallets');
+        finishPage(context, '/app/wallets');
       }
     }
     catch (aError)
@@ -213,7 +214,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
                 if (_wallet?.ownerName != null) 'wallet.owned_by'.tr(args: [_wallet!.ownerName!]),
                 'wallet.read_only'.tr(),
               ].join(' · '),
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: context.palette.inkMuted),
             ),
           ],
           const SizedBox(height: 24),
@@ -258,7 +259,7 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
             const SizedBox(height: 24),
             Row(
               children: [
-                const Icon(AppIcons.refreshCw, color: Colors.green),
+                Icon(AppIcons.refreshCw, color: context.palette.positive),
                 const SizedBox(width: 8),
                 Expanded(child: Text('wallet.linked_hint'.tr())),
               ],

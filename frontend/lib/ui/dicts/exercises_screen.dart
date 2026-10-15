@@ -8,6 +8,8 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../training/training_format.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
+import '../common/app_theme.dart';
 
 final AutoDisposeFutureProvider<List<DictExDto>> exercisesProv = FutureProvider.autoDispose<List<DictExDto>>((aRef) async
 {
@@ -28,51 +30,40 @@ class ExercisesScreen extends ConsumerWidget
     aContext.locale;
     final exercisesAsync = aRef.watch(exercisesProv);
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(
-            title: 'exercises.title'.tr(),
-            actions: [
-              ElevatedButton.icon(
-                onPressed: () => aContext.go('/app/exercises/new'),
-                icon: const Icon(AppIcons.plus, size: 18),
-                label: Text('exercises.add'.tr()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: exercisesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(exercisesProv)),
-              data: (aExercises) => aExercises.isEmpty
-                  ? Center(child: Text('common.no_data'.tr()))
-                  : ListView.builder(
-                      itemCount: aExercises.length,
-                      itemBuilder: (_, aIndex)
-                      {
-                        final ex = aExercises[aIndex];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: Icon(
-                              ex.isCustom ? AppIcons.user : AppIcons.activity,
-                              color: Colors.blue,
-                            ),
-                            title: Text(exerciseDisplayName(ex), style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${'exercises.types.${ex.exType}'.tr()} · MET ${ex.metVal}'),
-                            trailing: const Icon(AppIcons.chevronRight),
-                            onTap: () => aContext.go('/app/exercises/${ex.id}'),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
+    return ListPage(
+      title: 'exercises.title'.tr(),
+      onAdd: () => aContext.push('/app/exercises/new'),
+      addTooltip: 'exercises.add'.tr(),
+      builder: (_, aQuery) => exercisesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (aError, _) => ErrorRetry(error: aError, onRetry: () => aRef.invalidate(exercisesProv)),
+        data: (aExercises)
+        {
+          final shown = aExercises.where((aEx) => aQuery.isEmpty || exerciseDisplayName(aEx).toLowerCase().contains(aQuery)).toList();
+          if (shown.isEmpty)
+          {
+            return Center(child: Text('common.no_data'.tr()));
+          }
+          return ListView.builder(
+            key: const PageStorageKey('list.exercises'),
+            padding: screenPadding(aContext),
+            itemCount: shown.length,
+            itemBuilder: (_, aIndex)
+            {
+              final ex = shown[aIndex];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: Icon(ex.isCustom ? AppIcons.user : AppIcons.activity, color: aContext.colors.primary),
+                  title: Text(exerciseDisplayName(ex), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${'exercises.types.${ex.exType}'.tr()} · MET ${ex.metVal}'),
+                  trailing: const Icon(AppIcons.chevronRight),
+                  onTap: () => aContext.push('/app/exercises/${ex.id}'),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

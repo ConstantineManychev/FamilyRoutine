@@ -74,6 +74,7 @@ pub struct ProgramListItemDto
     pub schedule_mode: ScheduleMode,
     pub is_active: bool,
     pub day_count: i64,
+    pub updated_ts: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -6,7 +6,9 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/page_frames.dart';
 import 'geo_tree.dart';
+import '../common/app_theme.dart';
 
 class StreetsDictScreen extends ConsumerStatefulWidget
 {
@@ -69,22 +71,16 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
   {
     aContext.locale;
 
-    return Padding(
-      padding: screenPadding(aContext),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ScreenHeader(title: 'geo.streets_dict'.tr()),
-          const SizedBox(height: 24),
-          Expanded(child: buildTree(aCountryBody: _buildCities)),
-        ],
-      ),
+    return ListPage(
+      title: 'geo.streets_dict'.tr(),
+      onSearch: (aQuery) => setState(() => geoQuery = aQuery.trim().toLowerCase()),
+      child: buildTree(aCountryBody: _buildCities),
     );
   }
 
   Widget _buildCities(CountryDto aCountry)
   {
-    final cities = citiesCache[aCountry.id] ?? const <CityDto>[];
+    final cities = visibleCities(aCountry);
 
     if (cities.isEmpty)
     {
@@ -97,7 +93,7 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
           Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: context.palette.border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -106,7 +102,7 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
                   title: Text(city.name),
                   trailing: Icon(expandedCityId == city.id ? AppIcons.chevronUp : AppIcons.chevronDown),
                   onTap: () => toggleCity(city.id),
-                  tileColor: expandedCityId == city.id ? Colors.grey.shade100 : null,
+                  tileColor: expandedCityId == city.id ? context.palette.surfaceMuted : null,
                 ),
                 if (expandedCityId == city.id) _buildStreets(city),
               ],
@@ -123,7 +119,7 @@ class _StreetsDictScreenState extends ConsumerState<StreetsDictScreen> with GeoT
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: Colors.grey.shade50,
+      color: context.palette.surfaceMuted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
