@@ -42,6 +42,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
   List<TxDto>? _txs;
   Object? _error;
   int _generation = 0;
+  int _filterVersion = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -89,18 +90,21 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
     }
   }
 
-  Future<void> _load() async
+  Future<void> _load({bool aIsReset = true}) async
   {
     final generation = ++_generation;
     final filter = _filter;
     final (from, to) = filter.range;
-    setState(()
+    if (aIsReset)
     {
-      _error = null;
-      _cashflow = null;
-      _categories = null;
-      _txs = null;
-    });
+      setState(()
+      {
+        _error = null;
+        _cashflow = null;
+        _categories = null;
+        _txs = null;
+      });
+    }
 
     try
     {
@@ -137,6 +141,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
       }
       setState(()
       {
+        _error = null;
         _cashflow = results[0] as CashflowData;
         _categories = results[1] as CategoryStats;
         _txs = (results[2] as TxPage).items;
@@ -153,7 +158,11 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
 
   void _setFilter(FinanceFilter aFilter)
   {
-    setState(() => _filter = aFilter);
+    setState(()
+    {
+      _filter = aFilter;
+      _filterVersion++;
+    });
     _store();
     _load();
   }
@@ -164,7 +173,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
       ..invalidate(walletsProv)
       ..invalidate(bankConnsProv)
       ..invalidate(receiptsProv);
-    await _load();
+    await _load(aIsReset: false);
   }
 
   void _openFilters(List<AccountDto> aWallets)
@@ -186,7 +195,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
       ref
         ..invalidate(walletsProv)
         ..invalidate(receiptsProv);
-      await _load();
+      await _load(aIsReset: false);
     }
   }
 
@@ -196,7 +205,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
     if (isChanged == true && mounted)
     {
       ref.invalidate(walletsProv);
-      await _load();
+      await _load(aIsReset: false);
     }
   }
 
@@ -478,7 +487,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: CashflowChart(
-                key: ValueKey('cashflow:$code:${_filter.bucket.name}:$_generation'),
+                key: ValueKey('cashflow:$code:${_filter.bucket.name}:$_filterVersion'),
                 series: data.series.firstWhere((aSeries) => aSeries.currCode == code),
                 bucket: _filter.bucket,
               ),
@@ -515,7 +524,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
             BlockEmpty('finance.no_cashflow'.tr())
           else
             CategoryView(
-              key: ValueKey('categories:$code:$_generation'),
+              key: ValueKey('categories:$code:$_filterVersion'),
               series: data.series.firstWhere((aSeries) => aSeries.currCode == code),
               onOpenCategory: _openCategory,
             ),

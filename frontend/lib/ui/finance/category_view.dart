@@ -158,7 +158,7 @@ class _CategoryViewState extends State<CategoryView> with SingleTickerProviderSt
           controller: _tabs,
           tabs: [
             Tab(icon: const Icon(AppIcons.list, size: 18), text: 'finance.view_list'.tr()),
-            Tab(icon: const Icon(AppIcons.chartPie, size: 18), text: 'finance.view_chart'.tr()),
+            Tab(icon: const Icon(AppIcons.chartPie, size: 18), text: 'finance.view_donut'.tr()),
           ],
         ),
         GestureDetector(
@@ -189,76 +189,91 @@ class _CategoryList extends StatelessWidget
   @override
   Widget build(BuildContext aContext)
   {
-    final palette = aContext.palette;
-
     return Column(
       children: [
         for (final item in items)
-          InkWell(
-            onTap: () => onOpen(item.category),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: categoryColor(palette, item.category).withValues(alpha: 0.18),
-                    child: Icon(categoryIcon(item.category), size: 18, color: categoryColor(palette, item.category)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+          _CategoryRow(item: item, share: total <= 0 ? 0 : item.amount / total, currCode: currCode, onTap: () => onOpen(item.category)),
+      ],
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget
+{
+  final _Slice item;
+  final double share;
+  final String currCode;
+  final VoidCallback onTap;
+
+  const _CategoryRow({required this.item, required this.share, required this.currCode, required this.onTap});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final color = categoryColor(palette, item.category);
+    final percent = NumberFormat.percentPattern(Localizations.localeOf(aContext).toLanguageTag()).format(share);
+
+    return Semantics(
+      button: true,
+      container: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: color.withValues(alpha: 0.18),
+                child: Icon(categoryIcon(item.category), size: 18, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                categoryLabel(item.category),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkPrimary),
-                              ),
-                            ),
-                            Text(
-                              formatMoney(aContext, item.amount, currCode),
-                              style: TextStyle(fontWeight: FontWeight.w700, color: palette.inkPrimary, fontFeatures: const [FontFeature.tabularFigures()]),
-                            ),
-                          ],
+                        Expanded(
+                          child: Text(
+                            categoryLabel(item.category),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkPrimary),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value: total <= 0 ? 0 : item.amount / total,
-                                  minHeight: 4,
-                                  color: categoryColor(palette, item.category),
-                                  backgroundColor: palette.surfaceMuted,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 44,
-                              child: Text(
-                                NumberFormat.percentPattern(Localizations.localeOf(aContext).toLanguageTag()).format(total <= 0 ? 0 : item.amount / total),
-                                textAlign: TextAlign.right,
-                                style: TextStyle(fontSize: 12, color: palette.inkSecondary),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          formatMoney(aContext, item.amount, currCode),
+                          style: TextStyle(fontWeight: FontWeight.w700, color: palette.inkPrimary, fontFeatures: const [FontFeature.tabularFigures()]),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ExcludeSemantics(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(value: share, minHeight: 4, color: color, backgroundColor: palette.surfaceMuted),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 44,
+                          child: Text(percent, textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: palette.inkSecondary)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }

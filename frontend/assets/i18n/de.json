@@ -585,7 +585,8 @@
     "preset_month": "30 Tage",
     "preset_monthToDate": "Dieser Monat",
     "preset_quarter": "90 Tage",
-    "view_list": "Liste"
+    "view_list": "Liste",
+    "view_donut": "Diagramm"
   },
   "items": {
     "title": "Waren und Dienstleistungen",

@@ -585,7 +585,8 @@
     "preset_month": "30 дней",
     "preset_monthToDate": "Этот месяц",
     "preset_quarter": "90 дней",
-    "view_list": "Список"
+    "view_list": "Список",
+    "view_donut": "Диаграмма"
   },
   "items": {
     "title": "Товары и услуги",

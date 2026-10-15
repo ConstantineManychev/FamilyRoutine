@@ -585,7 +585,8 @@
     "preset_month": "30 days",
     "preset_monthToDate": "This month",
     "preset_quarter": "90 days",
-    "view_list": "List"
+    "view_list": "List",
+    "view_donut": "Chart"
   },
   "items": {
     "title": "Goods and services",

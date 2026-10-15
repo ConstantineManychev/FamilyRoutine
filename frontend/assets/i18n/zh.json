@@ -585,7 +585,8 @@
     "preset_month": "30 天",
     "preset_monthToDate": "本月",
     "preset_quarter": "90 天",
-    "view_list": "列表"
+    "view_list": "列表",
+    "view_donut": "图表"
   },
   "items": {
     "title": "商品和服务",

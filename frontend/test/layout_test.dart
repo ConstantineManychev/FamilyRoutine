@@ -90,11 +90,11 @@ void main()
   testWidgets('category block swipes between the list and the chart in portrait', (aTester) async
   {
     await aTester.binding.setSurfaceSize(_phone);
-    final series = CategorySeries(
+    const series = CategorySeries(
       currCode: 'EUR',
       incomeTotal: 0,
       expenseTotal: 30,
-      items: const [
+      items: [
         CategoryAmount(category: TxCategory.groceries, income: 0, expense: 20, txCount: 2),
         CategoryAmount(category: TxCategory.fuel, income: 0, expense: 10, txCount: 1),
       ],

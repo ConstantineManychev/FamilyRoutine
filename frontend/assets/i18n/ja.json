@@ -585,7 +585,8 @@
     "preset_month": "30日間",
     "preset_monthToDate": "今月",
     "preset_quarter": "90日間",
-    "view_list": "リスト"
+    "view_list": "リスト",
+    "view_donut": "グラフ"
   },
   "items": {
     "title": "商品とサービス",
