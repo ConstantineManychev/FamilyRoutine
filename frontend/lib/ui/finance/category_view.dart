@@ -7,12 +7,12 @@ import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/money.dart';
+import '../common/snap_tab_view.dart';
 
 const double _compactWidth = 600;
 const double _donutSize = 200;
 const double _ringWidth = 26;
 const double _segmentGap = 0.03;
-const double _swipeVelocity = 250;
 
 const Map<TxCategory, int> _categorySlots = {
   TxCategory.groceries: 0,
@@ -54,6 +54,7 @@ class _CategoryViewState extends State<CategoryView> with SingleTickerProviderSt
 {
   late final TabController _tabs = TabController(length: 2, vsync: this)..addListener(_onTab);
   bool _isIncome = false;
+  double _dragDx = 0;
 
   @override
   void dispose()
@@ -72,16 +73,14 @@ class _CategoryViewState extends State<CategoryView> with SingleTickerProviderSt
     }
   }
 
-  void _onSwipe(DragEndDetails aDetails)
+  void _onSwipeEnd(double aWidth)
   {
-    final velocity = aDetails.primaryVelocity ?? 0;
-    if (velocity < -_swipeVelocity && _tabs.index == 0)
+    final shift = aWidth <= 0 ? 0.0 : -_dragDx / aWidth;
+    _dragDx = 0;
+    final target = swipeTarget(aAnchor: _tabs.index, aPage: _tabs.index + shift, aCount: _tabs.length);
+    if (target != _tabs.index)
     {
-      _tabs.animateTo(1);
-    }
-    else if (velocity > _swipeVelocity && _tabs.index == 1)
-    {
-      _tabs.animateTo(0);
+      _tabs.animateTo(target, duration: tabSnapDuration);
     }
   }
 
@@ -161,15 +160,19 @@ class _CategoryViewState extends State<CategoryView> with SingleTickerProviderSt
             Tab(icon: const Icon(AppIcons.chartPie, size: 18), text: 'finance.view_donut'.tr()),
           ],
         ),
-        GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragEnd: _onSwipe,
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            alignment: Alignment.topCenter,
-            child: _tabs.index == 0
-                ? list
-                : Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Center(child: donut)),
+        LayoutBuilder(
+          builder: (_, aConstraints) => GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (_) => _dragDx = 0,
+            onHorizontalDragUpdate: (aDetails) => _dragDx += aDetails.delta.dx,
+            onHorizontalDragEnd: (_) => _onSwipeEnd(aConstraints.maxWidth),
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              alignment: Alignment.topCenter,
+              child: _tabs.index == 0
+                  ? list
+                  : Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Center(child: donut)),
+            ),
           ),
         ),
       ],

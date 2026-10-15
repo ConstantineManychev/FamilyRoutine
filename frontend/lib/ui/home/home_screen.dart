@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
 import '../common/app_theme.dart';
+import '../common/snap_tab_view.dart';
 import 'finance_tab.dart';
 import 'groups_tab.dart';
 import 'routine_tab.dart';
@@ -118,7 +119,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           ],
         ),
       ),
-      body: TabBarView(
+      body: SnapTabView(
         controller: _tabs,
         children: const [
           GroupsTab(),
