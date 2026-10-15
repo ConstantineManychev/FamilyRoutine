@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE transactions\n        SET tx_ts = $2\n        WHERE balance_doc_id = $1\n          AND (\n              tx_ts > $2\n              OR tx_ts <= COALESCE(\n                  (SELECT MAX(d.balance_ts) FROM balance_docs d WHERE d.account_id = $3 AND d.balance_ts < $2),\n                  '-infinity'::timestamptz\n              )\n          )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1d7218bcd591b6836931270773c86be008eb99586cd84de8b648f1141061e1cc"
+}

@@ -25,8 +25,9 @@ class ReceiptDetailScreen extends ConsumerStatefulWidget
 {
   final String? receiptId;
   final TxDto? initialTx;
+  final ReceiptPrefill? prefill;
 
-  const ReceiptDetailScreen({super.key, this.receiptId, this.initialTx});
+  const ReceiptDetailScreen({super.key, this.receiptId, this.initialTx, this.prefill});
 
   @override
   ConsumerState<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
@@ -236,6 +237,14 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           _placeId = places.any((aPlace) => aPlace.id == tx?.placeId) ? tx?.placeId : null;
           _placeAddrId = _placeId == null ? null : tx?.placeAddrId;
           _currId = currs.where((aCurr) => aCurr.code == tx?.currCode).firstOrNull?.id ?? _defaultCurrency(currs, wallets);
+          final prefill = widget.prefill;
+          if (prefill != null)
+          {
+            _ts = prefill.ts;
+            _currId = prefill.currId;
+            _cashAccountId = prefill.cashAccountId;
+            _isCashChosen = true;
+          }
           _rows.add(_ItemRow());
         }
       });
@@ -411,6 +420,10 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       if (_isEdit)
       {
         setState(() => _apply(saved));
+      }
+      else if (widget.prefill != null && context.canPop())
+      {
+        context.pop(true);
       }
       else
       {

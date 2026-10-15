@@ -44,8 +44,11 @@ pub async fn list_wallets(State(a_state): State<AppState>, a_user: AuthUser)
             a.mask,
             a.conn_id,
             bc.provider AS "provider?: BankProvider",
-            a.balance,
-            a.balance_ts,
+            CASE WHEN a.conn_id IS NULL THEN wallet_balance(a.id) ELSE a.balance END AS balance,
+            CASE
+                WHEN a.conn_id IS NULL THEN COALESCE((SELECT MAX(d.balance_ts) FROM balance_docs d WHERE d.account_id = a.id), a.balance_ts)
+                ELSE a.balance_ts
+            END AS balance_ts,
             a.is_active,
             v.is_editor AS "is_editable!",
             (a.user_id IS NOT DISTINCT FROM $1) AS "is_own!",
@@ -238,8 +241,11 @@ async fn load_wallet(a_state: &AppState, a_id: Uuid, a_user_id: Uuid) -> Result<
             a.mask,
             a.conn_id,
             bc.provider AS "provider?: BankProvider",
-            a.balance,
-            a.balance_ts,
+            CASE WHEN a.conn_id IS NULL THEN wallet_balance(a.id) ELSE a.balance END AS balance,
+            CASE
+                WHEN a.conn_id IS NULL THEN COALESCE((SELECT MAX(d.balance_ts) FROM balance_docs d WHERE d.account_id = a.id), a.balance_ts)
+                ELSE a.balance_ts
+            END AS balance_ts,
             a.is_active,
             v.is_editor AS "is_editable!",
             (a.user_id IS NOT DISTINCT FROM $2) AS "is_own!",

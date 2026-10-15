@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            d.id AS \"id!\",\n            d.account_id AS \"account_id!\",\n            d.balance_ts AS \"balance_ts!\",\n            d.amount AS \"amount!\",\n            d.note,\n            d.prev_ts AS \"prev_ts?\",\n            flow.expected AS \"expected?\",\n            d.amount - flow.expected AS \"delta?\"\n        FROM (\n            SELECT\n                bd.id, bd.account_id, bd.balance_ts, bd.amount, bd.note,\n                LAG(bd.balance_ts) OVER ordered AS prev_ts,\n                LAG(bd.amount) OVER ordered AS prev_amount\n            FROM balance_docs bd\n            WHERE bd.account_id = $1\n            WINDOW ordered AS (ORDER BY bd.balance_ts)\n        ) d\n        LEFT JOIN LATERAL (\n            SELECT d.prev_amount + COALESCE(SUM(t.amount), 0) AS expected\n            FROM transactions t\n            WHERE t.account_id = d.account_id\n              AND NOT t.is_pending\n              AND t.tx_ts > d.prev_ts\n              AND t.tx_ts <= d.balance_ts\n        ) flow ON d.prev_ts IS NOT NULL\n        WHERE $2::uuid IS NULL OR d.id = $2\n        ORDER BY d.balance_ts DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "balance_ts!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "amount!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "prev_ts?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "expected?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "delta?",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3c405130f226311f14a4680e1d988b115d55c68d251f8d0c875336cbc89b5780"
+}

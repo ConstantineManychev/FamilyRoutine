@@ -85,7 +85,8 @@ pub async fn list_transactions(
                 WHERE mp.user_id = $1 AND mp.merchant_id = t.merchant_id
                   AND can_see_scoped(lp.owner_id, lp.family_id, $1)
             ) AS "is_merchant_linked!",
-            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name
+            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name,
+            t.balance_doc_id
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
         JOIN accounts a ON a.id = t.account_id
@@ -585,7 +586,8 @@ where
                 WHERE mp.user_id = $2 AND mp.merchant_id = t.merchant_id
                   AND can_see_scoped(lp.owner_id, lp.family_id, $2)
             ) AS "is_merchant_linked!",
-            CASE WHEN a.user_id IS DISTINCT FROM $2 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name
+            CASE WHEN a.user_id IS DISTINCT FROM $2 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name,
+            t.balance_doc_id
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
         JOIN accounts a ON a.id = t.account_id

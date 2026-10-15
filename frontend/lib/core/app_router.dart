@@ -83,7 +83,10 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               GoRoute(path: 'receipts', builder: (_, __) => const ReceiptsScreen()),
               GoRoute(
                 path: 'receipts/new',
-                builder: (_, aState) => ReceiptDetailScreen(initialTx: aState.extra is TxDto ? aState.extra as TxDto : null),
+                builder: (_, aState) => ReceiptDetailScreen(
+                  initialTx: aState.extra is TxDto ? aState.extra as TxDto : null,
+                  prefill: aState.extra is ReceiptPrefill ? aState.extra as ReceiptPrefill : null,
+                ),
               ),
               GoRoute(
                 path: 'receipts/:id',

@@ -332,6 +332,7 @@ class TxDto
   final String? branch;
   final bool isMerchantLinked;
   final String? accountOwnerName;
+  final String? balanceDocId;
 
   const TxDto({
     required this.id,
@@ -366,6 +367,7 @@ class TxDto
     this.branch,
     this.isMerchantLinked = false,
     this.accountOwnerName,
+    this.balanceDocId,
   });
 
   bool get isTransfer => transferId != null;
@@ -410,6 +412,7 @@ class TxDto
         branch: aJson['branch'] as String?,
         isMerchantLinked: aJson['is_merchant_linked'] as bool? ?? false,
         accountOwnerName: aJson['account_owner_name'] as String?,
+        balanceDocId: aJson['balance_doc_id'] as String?,
       );
 }
 
@@ -884,4 +887,74 @@ class MerchantDto
         id: aJson['id'] as String,
         name: aJson['name'] as String,
       );
+}
+
+class BalanceWriteOff
+{
+  final String id;
+  final DateTime txTs;
+  final double amount;
+  final TxCategory? category;
+  final String? note;
+
+  const BalanceWriteOff({required this.id, required this.txTs, required this.amount, this.category, this.note});
+
+  factory BalanceWriteOff.fromJson(Map<String, dynamic> aJson) => BalanceWriteOff(
+        id: aJson['id'] as String,
+        txTs: parseTs(aJson['tx_ts']),
+        amount: parseDecimal(aJson['amount']),
+        category: TxCategory.parse(aJson['category']),
+        note: aJson['note'] as String?,
+      );
+}
+
+class BalanceDoc
+{
+  static const double _epsilon = 0.004;
+
+  final String id;
+  final DateTime balanceTs;
+  final double amount;
+  final String? note;
+  final DateTime? prevTs;
+  final double? expected;
+  final double? delta;
+  final List<BalanceWriteOff> writeOffs;
+
+  const BalanceDoc({
+    required this.id,
+    required this.balanceTs,
+    required this.amount,
+    this.note,
+    this.prevTs,
+    this.expected,
+    this.delta,
+    this.writeOffs = const [],
+  });
+
+  bool get isInitial => prevTs == null;
+
+  bool get hasDelta => (delta ?? 0).abs() > _epsilon;
+
+  factory BalanceDoc.fromJson(Map<String, dynamic> aJson) => BalanceDoc(
+        id: aJson['id'] as String,
+        balanceTs: parseTs(aJson['balance_ts']),
+        amount: parseDecimal(aJson['amount']),
+        note: aJson['note'] as String?,
+        prevTs: aJson['prev_ts'] == null ? null : parseTs(aJson['prev_ts']),
+        expected: parseDecimalOrNull(aJson['expected']),
+        delta: parseDecimalOrNull(aJson['delta']),
+        writeOffs: ((aJson['write_offs'] as List<dynamic>?) ?? const [])
+            .map((aItem) => BalanceWriteOff.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class ReceiptPrefill
+{
+  final String cashAccountId;
+  final String currId;
+  final DateTime ts;
+
+  const ReceiptPrefill({required this.cashAccountId, required this.currId, required this.ts});
 }

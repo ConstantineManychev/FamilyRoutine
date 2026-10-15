@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            t.id,\n            t.balance_doc_id AS \"balance_doc_id!\",\n            t.tx_ts,\n            t.amount,\n            t.category AS \"category: TxCategory\",\n            t.note\n        FROM transactions t\n        JOIN balance_docs d ON d.id = t.balance_doc_id\n        WHERE d.account_id = $1\n        ORDER BY t.tx_ts, t.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "balance_doc_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "tx_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "amount",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "category: TxCategory",
+        "type_info": {
+          "Custom": {
+            "name": "tx_cat_t",
+            "kind": {
+              "Enum": [
+                "groceries",
+                "restaurants",
+                "transport",
+                "fuel",
+                "shopping",
+                "health",
+                "utilities",
+                "entertainment",
+                "travel",
+                "education",
+                "home",
+                "cash",
+                "transfer",
+                "fees",
+                "income",
+                "other"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "note",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "d7cb968bd2c596c6b01b01e6a99b0bb1a918219880d6420ef31b66e1b845da37"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            a.id,\n            a.user_id,\n            a.family_id,\n            a.curr_id,\n            c.code AS curr_code,\n            a.account_type AS \"account_type: AccountType\",\n            a.bank_type AS \"bank_type: BankType\",\n            a.name,\n            a.mask,\n            a.conn_id,\n            bc.provider AS \"provider?: BankProvider\",\n            a.balance,\n            a.balance_ts,\n            a.is_active,\n            v.is_editor AS \"is_editable!\",\n            (a.user_id IS NOT DISTINCT FROM $1) AS \"is_own!\",\n            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,\n            CASE\n                WHEN a.user_id = $1 THEN ARRAY(SELECT s.family_id FROM account_shares s WHERE s.account_id = a.id)\n                ELSE ARRAY[]::uuid[]\n            END AS \"shared_family_ids!\"\n        FROM accounts a\n        JOIN account_viewers v ON v.account_id = a.id AND v.viewer_id = $1\n        JOIN currencies c ON c.id = a.curr_id\n        LEFT JOIN bank_conns bc ON bc.id = a.conn_id\n        LEFT JOIN users owner ON owner.id = a.user_id\n        ORDER BY a.is_active DESC, a.name ASC\n        ",
+  "query": "\n        SELECT\n            a.id,\n            a.user_id,\n            a.family_id,\n            a.curr_id,\n            c.code AS curr_code,\n            a.account_type AS \"account_type: AccountType\",\n            a.bank_type AS \"bank_type: BankType\",\n            a.name,\n            a.mask,\n            a.conn_id,\n            bc.provider AS \"provider?: BankProvider\",\n            CASE WHEN a.conn_id IS NULL THEN wallet_balance(a.id) ELSE a.balance END AS balance,\n            CASE\n                WHEN a.conn_id IS NULL THEN COALESCE((SELECT MAX(d.balance_ts) FROM balance_docs d WHERE d.account_id = a.id), a.balance_ts)\n                ELSE a.balance_ts\n            END AS balance_ts,\n            a.is_active,\n            v.is_editor AS \"is_editable!\",\n            (a.user_id IS NOT DISTINCT FROM $1) AS \"is_own!\",\n            CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,\n            CASE\n                WHEN a.user_id = $1 THEN ARRAY(SELECT s.family_id FROM account_shares s WHERE s.account_id = a.id)\n                ELSE ARRAY[]::uuid[]\n            END AS \"shared_family_ids!\"\n        FROM accounts a\n        JOIN account_viewers v ON v.account_id = a.id AND v.viewer_id = $1\n        JOIN currencies c ON c.id = a.curr_id\n        LEFT JOIN bank_conns bc ON bc.id = a.conn_id\n        LEFT JOIN users owner ON owner.id = a.user_id\n        ORDER BY a.is_active DESC, a.name ASC\n        ",
   "describe": {
     "columns": [
       {
@@ -143,8 +143,8 @@
       true,
       true,
       false,
-      true,
-      true,
+      null,
+      null,
       false,
       true,
       null,
@@ -152,5 +152,5 @@
       null
     ]
   },
-  "hash": "8921d8dfbafeb3e20813a290bf9c3738eb13f48b7362098e40025b4f9a2d5de3"
+  "hash": "f46a4f02672732765b2ce039220edb8d6c0fd523b40d1ace6265815ab1fda432"
 }

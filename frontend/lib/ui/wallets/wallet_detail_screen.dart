@@ -8,6 +8,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import 'balance_docs_card.dart';
 
 const List<String> accountTypes = ['cash', 'card', 'bank_acc'];
 const List<String> bankTypes = ['monobank', 'aib', 'other'];
@@ -262,6 +263,10 @@ class _WalletDetailScreenState extends ConsumerState<WalletDetailScreen>
                 Expanded(child: Text('wallet.linked_hint'.tr())),
               ],
             ),
+          ],
+          if (_wallet != null && !_wallet!.isLinked) ...[
+            const SizedBox(height: 32),
+            BalanceDocsCard(wallet: _wallet!),
           ],
         ],
       ),

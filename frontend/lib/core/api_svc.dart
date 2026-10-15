@@ -770,6 +770,46 @@ class ApiSvc
     return AccountDto.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<List<BalanceDoc>> getBalanceDocs(String aWalletId) async
+  {
+    final res = await _dio.get('/api/wallets/$aWalletId/balance-docs');
+    return (res.data as List<dynamic>).map((aItem) => BalanceDoc.fromJson(aItem as Map<String, dynamic>)).toList();
+  }
+
+  Map<String, dynamic> _balanceDocBody(DateTime aTs, double aAmount, String? aNote) => {
+        'balance_ts': aTs.toUtc().toIso8601String(),
+        'amount': moneyWire(aAmount),
+        'note': aNote,
+      };
+
+  Future<BalanceDoc> createBalanceDoc(String aWalletId, DateTime aTs, double aAmount, String? aNote) async
+  {
+    final res = await _dio.post('/api/wallets/$aWalletId/balance-docs', data: _balanceDocBody(aTs, aAmount, aNote));
+    return BalanceDoc.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<BalanceDoc> updateBalanceDoc(String aDocId, DateTime aTs, double aAmount, String? aNote) async
+  {
+    final res = await _dio.put('/api/balance-docs/$aDocId', data: _balanceDocBody(aTs, aAmount, aNote));
+    return BalanceDoc.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteBalanceDoc(String aDocId) async
+  {
+    await _dio.delete('/api/balance-docs/$aDocId');
+  }
+
+  Future<BalanceDoc> writeOffBalance(String aDocId, double aAmount, DateTime aTs, TxCategory? aCategory, String? aNote) async
+  {
+    final res = await _dio.post('/api/balance-docs/$aDocId/write-offs', data: {
+      'amount': moneyWire(aAmount),
+      'tx_ts': aTs.toUtc().toIso8601String(),
+      'category': aCategory?.name,
+      'note': aNote,
+    });
+    return BalanceDoc.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<List<SessionSummary>> getSessions({int aLimit = 20}) async
   {
     final res = await _dio.get('/api/training/sessions', queryParameters: {'limit': aLimit});

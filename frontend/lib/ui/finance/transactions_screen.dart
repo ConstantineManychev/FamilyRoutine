@@ -339,6 +339,7 @@ class TxTile extends StatelessWidget
       else
         categoryLabel(tx.category),
       if (tx.isPending) 'finance.pending'.tr(),
+      if (tx.balanceDocId != null) 'balance.tx_marker'.tr(),
     ].join(' · ');
 
     final amountColor = tx.isTransfer

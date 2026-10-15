@@ -194,6 +194,7 @@ pub struct TxDto
     pub branch: Option<String>,
     pub is_merchant_linked: bool,
     pub account_owner_name: Option<String>,
+    pub balance_doc_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -679,6 +680,52 @@ pub struct SaveManualPriceRequest
     pub price: Decimal,
     #[serde(default)]
     pub seen_ts: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BalanceWriteOffDto
+{
+    pub id: Uuid,
+    pub balance_doc_id: Uuid,
+    pub tx_ts: DateTime<Utc>,
+    pub amount: Decimal,
+    pub category: Option<TxCategory>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BalanceDocDto
+{
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub balance_ts: DateTime<Utc>,
+    pub amount: Decimal,
+    pub note: Option<String>,
+    pub prev_ts: Option<DateTime<Utc>>,
+    pub expected: Option<Decimal>,
+    pub delta: Option<Decimal>,
+    pub write_offs: Vec<BalanceWriteOffDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveBalanceDocRequest
+{
+    pub balance_ts: DateTime<Utc>,
+    pub amount: Decimal,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BalanceWriteOffRequest
+{
+    pub amount: Decimal,
+    #[serde(default)]
+    pub tx_ts: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub category: Option<TxCategory>,
     #[serde(default)]
     pub note: Option<String>,
 }

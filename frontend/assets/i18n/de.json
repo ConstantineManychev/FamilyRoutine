@@ -906,5 +906,29 @@
     "unsaved": "Ungespeicherte Änderungen",
     "delete_workout": "Training löschen",
     "delete_workout_confirm": "Dieses Training mit allen Sätzen löschen?"
+  },
+  "balance": {
+    "title": "Kontostand",
+    "set": "Kontostand erfassen",
+    "edit": "Kontostand bearbeiten",
+    "hint": "Der Kontostand ergibt sich aus der letzten Erfassung plus den Buchungen danach. Buchungen vor einer Erfassung ändern den aktuellen Stand nicht. Ohne Erfassung beginnt der Stand bei null mit der ersten Buchung.",
+    "empty": "Noch keine Kontostand-Erfassungen.",
+    "initial": "Anfangsbestand",
+    "matches": "Stimmt mit der Buchhaltung überein",
+    "delta": "Abweichung {} (laut Buchungen {})",
+    "written_off": "Ausgebucht {}",
+    "write_off_expense": "Als Ausgabe ausbuchen",
+    "write_off_income": "Als Einnahme erfassen",
+    "add_receipt": "Beleg hinzufügen",
+    "delete_title": "Kontostand-Erfassung löschen?",
+    "delete_confirm": "Der Stand wird wieder ab der vorherigen Erfassung berechnet.",
+    "delete_confirm_write_offs": "Der Stand wird wieder ab der vorherigen Erfassung berechnet. Daraus erstellte Ausbuchungen werden ebenfalls gelöscht: {}.",
+    "current_hint": "Laut Buchungen aktuell: {}. Geben Sie den tatsächlichen Betrag zum gewählten Zeitpunkt ein.",
+    "amount": "Tatsächlicher Stand",
+    "err_amount": "Betrag eingeben",
+    "write_off_hint": "Nicht zugeordnet {}. Datum nach {} und spätestens {}: so schließt die Buchung diese Abweichung und ändert den aktuellen Stand nicht.",
+    "err_write_off": "Der Betrag muss größer als null und höchstens {} sein",
+    "err_write_off_date": "Das Datum muss nach der vorherigen Erfassung und spätestens bei dieser liegen",
+    "tx_marker": "Ausbuchung zum Kontostand"
   }
 }

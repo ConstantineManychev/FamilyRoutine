@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE balance_docs SET balance_ts = $2, amount = $3, note = $4 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Numeric",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e430767f0de04b016a5be6cdf2fa6f165154a7b9b3c51ea8c0005c410f283ac3"
+}

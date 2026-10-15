@@ -426,6 +426,40 @@ void main()
       expect(receipt.ownerName, 'Boris Petrov');
     });
 
+    test('balance document separates opening records from differences', ()
+    {
+      final opening = BalanceDoc.fromJson({
+        'id': 'd1',
+        'account_id': 'w1',
+        'balance_ts': '2026-10-10T10:00:00Z',
+        'amount': '70.00',
+        'prev_ts': null,
+        'expected': null,
+        'delta': null,
+        'write_offs': const [],
+      });
+      expect(opening.isInitial, isTrue);
+      expect(opening.hasDelta, isFalse);
+
+      final checked = BalanceDoc.fromJson({
+        'id': 'd2',
+        'account_id': 'w1',
+        'balance_ts': '2026-10-12T10:00:00Z',
+        'amount': '50.00',
+        'prev_ts': '2026-10-10T10:00:00Z',
+        'expected': '65.00',
+        'delta': '-15.00',
+        'write_offs': [
+          {'id': 't1', 'balance_doc_id': 'd2', 'tx_ts': '2026-10-11T10:00:00Z', 'amount': '-10.00', 'category': 'groceries', 'note': null},
+        ],
+      });
+      expect(checked.isInitial, isFalse);
+      expect(checked.hasDelta, isTrue);
+      expect(checked.delta, -15);
+      expect(checked.writeOffs.single.category, TxCategory.groceries);
+      expect(BalanceDoc.fromJson({'id': 'd3', 'balance_ts': '2026-10-12T10:00:00Z', 'amount': '1', 'prev_ts': '2026-10-11T10:00:00Z', 'delta': '0.00'}).hasDelta, isFalse);
+    });
+
     test('place keeps existing address ids when saving', ()
     {
       final place = PlaceDto.fromJson({

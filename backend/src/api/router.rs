@@ -11,9 +11,9 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    ai_handlers, auth_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers, geo_handlers,
-    item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers,
-    stats_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
+    ai_handlers, auth_handlers, balance_handlers, bank_handlers, dashboard_handlers, ex_handlers, fam_handlers,
+    geo_handlers, item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers,
+    routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -233,6 +233,15 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/wallets/:id/archive", put(wallet_handlers::archive_wallet))
         .route("/wallets/:id/shares/:family_id", put(wallet_handlers::share_wallet))
+        .route(
+            "/wallets/:id/balance-docs",
+            get(balance_handlers::list_balance_docs).post(balance_handlers::create_balance_doc),
+        )
+        .route(
+            "/balance-docs/:id",
+            put(balance_handlers::update_balance_doc).delete(balance_handlers::delete_balance_doc),
+        )
+        .route("/balance-docs/:id/write-offs", post(balance_handlers::create_write_off))
         .route("/geo/countries", get(geo_handlers::list_countries))
         .route(
             "/geo/countries/:id/cities",

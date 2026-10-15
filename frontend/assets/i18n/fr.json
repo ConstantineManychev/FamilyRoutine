@@ -906,5 +906,29 @@
     "unsaved": "Modifications non enregistrées",
     "delete_workout": "Supprimer l'entraînement",
     "delete_workout_confirm": "Supprimer cet entraînement avec toutes ses séries ?"
+  },
+  "balance": {
+    "title": "Solde",
+    "set": "Indiquer le solde",
+    "edit": "Modifier le relevé de solde",
+    "hint": "Le solde correspond au dernier relevé plus les opérations suivantes. Les opérations antérieures à un relevé ne modifient pas le solde actuel. Sans relevé, le solde part de zéro à la première opération.",
+    "empty": "Aucun relevé de solde pour le moment.",
+    "initial": "Solde initial",
+    "matches": "Conforme aux écritures",
+    "delta": "Écart {} (selon les écritures {})",
+    "written_off": "Passé en écriture {}",
+    "write_off_expense": "Passer en dépense",
+    "write_off_income": "Enregistrer en revenu",
+    "add_receipt": "Ajouter un ticket",
+    "delete_title": "Supprimer le relevé de solde ?",
+    "delete_confirm": "Le solde sera de nouveau calculé à partir du relevé précédent.",
+    "delete_confirm_write_offs": "Le solde sera de nouveau calculé à partir du relevé précédent. Les écritures créées depuis ce relevé seront aussi supprimées : {}.",
+    "current_hint": "Solde actuel selon les écritures : {}. Saisissez le montant réel au moment choisi.",
+    "amount": "Solde réel",
+    "err_amount": "Saisissez un montant",
+    "write_off_hint": "Non réparti {}. Datez-la après {} et au plus tard {} : elle comblera cet écart sans modifier le solde actuel.",
+    "err_write_off": "Le montant doit être supérieur à zéro et au plus {}",
+    "err_write_off_date": "La date doit être postérieure au relevé précédent et au plus tard celle de ce relevé",
+    "tx_marker": "écriture de solde"
   }
 }

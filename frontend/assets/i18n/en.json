@@ -906,5 +906,29 @@
     "unsaved": "Unsaved changes",
     "delete_workout": "Delete workout",
     "delete_workout_confirm": "Delete this workout with all its sets?"
+  },
+  "balance": {
+    "title": "Balance",
+    "set": "Set balance",
+    "edit": "Edit balance record",
+    "hint": "The balance is the latest record plus the operations after it. Operations dated before a record do not change the current balance. Until there is a record, the balance starts from zero at the first operation.",
+    "empty": "No balance records yet.",
+    "initial": "Opening balance",
+    "matches": "Matches the books",
+    "delta": "Difference {} (books said {})",
+    "written_off": "Written off {}",
+    "write_off_expense": "Write off as expense",
+    "write_off_income": "Record as income",
+    "add_receipt": "Add receipt",
+    "delete_title": "Delete the balance record?",
+    "delete_confirm": "The balance will again be counted from the previous record.",
+    "delete_confirm_write_offs": "The balance will again be counted from the previous record. Write-offs created from it will be deleted too: {}.",
+    "current_hint": "Current balance in the books: {}. Enter the actual amount at the chosen moment.",
+    "amount": "Actual balance",
+    "err_amount": "Enter an amount",
+    "write_off_hint": "Unallocated {}. Date it after {} and no later than {}: then it closes this difference and does not change the current balance.",
+    "err_write_off": "The amount must be above zero and at most {}",
+    "err_write_off_date": "The date must be after the previous record and no later than this one",
+    "tx_marker": "balance write-off"
   }
 }

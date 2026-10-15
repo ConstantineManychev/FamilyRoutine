@@ -906,5 +906,29 @@
     "unsaved": "有未保存的更改",
     "delete_workout": "删除训练",
     "delete_workout_confirm": "删除这次训练及其所有组？"
+  },
+  "balance": {
+    "title": "余额",
+    "set": "登记余额",
+    "edit": "编辑余额记录",
+    "hint": "余额 = 最近一次余额记录 + 之后的交易。日期早于记录的交易不影响当前余额。没有记录时,余额从第一笔交易起按零计算。",
+    "empty": "还没有余额记录。",
+    "initial": "期初余额",
+    "matches": "与账目一致",
+    "delta": "差额 {}(账面为 {})",
+    "written_off": "已入账 {}",
+    "write_off_expense": "记为支出",
+    "write_off_income": "记为收入",
+    "add_receipt": "添加小票",
+    "delete_title": "删除余额记录?",
+    "delete_confirm": "余额将重新从上一条记录计算。",
+    "delete_confirm_write_offs": "余额将重新从上一条记录计算。由此记录创建的入账也会被删除:{} 笔。",
+    "current_hint": "当前账面余额:{}。请输入所选时间点的实际金额。",
+    "amount": "实际余额",
+    "err_amount": "请输入金额",
+    "write_off_hint": "未分配 {}。日期需晚于 {} 且不晚于 {}:这样可以抵消该差额,且不改变当前余额。",
+    "err_write_off": "金额必须大于零且不超过 {}",
+    "err_write_off_date": "日期必须晚于上一条记录且不晚于本记录",
+    "tx_marker": "余额记录入账"
   }
 }
