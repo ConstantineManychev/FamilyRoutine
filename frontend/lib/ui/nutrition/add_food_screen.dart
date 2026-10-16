@@ -13,6 +13,7 @@ import '../common/page_frames.dart';
 import '../common/snap_tab_view.dart';
 import 'amount_sheet.dart';
 import 'food_picker.dart';
+import 'meal_target.dart';
 import 'nutrition_format.dart';
 
 const double _maxQuickKcal = 10000;
@@ -22,10 +23,9 @@ const int _maxTitleLen = 200;
 class AddFoodScreen extends ConsumerStatefulWidget
 {
   final DateTime date;
-  final MealSlot meal;
   final String? markId;
 
-  const AddFoodScreen({super.key, required this.date, required this.meal, this.markId});
+  const AddFoodScreen({super.key, required this.date, this.markId});
 
   @override
   ConsumerState<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -33,7 +33,8 @@ class AddFoodScreen extends ConsumerStatefulWidget
 
 class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
 {
-  late MealSlot _meal = widget.meal;
+  List<DayMeal>? _meals;
+  MealTarget? _target;
   List<RecentFood>? _recent;
   List<Dish>? _dishes;
   Object? _dishesError;
@@ -49,8 +50,39 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   void initState()
   {
     super.initState();
+    _loadMeals();
     _loadRecent();
     _loadDishes();
+  }
+
+  Future<void> _loadMeals({String? aMarkId}) async
+  {
+    try
+    {
+      final day = await ref.read(apiProv).getNutritionDay(widget.date);
+      if (mounted)
+      {
+        setState(()
+        {
+          _meals = day.meals;
+          final markId = aMarkId ?? _target?.markId ?? widget.markId;
+          _target = aMarkId == null && _target?.isNew == true
+              ? _target
+              : defaultMealTarget(widget.date, day.meals, aMarkId: markId);
+        });
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        setState(()
+        {
+          _meals = const [];
+          _target ??= defaultMealTarget(widget.date, const []);
+        });
+      }
+    }
   }
 
   @override
@@ -110,18 +142,21 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     setState(() => _isBusy = true);
     try
     {
-      await ref.read(apiProv).addMealEntry({
-        'date': dateWire(widget.date),
-        ...aPayload,
-        if (widget.markId != null) 'status_mark_id': widget.markId,
-      });
+      final target = _target;
+      if (target == null)
+      {
+        return;
+      }
+      final api = ref.read(apiProv);
+      final markId = await ensureMealBlock(api, target);
+      await api.addMealEntry({'date': dateWire(widget.date), 'status_mark_id': markId, ...aPayload});
       if (!mounted)
       {
         return;
       }
       notifyNutritionChanged(ref);
-      showInfoSnack(context, 'nutrition.added'.tr(args: [aTitle, mealLabel(MealSlot.parse(aPayload['meal']))]));
-      await _loadRecent();
+      showInfoSnack(context, 'nutrition.added'.tr(args: [aTitle, mealLabel(target.kind)]));
+      await Future.wait([_loadMeals(aMarkId: markId), _loadRecent()]);
     }
     catch (aError)
     {
@@ -174,7 +209,6 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     final result = await showAmountSheet(
       context,
       aTarget: AmountTarget.item(item),
-      aMeal: _meal,
       aGrams: aGrams,
       aPortions: aPortions,
     );
@@ -182,7 +216,6 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     {
       return;
     }
-    setState(() => _meal = result.meal);
     await _save(item.name, {'item_id': item.id, ...result.toJson()});
   }
 
@@ -191,7 +224,6 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     final result = await showAmountSheet(
       context,
       aTarget: AmountTarget.dish(aDish),
-      aMeal: _meal,
       aGrams: aGrams,
       aPortions: aPortions ?? (aGrams == null && aDish.portionG != null ? 1 : null),
     );
@@ -199,7 +231,6 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     {
       return;
     }
-    setState(() => _meal = result.meal);
     await _save(aDish.name, {'dish_id': aDish.id, ...result.toJson()});
   }
 
@@ -271,7 +302,6 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     final title = _quickTitle.text.trim();
     String? wire(TextEditingController aCtrl) => _quickValue(aCtrl)?.toString();
     await _save(title.isEmpty ? 'nutrition.quick_title'.tr() : title, {
-      'meal': _meal.name,
       'quick': {
         'title': title.isEmpty ? null : title,
         'kcal': wire(_quickKcal),
@@ -426,6 +456,8 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   Widget build(BuildContext aContext)
   {
     aContext.locale;
+    final meals = _meals;
+    final target = _target;
 
     return DefaultTabController(
       length: 3,
@@ -434,24 +466,17 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-              child: Row(
-                children: [
-                  for (final meal in MealSlot.values)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        avatar: Icon(mealIcon(meal), size: 16),
-                        label: Text(mealLabel(meal)),
-                        selected: _meal == meal,
-                        showCheckmark: false,
-                        onSelected: (_) => setState(() => _meal = meal),
-                      ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: meals == null || target == null
+                  ? const LinearProgressIndicator()
+                  : MealTargetPicker(
+                      date: widget.date,
+                      meals: meals,
+                      value: target,
+                      isEnabled: !_isBusy,
+                      onChanged: (aTarget) => setState(() => _target = aTarget),
                     ),
-                ],
-              ),
             ),
             TabBar(
               tabs: [

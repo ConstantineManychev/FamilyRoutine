@@ -1,11 +1,11 @@
 use axum::extract::State;
 use axum::Json;
 use chrono::{Datelike, NaiveDate, Utc};
-use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, MealSlot, Sex, UserDto};
+use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, Sex, UserDto};
 
 use crate::api::extract::{ApiQuery, AuthUser};
 use crate::domain::errors::ApiError;
-use crate::services::nutrition::{bmr, slot_hour};
+use crate::services::nutrition::bmr;
 use crate::state::AppState;
 
 const DEF_WEIGHT_KG: f64 = 75.0;
@@ -98,10 +98,11 @@ pub async fn get_energy_timeline(
 
     let meals = sqlx::query!(
         r#"
-        SELECT meal AS "meal: MealSlot", SUM(kcal)::float8 AS "kcal!"
-        FROM meal_entries
-        WHERE user_id = $1 AND eaten_on = $2
-        GROUP BY meal
+        SELECT COALESCE(m.start_ts, me.created_ts) AS "ts!", SUM(me.kcal)::float8 AS "kcal!"
+        FROM meal_entries me
+        LEFT JOIN status_marks m ON m.id = me.status_mark_id
+        WHERE me.user_id = $1 AND me.eaten_on = $2
+        GROUP BY 1
         "#,
         a_user.user_id,
         a_query.target_date
@@ -135,7 +136,7 @@ pub async fn get_energy_timeline(
     }
 
     nodes.extend(meals.into_iter().map(|meal| EnergyNodeDto {
-        ts: day_start + chrono::Duration::hours(slot_hour(meal.meal)),
+        ts: meal.ts,
         event_type: EnergyEventType::Meal,
         val: meal.kcal,
         cum_val: 0.0,

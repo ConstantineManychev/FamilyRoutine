@@ -6,11 +6,13 @@ class MarkMeals
 {
   final Macros total;
   final List<MealEntry> entries;
+  final Macros? dayNorm;
 
-  const MarkMeals({this.total = Macros.zero, this.entries = const []});
+  const MarkMeals({this.total = Macros.zero, this.entries = const [], this.dayNorm});
 
   factory MarkMeals.fromJson(Map<String, dynamic> aJson) => MarkMeals(
         total: Macros.fromJson(aJson['total']),
+        dayNorm: Macros.fromJsonOrNull(aJson['day_norm']),
         entries: (aJson['entries'] as List? ?? const [])
             .map((aItem) => MealEntry.fromJson(aItem as Map<String, dynamic>))
             .toList(),

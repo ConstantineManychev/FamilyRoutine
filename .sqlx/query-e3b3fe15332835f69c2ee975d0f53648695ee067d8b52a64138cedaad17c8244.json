@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO nutrition_goals (\n            user_id, mode, pace_kg, target_kg, is_custom, custom_kcal, custom_prot, custom_fat, custom_carb\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        ON CONFLICT (user_id) DO UPDATE\n        SET mode = EXCLUDED.mode, pace_kg = EXCLUDED.pace_kg, target_kg = EXCLUDED.target_kg,\n            is_custom = EXCLUDED.is_custom, custom_kcal = EXCLUDED.custom_kcal, custom_prot = EXCLUDED.custom_prot,\n            custom_fat = EXCLUDED.custom_fat, custom_carb = EXCLUDED.custom_carb, updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "goal_mode_t",
+            "kind": {
+              "Enum": [
+                "lose",
+                "maintain",
+                "gain"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Bool",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e3b3fe15332835f69c2ee975d0f53648695ee067d8b52a64138cedaad17c8244"
+}

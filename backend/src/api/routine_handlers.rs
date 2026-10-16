@@ -12,7 +12,7 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
-use crate::api::nutrition_handlers::{mark_entries, require_meal_mark};
+use crate::api::nutrition_handlers::{load_norm, mark_entries, require_meal_mark};
 use crate::api::training_handlers::load_session;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::clean_optional_text;
@@ -409,9 +409,11 @@ async fn build_details(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid)
         RoutineStatus::Meal if can_see_meals =>
         {
             let entries = mark_entries(a_conn, row.user_id, row.id).await?;
+            let (norm, _) = load_norm(a_conn, row.user_id, row.start_ts.date_naive(), row.start_ts).await?;
             meals = Some(MarkMealsDto {
                 total: sum(entries.iter().map(|entry| entry.total)),
                 entries,
+                day_norm: norm.map(|norm| norm.target),
             });
         }
         RoutineStatus::Gym | RoutineStatus::Meal => is_details_hidden = true,
@@ -596,6 +598,20 @@ pub async fn place_mark(
     .execute(&mut *a_conn)
     .await?;
 
+    let outer = sqlx::query!(
+        r#"
+        SELECT status AS "status: RoutineStatus", note, end_ts
+        FROM status_marks
+        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
+        ORDER BY start_ts DESC
+        LIMIT 1
+        "#,
+        a_user_id,
+        a_start
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+
     sqlx::query!(
         r#"
         UPDATE status_marks SET end_ts = $2
@@ -621,7 +637,7 @@ pub async fn place_mark(
         (end, next) => end.or(next),
     };
 
-    Ok(sqlx::query_as!(
+    let mark = sqlx::query_as!(
         StatusMarkDto,
         r#"
         INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
@@ -635,7 +651,29 @@ pub async fn place_mark(
         end
     )
     .fetch_one(&mut *a_conn)
-    .await?)
+    .await?;
+
+    if let (Some(outer), Some(resume)) = (outer, a_end.filter(|_| end == a_end))
+    {
+        if outer.end_ts.is_none_or(|outer_end| outer_end > resume)
+        {
+            sqlx::query!(
+                r#"
+                INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+                a_user_id,
+                outer.status as RoutineStatus,
+                outer.note,
+                resume,
+                outer.end_ts
+            )
+            .execute(&mut *a_conn)
+            .await?;
+        }
+    }
+
+    Ok(mark)
 }
 
 async fn lock_user_marks(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<(), ApiError>

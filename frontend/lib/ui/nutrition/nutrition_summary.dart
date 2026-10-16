@@ -14,8 +14,9 @@ class NutritionSummary extends StatelessWidget
 {
   final NutritionDay day;
   final bool isCompact;
+  final VoidCallback? onOpenGoal;
 
-  const NutritionSummary({super.key, required this.day, this.isCompact = false});
+  const NutritionSummary({super.key, required this.day, this.isCompact = false, this.onOpenGoal});
 
   @override
   Widget build(BuildContext aContext)
@@ -41,21 +42,22 @@ class NutritionSummary extends StatelessWidget
               Icon(AppIcons.alertCircle, size: 16, color: palette.inkMuted),
               const SizedBox(width: 6),
               Expanded(child: Text(normGapText(day.normGaps), style: TextStyle(fontSize: 12, color: palette.inkSecondary))),
-              if (!day.normGaps.contains(NormGap.child))
-                TextButton(onPressed: () => aContext.push('/app/profile'), child: Text('nutrition.open_profile'.tr())),
+              TextButton(onPressed: () => aContext.push('/app/profile'), child: Text('nutrition.open_profile'.tr())),
             ],
           ),
         ],
-        if (norm != null && !isCompact) ...[
-          const SizedBox(height: 4),
-          Text(
-            'nutrition.norm_basis'.tr(args: [
-              formatAmount(aContext, norm.bmr, aDigits: 0),
-              'nutrition.activity_${norm.activity?.wire ?? 'moderate'}'.tr(),
-              formatAmount(aContext, norm.weightKg),
-            ]),
-            style: TextStyle(fontSize: 12, color: palette.inkMuted),
-          ),
+        if (norm != null) ...[
+          const SizedBox(height: 2),
+          NormLine(norm: norm, onTap: onOpenGoal),
+          if (!isCompact) ...[
+            for (final warning in norm.warnings)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(normWarningText(aContext, warning, norm), style: TextStyle(fontSize: 12, color: palette.warning)),
+              ),
+            const SizedBox(height: 4),
+            Text(normBasis(aContext, norm), style: TextStyle(fontSize: 12, color: palette.inkMuted)),
+          ],
         ],
         if (day.workoutKcal > 0 && !isCompact) ...[
           const SizedBox(height: 4),
@@ -172,6 +174,65 @@ class _MacroBar extends StatelessWidget
           ],
         ),
       ),
+    );
+  }
+}
+
+String normBasis(BuildContext aContext, NutritionNorm aNorm)
+{
+  final activity = 'nutrition.activity_${aNorm.activity?.wire ?? 'moderate'}'.tr();
+  final maintenance = formatAmount(aContext, aNorm.maintenanceKcal ?? 0, aDigits: 0);
+  return switch (aNorm.kind)
+  {
+    NormKind.child => aNorm.isTrainingBoost
+        ? 'goal.child_basis_boost'.tr(args: [maintenance, activity, '${aNorm.recentWorkouts}'])
+        : 'goal.child_basis'.tr(args: [maintenance, activity]),
+    NormKind.custom when aNorm.maintenanceKcal == null => 'goal.custom_basis'.tr(),
+    _ => 'nutrition.norm_basis'.tr(args: [
+        maintenance,
+        formatAmount(aContext, aNorm.bmr ?? 0, aDigits: 0),
+        activity,
+        formatAmount(aContext, aNorm.weightKg ?? 0),
+      ]),
+  };
+}
+
+class NormLine extends StatelessWidget
+{
+  final NutritionNorm norm;
+  final VoidCallback? onTap;
+
+  const NormLine({super.key, required this.norm, this.onTap});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final tap = onTap;
+    final line = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(AppIcons.slidersHorizontal, size: 14, color: palette.inkSecondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              normHeadline(aContext, norm),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: palette.inkSecondary),
+            ),
+          ),
+          if (norm.warnings.isNotEmpty) Icon(AppIcons.alertCircle, size: 14, color: palette.warning),
+          if (tap != null) Icon(AppIcons.chevronRight, size: 16, color: palette.inkMuted),
+        ],
+      ),
+    );
+    if (tap == null)
+    {
+      return line;
+    }
+    return Semantics(
+      button: true,
+      child: InkWell(key: const ValueKey('nutrition.norm_line'), borderRadius: BorderRadius.circular(6), onTap: tap, child: line),
     );
   }
 }

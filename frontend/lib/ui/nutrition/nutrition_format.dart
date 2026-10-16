@@ -14,16 +14,66 @@ void notifyNutritionChanged(WidgetRef aRef)
   aRef.read(routineRevisionProv.notifier).state++;
 }
 
-String mealLabel(MealSlot aMeal) => 'nutrition.meal_${aMeal.name}'.tr();
-
-IconData mealIcon(MealSlot aMeal)
+String mealLabel(MealKind aKind) => switch (aKind)
 {
-  return switch (aMeal)
+  MealKind.breakfast => 'nutrition.meal_breakfast'.tr(),
+  MealKind.secondBreakfast => 'nutrition.meal_second_breakfast'.tr(),
+  MealKind.lunch => 'nutrition.meal_lunch'.tr(),
+  MealKind.afternoonSnack => 'nutrition.meal_afternoon_snack'.tr(),
+  MealKind.dinner => 'nutrition.meal_dinner'.tr(),
+  MealKind.nightSnack => 'nutrition.meal_night_snack'.tr(),
+};
+
+IconData mealIcon(MealKind aKind) => switch (aKind)
+{
+  MealKind.breakfast => AppIcons.sunrise,
+  MealKind.secondBreakfast => AppIcons.coffee,
+  MealKind.lunch => AppIcons.soup,
+  MealKind.afternoonSnack => AppIcons.cookie,
+  MealKind.dinner => AppIcons.sunset,
+  MealKind.nightSnack => AppIcons.moon,
+};
+
+String mealTitle(BuildContext aContext, DayMeal aMeal) => '${mealLabel(aMeal.kind)} · ${formatClock(aContext, aMeal.mark.startTs)}';
+
+String goalModeLabel(GoalMode aMode) => 'goal.mode_${aMode.name}'.tr();
+
+String paceText(BuildContext aContext, double aPace) => 'goal.pace_value'.tr(args: [formatAmount(aContext, aPace, aDigits: 2)]);
+
+String signedKcal(BuildContext aContext, double aValue)
+{
+  final sign = aValue > 0 ? '+' : (aValue < 0 ? '−' : '');
+  return '$sign${formatAmount(aContext, aValue.abs(), aDigits: 0)}';
+}
+
+String normHeadline(BuildContext aContext, NutritionNorm aNorm)
+{
+  return switch (aNorm.kind)
   {
-    MealSlot.breakfast => AppIcons.sunrise,
-    MealSlot.lunch => AppIcons.soup,
-    MealSlot.dinner => AppIcons.sunset,
-    MealSlot.snack => AppIcons.cookie,
+    NormKind.child => 'goal.child_norm'.tr(args: ['${aNorm.age}']),
+    NormKind.custom => 'goal.custom_norm'.tr(),
+    NormKind.adult when aNorm.mode == GoalMode.maintain => goalModeLabel(aNorm.mode),
+    NormKind.adult => 'goal.mode_line'.tr(args: [
+        goalModeLabel(aNorm.mode),
+        signedKcal(aContext, aNorm.deltaKcal),
+        paceText(aContext, aNorm.effectivePaceKg ?? 0),
+      ]),
+  };
+}
+
+String normWarningText(BuildContext aContext, NormWarning aWarning, NutritionNorm aNorm)
+{
+  final floor = formatAmount(aContext, aNorm.floorKcal ?? 0, aDigits: 0);
+  final pace = paceText(aContext, aNorm.effectivePaceKg ?? 0);
+  return switch (aWarning)
+  {
+    NormWarning.deficitCapped => 'goal.warn_deficit_capped'.tr(args: [pace]),
+    NormWarning.floorReached => 'goal.warn_floor_reached'.tr(args: [floor, pace]),
+    NormWarning.surplusCapped => 'goal.warn_surplus_capped'.tr(args: [pace]),
+    NormWarning.surplusRaised => 'goal.warn_surplus_raised'.tr(args: [pace]),
+    NormWarning.targetPassed => 'goal.warn_target_passed'.tr(),
+    NormWarning.customBelowFloor => 'goal.warn_custom_below_floor'.tr(args: [floor]),
+    NormWarning.customMacrosMismatch => 'goal.warn_custom_mismatch'.tr(),
   };
 }
 
@@ -71,10 +121,6 @@ String entryAmount(BuildContext aContext, MealEntry aEntry)
 
 String normGapText(List<NormGap> aGaps)
 {
-  if (aGaps.contains(NormGap.child))
-  {
-    return 'nutrition.norm_child'.tr();
-  }
   final names = aGaps.map((aGap) => 'nutrition.gap_${aGap.name}'.tr()).join(', ');
   return 'nutrition.norm_missing'.tr(args: [names]);
 }

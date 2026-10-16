@@ -1,0 +1,75 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT mode AS \"mode: GoalMode\", pace_kg, target_kg, is_custom, custom_kcal, custom_prot, custom_fat, custom_carb\n        FROM nutrition_goals\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mode: GoalMode",
+        "type_info": {
+          "Custom": {
+            "name": "goal_mode_t",
+            "kind": {
+              "Enum": [
+                "lose",
+                "maintain",
+                "gain"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "pace_kg",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_kg",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_custom",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "custom_kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "custom_prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "custom_fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "custom_carb",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "192a844dfc9132c93b6ffc96c97c6c499db1dd5ba0fa0adef8abc3aa6ee32ac5"
+}

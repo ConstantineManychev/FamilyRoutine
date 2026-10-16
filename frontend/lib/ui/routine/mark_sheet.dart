@@ -196,7 +196,10 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     final isConfirmed = await confirmAction(
       context,
       aTitle: 'routine.delete_mark'.tr(),
-      aMessage: 'routine.delete_mark_confirm'.tr(args: [aMark.status.label, formatSpan(context, aMark)]),
+      aMessage: [
+        'routine.delete_mark_confirm'.tr(args: [aMark.status.label, formatSpan(context, aMark)]),
+        if ((_details?.meals?.entries ?? const []).isNotEmpty) 'routine.delete_meal_hint'.tr(),
+      ].join('\n\n'),
     );
     if (!isConfirmed || !mounted)
     {
@@ -222,14 +225,58 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     }
   }
 
+  Future<void> _copyYesterday(StatusMarkDto aMark) async
+  {
+    setState(() => _isBusy = true);
+    try
+    {
+      final api = ref.read(apiProv);
+      final result = await api.copyMealFromYesterday(aMark.id, dayOnly(aMark.startTs));
+      final details = await api.getMarkDetails(aMark.id);
+      notifyNutritionChanged(ref);
+      if (mounted)
+      {
+        setState(() => _details = details);
+        showInfoSnack(
+          context,
+          result.sourceStartTs == null ? 'nutrition.copy_none'.tr() : 'nutrition.copied'.plural(result.copied),
+        );
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
+    finally
+    {
+      if (mounted)
+      {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
   Future<void> _linkEntries(StatusMarkDto aMark) async
   {
     final api = ref.read(apiProv);
     final List<MealEntry> entries;
+    final Map<String, String> labels;
     try
     {
       final day = await api.getNutritionDay(dayOnly(aMark.startTs));
-      entries = [for (final group in day.meals) ...group.entries];
+      if (!mounted)
+      {
+        return;
+      }
+      entries = [for (final meal in day.meals) ...meal.entries, ...day.unlinked];
+      labels = {
+        for (final meal in day.meals)
+          for (final entry in meal.entries) entry.id: mealTitle(context, meal),
+        for (final entry in day.unlinked) entry.id: 'nutrition.unlinked'.tr(),
+      };
     }
     catch (aError)
     {
@@ -246,7 +293,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
 
     final selected = await showDialog<List<String>>(
       context: context,
-      builder: (_) => _LinkEntriesDialog(markId: aMark.id, entries: entries),
+      builder: (_) => _LinkEntriesDialog(markId: aMark.id, entries: entries, labels: labels),
     );
     if (selected == null || !mounted)
     {
@@ -545,6 +592,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     final palette = aContext.palette;
     final meals = aDetails.meals ?? const MarkMeals();
     final mark = aDetails.mark;
+    final dayNorm = meals.dayNorm;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -564,6 +612,15 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
         ),
         const SizedBox(height: 2),
         Text(macrosLine(aContext, meals.total), style: TextStyle(fontSize: 12, color: palette.inkSecondary)),
+        if (dayNorm != null && dayNorm.kcal > 0)
+          Text(
+            'routine.norm_share'.tr(args: [
+              formatAmount(aContext, meals.total.kcal / dayNorm.kcal * 100, aDigits: 0),
+              formatAmount(aContext, dayNorm.kcal, aDigits: 0),
+            ]),
+            key: const ValueKey('mark.norm_share'),
+            style: TextStyle(fontSize: 12, color: palette.inkMuted),
+          ),
         const SizedBox(height: 8),
         if (meals.entries.isEmpty)
           Text(
@@ -601,6 +658,12 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
               alignment: WrapAlignment.end,
               children: [
                 TextButton.icon(
+                  key: const ValueKey('mark.copy_yesterday'),
+                  onPressed: _isBusy ? null : () => _copyYesterday(mark),
+                  icon: const Icon(AppIcons.history, size: 16),
+                  label: Text('nutrition.copy_meal'.tr()),
+                ),
+                TextButton.icon(
                   key: const ValueKey('mark.link_meals'),
                   onPressed: _isBusy ? null : () => _linkEntries(mark),
                   icon: const Icon(AppIcons.link, size: 16),
@@ -610,7 +673,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                   key: const ValueKey('mark.add_food'),
                   onPressed: _isBusy
                       ? null
-                      : () => _leaveTo(addFoodPath(dayOnly(mark.startTs), MealSlot.forHour(mark.startTs.hour), aMarkId: mark.id)),
+                      : () => _leaveTo(addFoodPath(dayOnly(mark.startTs), aMarkId: mark.id)),
                   icon: const Icon(AppIcons.plus, size: 16),
                   label: Text('routine.add_food'.tr()),
                 ),
@@ -722,8 +785,9 @@ class _LinkEntriesDialog extends StatefulWidget
 {
   final String markId;
   final List<MealEntry> entries;
+  final Map<String, String> labels;
 
-  const _LinkEntriesDialog({required this.markId, required this.entries});
+  const _LinkEntriesDialog({required this.markId, required this.entries, required this.labels});
 
   @override
   State<_LinkEntriesDialog> createState() => _LinkEntriesDialogState();
@@ -771,9 +835,8 @@ class _LinkEntriesDialogState extends State<_LinkEntriesDialog>
                       title: Text(entryTitle(entry), maxLines: 2, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
                         [
-                          mealLabel(entry.meal),
+                          if (widget.labels[entry.id] != null) widget.labels[entry.id]!,
                           formatKcal(aContext, entry.total.kcal),
-                          if (entry.statusMarkId != null && entry.statusMarkId != widget.markId) 'routine.linked_elsewhere'.tr(),
                         ].join(' · '),
                       ),
                     ),

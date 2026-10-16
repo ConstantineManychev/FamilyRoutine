@@ -3,23 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{ActivityLevel, ItemUnit};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "meal_t", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum MealSlot
-{
-    Breakfast,
-    Lunch,
-    Dinner,
-    Snack,
-}
-
-impl MealSlot
-{
-    pub const ALL: [MealSlot; 4] = [MealSlot::Breakfast, MealSlot::Lunch, MealSlot::Dinner, MealSlot::Snack];
-}
+use crate::{ActivityLevel, ItemUnit, StatusMarkDto};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "meal_source_t", rename_all = "snake_case")]
@@ -39,7 +23,39 @@ pub enum NormGap
     Height,
     Sex,
     Activity,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "goal_mode_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum GoalMode
+{
+    Lose,
+    #[default]
+    Maintain,
+    Gain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NormKind
+{
+    Adult,
     Child,
+    Custom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NormWarning
+{
+    DeficitCapped,
+    FloorReached,
+    SurplusCapped,
+    SurplusRaised,
+    TargetPassed,
+    CustomBelowFloor,
+    CustomMacrosMismatch,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +138,6 @@ pub struct MealEntryDto
 {
     pub id: Uuid,
     pub date: NaiveDate,
-    pub meal: MealSlot,
     pub source: MealSource,
     pub item_id: Option<Uuid>,
     pub dish_id: Option<Uuid>,
@@ -138,9 +153,9 @@ pub struct MealEntryDto
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct MealGroupDto
+pub struct DayMealDto
 {
-    pub meal: MealSlot,
+    pub mark: StatusMarkDto,
     pub total: MacrosDto,
     pub entries: Vec<MealEntryDto>,
 }
@@ -149,9 +164,22 @@ pub struct MealGroupDto
 pub struct NutritionNormDto
 {
     pub target: MacrosDto,
-    pub bmr: Decimal,
-    pub activity: ActivityLevel,
-    pub weight_kg: Decimal,
+    pub kind: NormKind,
+    pub mode: GoalMode,
+    pub age: i32,
+    pub maintenance_kcal: Option<Decimal>,
+    pub bmr: Option<Decimal>,
+    pub floor_kcal: Option<Decimal>,
+    pub delta_kcal: Decimal,
+    pub pace_kg: Option<Decimal>,
+    pub effective_pace_kg: Option<Decimal>,
+    pub target_kg: Option<Decimal>,
+    pub weeks_to_target: Option<i32>,
+    pub activity: Option<ActivityLevel>,
+    pub weight_kg: Option<Decimal>,
+    pub recent_workouts: i64,
+    pub is_training_boost: bool,
+    pub warnings: Vec<NormWarning>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -159,10 +187,56 @@ pub struct NutritionDayDto
 {
     pub date: NaiveDate,
     pub total: MacrosDto,
-    pub meals: Vec<MealGroupDto>,
+    pub meals: Vec<DayMealDto>,
+    pub unlinked: Vec<MealEntryDto>,
+    pub unlinked_total: MacrosDto,
     pub norm: Option<NutritionNormDto>,
     pub norm_gaps: Vec<NormGap>,
     pub workout_kcal: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NutritionGoalDto
+{
+    pub mode: GoalMode,
+    pub pace_kg: Option<Decimal>,
+    pub target_kg: Option<Decimal>,
+    pub is_custom: bool,
+    pub custom: Option<MacrosDto>,
+    pub is_child: bool,
+    pub norm: Option<NutritionNormDto>,
+    pub norm_gaps: Vec<NormGap>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveGoalRequest
+{
+    pub mode: GoalMode,
+    #[serde(default)]
+    pub pace_kg: Option<Decimal>,
+    #[serde(default)]
+    pub target_kg: Option<Decimal>,
+    #[serde(default)]
+    pub is_custom: bool,
+    #[serde(default)]
+    pub custom: Option<MacrosDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PersonNormDto
+{
+    pub is_child: bool,
+    pub norm: Option<NutritionNormDto>,
+    pub norm_gaps: Vec<NormGap>,
+    pub eaten: MacrosDto,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PersonNormQuery
+{
+    pub date: NaiveDate,
+    #[serde(default)]
+    pub tz_offset_min: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -191,7 +265,7 @@ pub struct QuickEntryRequest
 pub struct NewMealEntryRequest
 {
     pub date: NaiveDate,
-    pub meal: MealSlot,
+    pub status_mark_id: Uuid,
     #[serde(default)]
     pub item_id: Option<Uuid>,
     #[serde(default)]
@@ -202,15 +276,14 @@ pub struct NewMealEntryRequest
     pub grams: Option<Decimal>,
     #[serde(default)]
     pub portions: Option<Decimal>,
-    #[serde(default)]
-    pub status_mark_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateMealEntryRequest
 {
     pub date: NaiveDate,
-    pub meal: MealSlot,
+    #[serde(default)]
+    pub status_mark_id: Option<Uuid>,
     #[serde(default)]
     pub grams: Option<Decimal>,
     #[serde(default)]
@@ -222,16 +295,15 @@ pub struct UpdateMealEntryRequest
 #[derive(Debug, Clone, Deserialize)]
 pub struct CopyMealsRequest
 {
-    pub from: NaiveDate,
-    pub to: NaiveDate,
-    #[serde(default)]
-    pub meal: Option<MealSlot>,
+    pub status_mark_id: Uuid,
+    pub date: NaiveDate,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CopyMealsDto
 {
     pub copied: usize,
+    pub source_start_ts: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize)]

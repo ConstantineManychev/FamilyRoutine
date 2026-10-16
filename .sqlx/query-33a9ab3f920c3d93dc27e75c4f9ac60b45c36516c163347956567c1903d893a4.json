@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE id = $1 AND user_id = $2\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND status_mark_id = $2\n        ORDER BY created_ts, id\n        ",
   "describe": {
     "columns": [
       {
@@ -15,23 +15,6 @@
       },
       {
         "ordinal": 2,
-        "name": "meal: MealSlot",
-        "type_info": {
-          "Custom": {
-            "name": "meal_t",
-            "kind": {
-              "Enum": [
-                "breakfast",
-                "lunch",
-                "dinner",
-                "snack"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "ordinal": 3,
         "name": "source: MealSource",
         "type_info": {
           "Custom": {
@@ -47,87 +30,87 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "item_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "dish_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "title",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "grams",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "portions",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "portion_g",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "is_ml",
         "type_info": "Bool"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "kcal_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "prot_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "fat_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "carb_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 15,
+        "ordinal": 14,
         "name": "kcal",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 16,
+        "ordinal": 15,
         "name": "prot",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 17,
+        "ordinal": 16,
         "name": "fat",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 18,
+        "ordinal": 17,
         "name": "carb",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 19,
+        "ordinal": 18,
         "name": "status_mark_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 20,
+        "ordinal": 19,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -139,7 +122,6 @@
       ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -162,5 +144,5 @@
       false
     ]
   },
-  "hash": "60d3405278a66694201a1cff13aabcfc170c11c60a10ace7293eff9677bd7268"
+  "hash": "33a9ab3f920c3d93dc27e75c4f9ac60b45c36516c163347956567c1903d893a4"
 }

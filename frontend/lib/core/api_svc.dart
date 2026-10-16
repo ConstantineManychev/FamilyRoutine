@@ -585,14 +585,37 @@ class ApiSvc
     return _list(res.data, RecentFood.fromJson);
   }
 
-  Future<int> copyMeals(DateTime aFrom, DateTime aTo, {MealSlot? aMeal}) async
+  Future<CopyResult> copyMealFromYesterday(String aMarkId, DateTime aDate) async
   {
-    final res = await _dio.post('/api/nutrition/copy', data: {
-      'from': dateWire(aFrom),
-      'to': dateWire(aTo),
-      if (aMeal != null) 'meal': aMeal.name,
+    final res = await _dio.post('/api/nutrition/copy', data: {'status_mark_id': aMarkId, 'date': dateWire(aDate)});
+    return CopyResult.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NutritionGoal> getNutritionGoal() async
+  {
+    final res = await _dio.get('/api/nutrition/goal');
+    return NutritionGoal.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NutritionGoal> previewNutritionGoal(GoalDraft aDraft) async
+  {
+    final res = await _dio.post('/api/nutrition/goal/preview', data: aDraft.toJson());
+    return NutritionGoal.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NutritionGoal> saveNutritionGoal(GoalDraft aDraft) async
+  {
+    final res = await _dio.put('/api/nutrition/goal', data: aDraft.toJson());
+    return NutritionGoal.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<PersonNorm> getPersonNorm(String aPersonId, DateTime aDate) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/nutrition/norm', queryParameters: {
+      'date': dateWire(aDate),
+      'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
     });
-    return ((res.data as Map<String, dynamic>)['copied'] as num?)?.toInt() ?? 0;
+    return PersonNorm.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<ItemPricesData> getItemPrices(String aId, {String? aConvertTo}) async
@@ -699,12 +722,13 @@ class ApiSvc
     return CategoryStats.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs}) async
+  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs, DateTime? aEndTs}) async
   {
     final res = await _dio.post('/api/routine/marks', data: {
       'status': aStatus.toJson(),
       if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
       if (aStartTs != null) 'start_ts': aStartTs.toUtc().toIso8601String(),
+      if (aEndTs != null) 'end_ts': aEndTs.toUtc().toIso8601String(),
     });
     return StatusMarkDto.fromJson(res.data as Map<String, dynamic>);
   }

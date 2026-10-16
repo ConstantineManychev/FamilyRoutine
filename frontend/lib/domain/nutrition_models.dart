@@ -1,31 +1,29 @@
 import 'finance_models.dart';
 import 'planner_models.dart';
 import 'profile_models.dart';
+import 'routine_models.dart';
 
-enum MealSlot
+enum MealKind
 {
-  breakfast,
-  lunch,
-  dinner,
-  snack;
+  breakfast(4),
+  secondBreakfast(9),
+  lunch(12),
+  afternoonSnack(16),
+  dinner(18),
+  nightSnack(22);
 
-  static MealSlot parse(Object? aValue) => values.firstWhere((aItem) => aItem.name == aValue, orElse: () => MealSlot.snack);
+  final int fromHour;
 
-  static MealSlot forHour(int aHour)
+  const MealKind(this.fromHour);
+
+  static MealKind forTime(DateTime aTs)
   {
-    if (aHour < 11)
+    final hour = aTs.hour;
+    if (hour < breakfast.fromHour)
     {
-      return MealSlot.breakfast;
+      return nightSnack;
     }
-    if (aHour < 16)
-    {
-      return MealSlot.lunch;
-    }
-    if (aHour < 18)
-    {
-      return MealSlot.snack;
-    }
-    return MealSlot.dinner;
+    return values.lastWhere((aKind) => hour >= aKind.fromHour);
   }
 }
 
@@ -43,8 +41,7 @@ enum NormGap
   weight,
   height,
   sex,
-  activity,
-  child;
+  activity;
 
   static NormGap? parse(Object? aValue)
   {
@@ -279,7 +276,6 @@ class MealEntry
 {
   final String id;
   final DateTime date;
-  final MealSlot meal;
   final MealSource source;
   final String? itemId;
   final String? dishId;
@@ -295,7 +291,6 @@ class MealEntry
   const MealEntry({
     required this.id,
     required this.date,
-    required this.meal,
     required this.source,
     this.itemId,
     this.dishId,
@@ -312,7 +307,6 @@ class MealEntry
   factory MealEntry.fromJson(Map<String, dynamic> aJson) => MealEntry(
         id: aJson['id'] as String,
         date: parseDateWire(aJson['date']),
-        meal: MealSlot.parse(aJson['meal']),
         source: MealSource.parse(aJson['source']),
         itemId: aJson['item_id'] as String?,
         dishId: aJson['dish_id'] as String?,
@@ -327,45 +321,145 @@ class MealEntry
       );
 }
 
-class MealGroup
+class DayMeal
 {
-  final MealSlot meal;
+  final StatusMarkDto mark;
   final Macros total;
   final List<MealEntry> entries;
 
-  const MealGroup({required this.meal, this.total = Macros.zero, this.entries = const []});
+  const DayMeal({required this.mark, this.total = Macros.zero, this.entries = const []});
 
-  factory MealGroup.fromJson(Map<String, dynamic> aJson) => MealGroup(
-        meal: MealSlot.parse(aJson['meal']),
+  MealKind get kind => MealKind.forTime(mark.startTs);
+
+  bool isActiveAt(DateTime aMoment) => mark.isActiveAt(aMoment);
+
+  factory DayMeal.fromJson(Map<String, dynamic> aJson) => DayMeal(
+        mark: StatusMarkDto.fromJson(aJson['mark'] as Map<String, dynamic>),
         total: Macros.fromJson(aJson['total']),
-        entries: (aJson['entries'] as List? ?? const [])
-            .map((aItem) => MealEntry.fromJson(aItem as Map<String, dynamic>))
-            .toList(),
+        entries: _entries(aJson['entries']),
       );
+}
+
+List<MealEntry> _entries(Object? aJson) =>
+    (aJson as List? ?? const []).map((aItem) => MealEntry.fromJson(aItem as Map<String, dynamic>)).toList();
+
+enum GoalMode
+{
+  lose,
+  maintain,
+  gain;
+
+  static GoalMode parse(Object? aValue) => values.firstWhere((aItem) => aItem.name == aValue, orElse: () => GoalMode.maintain);
+}
+
+enum NormKind
+{
+  adult,
+  child,
+  custom;
+
+  static NormKind parse(Object? aValue) => values.firstWhere((aItem) => aItem.name == aValue, orElse: () => NormKind.adult);
+}
+
+enum NormWarning
+{
+  deficitCapped('deficit_capped'),
+  floorReached('floor_reached'),
+  surplusCapped('surplus_capped'),
+  surplusRaised('surplus_raised'),
+  targetPassed('target_passed'),
+  customBelowFloor('custom_below_floor'),
+  customMacrosMismatch('custom_macros_mismatch');
+
+  final String wire;
+
+  const NormWarning(this.wire);
+
+  static NormWarning? parse(Object? aValue)
+  {
+    for (final warning in values)
+    {
+      if (warning.wire == aValue)
+      {
+        return warning;
+      }
+    }
+    return null;
+  }
 }
 
 class NutritionNorm
 {
   final Macros target;
-  final double bmr;
+  final NormKind kind;
+  final GoalMode mode;
+  final int age;
+  final double? maintenanceKcal;
+  final double? bmr;
+  final double? floorKcal;
+  final double deltaKcal;
+  final double? paceKg;
+  final double? effectivePaceKg;
+  final double? targetKg;
+  final int? weeksToTarget;
   final ActivityLevel? activity;
-  final double weightKg;
+  final double? weightKg;
+  final int recentWorkouts;
+  final bool isTrainingBoost;
+  final List<NormWarning> warnings;
 
-  const NutritionNorm({required this.target, required this.bmr, this.activity, required this.weightKg});
+  const NutritionNorm({
+    required this.target,
+    this.kind = NormKind.adult,
+    this.mode = GoalMode.maintain,
+    this.age = 0,
+    this.maintenanceKcal,
+    this.bmr,
+    this.floorKcal,
+    this.deltaKcal = 0,
+    this.paceKg,
+    this.effectivePaceKg,
+    this.targetKg,
+    this.weeksToTarget,
+    this.activity,
+    this.weightKg,
+    this.recentWorkouts = 0,
+    this.isTrainingBoost = false,
+    this.warnings = const [],
+  });
 
   factory NutritionNorm.fromJson(Map<String, dynamic> aJson) => NutritionNorm(
         target: Macros.fromJson(aJson['target']),
-        bmr: parseDecimal(aJson['bmr']),
+        kind: NormKind.parse(aJson['kind']),
+        mode: GoalMode.parse(aJson['mode']),
+        age: (aJson['age'] as num?)?.toInt() ?? 0,
+        maintenanceKcal: parseDecimalOrNull(aJson['maintenance_kcal']),
+        bmr: parseDecimalOrNull(aJson['bmr']),
+        floorKcal: parseDecimalOrNull(aJson['floor_kcal']),
+        deltaKcal: parseDecimal(aJson['delta_kcal']),
+        paceKg: parseDecimalOrNull(aJson['pace_kg']),
+        effectivePaceKg: parseDecimalOrNull(aJson['effective_pace_kg']),
+        targetKg: parseDecimalOrNull(aJson['target_kg']),
+        weeksToTarget: (aJson['weeks_to_target'] as num?)?.toInt(),
         activity: ActivityLevel.parse(aJson['activity']),
-        weightKg: parseDecimal(aJson['weight_kg']),
+        weightKg: parseDecimalOrNull(aJson['weight_kg']),
+        recentWorkouts: (aJson['recent_workouts'] as num?)?.toInt() ?? 0,
+        isTrainingBoost: aJson['is_training_boost'] as bool? ?? false,
+        warnings: (aJson['warnings'] as List? ?? const []).map(NormWarning.parse).whereType<NormWarning>().toList(),
       );
+
+  static NutritionNorm? fromJsonOrNull(Object? aJson) => aJson is Map<String, dynamic> ? NutritionNorm.fromJson(aJson) : null;
 }
+
+List<NormGap> _gaps(Object? aJson) => (aJson as List? ?? const []).map(NormGap.parse).whereType<NormGap>().toList();
 
 class NutritionDay
 {
   final DateTime date;
   final Macros total;
-  final List<MealGroup> meals;
+  final List<DayMeal> meals;
+  final List<MealEntry> unlinked;
+  final Macros unlinkedTotal;
   final NutritionNorm? norm;
   final List<NormGap> normGaps;
   final double workoutKcal;
@@ -374,6 +468,8 @@ class NutritionDay
     required this.date,
     this.total = Macros.zero,
     this.meals = const [],
+    this.unlinked = const [],
+    this.unlinkedTotal = Macros.zero,
     this.norm,
     this.normGaps = const [],
     this.workoutKcal = 0,
@@ -383,16 +479,129 @@ class NutritionDay
         date: parseDateWire(aJson['date']),
         total: Macros.fromJson(aJson['total']),
         meals: (aJson['meals'] as List? ?? const [])
-            .map((aItem) => MealGroup.fromJson(aItem as Map<String, dynamic>))
+            .map((aItem) => DayMeal.fromJson(aItem as Map<String, dynamic>))
             .toList(),
-        norm: aJson['norm'] is Map<String, dynamic> ? NutritionNorm.fromJson(aJson['norm'] as Map<String, dynamic>) : null,
-        normGaps: (aJson['norm_gaps'] as List? ?? const []).map(NormGap.parse).whereType<NormGap>().toList(),
+        unlinked: _entries(aJson['unlinked']),
+        unlinkedTotal: Macros.fromJson(aJson['unlinked_total']),
+        norm: NutritionNorm.fromJsonOrNull(aJson['norm']),
+        normGaps: _gaps(aJson['norm_gaps']),
         workoutKcal: parseDecimal(aJson['workout_kcal']),
       );
 
-  MealGroup group(MealSlot aMeal) => meals.firstWhere((aItem) => aItem.meal == aMeal, orElse: () => MealGroup(meal: aMeal));
+  bool get isEmpty => meals.every((aMeal) => aMeal.entries.isEmpty) && unlinked.isEmpty;
 
-  bool get isEmpty => meals.every((aGroup) => aGroup.entries.isEmpty);
+  DayMeal? mealById(String? aMarkId) => meals.where((aMeal) => aMeal.mark.id == aMarkId).firstOrNull;
+
+  DayMeal? activeMeal(DateTime aMoment) => meals.where((aMeal) => aMeal.isActiveAt(aMoment)).firstOrNull;
+}
+
+class NutritionGoal
+{
+  final GoalMode mode;
+  final double? paceKg;
+  final double? targetKg;
+  final bool isCustom;
+  final Macros? custom;
+  final bool isChild;
+  final NutritionNorm? norm;
+  final List<NormGap> normGaps;
+
+  const NutritionGoal({
+    this.mode = GoalMode.maintain,
+    this.paceKg,
+    this.targetKg,
+    this.isCustom = false,
+    this.custom,
+    this.isChild = false,
+    this.norm,
+    this.normGaps = const [],
+  });
+
+  factory NutritionGoal.fromJson(Map<String, dynamic> aJson) => NutritionGoal(
+        mode: GoalMode.parse(aJson['mode']),
+        paceKg: parseDecimalOrNull(aJson['pace_kg']),
+        targetKg: parseDecimalOrNull(aJson['target_kg']),
+        isCustom: aJson['is_custom'] as bool? ?? false,
+        custom: Macros.fromJsonOrNull(aJson['custom']),
+        isChild: aJson['is_child'] as bool? ?? false,
+        norm: NutritionNorm.fromJsonOrNull(aJson['norm']),
+        normGaps: _gaps(aJson['norm_gaps']),
+      );
+}
+
+class GoalDraft
+{
+  final GoalMode mode;
+  final double? paceKg;
+  final double? targetKg;
+  final bool isCustom;
+  final Macros? custom;
+
+  const GoalDraft({this.mode = GoalMode.maintain, this.paceKg, this.targetKg, this.isCustom = false, this.custom});
+
+  factory GoalDraft.of(NutritionGoal aGoal) => GoalDraft(
+        mode: aGoal.mode,
+        paceKg: aGoal.paceKg,
+        targetKg: aGoal.targetKg,
+        isCustom: aGoal.isCustom,
+        custom: aGoal.custom,
+      );
+
+  GoalDraft copyWith({GoalMode? mode, double? paceKg, double? targetKg, bool? isCustom, Macros? custom, bool isTargetCleared = false}) => GoalDraft(
+        mode: mode ?? this.mode,
+        paceKg: paceKg ?? this.paceKg,
+        targetKg: isTargetCleared ? null : targetKg ?? this.targetKg,
+        isCustom: isCustom ?? this.isCustom,
+        custom: custom ?? this.custom,
+      );
+
+  Map<String, dynamic> toJson()
+  {
+    final custom = this.custom;
+    return {
+      'mode': mode.name,
+      if (mode != GoalMode.maintain && paceKg != null) 'pace_kg': paceKg.toString(),
+      if (mode != GoalMode.maintain && targetKg != null) 'target_kg': targetKg.toString(),
+      'is_custom': isCustom,
+      if (custom != null)
+        'custom': {
+          'kcal': custom.kcal.round().toString(),
+          'prot': custom.prot.round().toString(),
+          'fat': custom.fat.round().toString(),
+          'carb': custom.carb.round().toString(),
+        },
+    };
+  }
+}
+
+class PersonNorm
+{
+  final bool isChild;
+  final NutritionNorm? norm;
+  final List<NormGap> normGaps;
+  final Macros eaten;
+
+  const PersonNorm({this.isChild = false, this.norm, this.normGaps = const [], this.eaten = Macros.zero});
+
+  factory PersonNorm.fromJson(Map<String, dynamic> aJson) => PersonNorm(
+        isChild: aJson['is_child'] as bool? ?? false,
+        norm: NutritionNorm.fromJsonOrNull(aJson['norm']),
+        normGaps: _gaps(aJson['norm_gaps']),
+        eaten: Macros.fromJson(aJson['eaten']),
+      );
+}
+
+class CopyResult
+{
+  final int copied;
+  final DateTime? sourceStartTs;
+
+  const CopyResult({this.copied = 0, this.sourceStartTs});
+
+  factory CopyResult.fromJson(Map<String, dynamic> aJson) => CopyResult(
+        copied: (aJson['copied'] as num?)?.toInt() ?? 0,
+        sourceStartTs: parseTsOrNull(aJson['source_start_ts']),
+      );
 }
 
 class RecentFood

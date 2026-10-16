@@ -153,6 +153,7 @@ pub struct ProfileDto
     pub can_edit: bool,
     pub visible_groups: Vec<MetricGroup>,
     pub is_training_visible: bool,
+    pub is_meals_visible: bool,
     pub latest: Vec<MetricValueDto>,
     pub sharing: Vec<ProfileSharingDto>,
 }

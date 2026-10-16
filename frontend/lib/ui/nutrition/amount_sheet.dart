@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
+import 'meal_target.dart';
 import 'nutrition_format.dart';
 
 const double maxEntryGrams = 10000;
@@ -44,23 +45,31 @@ class AmountTarget
 
 class AmountResult
 {
-  final MealSlot meal;
+  final MealTarget? target;
   final double? grams;
   final double? portions;
   final bool isDelete;
 
-  const AmountResult({required this.meal, this.grams, this.portions, this.isDelete = false});
+  const AmountResult({this.target, this.grams, this.portions, this.isDelete = false});
 
   Map<String, dynamic> toJson() => {
-        'meal': meal.name,
         if (portions != null) 'portions': amountText(portions) else 'grams': amountText(grams),
       };
+}
+
+class MealChoice
+{
+  final DateTime date;
+  final List<DayMeal> meals;
+  final MealTarget initial;
+
+  const MealChoice({required this.date, required this.meals, required this.initial});
 }
 
 Future<AmountResult?> showAmountSheet(
   BuildContext aContext, {
   required AmountTarget aTarget,
-  required MealSlot aMeal,
+  MealChoice? aMealChoice,
   double? aGrams,
   double? aPortions,
   bool aIsEdit = false,
@@ -71,19 +80,19 @@ Future<AmountResult?> showAmountSheet(
     useRootNavigator: true,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => AmountSheet(target: aTarget, meal: aMeal, grams: aGrams, portions: aPortions, isEdit: aIsEdit),
+    builder: (_) => AmountSheet(target: aTarget, mealChoice: aMealChoice, grams: aGrams, portions: aPortions, isEdit: aIsEdit),
   );
 }
 
 class AmountSheet extends StatefulWidget
 {
   final AmountTarget target;
-  final MealSlot meal;
+  final MealChoice? mealChoice;
   final double? grams;
   final double? portions;
   final bool isEdit;
 
-  const AmountSheet({super.key, required this.target, required this.meal, this.grams, this.portions, this.isEdit = false});
+  const AmountSheet({super.key, required this.target, this.mealChoice, this.grams, this.portions, this.isEdit = false});
 
   @override
   State<AmountSheet> createState() => _AmountSheetState();
@@ -91,7 +100,7 @@ class AmountSheet extends StatefulWidget
 
 class _AmountSheetState extends State<AmountSheet>
 {
-  late MealSlot _meal = widget.meal;
+  late MealTarget? _meal = widget.mealChoice?.initial;
   late AmountUnit _unit = widget.portions != null && widget.target.portionG != null ? AmountUnit.portions : AmountUnit.grams;
   late final TextEditingController _ctrl = TextEditingController(text: amountText(_initialValue()));
 
@@ -156,7 +165,7 @@ class _AmountSheetState extends State<AmountSheet>
     }
     final value = _value!;
     Navigator.of(context).pop(AmountResult(
-      meal: _meal,
+      target: _meal,
       grams: _unit == AmountUnit.grams ? value : null,
       portions: _unit == AmountUnit.portions ? value : null,
     ));
@@ -174,6 +183,8 @@ class _AmountSheetState extends State<AmountSheet>
     final grams = _grams;
     final preview = grams == null ? null : target.per100.forGrams(grams);
     final presets = _unit == AmountUnit.portions ? _portionPresets : _gramPresets;
+    final choice = widget.mealChoice;
+    final meal = _meal;
 
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
@@ -242,23 +253,15 @@ class _AmountSheetState extends State<AmountSheet>
                           ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Text('nutrition.meal'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkSecondary)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final meal in MealSlot.values)
-                          ChoiceChip(
-                            avatar: Icon(mealIcon(meal), size: 16),
-                            label: Text(mealLabel(meal)),
-                            selected: _meal == meal,
-                            showCheckmark: false,
-                            onSelected: (_) => setState(() => _meal = meal),
-                          ),
-                      ],
-                    ),
+                    if (choice != null && meal != null) ...[
+                      const SizedBox(height: 12),
+                      MealTargetPicker(
+                        date: choice.date,
+                        meals: choice.meals,
+                        value: meal,
+                        onChanged: (aTarget) => setState(() => _meal = aTarget),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -288,7 +291,7 @@ class _AmountSheetState extends State<AmountSheet>
                     IconButton(
                       tooltip: 'common.delete'.tr(),
                       color: palette.danger,
-                      onPressed: () => Navigator.of(aContext).pop(AmountResult(meal: _meal, isDelete: true)),
+                      onPressed: () => Navigator.of(aContext).pop(const AmountResult(isDelete: true)),
                       icon: const Icon(AppIcons.trash2),
                     ),
                   const Spacer(),

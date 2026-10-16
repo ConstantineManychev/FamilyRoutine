@@ -70,12 +70,13 @@ const Map<String, List<String>> dynamicKeys = {
     'stationary_bike', 'rowing_machine', 'elliptical', 'jump_rope', 'swimming', 'stretching', 'yoga',
   ],
   'places': ['err_name_req', 'err_country_req', 'err_city_req'],
+  'goal': ['mode_lose', 'mode_maintain', 'mode_gain'],
   'cats': [
     'level_1', 'level_2', 'level_3', 'per_100_g', 'per_100_ml', 'per_100_short_g', 'per_100_short_ml',
     'items_count.one', 'items_count.other',
   ],
   'nutrition': [
-    'meal_breakfast', 'meal_lunch', 'meal_dinner', 'meal_snack', 'gap_weight', 'gap_height', 'gap_sex', 'gap_activity',
+    'gap_weight', 'gap_height', 'gap_sex', 'gap_activity',
     'activity_sedentary', 'activity_light', 'activity_moderate', 'activity_active', 'activity_very_active',
     'copied.one', 'copied.other', 'missing_count.one', 'missing_count.other',
   ],

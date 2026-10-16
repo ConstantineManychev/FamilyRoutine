@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            u.birth_date,\n            u.sex AS \"sex: Sex\",\n            u.activity AS \"activity: ActivityLevel\",\n            COALESCE(\n                (\n                    SELECT v.value FROM body_values v JOIN body_entries e ON e.id = v.entry_id\n                    WHERE e.user_id = u.id AND v.metric = 'weight' AND e.measured_ts < $2\n                    ORDER BY e.measured_ts DESC LIMIT 1\n                ),\n                (\n                    SELECT v.value FROM body_values v JOIN body_entries e ON e.id = v.entry_id\n                    WHERE e.user_id = u.id AND v.metric = 'weight'\n                    ORDER BY e.measured_ts LIMIT 1\n                )\n            ) AS \"weight_kg?\",\n            (\n                SELECT v.value FROM body_values v JOIN body_entries e ON e.id = v.entry_id\n                WHERE e.user_id = u.id AND v.metric = 'height'\n                ORDER BY e.measured_ts DESC LIMIT 1\n            ) AS \"height_cm?\",\n            (\n                SELECT COUNT(*) FROM workout_sessions w\n                WHERE w.user_id = u.id AND w.finished_ts IS NOT NULL AND w.started_ts < $2 AND w.started_ts >= $3\n            ) AS \"recent_workouts!\"\n        FROM users u\n        WHERE u.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "birth_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "sex: Sex",
+        "type_info": {
+          "Custom": {
+            "name": "sex_t",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "activity: ActivityLevel",
+        "type_info": {
+          "Custom": {
+            "name": "activity_t",
+            "kind": {
+              "Enum": [
+                "sedentary",
+                "light",
+                "moderate",
+                "active",
+                "very_active"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "weight_kg?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "height_cm?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "recent_workouts!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "e73a7a788fbc0a3ccfc7f6cc665a4d50ae6bee23fe0c834ffecfe15ab6936cf8"
+}

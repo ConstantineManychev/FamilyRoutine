@@ -524,6 +524,7 @@ async fn person_dto(
         can_edit: a_access.is_manager,
         visible_groups: a_access.visible_groups(),
         is_training_visible: a_access.can_see_training(),
+        is_meals_visible: a_access.can_see_meals(),
         latest,
         sharing,
     })

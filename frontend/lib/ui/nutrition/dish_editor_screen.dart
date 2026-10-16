@@ -11,6 +11,7 @@ import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import 'amount_sheet.dart';
 import 'food_picker.dart';
+import 'meal_target.dart';
 import 'nutrition_format.dart';
 
 const double _contentMaxWidth = 720;
@@ -305,24 +306,44 @@ class _DishEditorScreenState extends ConsumerState<DishEditorScreen>
     {
       return;
     }
-    final now = DateTime.now();
+    final api = ref.read(apiProv);
+    final today = dayOnly(DateTime.now());
+    final List<DayMeal> meals;
+    try
+    {
+      meals = (await api.getNutritionDay(today)).meals;
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+      return;
+    }
+    if (!mounted)
+    {
+      return;
+    }
     final result = await showAmountSheet(
       context,
       aTarget: AmountTarget.dish(dish),
-      aMeal: MealSlot.forHour(now.hour),
+      aMealChoice: MealChoice(date: today, meals: meals, initial: defaultMealTarget(today, meals)),
       aPortions: dish.portionG != null ? 1 : null,
     );
-    if (result == null || !mounted)
+    final target = result?.target;
+    if (result == null || target == null || !mounted)
     {
       return;
     }
     try
     {
-      await ref.read(apiProv).addMealEntry({'date': dateWire(now), 'dish_id': dish.id, ...result.toJson()});
+      final markId = await ensureMealBlock(api, target);
+      await api.addMealEntry({'date': dateWire(today), 'status_mark_id': markId, 'dish_id': dish.id, ...result.toJson()});
       if (mounted)
       {
         notifyNutritionChanged(ref);
-        showInfoSnack(context, 'nutrition.added'.tr(args: [dish.name, mealLabel(result.meal)]));
+        showInfoSnack(context, 'nutrition.added'.tr(args: [dish.name, mealLabel(target.kind)]));
       }
     }
     catch (aError)

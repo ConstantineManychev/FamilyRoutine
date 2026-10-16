@@ -1,10 +1,11 @@
 mod common;
 
 use axum::http::{Method, StatusCode};
-use chrono::{Datelike, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, SecondsFormat, Utc};
 use common::{TestApp, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 async fn send(
     a_app: &TestApp,
@@ -51,14 +52,32 @@ async fn day(a_app: &TestApp, a_user: &TestUser, a_date: NaiveDate) -> Value
     day
 }
 
-fn meal<'a>(a_day: &'a Value, a_meal: &str) -> &'a Value
+fn meal<'a>(a_day: &'a Value, a_mark_id: &str) -> &'a Value
 {
     a_day["meals"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|group| group["meal"] == a_meal)
+        .find(|group| group["mark"]["id"] == a_mark_id)
         .unwrap()
+}
+
+async fn block(a_app: &TestApp, a_user: &TestUser, a_start: DateTime<Utc>, a_minutes: i64) -> String
+{
+    let (status, mark) = send(
+        a_app,
+        a_user,
+        Method::POST,
+        "/api/routine/marks",
+        Some(json!({
+            "status": "meal",
+            "start_ts": a_start.to_rfc3339_opts(SecondsFormat::Secs, true),
+            "end_ts": (a_start + Duration::minutes(a_minutes)).to_rfc3339_opts(SecondsFormat::Secs, true)
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{mark}");
+    mark["id"].as_str().unwrap().to_string()
 }
 
 fn age_today(a_birth: NaiveDate) -> i32
@@ -79,6 +98,11 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let alice = app.user("alice@example.com").await;
     let bob = app.user("bob@example.com").await;
     let today = Utc::now().date_naive();
+    let midnight = today.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let breakfast = block(&app, &alice, midnight + Duration::hours(5), 30).await;
+    let lunch = block(&app, &alice, midnight + Duration::hours(10), 40).await;
+    let snack = block(&app, &alice, midnight + Duration::hours(13), 15).await;
+    let dinner = block(&app, &alice, midnight + Duration::hours(16), 30).await;
 
     let buckwheat = food(
         &app,
@@ -165,7 +189,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (status, by_portion) = add(
         &app,
         &alice,
-        json!({ "date": today, "meal": "lunch", "dish_id": dish_id, "portions": "1.5" }),
+        json!({ "date": today, "status_mark_id": lunch, "dish_id": dish_id, "portions": "1.5" }),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{by_portion}");
@@ -175,7 +199,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (_, by_pieces) = add(
         &app,
         &alice,
-        json!({ "date": today, "meal": "breakfast", "item_id": egg, "portions": "2" }),
+        json!({ "date": today, "status_mark_id": breakfast, "item_id": egg, "portions": "2" }),
     )
     .await;
     assert_eq!(by_pieces["grams"], "110");
@@ -186,7 +210,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (_, glass) = add(
         &app,
         &alice,
-        json!({ "date": today, "meal": "breakfast", "item_id": milk, "grams": "250" }),
+        json!({ "date": today, "status_mark_id": breakfast, "item_id": milk, "grams": "250" }),
     )
     .await;
     assert_eq!(glass["is_ml"], true);
@@ -194,7 +218,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (status, quick) = add(
         &app,
         &alice,
-        json!({ "date": today, "meal": "snack", "quick": { "title": "Кофе с собой", "kcal": "120", "fat": "6" } }),
+        json!({ "date": today, "status_mark_id": snack, "quick": { "title": "Кофе с собой", "kcal": "120", "fat": "6" } }),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{quick}");
@@ -204,12 +228,14 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     );
 
     for body in [
-        json!({ "date": today, "meal": "lunch", "item_id": salt, "grams": "5" }),
-        json!({ "date": today, "meal": "lunch", "item_id": service, "grams": "5" }),
-        json!({ "date": today, "meal": "lunch", "item_id": milk, "portions": "1" }),
-        json!({ "date": today, "meal": "lunch", "item_id": egg }),
-        json!({ "date": today, "meal": "lunch", "item_id": egg, "dish_id": dish_id, "grams": "5" }),
-        json!({ "date": today + Duration::days(30), "meal": "lunch", "item_id": egg, "grams": "5" }),
+        json!({ "date": today, "status_mark_id": lunch, "item_id": salt, "grams": "5" }),
+        json!({ "date": today, "status_mark_id": lunch, "item_id": service, "grams": "5" }),
+        json!({ "date": today, "status_mark_id": lunch, "item_id": milk, "portions": "1" }),
+        json!({ "date": today, "status_mark_id": lunch, "item_id": egg }),
+        json!({ "date": today, "status_mark_id": lunch, "item_id": egg, "dish_id": dish_id, "grams": "5" }),
+        json!({ "date": today + Duration::days(30), "status_mark_id": lunch, "item_id": egg, "grams": "5" }),
+        json!({ "date": today + Duration::days(3), "status_mark_id": lunch, "item_id": egg, "grams": "5" }),
+        json!({ "date": today, "status_mark_id": Uuid::nil(), "item_id": egg, "grams": "5" }),
     ]
     {
         assert_eq!(
@@ -246,11 +272,13 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     assert_eq!(status, StatusCode::OK);
 
     let summary = day(&app, &alice, today).await;
-    let lunch = meal(&summary, "lunch");
-    assert_eq!(lunch["entries"][0]["total"]["kcal"], "343");
-    assert_eq!(lunch["entries"][0]["per_100"]["kcal"], "114.33");
-    assert_eq!(meal(&summary, "breakfast")["total"]["kcal"], "302.7");
-    assert_eq!(meal(&summary, "dinner")["entries"], json!([]));
+    let lunch_group = meal(&summary, &lunch);
+    assert_eq!(lunch_group["entries"][0]["total"]["kcal"], "343");
+    assert_eq!(lunch_group["entries"][0]["per_100"]["kcal"], "114.33");
+    assert_eq!(meal(&summary, &breakfast)["total"]["kcal"], "302.7");
+    assert_eq!(meal(&summary, &dinner)["entries"], json!([]));
+    assert_eq!(summary["meals"].as_array().unwrap().len(), 4);
+    assert_eq!(summary["unlinked"], json!([]));
     assert_eq!(summary["total"]["kcal"], "765.7");
     assert_eq!(summary["norm"], Value::Null);
     assert_eq!(summary["norm_gaps"], json!(["weight", "height", "sex", "activity"]));
@@ -261,11 +289,11 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
         &alice,
         Method::PUT,
         &format!("/api/nutrition/entries/{entry_id}"),
-        Some(json!({ "date": today, "meal": "dinner", "portions": "1" })),
+        Some(json!({ "date": today, "status_mark_id": dinner, "portions": "1" })),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{moved}");
-    assert_eq!(moved["meal"], "dinner");
+    assert_eq!(moved["status_mark_id"], dinner.as_str());
     assert_eq!(moved["grams"], "200");
     assert_eq!(moved["total"]["kcal"], "228.7");
     let quick_id = quick["id"].as_str().unwrap();
@@ -274,7 +302,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
         &alice,
         Method::PUT,
         &format!("/api/nutrition/entries/{quick_id}"),
-        Some(json!({ "date": today, "meal": "snack", "grams": "100" })),
+        Some(json!({ "date": today, "status_mark_id": snack, "grams": "100" })),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -282,7 +310,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (_, fresh) = add(
         &app,
         &alice,
-        json!({ "date": today, "meal": "dinner", "dish_id": dish_id, "portions": "1" }),
+        json!({ "date": today, "status_mark_id": dinner, "dish_id": dish_id, "portions": "1" }),
     )
     .await;
     assert_eq!(fresh["grams"], "250");
@@ -315,26 +343,100 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let summary = day(&app, &alice, today).await;
     let age = age_today(NaiveDate::from_ymd_opt(1990, 5, 17).unwrap());
     let bmr = 600.0 + 1031.25 - 5.0 * f64::from(age) - 161.0;
+    let maintenance = (bmr * 1.375).round();
+    assert_eq!(summary["norm"]["kind"], "adult");
     assert_eq!(summary["norm"]["bmr"], format!("{}", bmr.round()));
-    assert_eq!(summary["norm"]["target"]["kcal"], format!("{}", (bmr * 1.375).round()));
+    assert_eq!(summary["norm"]["target"]["kcal"], format!("{maintenance}"));
     assert_eq!(summary["norm"]["target"]["prot"], "96");
     assert_eq!(summary["norm"]["weight_kg"], "60");
     assert_eq!(summary["norm_gaps"], json!([]));
 
-    let tomorrow = today + Duration::days(1);
+    let (status, goal) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        "/api/nutrition/goal",
+        Some(json!({ "mode": "lose", "pace_kg": "0.5", "target_kg": "55" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{goal}");
+    let deficit = (maintenance * 0.25).round().min(550.0);
+    assert_eq!(goal["norm"]["delta_kcal"], format!("-{deficit}"));
+    assert_eq!(
+        goal["norm"]["target"]["prot"],
+        format!("{}", 120f64.min(0.35 * (maintenance - deficit) / 4.0).round())
+    );
+    assert_eq!(goal["is_child"], false);
+    if deficit < 550.0
+    {
+        assert_eq!(goal["norm"]["warnings"], json!(["deficit_capped"]));
+    }
+    let summary = day(&app, &alice, today).await;
+    assert_eq!(summary["norm"]["target"]["kcal"], format!("{}", maintenance - deficit));
+    assert_eq!(summary["norm"]["mode"], "lose");
+    let (status, preview) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/nutrition/goal/preview",
+        Some(json!({
+            "mode": "lose", "pace_kg": "0.5", "is_custom": true,
+            "custom": { "kcal": "1800", "prot": "120", "fat": "60", "carb": "195" }
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{preview}");
+    assert_eq!(preview["norm"]["kind"], "custom");
+    assert_eq!(preview["norm"]["target"]["kcal"], "1800");
+    let (_, stored) = send(&app, &alice, Method::GET, "/api/nutrition/goal", None).await;
+    assert_eq!(stored["is_custom"], false);
+    assert_eq!(stored["target_kg"], "55");
+    for body in [
+        json!({ "mode": "lose" }),
+        json!({ "mode": "gain", "pace_kg": "3" }),
+        json!({ "mode": "maintain", "is_custom": true }),
+        json!({ "mode": "maintain", "is_custom": true, "custom": { "kcal": "300", "prot": "1", "fat": "1", "carb": "1" } }),
+    ]
+    {
+        assert_eq!(
+            send(&app, &alice, Method::PUT, "/api/nutrition/goal", Some(body.clone()))
+                .await
+                .0,
+            StatusCode::BAD_REQUEST,
+            "{body}"
+        );
+    }
+
+    let yesterday_start = midnight + Duration::hours(5) - Duration::hours(24) + Duration::minutes(50);
+    let yesterday_block = block(&app, &alice, yesterday_start, 20).await;
+    let (status, _) = add(
+        &app,
+        &alice,
+        json!({ "date": today - Duration::days(1), "status_mark_id": yesterday_block, "quick": { "title": "Овсянка", "kcal": "300" } }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
     let (status, copied) = send(
         &app,
         &alice,
         Method::POST,
         "/api/nutrition/copy",
-        Some(json!({ "from": today, "to": tomorrow, "meal": "breakfast" })),
+        Some(json!({ "date": today, "status_mark_id": breakfast })),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{copied}");
-    assert_eq!(copied["copied"], 2);
-    let next = day(&app, &alice, tomorrow).await;
-    assert_eq!(meal(&next, "breakfast")["total"]["kcal"], "302.7");
-    assert_eq!(meal(&next, "breakfast")["entries"][0]["title"], "Яйцо");
+    assert_eq!(copied["copied"], 1);
+    let summary = day(&app, &alice, today).await;
+    assert_eq!(meal(&summary, &breakfast)["total"]["kcal"], "602.7");
+    let (_, nothing) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/nutrition/copy",
+        Some(json!({ "date": today, "status_mark_id": dinner })),
+    )
+    .await;
+    assert_eq!(nothing, json!({ "copied": 0, "source_start_ts": null }));
 
     let (_, recent) = send(&app, &alice, Method::GET, "/api/nutrition/recent", None).await;
     let recent = recent.as_array().unwrap();
@@ -355,9 +457,23 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
     let (status, _) = send(&app, &alice, Method::DELETE, &format!("/api/dishes/{dish_id}"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let summary = day(&app, &alice, today).await;
-    assert_eq!(meal(&summary, "dinner")["entries"][0]["total"]["kcal"], "228.7");
-    assert_eq!(meal(&summary, "dinner")["entries"][0]["dish_id"], Value::Null);
-    assert_eq!(meal(&summary, "dinner")["entries"][0]["title"], "Гречка варёная");
+    assert_eq!(meal(&summary, &dinner)["entries"][0]["total"]["kcal"], "228.7");
+    assert_eq!(meal(&summary, &dinner)["entries"][0]["dish_id"], Value::Null);
+    assert_eq!(meal(&summary, &dinner)["entries"][0]["title"], "Гречка варёная");
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::DELETE,
+        &format!("/api/routine/marks/{snack}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let summary = day(&app, &alice, today).await;
+    assert_eq!(summary["meals"].as_array().unwrap().len(), 3);
+    assert_eq!(summary["unlinked"][0]["title"], "Кофе с собой");
+    assert_eq!(summary["unlinked_total"]["kcal"], "120");
 
     let alice_entry = glass["id"].as_str().unwrap();
     assert_eq!(
@@ -366,7 +482,7 @@ async fn dishes_account_for_cooking_and_diary_keeps_snapshots(a_db: PgPool)
             &bob,
             Method::PUT,
             &format!("/api/nutrition/entries/{alice_entry}"),
-            Some(json!({ "date": today, "meal": "lunch", "grams": "100" }))
+            Some(json!({ "date": today, "status_mark_id": lunch, "grams": "100" }))
         )
         .await
         .0,
@@ -397,6 +513,7 @@ async fn dishes_are_private_until_shared_with_the_group(a_db: PgPool)
     let home = app.family(&anna, "Home").await;
     app.join(&anna, &boris, &home, "standard").await;
     let today = Utc::now().date_naive();
+    let lunch = block(&app, &boris, Utc::now() - Duration::minutes(30), 20).await;
 
     let rice = food(
         &app,
@@ -426,7 +543,7 @@ async fn dishes_are_private_until_shared_with_the_group(a_db: PgPool)
         add(
             &app,
             &boris,
-            json!({ "date": today, "meal": "lunch", "dish_id": dish_id, "grams": "100" })
+            json!({ "date": today, "status_mark_id": lunch, "dish_id": dish_id, "grams": "100" })
         )
         .await
         .0,
@@ -452,7 +569,7 @@ async fn dishes_are_private_until_shared_with_the_group(a_db: PgPool)
     let (status, eaten) = add(
         &app,
         &boris,
-        json!({ "date": today, "meal": "lunch", "dish_id": dish_id, "portions": "1" }),
+        json!({ "date": today, "status_mark_id": lunch, "dish_id": dish_id, "portions": "1" }),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{eaten}");

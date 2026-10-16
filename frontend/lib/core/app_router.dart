@@ -22,6 +22,7 @@ import '../ui/home/fam_detail_screen.dart';
 import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/nutrition/add_food_screen.dart';
+import '../ui/nutrition/goal_screen.dart';
 import '../ui/nutrition/dish_editor_screen.dart';
 import '../ui/nutrition/dishes_screen.dart';
 import '../ui/nutrition/nutrition_diary_screen.dart';
@@ -153,14 +154,12 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                 ),
               ),
               _own('nutrition', (aState) => NutritionDiaryScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
+              _own('nutrition/goal', (_) => const GoalScreen()),
               _own(
                 'nutrition/add',
                 (aState) => AddFoodScreen(
                   key: ValueKey(aState.uri.toString()),
                   date: dayOnly(DateTime.tryParse(aState.uri.queryParameters['date'] ?? '') ?? DateTime.now()),
-                  meal: aState.uri.queryParameters['meal'] == null
-                      ? MealSlot.forHour(DateTime.now().hour)
-                      : MealSlot.parse(aState.uri.queryParameters['meal']),
                   markId: aState.uri.queryParameters['mark'],
                 ),
               ),

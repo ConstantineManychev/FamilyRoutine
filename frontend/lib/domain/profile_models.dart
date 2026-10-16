@@ -241,6 +241,7 @@ class PersonProfile
   final bool canEdit;
   final List<MetricGroup> visibleGroups;
   final bool isTrainingVisible;
+  final bool isMealsVisible;
   final List<MetricValue> latest;
   final List<ProfileSharing> sharing;
 
@@ -258,6 +259,7 @@ class PersonProfile
     required this.canEdit,
     required this.visibleGroups,
     this.isTrainingVisible = false,
+    this.isMealsVisible = false,
     required this.latest,
     required this.sharing,
   });
@@ -278,6 +280,7 @@ class PersonProfile
         canEdit: aJson['can_edit'] as bool,
         visibleGroups: (aJson['visible_groups'] as List<dynamic>).map(MetricGroup.parse).whereType<MetricGroup>().toList(),
         isTrainingVisible: aJson['is_training_visible'] as bool? ?? false,
+        isMealsVisible: aJson['is_meals_visible'] as bool? ?? false,
         latest: (aJson['latest'] as List<dynamic>)
             .map((aItem) => MetricValue.fromJson(aItem as Map<String, dynamic>))
             .whereType<MetricValue>()

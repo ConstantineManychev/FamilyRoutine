@@ -88,6 +88,14 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
         Some(base + Duration::hours(5)),
     )
     .await;
+    let second_meal = mark(
+        &app,
+        &alice,
+        "meal",
+        base + Duration::hours(5),
+        Some(base + Duration::minutes(330)),
+    )
+    .await;
     let current = mark(&app, &alice, "home", Utc::now() - Duration::minutes(10), None).await;
     let (_, now_mark) = send(&app, &alice, Method::GET, "/api/routine/current", None).await;
     assert_eq!(now_mark["id"], current.as_str());
@@ -151,7 +159,7 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
         &alice,
         Method::POST,
         "/api/nutrition/entries",
-        Some(json!({ "date": today, "meal": "lunch", "item_id": item["id"], "grams": "100", "status_mark_id": meal })),
+        Some(json!({ "date": today, "item_id": item["id"], "grams": "100", "status_mark_id": meal })),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{linked}");
@@ -161,7 +169,7 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
         &alice,
         Method::POST,
         "/api/nutrition/entries",
-        Some(json!({ "date": today, "meal": "snack", "quick": { "title": "Кофе", "kcal": "60" } })),
+        Some(json!({ "date": today, "quick": { "title": "Кофе", "kcal": "60" }, "status_mark_id": second_meal })),
     )
     .await;
     assert_eq!(
@@ -170,7 +178,7 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
             &alice,
             Method::POST,
             "/api/nutrition/entries",
-            Some(json!({ "date": today, "meal": "lunch", "quick": { "kcal": "10" }, "status_mark_id": leisure }))
+            Some(json!({ "date": today, "quick": { "kcal": "10" }, "status_mark_id": leisure }))
         )
         .await
         .0,

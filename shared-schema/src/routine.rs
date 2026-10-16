@@ -61,6 +61,7 @@ pub struct MarkMealsDto
 {
     pub total: MacrosDto,
     pub entries: Vec<MealEntryDto>,
+    pub day_norm: Option<MacrosDto>,
 }
 
 #[derive(Debug, Clone, Serialize)]

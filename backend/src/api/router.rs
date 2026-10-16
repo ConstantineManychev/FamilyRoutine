@@ -80,6 +80,12 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/nutrition/recent", get(nutrition_handlers::recent_foods))
         .route("/nutrition/copy", post(nutrition_handlers::copy_meals))
         .route(
+            "/nutrition/goal",
+            get(nutrition_handlers::get_goal).put(nutrition_handlers::save_goal),
+        )
+        .route("/nutrition/goal/preview", post(nutrition_handlers::preview_goal))
+        .route("/people/:id/nutrition/norm", get(nutrition_handlers::person_norm))
+        .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),
         )

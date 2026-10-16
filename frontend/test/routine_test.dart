@@ -55,7 +55,7 @@ class _FakeApi extends ApiSvc
   Future<StatusMarkDto?> getCurrentMark() async => current;
 
   @override
-  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs}) async
+  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs, DateTime? aEndTs}) async
   {
     created.add(aStatus);
     createdStarts.add(aStartTs);
@@ -99,11 +99,11 @@ Map<String, dynamic> _mealDetails({bool aIsMine = true}) => {
       'workout': null,
       'meals': {
         'total': _macros('403', '13', '1', '68'),
+        'day_norm': _macros('2015', '101', '67', '252'),
         'entries': [
           {
             'id': 'e1',
             'date': '2026-10-16',
-            'meal': 'breakfast',
             'source': 'item',
             'item_id': 'i1',
             'title': 'Buckwheat',
@@ -116,7 +116,6 @@ Map<String, dynamic> _mealDetails({bool aIsMine = true}) => {
           {
             'id': 'e2',
             'date': '2026-10-16',
-            'meal': 'breakfast',
             'source': 'quick',
             'title': 'Coffee',
             'grams': null,
@@ -238,6 +237,8 @@ void main()
     expect(find.text('Buckwheat'), findsOneWidget);
     expect(find.text('Coffee'), findsOneWidget);
     expect(find.byKey(const ValueKey('mark.meals_total')), findsOneWidget);
+    expect(find.text('20% of the daily norm (2,015 kcal)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mark.copy_yesterday')), findsOneWidget);
     expect(find.byKey(const ValueKey('mark.add_food')), findsOneWidget);
     expect(find.byKey(const ValueKey('mark.link_meals')), findsOneWidget);
 

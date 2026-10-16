@@ -13,6 +13,7 @@ import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../settings/ai_settings_section.dart';
 import '../settings/app_settings_section.dart';
+import '../nutrition/person_norm_card.dart';
 import '../training/person_training_card.dart';
 import 'body_entry_editor.dart';
 import 'metric_format.dart';
@@ -281,6 +282,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 _buildHeader(aContext, profile),
                 const SizedBox(height: 24),
                 _buildMetrics(aContext, profile),
+                if (profile.isSelf || profile.isMealsVisible) ...[
+                  const SizedBox(height: 24),
+                  PersonNormCard(key: ValueKey('norm:${profile.id}'), personId: profile.id, isSelf: profile.isSelf),
+                ],
                 if (!profile.isSelf && profile.isTrainingVisible) ...[
                   const SizedBox(height: 24),
                   PersonTrainingCard(personId: profile.id),

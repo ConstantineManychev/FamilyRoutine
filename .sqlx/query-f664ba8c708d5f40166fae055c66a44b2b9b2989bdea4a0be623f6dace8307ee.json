@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)\n        RETURNING id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
+  "query": "\n        UPDATE meal_entries\n        SET eaten_on = $2, status_mark_id = $3, title = $4, grams = $5, portions = $6, kcal = $7, prot = $8,\n            fat = $9, carb = $10\n        WHERE id = $1\n        RETURNING id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
   "describe": {
     "columns": [
       {
@@ -15,23 +15,6 @@
       },
       {
         "ordinal": 2,
-        "name": "meal: MealSlot",
-        "type_info": {
-          "Custom": {
-            "name": "meal_t",
-            "kind": {
-              "Enum": [
-                "breakfast",
-                "lunch",
-                "dinner",
-                "snack"
-              ]
-            }
-          }
-        }
-      },
-      {
-        "ordinal": 3,
         "name": "source: MealSource",
         "type_info": {
           "Custom": {
@@ -47,87 +30,87 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "item_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "dish_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "title",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "grams",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "portions",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "portion_g",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "is_ml",
         "type_info": "Bool"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "kcal_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "prot_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "fat_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "carb_100",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 15,
+        "ordinal": 14,
         "name": "kcal",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 16,
+        "ordinal": 15,
         "name": "prot",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 17,
+        "ordinal": 16,
         "name": "fat",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 18,
+        "ordinal": 17,
         "name": "carb",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 19,
+        "ordinal": 18,
         "name": "status_mark_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 20,
+        "ordinal": 19,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -136,51 +119,17 @@
       "Left": [
         "Uuid",
         "Date",
-        {
-          "Custom": {
-            "name": "meal_t",
-            "kind": {
-              "Enum": [
-                "breakfast",
-                "lunch",
-                "dinner",
-                "snack"
-              ]
-            }
-          }
-        },
-        {
-          "Custom": {
-            "name": "meal_source_t",
-            "kind": {
-              "Enum": [
-                "item",
-                "dish",
-                "quick"
-              ]
-            }
-          }
-        },
-        "Uuid",
         "Uuid",
         "Varchar",
         "Numeric",
         "Numeric",
         "Numeric",
-        "Bool",
         "Numeric",
         "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Uuid"
+        "Numeric"
       ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -203,5 +152,5 @@
       false
     ]
   },
-  "hash": "df03c4b1fd1a46d8f1e45a080532d74646a150f1fd222ffd125488cae5e9c57a"
+  "hash": "f664ba8c708d5f40166fae055c66a44b2b9b2989bdea4a0be623f6dace8307ee"
 }

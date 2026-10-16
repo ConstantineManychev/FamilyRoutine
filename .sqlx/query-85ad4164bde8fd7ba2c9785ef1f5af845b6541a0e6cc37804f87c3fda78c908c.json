@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT status AS \"status: RoutineStatus\", note, end_ts\n        FROM status_marks\n        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)\n        ORDER BY start_ts DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: RoutineStatus",
+        "type_info": {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "end_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "85ad4164bde8fd7ba2c9785ef1f5af845b6541a0e6cc37804f87c3fda78c908c"
+}

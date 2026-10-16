@@ -78,13 +78,13 @@ class _NutritionTodayBlockState extends ConsumerState<NutritionTodayBlock>
     }
     else
     {
-      final eaten = MealSlot.values.map(day.group).where((aGroup) => aGroup.entries.isNotEmpty).toList();
+      final eaten = day.meals.where((aMeal) => aMeal.entries.isNotEmpty).toList();
       content = Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            NutritionSummary(day: day, isCompact: true),
+            NutritionSummary(day: day, isCompact: true, onOpenGoal: () => _open(goalPath)),
             if (eaten.isEmpty)
               Text('nutrition.today_empty'.tr(), style: TextStyle(color: palette.inkMuted))
             else
@@ -92,14 +92,14 @@ class _NutritionTodayBlockState extends ConsumerState<NutritionTodayBlock>
                 spacing: 16,
                 runSpacing: 4,
                 children: [
-                  for (final group in eaten)
+                  for (final meal in eaten)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(mealIcon(group.meal), size: 14, color: palette.inkSecondary),
+                        Icon(mealIcon(meal.kind), size: 14, color: palette.inkSecondary),
                         const SizedBox(width: 4),
                         Text(
-                          '${mealLabel(group.meal)} ${formatKcal(aContext, group.total.kcal)}',
+                          '${mealTitle(aContext, meal)} · ${formatKcal(aContext, meal.total.kcal)}',
                           style: TextStyle(color: palette.inkSecondary),
                         ),
                       ],
@@ -111,10 +111,9 @@ class _NutritionTodayBlockState extends ConsumerState<NutritionTodayBlock>
       );
     }
 
-    final now = DateTime.now();
     return BlockCard(
       title: 'nutrition.today_block'.tr(),
-      onAdd: () => _open(addFoodPath(dayOnly(now), MealSlot.forHour(now.hour))),
+      onAdd: () => _open(addFoodPath(dayOnly(DateTime.now()))),
       addTooltip: 'nutrition.add_food'.tr(),
       onExpand: () => _open('/app/nutrition'),
       child: content,
