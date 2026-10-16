@@ -7,10 +7,11 @@ use chrono::{DateTime, Duration, Utc};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use shared_schema::{
-    ExType, FinishSessionRequest, PersonTrainingDto, PlanQuery, PlannedWorkoutDto, ProgramDayDto, ProgramDto,
-    ProgramExerciseDto, ProgramListItemDto, RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest,
-    ScheduleMode, SessionDto, SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest,
-    StartSessionRequest, TrainingPlanDto,
+    ExType, ExerciseProgressDto, FinishSessionRequest, PersonTrainingDto, PlanQuery, PlannedWorkoutDto, ProgramDayDto,
+    ProgramDto, ProgramExerciseDto, ProgramListItemDto, ProgressMeasure, ProgressionAdviceDto, ProgressionKind,
+    RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest, ScheduleMode, SessionDto,
+    SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest, StartSessionRequest,
+    TrainingPlanDto,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -22,6 +23,7 @@ use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text};
 use crate::security::profile_access::profile_access;
 use crate::services::planner::parse_zone;
+use crate::services::progression::{progress_point, suggest, ExerciseTraits, PlannedExercise};
 use crate::services::training_schedule::{plan, Planned, Reference, ScheduleDay};
 use crate::services::workout_calc::{average_met, session_kcal, ExerciseLoad};
 use crate::state::AppState;
@@ -43,6 +45,9 @@ const MAX_SESSION_HOURS: i64 = 12;
 const DEFAULT_SESSIONS_LIMIT: i64 = 20;
 const MAX_SESSIONS_LIMIT: i64 = 200;
 const WEIGHT_SCALE: u32 = 2;
+const HISTORY_DEPTH: i64 = 2;
+const PROGRESS_SESSIONS: i64 = 100;
+const LOWER_BODY_SHARE: i32 = 50;
 
 struct ProgramRow
 {
@@ -102,6 +107,9 @@ struct SessionExRow
     duration_sec: Option<i32>,
     target_weight: Option<Decimal>,
     rest_sec: Option<i32>,
+    advice: Option<ProgressionKind>,
+    advice_from: Option<Decimal>,
+    advice_to: Option<Decimal>,
 }
 
 struct SetRow
@@ -113,11 +121,18 @@ struct SetRow
     is_done: bool,
 }
 
-struct PreviousRow
+struct HistoryRow
 {
     ex_id: Uuid,
     session_exercise_id: Uuid,
     started_ts: DateTime<Utc>,
+    is_same_day: bool,
+}
+
+struct PastExercise
+{
+    started_ts: DateTime<Utc>,
+    sets: Vec<SessionSetDto>,
 }
 
 pub async fn list_programs(
@@ -614,6 +629,86 @@ pub async fn begin_session(
     Ok(session_id)
 }
 
+pub async fn exercise_progress(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_ex_id): ApiPath<Uuid>,
+) -> Result<Json<ExerciseProgressDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    let exercise = sqlx::query!(
+        "SELECT id, code, name FROM dict_exs WHERE id = $1 AND (NOT is_custom OR created_by = $2)",
+        a_ex_id,
+        a_user.user_id
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT s.id, s.started_ts, s.day_name, ss.reps, ss.weight_kg, ss.duration_sec
+        FROM (
+            SELECT DISTINCT recent.id, recent.started_ts
+            FROM workout_sessions recent
+            JOIN session_exercises used ON used.session_id = recent.id
+            WHERE recent.user_id = $1 AND used.ex_id = $2 AND recent.finished_ts IS NOT NULL
+            ORDER BY recent.started_ts DESC
+            LIMIT $3
+        ) picked
+        JOIN workout_sessions s ON s.id = picked.id
+        JOIN session_exercises se ON se.session_id = s.id AND se.ex_id = $2
+        JOIN session_sets ss ON ss.session_exercise_id = se.id AND ss.is_done
+        ORDER BY s.started_ts, s.id, se.position, ss.set_index
+        "#,
+        a_user.user_id,
+        a_ex_id,
+        PROGRESS_SESSIONS
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut points = Vec::new();
+    let mut index = 0;
+    while index < rows.len()
+    {
+        let head = &rows[index];
+        let sets: Vec<SessionSetDto> = rows[index..]
+            .iter()
+            .take_while(|row| row.id == head.id)
+            .map(|row| SessionSetDto {
+                reps: row.reps,
+                weight_kg: row.weight_kg,
+                duration_sec: row.duration_sec,
+                is_done: true,
+            })
+            .collect();
+        index += sets.len();
+        points.push(progress_point(head.id, head.started_ts, head.day_name.clone(), &sets));
+    }
+
+    let measure = if points.iter().any(|point| point.top_weight_kg.is_some())
+    {
+        ProgressMeasure::Weight
+    }
+    else if points.iter().any(|point| point.total_reps > 0)
+    {
+        ProgressMeasure::Reps
+    }
+    else
+    {
+        ProgressMeasure::Duration
+    };
+
+    Ok(Json(ExerciseProgressDto {
+        ex_id: exercise.id,
+        ex_code: exercise.code,
+        ex_name: exercise.name,
+        measure,
+        points,
+    }))
+}
+
 pub async fn get_session(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -642,12 +737,13 @@ pub async fn save_session(
     sqlx::query!("UPDATE workout_sessions SET note = $2 WHERE id = $1", a_id, note)
         .execute(&mut *tx)
         .await?;
+    let advice = load_advice(&mut tx, a_id).await?;
     sqlx::query!("DELETE FROM session_exercises WHERE session_id = $1", a_id)
         .execute(&mut *tx)
         .await?;
     for (position, exercise) in exercises.iter().enumerate()
     {
-        insert_session_exercise(&mut tx, a_id, position as i32, exercise).await?;
+        insert_session_exercise(&mut tx, a_id, position as i32, exercise, advice.get(&exercise.ex_id)).await?;
     }
 
     if let (Some(finished_ts), Some(intensity)) = (session.finished_ts, session.intensity)
@@ -1126,28 +1222,31 @@ async fn prefill_session(
     .fetch_all(&mut *a_conn)
     .await?;
     let ex_ids: Vec<Uuid> = planned.iter().map(|exercise| exercise.ex_id).collect();
-    let previous = load_previous(a_conn, a_user_id, a_session_id, Some(a_day_id), a_started_ts, &ex_ids).await?;
+    let traits = load_traits(a_conn, &ex_ids).await?;
+    let history = load_history(a_conn, a_user_id, a_session_id, Some(a_day_id), a_started_ts, &ex_ids).await?;
 
     for (position, exercise) in planned.iter().enumerate()
     {
-        let last = previous
+        let plan = PlannedExercise {
+            sets: exercise.sets.max(1) as usize,
+            reps_min: exercise.reps_min,
+            reps_max: exercise.reps_max,
+            duration_sec: exercise.duration_sec,
+            weight_kg: exercise.weight_kg,
+            weight_step: exercise.weight_step,
+        };
+        let past: Vec<Vec<SessionSetDto>> = history
             .get(&exercise.ex_id)
-            .map(|(_, sets)| sets.as_slice())
+            .map(|entries| entries.iter().map(|entry| entry.sets.clone()).collect())
             .unwrap_or_default();
-        let sets = (0..exercise.sets as usize)
-            .map(|index| {
-                let before = last.get(index).or(last.last());
-                SessionSetDto {
-                    reps: before
-                        .and_then(|set| set.reps)
-                        .or(exercise.reps_max)
-                        .or(exercise.reps_min),
-                    weight_kg: before.and_then(|set| set.weight_kg).or(exercise.weight_kg),
-                    duration_sec: before.and_then(|set| set.duration_sec).or(exercise.duration_sec),
-                    is_done: false,
-                }
-            })
-            .collect();
+        let suggestion = suggest(
+            &plan,
+            traits.get(&exercise.ex_id).unwrap_or(&ExerciseTraits {
+                ex_type: ExType::Strength,
+                is_lower_body: false,
+            }),
+            &past,
+        );
         let session_exercise = SaveSessionExercise {
             ex_id: exercise.ex_id,
             reps_min: exercise.reps_min,
@@ -1155,11 +1254,75 @@ async fn prefill_session(
             duration_sec: exercise.duration_sec,
             target_weight: exercise.weight_kg,
             rest_sec: exercise.rest_sec,
-            sets,
+            sets: suggestion.sets,
         };
-        insert_session_exercise(a_conn, a_session_id, position as i32, &session_exercise).await?;
+        insert_session_exercise(
+            a_conn,
+            a_session_id,
+            position as i32,
+            &session_exercise,
+            suggestion.advice.as_ref(),
+        )
+        .await?;
     }
     Ok(())
+}
+
+async fn load_traits(a_conn: &mut PgConnection, a_ex_ids: &[Uuid]) -> Result<HashMap<Uuid, ExerciseTraits>, ApiError>
+{
+    let rows = sqlx::query!(
+        r#"
+        SELECT e.id, e.type AS "ex_type: ExType",
+               COALESCE((SELECT g.pct FROM ex_musc_grps g WHERE g.ex_id = e.id AND g.grp = 'legs'), 0) >= $2 AS "is_lower_body!"
+        FROM dict_exs e WHERE e.id = ANY($1)
+        "#,
+        a_ex_ids,
+        Decimal::from(LOWER_BODY_SHARE)
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            (
+                row.id,
+                ExerciseTraits {
+                    ex_type: row.ex_type,
+                    is_lower_body: row.is_lower_body,
+                },
+            )
+        })
+        .collect())
+}
+
+async fn load_advice(
+    a_conn: &mut PgConnection,
+    a_session_id: Uuid,
+) -> Result<HashMap<Uuid, ProgressionAdviceDto>, ApiError>
+{
+    let rows = sqlx::query!(
+        r#"
+        SELECT DISTINCT ON (ex_id) ex_id, advice AS "advice!: ProgressionKind", advice_from, advice_to
+        FROM session_exercises WHERE session_id = $1 AND advice IS NOT NULL
+        ORDER BY ex_id, position
+        "#,
+        a_session_id
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            (
+                row.ex_id,
+                ProgressionAdviceDto {
+                    kind: row.advice,
+                    from: row.advice_from,
+                    to: row.advice_to,
+                },
+            )
+        })
+        .collect())
 }
 
 async fn insert_session_exercise(
@@ -1167,12 +1330,15 @@ async fn insert_session_exercise(
     a_session_id: Uuid,
     a_position: i32,
     a_exercise: &SaveSessionExercise,
+    a_advice: Option<&ProgressionAdviceDto>,
 ) -> Result<(), ApiError>
 {
     let exercise_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO session_exercises (session_id, position, ex_id, reps_min, reps_max, duration_sec, target_weight, rest_sec)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO session_exercises (
+            session_id, position, ex_id, reps_min, reps_max, duration_sec, target_weight, rest_sec, advice, advice_from, advice_to
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
         "#,
         a_session_id,
@@ -1182,7 +1348,10 @@ async fn insert_session_exercise(
         a_exercise.reps_max,
         a_exercise.duration_sec,
         a_exercise.target_weight,
-        a_exercise.rest_sec
+        a_exercise.rest_sec,
+        a_advice.map(|advice| advice.kind) as Option<ProgressionKind>,
+        a_advice.and_then(|advice| advice.from),
+        a_advice.and_then(|advice| advice.to)
     )
     .fetch_one(&mut *a_conn)
     .await?;
@@ -1216,22 +1385,54 @@ async fn load_previous(
     a_ex_ids: &[Uuid],
 ) -> Result<HashMap<Uuid, (DateTime<Utc>, Vec<SessionSetDto>)>, ApiError>
 {
+    let history = load_history(a_conn, a_user_id, a_session_id, a_day_id, a_before, a_ex_ids).await?;
+    Ok(history
+        .into_iter()
+        .filter_map(|(ex_id, mut entries)| {
+            (!entries.is_empty()).then(|| {
+                let latest = entries.swap_remove(0);
+                (ex_id, (latest.started_ts, latest.sets))
+            })
+        })
+        .collect())
+}
+
+async fn load_history(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_session_id: Uuid,
+    a_day_id: Option<Uuid>,
+    a_before: DateTime<Utc>,
+    a_ex_ids: &[Uuid],
+) -> Result<HashMap<Uuid, Vec<PastExercise>>, ApiError>
+{
     let rows = sqlx::query_as!(
-        PreviousRow,
+        HistoryRow,
         r#"
-        SELECT DISTINCT ON (se.ex_id) se.ex_id, se.id AS session_exercise_id, s.started_ts
-        FROM session_exercises se
-        JOIN workout_sessions s ON s.id = se.session_id
-        WHERE s.user_id = $1 AND s.id <> $2 AND s.finished_ts IS NOT NULL AND s.started_ts < $3
-          AND se.ex_id = ANY($4)
-          AND EXISTS (SELECT 1 FROM session_sets ss WHERE ss.session_exercise_id = se.id AND ss.is_done)
-        ORDER BY se.ex_id, (s.day_id IS NOT DISTINCT FROM $5) DESC, s.started_ts DESC, se.position
+        SELECT ex_id AS "ex_id!", session_exercise_id AS "session_exercise_id!", started_ts AS "started_ts!",
+               is_same_day AS "is_same_day!"
+        FROM (
+            SELECT se.ex_id, se.id AS session_exercise_id, s.started_ts,
+                   (s.day_id IS NOT DISTINCT FROM $5) AS is_same_day,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY se.ex_id
+                       ORDER BY (s.day_id IS NOT DISTINCT FROM $5) DESC, s.started_ts DESC, se.position
+                   ) AS rank
+            FROM session_exercises se
+            JOIN workout_sessions s ON s.id = se.session_id
+            WHERE s.user_id = $1 AND s.id <> $2 AND s.finished_ts IS NOT NULL AND s.started_ts < $3
+              AND se.ex_id = ANY($4)
+              AND EXISTS (SELECT 1 FROM session_sets ss WHERE ss.session_exercise_id = se.id AND ss.is_done)
+        ) ranked
+        WHERE rank <= $6
+        ORDER BY ex_id, rank
         "#,
         a_user_id,
         a_session_id,
         a_before,
         a_ex_ids,
-        a_day_id
+        a_day_id,
+        HISTORY_DEPTH
     )
     .fetch_all(&mut *a_conn)
     .await?;
@@ -1249,17 +1450,24 @@ async fn load_previous(
     .fetch_all(&mut *a_conn)
     .await?;
 
-    Ok(rows
-        .into_iter()
-        .map(|row| {
-            let done = sets
+    let mut history: HashMap<Uuid, Vec<PastExercise>> = HashMap::new();
+    for row in rows
+    {
+        let entries = history.entry(row.ex_id).or_default();
+        if !entries.is_empty() && !row.is_same_day
+        {
+            continue;
+        }
+        entries.push(PastExercise {
+            started_ts: row.started_ts,
+            sets: sets
                 .iter()
                 .filter(|set| set.session_exercise_id == row.session_exercise_id)
                 .map(set_dto)
-                .collect();
-            (row.ex_id, (row.started_ts, done))
-        })
-        .collect())
+                .collect(),
+        });
+    }
+    Ok(history)
 }
 
 fn set_dto(a_row: &SetRow) -> SessionSetDto
@@ -1303,7 +1511,8 @@ pub async fn load_session(
         SessionExRow,
         r#"
         SELECT se.id, se.ex_id, e.code AS ex_code, e.name AS ex_name, e.type AS "ex_type: ExType", se.reps_min, se.reps_max,
-               se.duration_sec, se.target_weight, se.rest_sec
+               se.duration_sec, se.target_weight, se.rest_sec, se.advice AS "advice: ProgressionKind", se.advice_from,
+               se.advice_to
         FROM session_exercises se JOIN dict_exs e ON e.id = se.ex_id
         WHERE se.session_id = $1
         ORDER BY se.position
@@ -1370,6 +1579,11 @@ pub async fn load_session(
                     rest_sec: exercise.rest_sec,
                     previous: previous_sets,
                     previous_ts,
+                    advice: exercise.advice.map(|kind| ProgressionAdviceDto {
+                        kind,
+                        from: exercise.advice_from,
+                        to: exercise.advice_to,
+                    }),
                 }
             })
             .collect(),

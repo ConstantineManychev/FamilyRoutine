@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
@@ -301,6 +302,12 @@ class _ExerciseDetailScreenState extends ConsumerState<ExerciseDetailScreen>
         ScreenHeader(
           title: _isEdit ? 'exercises.edit'.tr() : 'exercises.add'.tr(),
           actions: [
+            if (_isEdit)
+              OutlinedButton.icon(
+                onPressed: () => context.push('/app/training/exercises/${widget.exId}'),
+                icon: const Icon(AppIcons.trendingUp, size: 18),
+                label: Text('training.my_progress'.tr()),
+              ),
             if (_isEdit && _isEditable)
               OutlinedButton.icon(
                 onPressed: _isSaving ? null : _delete,

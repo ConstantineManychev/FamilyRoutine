@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT ON (ex_id) ex_id, advice AS \"advice!: ProgressionKind\", advice_from, advice_to\n        FROM session_exercises WHERE session_id = $1 AND advice IS NOT NULL\n        ORDER BY ex_id, position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ex_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "advice!: ProgressionKind",
+        "type_info": {
+          "Custom": {
+            "name": "progression_t",
+            "kind": {
+              "Enum": [
+                "increase_weight",
+                "add_reps",
+                "deload",
+                "add_time",
+                "bodyweight_top",
+                "hold"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "advice_from",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "advice_to",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6db9c3a53b3de551665c554be38fa287d2a989aca2da9c9ceec695c75b9f21c9"
+}

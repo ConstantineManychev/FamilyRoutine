@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT se.id, se.ex_id, e.code AS ex_code, e.name AS ex_name, e.type AS \"ex_type: ExType\", se.reps_min, se.reps_max,\n               se.duration_sec, se.target_weight, se.rest_sec\n        FROM session_exercises se JOIN dict_exs e ON e.id = se.ex_id\n        WHERE se.session_id = $1\n        ORDER BY se.position\n        ",
+  "query": "\n        SELECT se.id, se.ex_id, e.code AS ex_code, e.name AS ex_name, e.type AS \"ex_type: ExType\", se.reps_min, se.reps_max,\n               se.duration_sec, se.target_weight, se.rest_sec, se.advice AS \"advice: ProgressionKind\", se.advice_from,\n               se.advice_to\n        FROM session_exercises se JOIN dict_exs e ON e.id = se.ex_id\n        WHERE se.session_id = $1\n        ORDER BY se.position\n        ",
   "describe": {
     "columns": [
       {
@@ -64,6 +64,35 @@
         "ordinal": 9,
         "name": "rest_sec",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "advice: ProgressionKind",
+        "type_info": {
+          "Custom": {
+            "name": "progression_t",
+            "kind": {
+              "Enum": [
+                "increase_weight",
+                "add_reps",
+                "deload",
+                "add_time",
+                "bodyweight_top",
+                "hold"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "advice_from",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "advice_to",
+        "type_info": "Numeric"
       }
     ],
     "parameters": {
@@ -81,8 +110,11 @@
       true,
       true,
       true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "e22a2cf5c49b200e3a9385160269a10dffb3f5dc711e6a9ab55f89a321cb5c4f"
+  "hash": "e5b1fa2ec3263482fe592cb07452083ca3196b22ca8b163de80a444901917cd3"
 }

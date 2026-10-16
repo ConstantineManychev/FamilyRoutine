@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT e.id, e.type AS \"ex_type: ExType\",\n               COALESCE((SELECT g.pct FROM ex_musc_grps g WHERE g.ex_id = e.id AND g.grp = 'legs'), 0) >= $2 AS \"is_lower_body!\"\n        FROM dict_exs e WHERE e.id = ANY($1)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ex_type: ExType",
+        "type_info": {
+          "Custom": {
+            "name": "ex_type_t",
+            "kind": {
+              "Enum": [
+                "cardio",
+                "strength",
+                "flexibility",
+                "mixed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_lower_body!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "e4225f657dc94b36a1a89cb964f76e96e8a2187a8dd8de6061e0fa076ba23b72"
+}

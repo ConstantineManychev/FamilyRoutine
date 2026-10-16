@@ -27,6 +27,7 @@ import '../ui/planner/planner_screen.dart';
 import '../ui/profile/metric_history_screen.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/settings/settings_screen.dart';
+import '../ui/training/exercise_progress_screen.dart';
 import '../ui/training/person_session_screen.dart';
 import '../ui/training/program_editor_screen.dart';
 import '../ui/training/training_screen.dart';
@@ -116,6 +117,7 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   _sub('programs/new', (_) => const ProgramEditorScreen()),
                   _sub('programs/:id', (aState) => ProgramEditorScreen(key: ValueKey(_param(aState, 'id')), programId: _param(aState, 'id'))),
                   _sub('sessions/:id', (aState) => WorkoutSessionScreen(key: ValueKey(_param(aState, 'id')), sessionId: _param(aState, 'id')!)),
+                  _sub('exercises/:id', (aState) => ExerciseProgressScreen(key: ValueKey(_param(aState, 'id')), exId: _param(aState, 'id')!)),
                 ],
               ),
               _sub('profile', (_) => const ProfileScreen()),

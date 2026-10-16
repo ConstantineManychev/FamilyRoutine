@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
+import '../common/app_icons.dart';
 
 String exerciseName(String? aCode, String aName)
 {
@@ -98,3 +99,29 @@ String sessionSubtitle(BuildContext aContext, SessionSummary aSession) => [
       if (aSession.volumeKg > 0) formatWeight(aContext, aSession.volumeKg),
       if (aSession.kcal != null) 'training.kcal'.tr(args: [formatNumber(aContext, aSession.kcal!)]),
     ].join(' · ');
+
+IconData adviceIcon(ProgressionKind aKind) => switch (aKind)
+{
+  ProgressionKind.increaseWeight => AppIcons.trendingUp,
+  ProgressionKind.addReps => AppIcons.plusCircle,
+  ProgressionKind.deload => AppIcons.arrowDown,
+  ProgressionKind.addTime => AppIcons.clock,
+  ProgressionKind.bodyweightTop => AppIcons.zap,
+  ProgressionKind.hold => AppIcons.clock,
+};
+
+String adviceText(BuildContext aContext, ProgressionAdvice aAdvice)
+{
+  final from = aAdvice.from ?? 0;
+  final to = aAdvice.to ?? 0;
+  return switch (aAdvice.kind)
+  {
+    ProgressionKind.increaseWeight => 'training.advice_increase'.tr(args: [formatWeight(aContext, to), formatNumber(aContext, to - from)]),
+    ProgressionKind.addReps when from > 0 => 'training.advice_reps'.tr(args: [formatWeight(aContext, from)]),
+    ProgressionKind.addReps => 'training.advice_reps_body'.tr(),
+    ProgressionKind.deload => 'training.advice_deload'.tr(args: [formatWeight(aContext, to)]),
+    ProgressionKind.addTime => 'training.advice_time'.tr(args: [formatClock(to.round()), formatClock((to - from).round())]),
+    ProgressionKind.bodyweightTop => 'training.advice_body_top'.tr(),
+    ProgressionKind.hold => 'training.advice_hold'.tr(args: [formatClock(to.round())]),
+  };
+}

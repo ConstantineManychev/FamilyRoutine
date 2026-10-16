@@ -74,6 +74,10 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/training/today", put(training_handlers::set_today))
         .route("/training/plan", get(training_handlers::get_plan))
         .route(
+            "/training/exercises/:id/progress",
+            get(training_handlers::exercise_progress),
+        )
+        .route(
             "/training/sessions",
             get(training_handlers::list_sessions).post(training_handlers::start_session),
         )

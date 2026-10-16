@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO session_exercises (\n            session_id, position, ex_id, reps_min, reps_max, duration_sec, target_weight, rest_sec, advice, advice_from, advice_to\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Numeric",
+        "Int4",
+        {
+          "Custom": {
+            "name": "progression_t",
+            "kind": {
+              "Enum": [
+                "increase_weight",
+                "add_reps",
+                "deload",
+                "add_time",
+                "bodyweight_top",
+                "hold"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d3015679f7e52dc331cc729776296119ab8f29615e59a2985f38abf15246ff52"
+}

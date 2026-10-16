@@ -165,6 +165,60 @@ pub struct SessionSetDto
     pub is_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "progression_t", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum ProgressionKind
+{
+    IncreaseWeight,
+    AddReps,
+    Deload,
+    AddTime,
+    BodyweightTop,
+    Hold,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ProgressionAdviceDto
+{
+    pub kind: ProgressionKind,
+    pub from: Option<Decimal>,
+    pub to: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProgressMeasure
+{
+    Weight,
+    Reps,
+    Duration,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProgressPointDto
+{
+    pub session_id: Uuid,
+    pub started_ts: DateTime<Utc>,
+    pub day_name: Option<String>,
+    pub e1rm_kg: Option<Decimal>,
+    pub top_weight_kg: Option<Decimal>,
+    pub top_reps: Option<i32>,
+    pub best_duration_sec: Option<i32>,
+    pub total_reps: i32,
+    pub volume_kg: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExerciseProgressDto
+{
+    pub ex_id: Uuid,
+    pub ex_code: Option<String>,
+    pub ex_name: String,
+    pub measure: ProgressMeasure,
+    pub points: Vec<ProgressPointDto>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionExerciseDto
 {
@@ -180,6 +234,7 @@ pub struct SessionExerciseDto
     pub sets: Vec<SessionSetDto>,
     pub previous: Vec<SessionSetDto>,
     pub previous_ts: Option<DateTime<Utc>>,
+    pub advice: Option<ProgressionAdviceDto>,
 }
 
 #[derive(Debug, Clone, Serialize)]

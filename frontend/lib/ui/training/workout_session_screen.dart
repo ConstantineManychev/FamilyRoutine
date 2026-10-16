@@ -458,6 +458,11 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
                   ),
                 ),
                 IconButton(
+                  tooltip: 'training.progress'.tr(),
+                  onPressed: () => context.push('/app/training/exercises/${exercise.exId}'),
+                  icon: const Icon(AppIcons.trendingUp, size: 18),
+                ),
+                IconButton(
                   tooltip: 'training.remove_exercise'.tr(),
                   onPressed: ()
                   {
@@ -470,6 +475,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen>
               ],
             ),
             Text(target, style: TextStyle(color: context.palette.inkSecondary)),
+            if (exercise.advice != null && !aSession.isFinished) _AdviceLine(advice: exercise.advice!),
             if (exercise.previous.isNotEmpty && previousTs != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -624,6 +630,36 @@ class _IntensityDialogState extends State<_IntensityDialog>
         TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
         FilledButton(onPressed: () => Navigator.of(aContext).pop(_value), child: Text('training.finish_action'.tr())),
       ],
+    );
+  }
+}
+
+class _AdviceLine extends StatelessWidget
+{
+  final ProgressionAdvice advice;
+
+  const _AdviceLine({required this.advice});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final iconColor = advice.kind == ProgressionKind.deload ? palette.warning : aContext.colors.primary;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(adviceIcon(advice.kind), size: 16, color: iconColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              adviceText(aContext, advice),
+              style: TextStyle(color: palette.inkPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

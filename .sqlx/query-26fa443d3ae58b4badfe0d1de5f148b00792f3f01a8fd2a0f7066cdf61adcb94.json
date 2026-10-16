@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id, s.started_ts, s.day_name, ss.reps, ss.weight_kg, ss.duration_sec\n        FROM (\n            SELECT DISTINCT recent.id, recent.started_ts\n            FROM workout_sessions recent\n            JOIN session_exercises used ON used.session_id = recent.id\n            WHERE recent.user_id = $1 AND used.ex_id = $2 AND recent.finished_ts IS NOT NULL\n            ORDER BY recent.started_ts DESC\n            LIMIT $3\n        ) picked\n        JOIN workout_sessions s ON s.id = picked.id\n        JOIN session_exercises se ON se.session_id = s.id AND se.ex_id = $2\n        JOIN session_sets ss ON ss.session_exercise_id = se.id AND ss.is_done\n        ORDER BY s.started_ts, s.id, se.position, ss.set_index\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "day_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "reps",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "weight_kg",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "duration_sec",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "26fa443d3ae58b4badfe0d1de5f148b00792f3f01a8fd2a0f7066cdf61adcb94"
+}

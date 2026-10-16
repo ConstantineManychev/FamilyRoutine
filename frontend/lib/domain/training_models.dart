@@ -271,6 +271,118 @@ class SessionSet
       };
 }
 
+enum ProgressionKind
+{
+  increaseWeight,
+  addReps,
+  deload,
+  addTime,
+  bodyweightTop,
+  hold;
+
+  static ProgressionKind? parse(Object? aValue) => switch (aValue)
+  {
+    'increase_weight' => ProgressionKind.increaseWeight,
+    'add_reps' => ProgressionKind.addReps,
+    'deload' => ProgressionKind.deload,
+    'add_time' => ProgressionKind.addTime,
+    'bodyweight_top' => ProgressionKind.bodyweightTop,
+    'hold' => ProgressionKind.hold,
+    _ => null,
+  };
+}
+
+class ProgressionAdvice
+{
+  final ProgressionKind kind;
+  final double? from;
+  final double? to;
+
+  const ProgressionAdvice({required this.kind, this.from, this.to});
+
+  static ProgressionAdvice? fromJson(Object? aJson)
+  {
+    if (aJson is! Map<String, dynamic>)
+    {
+      return null;
+    }
+    final kind = ProgressionKind.parse(aJson['kind']);
+    return kind == null ? null : ProgressionAdvice(kind: kind, from: _decimalOrNull(aJson['from']), to: _decimalOrNull(aJson['to']));
+  }
+}
+
+enum ProgressMeasure
+{
+  weight,
+  reps,
+  duration;
+
+  static ProgressMeasure parse(Object? aValue) => values.firstWhere((aItem) => aItem.name == aValue, orElse: () => ProgressMeasure.weight);
+}
+
+class ProgressPoint
+{
+  final String sessionId;
+  final DateTime startedTs;
+  final String? dayName;
+  final double? e1rmKg;
+  final double? topWeightKg;
+  final int? topReps;
+  final int? bestDurationSec;
+  final int totalReps;
+  final double volumeKg;
+
+  const ProgressPoint({
+    required this.sessionId,
+    required this.startedTs,
+    this.dayName,
+    this.e1rmKg,
+    this.topWeightKg,
+    this.topReps,
+    this.bestDurationSec,
+    this.totalReps = 0,
+    this.volumeKg = 0,
+  });
+
+  double? valueOf(ProgressMeasure aMeasure) => switch (aMeasure)
+  {
+    ProgressMeasure.weight => e1rmKg ?? topWeightKg,
+    ProgressMeasure.reps => topReps?.toDouble(),
+    ProgressMeasure.duration => bestDurationSec?.toDouble(),
+  };
+
+  factory ProgressPoint.fromJson(Map<String, dynamic> aJson) => ProgressPoint(
+        sessionId: aJson['session_id'] as String,
+        startedTs: parseTs(aJson['started_ts']),
+        dayName: aJson['day_name'] as String?,
+        e1rmKg: _decimalOrNull(aJson['e1rm_kg']),
+        topWeightKg: _decimalOrNull(aJson['top_weight_kg']),
+        topReps: aJson['top_reps'] as int?,
+        bestDurationSec: aJson['best_duration_sec'] as int?,
+        totalReps: aJson['total_reps'] as int? ?? 0,
+        volumeKg: _decimalOrNull(aJson['volume_kg']) ?? 0,
+      );
+}
+
+class ExerciseProgress
+{
+  final String exId;
+  final String? exCode;
+  final String exName;
+  final ProgressMeasure measure;
+  final List<ProgressPoint> points;
+
+  const ExerciseProgress({required this.exId, this.exCode, required this.exName, required this.measure, required this.points});
+
+  factory ExerciseProgress.fromJson(Map<String, dynamic> aJson) => ExerciseProgress(
+        exId: aJson['ex_id'] as String,
+        exCode: aJson['ex_code'] as String?,
+        exName: aJson['ex_name'] as String,
+        measure: ProgressMeasure.parse(aJson['measure']),
+        points: (aJson['points'] as List<dynamic>).map((aItem) => ProgressPoint.fromJson(aItem as Map<String, dynamic>)).toList(),
+      );
+}
+
 class SessionExercise
 {
   final String exId;
@@ -285,6 +397,7 @@ class SessionExercise
   final List<SessionSet> sets;
   final List<SessionSet> previous;
   final DateTime? previousTs;
+  final ProgressionAdvice? advice;
 
   SessionExercise({
     required this.exId,
@@ -299,6 +412,7 @@ class SessionExercise
     required this.sets,
     this.previous = const [],
     this.previousTs,
+    this.advice,
   });
 
   bool get isTimed => durationSec != null || exType == 'cardio' || exType == 'flexibility';
@@ -318,6 +432,7 @@ class SessionExercise
             .map((aItem) => SessionSet.fromJson(aItem as Map<String, dynamic>))
             .toList(),
         previousTs: parseTsOrNull(aJson['previous_ts']),
+        advice: ProgressionAdvice.fromJson(aJson['advice']),
       );
 
   Map<String, dynamic> toJson() => {

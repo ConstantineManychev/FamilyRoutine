@@ -899,6 +899,12 @@ class ApiSvc
     return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<ExerciseProgress> getExerciseProgress(String aExId) async
+  {
+    final res = await _dio.get('/api/training/exercises/$aExId/progress');
+    return ExerciseProgress.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<WorkoutSession> getSession(String aId) async
   {
     final res = await _dio.get('/api/training/sessions/$aId');
