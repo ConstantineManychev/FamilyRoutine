@@ -7,6 +7,8 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../planner/planner_common.dart';
+import '../routine/routine_style.dart' as routine_style;
 import '../routine/dash_card.dart';
 import 'training_format.dart';
 import 'training_revision.dart';
@@ -132,6 +134,12 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
       );
     }
 
+    final slot = plan.nextSlot;
+    if (slot != null)
+    {
+      return _buildSlot(aContext, plan, slot);
+    }
+
     final next = plan.next;
     if (next == null)
     {
@@ -164,6 +172,57 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
             onPressed: _isBusy ? null : () => _start(next.dayId),
             icon: const Icon(AppIcons.dumbbell, size: 18),
             label: Text('training.start_day'.tr(args: [next.dayName])),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _startSlot(PlanSlot aSlot) async
+  {
+    setState(() => _isBusy = true);
+    await startTrainingSlot(context, ref, aSlot.eventId, aSlot.occDate);
+    if (mounted)
+    {
+      setState(() => _isBusy = false);
+      await _load();
+    }
+  }
+
+  Widget _buildSlot(BuildContext aContext, TrainingPlan aPlan, PlanSlot aSlot)
+  {
+    final localeTag = aContext.locale.toLanguageTag();
+    final start = routine_style.formatClock(aContext, aSlot.startTs);
+    final isToday = DateUtils.isSameDay(aSlot.startTs, DateTime.now());
+    final String when;
+    if (!isToday)
+    {
+      when = 'planner.slot_on'.tr(args: [DateFormat.MMMEd(localeTag).format(aSlot.startTs), start]);
+    }
+    else if (aSlot.timing == PlanTiming.window)
+    {
+      when = 'planner.slot_window_today'.tr(args: [start, routine_style.formatClock(aContext, aSlot.endTs)]);
+    }
+    else
+    {
+      when = 'planner.slot_today'.tr(args: [start]);
+    }
+    final dayName = aSlot.dayName ?? aPlan.next?.dayName;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(when, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        Text(
+          [aSlot.title, if (dayName != null && dayName != aSlot.title) dayName].join(' · '),
+          style: TextStyle(color: context.palette.inkSecondary),
+        ),
+        if (isToday) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _isBusy ? null : () => _startSlot(aSlot),
+            icon: const Icon(AppIcons.dumbbell, size: 18),
+            label: Text('planner.start_training'.tr()),
           ),
         ],
       ],

@@ -12,8 +12,9 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
-    fam_handlers, geo_handlers, item_handlers, place_handlers, profile_handlers, receipt_handlers, recognize_handlers,
-    routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
+    fam_handlers, geo_handlers, item_handlers, place_handlers, planner_handlers, profile_handlers, receipt_handlers,
+    recognize_handlers, routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers,
+    wallet_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -129,6 +130,26 @@ pub fn build_router(a_state: AppState) -> Router
         .route(
             "/dicts/items/:id/manual-prices/:price_id",
             axum::routing::delete(item_handlers::delete_manual_price),
+        )
+        .route("/plan", get(planner_handlers::agenda))
+        .route("/plan/time-zones", get(planner_handlers::time_zones))
+        .route(
+            "/plan/events",
+            get(planner_handlers::list_events).post(planner_handlers::create_event),
+        )
+        .route(
+            "/plan/events/:id",
+            get(planner_handlers::get_event)
+                .put(planner_handlers::update_event)
+                .delete(planner_handlers::delete_event),
+        )
+        .route(
+            "/plan/events/:id/occurrences/:date",
+            put(planner_handlers::save_occurrence),
+        )
+        .route(
+            "/plan/events/:id/occurrences/:date/start",
+            post(planner_handlers::start_occurrence),
         )
         .route(
             "/families",

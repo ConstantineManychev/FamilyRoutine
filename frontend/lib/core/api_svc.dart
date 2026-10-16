@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../domain/models.dart';
 import 'app_config.dart';
+import 'device_tz.dart';
 import 'token_store.dart';
 
 typedef UnauthorizedHandler = void Function();
@@ -770,9 +771,59 @@ class ApiSvc
   {
     final res = await _dio.get(
       '/api/training/plan',
-      queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes, 'days': aDays},
+      queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes, 'days': aDays, 'tz': deviceTimeZone()},
     );
     return TrainingPlan.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<Occurrence>> getAgenda(DateTime aFrom, DateTime aTo) async
+  {
+    final res = await _dio.get('/api/plan', queryParameters: {
+      'from': dateWire(aFrom),
+      'to': dateWire(aTo),
+      'tz': deviceTimeZone(),
+    });
+    return _list((res.data as Map<String, dynamic>)['occurrences'], Occurrence.fromJson);
+  }
+
+  Future<List<PlanEvent>> getPlanEvents() async
+  {
+    final res = await _dio.get('/api/plan/events');
+    return _list(res.data, PlanEvent.fromJson);
+  }
+
+  Future<PlanEvent> getPlanEvent(String aId) async
+  {
+    final res = await _dio.get('/api/plan/events/$aId');
+    return PlanEvent.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<PlanEvent> savePlanEvent(String? aId, Map<String, dynamic> aPayload) async
+  {
+    final res = aId == null
+        ? await _dio.post('/api/plan/events', data: aPayload)
+        : await _dio.put('/api/plan/events/$aId', data: aPayload);
+    return PlanEvent.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deletePlanEvent(String aId) => _dio.delete('/api/plan/events/$aId');
+
+  Future<void> saveOccurrence(String aEventId, DateTime aOccDate, PlanState aState, {DateTime? aMovedStart}) =>
+      _dio.put('/api/plan/events/$aEventId/occurrences/${dateWire(aOccDate)}', data: {
+        'state': aState.name,
+        if (aMovedStart != null) 'moved_start': aMovedStart.toUtc().toIso8601String(),
+      });
+
+  Future<WorkoutSession> startOccurrence(String aEventId, DateTime aOccDate) async
+  {
+    final res = await _dio.post('/api/plan/events/$aEventId/occurrences/${dateWire(aOccDate)}/start');
+    return WorkoutSession.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<String>> getTimeZones() async
+  {
+    final res = await _dio.get('/api/plan/time-zones');
+    return (res.data as List<dynamic>).cast<String>();
   }
 
   Future<PersonTraining> getPersonTraining(String aPersonId) async

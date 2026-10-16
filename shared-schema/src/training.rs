@@ -122,6 +122,7 @@ pub struct TrainingPlanDto
     pub upcoming: Vec<PlannedWorkoutDto>,
     pub active_session_id: Option<Uuid>,
     pub last_session: Option<SessionSummaryDto>,
+    pub next_slot: Option<crate::PlanSlotDto>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -131,6 +132,8 @@ pub struct PlanQuery
     pub tz_offset_min: i32,
     #[serde(default)]
     pub days: Option<i64>,
+    #[serde(default)]
+    pub tz: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

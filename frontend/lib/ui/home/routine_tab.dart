@@ -9,6 +9,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../planner/planner_screen.dart';
 import '../routine/family_timeline_card.dart';
 import '../routine/my_status_card.dart';
 import '../training/next_workout_card.dart';
@@ -42,6 +43,8 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
       padding: tabPadding(aContext),
       children: [
         const MyStatusCard(),
+        const SizedBox(height: _blockGap),
+        const TodayPlanBlock(),
         for (final fam in fams) ...[
           const SizedBox(height: _blockGap),
           FamilyTimelineCard(key: ValueKey('timeline:${fam.id}'), familyId: fam.id, title: fam.name),

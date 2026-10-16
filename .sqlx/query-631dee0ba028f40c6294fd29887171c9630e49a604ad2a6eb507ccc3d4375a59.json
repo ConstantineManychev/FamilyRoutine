@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO plan_instances (event_id, occ_date, state, moved_date, moved_time, done_ts, updated_ts)\n        VALUES ($1, $2, $3, $4, $5, CASE WHEN $3 = 'done'::plan_state_t THEN NOW() END, NOW())\n        ON CONFLICT (event_id, occ_date) DO UPDATE\n        SET state = EXCLUDED.state,\n            moved_date = EXCLUDED.moved_date,\n            moved_time = EXCLUDED.moved_time,\n            done_ts = CASE WHEN EXCLUDED.state = 'done' THEN COALESCE(plan_instances.done_ts, NOW()) END,\n            updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        {
+          "Custom": {
+            "name": "plan_state_t",
+            "kind": {
+              "Enum": [
+                "planned",
+                "done",
+                "skipped"
+              ]
+            }
+          }
+        },
+        "Date",
+        "Time"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "631dee0ba028f40c6294fd29887171c9630e49a604ad2a6eb507ccc3d4375a59"
+}

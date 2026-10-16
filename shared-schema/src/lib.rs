@@ -1,5 +1,6 @@
 mod ai;
 mod finance;
+mod planner;
 mod profile;
 mod routine;
 mod training;
@@ -7,6 +8,7 @@ mod training;
 pub use ai::*;
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
+pub use planner::*;
 pub use profile::*;
 pub use routine::*;
 use rust_decimal::Decimal;

@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE plan_events\n        SET title = $3, note = $4, category = $5, timing = $6, start_date = $7, start_time = $8, window_min = $9,\n            duration_min = $10, tz = $11, repeat = $12, repeat_every = $13, weekday_mask = $14, until_date = $15,\n            program_id = $16, day_id = $17, updated_ts = NOW()\n        WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "plan_timing_t",
+            "kind": {
+              "Enum": [
+                "fixed",
+                "window"
+              ]
+            }
+          }
+        },
+        "Date",
+        "Time",
+        "Int4",
+        "Int4",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "plan_repeat_t",
+            "kind": {
+              "Enum": [
+                "once",
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Int4",
+        "Date",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e3176acffe274ca4a8547b2c4d8996a5f7fe80e1efb546dadd4d144f21781628"
+}

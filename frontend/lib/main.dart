@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'core/app_router.dart';
+import 'core/device_tz.dart';
 import 'providers/theme_prov.dart';
 import 'ui/common/barcode_scanner.dart';
 
@@ -25,7 +26,7 @@ Future<void> main() async
   LicenseRegistry.addLicense(_lucideLicense);
   configureBarcodeScanner();
   Intl.systemLocale = Intl.canonicalizedLocale(binding.platformDispatcher.locale.toLanguageTag());
-  await EasyLocalization.ensureInitialized();
+  await Future.wait([EasyLocalization.ensureInitialized(), detectDeviceTimeZone()]);
 
   runApp(
     ProviderScope(

@@ -10,6 +10,7 @@ pub mod fam_handlers;
 pub mod geo_handlers;
 pub mod item_handlers;
 pub mod place_handlers;
+pub mod planner_handlers;
 pub mod profile_handlers;
 pub mod receipt_handlers;
 pub mod recognize_handlers;

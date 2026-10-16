@@ -2,6 +2,7 @@ import 'finance_models.dart';
 
 export 'ai_models.dart';
 export 'finance_models.dart';
+export 'planner_models.dart';
 export 'profile_models.dart';
 export 'routine_models.dart';
 export 'training_models.dart';

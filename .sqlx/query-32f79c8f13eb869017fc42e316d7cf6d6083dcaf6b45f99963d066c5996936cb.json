@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO plan_events (\n            user_id, title, note, category, timing, start_date, start_time, window_min, duration_min, tz,\n            repeat, repeat_every, weekday_mask, until_date, program_id, day_id\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "plan_timing_t",
+            "kind": {
+              "Enum": [
+                "fixed",
+                "window"
+              ]
+            }
+          }
+        },
+        "Date",
+        "Time",
+        "Int4",
+        "Int4",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "plan_repeat_t",
+            "kind": {
+              "Enum": [
+                "once",
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Int4",
+        "Date",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "32f79c8f13eb869017fc42e316d7cf6d6083dcaf6b45f99963d066c5996936cb"
+}

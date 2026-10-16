@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO plan_instances (event_id, occ_date, state, session_id, updated_ts)\n        VALUES ($1, $2, 'planned', $3, NOW())\n        ON CONFLICT (event_id, occ_date) DO UPDATE\n        SET state = 'planned', session_id = EXCLUDED.session_id, done_ts = NULL, updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9b757731705d93fca8ca4164beb324a7f4ea44296720204325afefab17aa4bda"
+}

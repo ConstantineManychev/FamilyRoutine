@@ -16,10 +16,12 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
+use crate::api::planner_handlers::{complete_session_slot, next_training_slot, reopen_session_slot};
 use crate::api::routine_handlers::place_mark;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text};
 use crate::security::profile_access::profile_access;
+use crate::services::planner::parse_zone;
 use crate::services::training_schedule::{plan, Planned, Reference, ScheduleDay};
 use crate::services::workout_calc::{average_met, session_kcal, ExerciseLoad};
 use crate::state::AppState;
@@ -315,8 +317,26 @@ pub async fn get_plan(
     ApiQuery(a_query): ApiQuery<PlanQuery>,
 ) -> Result<Json<TrainingPlanDto>, ApiError>
 {
+    let viewer = match a_query.tz.as_deref()
+    {
+        Some(name) => Some(parse_zone(name).ok_or(ApiError::Validation("tz"))?),
+        None => None,
+    };
     let mut conn = a_state.db.acquire().await?;
-    build_plan(&mut conn, a_user.user_id, &a_query).await.map(Json)
+    let mut plan = build_plan(&mut conn, a_user.user_id, &a_query).await?;
+    if let Some(viewer) = viewer
+    {
+        plan.next_slot = next_training_slot(&mut conn, a_user.user_id, viewer, Utc::now())
+            .await?
+            .map(|mut slot| {
+                if slot.day_name.is_none()
+                {
+                    slot.day_name = plan.upcoming.first().map(|planned| planned.day_name.clone());
+                }
+                slot
+            });
+    }
+    Ok(Json(plan))
 }
 
 pub async fn person_training(
@@ -371,92 +391,12 @@ async fn build_plan(
     }
     let offset = Duration::minutes(i64::from(a_query.tz_offset_min));
     let horizon = a_query.days.unwrap_or(DEFAULT_HORIZON_DAYS).clamp(1, MAX_HORIZON_DAYS);
-    let today = (Utc::now() + offset).date_naive();
 
-    let program = sqlx::query!(
-        r#"
-        SELECT p.id, p.name, p.schedule_mode AS "schedule_mode: ScheduleMode", p.anchor_day_id, p.anchor_date, p.anchor_ts,
-               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!",
-               p.updated_ts
-        FROM training_programs p
-        WHERE p.user_id = $1 AND p.is_active
-        "#,
-        a_user_id
-    )
-    .fetch_optional(&mut *a_conn)
-    .await?;
-
-    let mut upcoming = Vec::new();
-    let mut program_item = None;
-    if let Some(program) = program
+    let (program_item, upcoming) = match program_plan(a_conn, a_user_id, None, offset, horizon).await?
     {
-        let days = load_days(a_conn, program.id).await?;
-        let last_done = sqlx::query!(
-            r#"
-            SELECT day_id AS "day_id!", started_ts
-            FROM workout_sessions
-            WHERE user_id = $1 AND program_id = $2 AND day_id IS NOT NULL AND finished_ts IS NOT NULL
-            ORDER BY started_ts DESC
-            LIMIT 1
-            "#,
-            a_user_id,
-            program.id
-        )
-        .fetch_optional(&mut *a_conn)
-        .await?;
-
-        let index_of = |a_day_id: Uuid| days.iter().position(|day| day.id == a_day_id);
-        let done = last_done.and_then(|row| {
-            index_of(row.day_id).map(|day_index| {
-                (
-                    row.started_ts,
-                    Reference::Done {
-                        day_index,
-                        date: (row.started_ts + offset).date_naive(),
-                    },
-                )
-            })
-        });
-        let chosen = match (program.anchor_day_id, program.anchor_date, program.anchor_ts)
-        {
-            (Some(day_id), Some(date), Some(set_ts)) =>
-            {
-                index_of(day_id).map(|day_index| (set_ts, Reference::Chosen { day_index, date }))
-            }
-            _ => None,
-        };
-        let reference = match (done, chosen)
-        {
-            (Some((done_ts, done)), Some((chosen_ts, chosen))) => Some(if chosen_ts > done_ts { chosen } else { done }),
-            (done, chosen) => done.or(chosen).map(|(_, reference)| reference),
-        };
-
-        let schedule: Vec<ScheduleDay> = days
-            .iter()
-            .map(|day| ScheduleDay {
-                rest_days_after: day.rest_days_after,
-                weekday_mask: day.weekday_mask,
-            })
-            .collect();
-        upcoming = plan(program.schedule_mode, &schedule, reference, today, horizon)
-            .into_iter()
-            .map(|item: Planned| PlannedWorkoutDto {
-                day_id: days[item.day_index].id,
-                day_name: days[item.day_index].name.clone(),
-                date: item.date,
-                is_overdue: item.is_overdue,
-            })
-            .collect();
-
-        program_item = Some(ProgramListItemDto {
-            id: program.id,
-            name: program.name,
-            schedule_mode: program.schedule_mode,
-            is_active: true,
-            day_count: program.day_count,
-            updated_ts: program.updated_ts,
-        });
-    }
+        Some((program, upcoming)) => (Some(program), upcoming),
+        None => (None, Vec::new()),
+    };
 
     let active_session_id = sqlx::query_scalar!(
         "SELECT id FROM workout_sessions WHERE user_id = $1 AND finished_ts IS NULL",
@@ -471,7 +411,109 @@ async fn build_plan(
         upcoming,
         active_session_id,
         last_session,
+        next_slot: None,
     })
+}
+
+pub async fn program_plan(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_program_id: Option<Uuid>,
+    a_offset: Duration,
+    a_horizon: i64,
+) -> Result<Option<(ProgramListItemDto, Vec<PlannedWorkoutDto>)>, ApiError>
+{
+    let today = (Utc::now() + a_offset).date_naive();
+    let program = sqlx::query!(
+        r#"
+        SELECT p.id, p.name, p.schedule_mode AS "schedule_mode: ScheduleMode", p.is_active,
+               p.anchor_day_id, p.anchor_date, p.anchor_ts,
+               (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id) AS "day_count!",
+               p.updated_ts
+        FROM training_programs p
+        WHERE p.user_id = $1 AND (($2::uuid IS NULL AND p.is_active) OR p.id = $2)
+        "#,
+        a_user_id,
+        a_program_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+
+    let Some(program) = program
+    else
+    {
+        return Ok(None);
+    };
+
+    let days = load_days(a_conn, program.id).await?;
+    let last_done = sqlx::query!(
+        r#"
+        SELECT day_id AS "day_id!", started_ts
+        FROM workout_sessions
+        WHERE user_id = $1 AND program_id = $2 AND day_id IS NOT NULL AND finished_ts IS NOT NULL
+        ORDER BY started_ts DESC
+        LIMIT 1
+        "#,
+        a_user_id,
+        program.id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+
+    let index_of = |a_day_id: Uuid| days.iter().position(|day| day.id == a_day_id);
+    let done = last_done.and_then(|row| {
+        index_of(row.day_id).map(|day_index| {
+            (
+                row.started_ts,
+                Reference::Done {
+                    day_index,
+                    date: (row.started_ts + a_offset).date_naive(),
+                },
+            )
+        })
+    });
+    let chosen = match (program.anchor_day_id, program.anchor_date, program.anchor_ts)
+    {
+        (Some(day_id), Some(date), Some(set_ts)) =>
+        {
+            index_of(day_id).map(|day_index| (set_ts, Reference::Chosen { day_index, date }))
+        }
+        _ => None,
+    };
+    let reference = match (done, chosen)
+    {
+        (Some((done_ts, done)), Some((chosen_ts, chosen))) => Some(if chosen_ts > done_ts { chosen } else { done }),
+        (done, chosen) => done.or(chosen).map(|(_, reference)| reference),
+    };
+
+    let schedule: Vec<ScheduleDay> = days
+        .iter()
+        .map(|day| ScheduleDay {
+            rest_days_after: day.rest_days_after,
+            weekday_mask: day.weekday_mask,
+        })
+        .collect();
+    let upcoming = plan(program.schedule_mode, &schedule, reference, today, a_horizon)
+        .into_iter()
+        .map(|item: Planned| PlannedWorkoutDto {
+            day_id: days[item.day_index].id,
+            day_name: days[item.day_index].name.clone(),
+            date: item.date,
+            is_overdue: item.is_overdue,
+        })
+        .collect();
+
+    Ok(Some((
+        ProgramListItemDto {
+            id: program.id,
+            name: program.name,
+            schedule_mode: program.schedule_mode,
+            is_active: program.is_active,
+            day_count: program.day_count,
+            updated_ts: program.updated_ts,
+        },
+        upcoming,
+    )))
 }
 
 pub async fn list_sessions(
@@ -494,26 +536,39 @@ pub async fn start_session(
     ApiJson(a_req): ApiJson<StartSessionRequest>,
 ) -> Result<(StatusCode, Json<SessionDto>), ApiError>
 {
+    let mut tx = a_state.db.begin().await?;
+    let session_id = begin_session(&mut tx, a_user.user_id, a_req.day_id, a_req.started_ts).await?;
+    let dto = load_session(&mut tx, a_user.user_id, session_id).await?;
+    tx.commit().await?;
+    Ok((StatusCode::CREATED, Json(dto)))
+}
+
+pub async fn begin_session(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_day_id: Option<Uuid>,
+    a_started_ts: Option<DateTime<Utc>>,
+) -> Result<Uuid, ApiError>
+{
     let now = Utc::now();
-    let started_ts = a_req.started_ts.unwrap_or(now);
+    let started_ts = a_started_ts.unwrap_or(now);
     if started_ts < now - Duration::days(MAX_BACKDATE_DAYS) || started_ts > now + Duration::minutes(CLOCK_SKEW_MINUTES)
     {
         return Err(ApiError::Validation("started_ts"));
     }
 
-    let mut tx = a_state.db.begin().await?;
     let open = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM workout_sessions WHERE user_id = $1 AND finished_ts IS NULL) AS "exists!""#,
-        a_user.user_id
+        a_user_id
     )
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *a_conn)
     .await?;
     if open
     {
         return Err(ApiError::Conflict("SESSION_ACTIVE"));
     }
 
-    let day = match a_req.day_id
+    let day = match a_day_id
     {
         Some(day_id) => Some(
             sqlx::query!(
@@ -523,9 +578,9 @@ pub async fn start_session(
                 WHERE d.id = $1 AND p.user_id = $2
                 "#,
                 day_id,
-                a_user.user_id
+                a_user_id
             )
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut *a_conn)
             .await?
             .ok_or(ApiError::NotFound)?,
         ),
@@ -533,14 +588,14 @@ pub async fn start_session(
     };
 
     let mark_note = day.as_ref().map(|day| day.name.clone());
-    let mark = place_mark(&mut tx, a_user.user_id, RoutineStatus::Gym, mark_note, started_ts, None).await?;
+    let mark = place_mark(&mut *a_conn, a_user_id, RoutineStatus::Gym, mark_note, started_ts, None).await?;
     let session_id = sqlx::query_scalar!(
         r#"
         INSERT INTO workout_sessions (user_id, program_id, day_id, program_name, day_name, started_ts, status_mark_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
         "#,
-        a_user.user_id,
+        a_user_id,
         day.as_ref().map(|day| day.program_id),
         day.as_ref().map(|day| day.id),
         day.as_ref().map(|day| day.program_name.clone()),
@@ -548,17 +603,15 @@ pub async fn start_session(
         started_ts,
         mark.id
     )
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *a_conn)
     .await?;
 
     if let Some(day) = &day
     {
-        prefill_session(&mut tx, a_user.user_id, session_id, day.id, started_ts).await?;
+        prefill_session(a_conn, a_user_id, session_id, day.id, started_ts).await?;
     }
 
-    let dto = load_session(&mut tx, a_user.user_id, session_id).await?;
-    tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(dto)))
+    Ok(session_id)
 }
 
 pub async fn get_session(
@@ -670,6 +723,15 @@ pub async fn finish_session(
         .execute(&mut *tx)
         .await?;
     }
+    complete_session_slot(
+        &mut tx,
+        a_user.user_id,
+        a_id,
+        session.program_id,
+        session.started_ts,
+        finished_ts,
+    )
+    .await?;
 
     let dto = load_session(&mut tx, a_user.user_id, a_id).await?;
     tx.commit().await?;
@@ -684,6 +746,7 @@ pub async fn delete_session(
 {
     let mut tx = a_state.db.begin().await?;
     let session = load_session_row(&mut tx, a_user.user_id, a_id).await?;
+    reopen_session_slot(&mut tx, a_id).await?;
     sqlx::query!("DELETE FROM workout_sessions WHERE id = $1", a_id)
         .execute(&mut *tx)
         .await?;
@@ -1229,7 +1292,11 @@ async fn load_session_row(
     .ok_or(ApiError::NotFound)
 }
 
-async fn load_session(a_conn: &mut PgConnection, a_user_id: Uuid, a_session_id: Uuid) -> Result<SessionDto, ApiError>
+pub async fn load_session(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_session_id: Uuid,
+) -> Result<SessionDto, ApiError>
 {
     let session = load_session_row(a_conn, a_user_id, a_session_id).await?;
     let exercises = sqlx::query_as!(

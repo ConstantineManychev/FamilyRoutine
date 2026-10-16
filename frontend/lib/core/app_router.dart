@@ -22,6 +22,8 @@ import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/places/place_detail_screen.dart';
 import '../ui/places/places_screen.dart';
+import '../ui/planner/plan_event_editor_screen.dart';
+import '../ui/planner/planner_screen.dart';
 import '../ui/profile/metric_history_screen.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/settings/settings_screen.dart';
@@ -101,6 +103,12 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               _sub('items/new', (aState) => ItemDetailScreen(initialBarcode: aState.uri.queryParameters['barcode'])),
               _sub('items/:id', (aState) => ItemDetailScreen(key: ValueKey(_param(aState, 'id')), itemId: _param(aState, 'id'))),
               _sub('settings', (_) => const SettingsScreen()),
+              _own('planner', (_) => const PlannerScreen()),
+              _sub(
+                'planner/events/new',
+                (aState) => PlanEventEditorScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? '')),
+              ),
+              _sub('planner/events/:id', (aState) => PlanEventEditorScreen(key: ValueKey(_param(aState, 'id')), eventId: _param(aState, 'id'))),
               _sub(
                 'training',
                 (_) => const TrainingScreen(),

@@ -1,4 +1,5 @@
 import 'finance_models.dart';
+import 'planner_models.dart';
 
 enum ScheduleMode
 {
@@ -207,8 +208,15 @@ class TrainingPlan
   final List<PlannedWorkout> upcoming;
   final String? activeSessionId;
   final SessionSummary? lastSession;
+  final PlanSlot? nextSlot;
 
-  const TrainingPlan({required this.program, required this.upcoming, required this.activeSessionId, required this.lastSession});
+  const TrainingPlan({
+    required this.program,
+    required this.upcoming,
+    required this.activeSessionId,
+    required this.lastSession,
+    this.nextSlot,
+  });
 
   PlannedWorkout? get next => upcoming.isEmpty ? null : upcoming.first;
 
@@ -218,6 +226,7 @@ class TrainingPlan
         activeSessionId: aJson['active_session_id'] as String?,
         lastSession:
             aJson['last_session'] == null ? null : SessionSummary.fromJson(aJson['last_session'] as Map<String, dynamic>),
+        nextSlot: aJson['next_slot'] == null ? null : PlanSlot.fromJson(aJson['next_slot'] as Map<String, dynamic>),
       );
 }
 

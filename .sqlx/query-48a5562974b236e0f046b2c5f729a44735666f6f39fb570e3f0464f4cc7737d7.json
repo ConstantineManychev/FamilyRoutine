@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT EXISTS (\n                    SELECT 1 FROM training_programs p\n                    WHERE p.id = $1 AND p.user_id = $2\n                      AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM program_days d WHERE d.id = $3 AND d.program_id = p.id))\n                ) AS \"is_valid!\"\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_valid!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "48a5562974b236e0f046b2c5f729a44735666f6f39fb570e3f0464f4cc7737d7"
+}
