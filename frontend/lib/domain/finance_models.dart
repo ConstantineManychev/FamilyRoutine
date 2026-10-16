@@ -113,6 +113,24 @@ enum ItemOwnerKind
   }
 }
 
+enum NetMeasure
+{
+  g,
+  ml;
+
+  static NetMeasure? parse(Object? aValue)
+  {
+    for (final measure in values)
+    {
+      if (measure.name == aValue)
+      {
+        return measure;
+      }
+    }
+    return null;
+  }
+}
+
 class NutritionData
 {
   final double? kcal;
@@ -161,6 +179,9 @@ class DictItemDto
   final ItemUnit unit;
   final String? barcode;
   final NutritionData nutrition;
+  final double? netQty;
+  final NetMeasure? netMeasure;
+  final String? catId;
   final ItemOwnerKind ownerKind;
   final String? ownerName;
   final bool isEditable;
@@ -173,6 +194,9 @@ class DictItemDto
     required this.unit,
     this.barcode,
     this.nutrition = NutritionData.empty,
+    this.netQty,
+    this.netMeasure,
+    this.catId,
     this.ownerKind = ItemOwnerKind.user,
     this.ownerName,
     this.isEditable = false,
@@ -196,6 +220,9 @@ class DictItemDto
         unit: ItemUnit.parse(aJson['unit']),
         barcode: aJson['barcode'] as String?,
         nutrition: NutritionData.fromJson(aJson['nutrition']),
+        netQty: parseDecimalOrNull(aJson['net_qty']),
+        netMeasure: NetMeasure.parse(aJson['net_measure']),
+        catId: aJson['cat_id'] as String?,
         ownerKind: ItemOwnerKind.parse(aJson['owner_kind']),
         ownerName: aJson['owner_name'] as String?,
         isEditable: aJson['is_editable'] as bool? ?? false,
@@ -209,6 +236,9 @@ class DictItemDto
     {
       String? aBarcode,
       NutritionData aNutrition = NutritionData.empty,
+      double? aNetQty,
+      NetMeasure? aNetMeasure,
+      String? aCatId,
     }
   ) => {
         'name': aName,
@@ -216,6 +246,8 @@ class DictItemDto
         'unit': aUnit.wire,
         if (aBarcode != null && aBarcode.trim().isNotEmpty) 'barcode': aBarcode.trim(),
         if (!aNutrition.isEmpty) 'nutrition': aNutrition.toJson(),
+        if (aNetQty != null && aNetMeasure != null) ...{'net_qty': aNetQty.toString(), 'net_measure': aNetMeasure.name},
+        if (aCatId != null) 'cat_id': aCatId,
       };
 }
 
@@ -242,6 +274,8 @@ class ProductInfo
   final String? suggestedName;
   final String? barcode;
   final NutritionData nutrition;
+  final double? netQty;
+  final NetMeasure? netMeasure;
 
   const ProductInfo({
     this.kind,
@@ -251,6 +285,8 @@ class ProductInfo
     this.suggestedName,
     this.barcode,
     this.nutrition = NutritionData.empty,
+    this.netQty,
+    this.netMeasure,
   });
 
   String? get bestName => suggestedName ?? name;
@@ -263,6 +299,8 @@ class ProductInfo
         suggestedName: aJson['suggested_name'] as String?,
         barcode: aJson['barcode'] as String?,
         nutrition: NutritionData.fromJson(aJson['nutrition']),
+        netQty: parseDecimalOrNull(aJson['net_qty']),
+        netMeasure: NetMeasure.parse(aJson['net_measure']),
       );
 }
 

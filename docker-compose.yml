@@ -46,6 +46,7 @@ services:
       RECEIPT_AI_USER_KEYS: ${RECEIPT_AI_USER_KEYS:-true}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       OFF_ENABLED: ${OFF_ENABLED:-true}
+      PRODUCT_CAT_MAX_DEPTH: ${PRODUCT_CAT_MAX_DEPTH:-3}
       ANDROID_PACKAGE_NAME: ${ANDROID_PACKAGE_NAME:-com.familyroutine.family_routine}
       ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
     secrets:

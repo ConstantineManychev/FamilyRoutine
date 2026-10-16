@@ -1,6 +1,7 @@
 import 'finance_models.dart';
 
 export 'ai_models.dart';
+export 'catalog_models.dart';
 export 'finance_models.dart';
 export 'nutrition_models.dart';
 export 'planner_models.dart';

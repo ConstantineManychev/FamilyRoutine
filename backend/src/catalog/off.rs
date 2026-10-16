@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shared_schema::{ItemKind, NutritionDto, ProductInfoDto};
 
+use crate::catalog::quantity::with_quantity;
+
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(6);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const USER_AGENT: &str = "FamilyRoutine/1.0";
@@ -107,7 +109,7 @@ impl OffProduct
     pub fn to_info(&self, a_barcode: &str, a_lang: Option<&str>) -> ProductInfoDto
     {
         let name = self.name_for(a_lang);
-        ProductInfoDto {
+        with_quantity(ProductInfoDto {
             kind: Some(ItemKind::Food),
             suggested_name: suggest_name(name.as_deref(), self.brand.as_deref(), self.quantity.as_deref()),
             name,
@@ -115,7 +117,9 @@ impl OffProduct
             quantity: self.quantity.clone(),
             barcode: Some(a_barcode.to_string()),
             nutrition: (!self.nutrition.is_empty()).then(|| self.nutrition.clone()),
-        }
+            net_qty: None,
+            net_measure: None,
+        })
     }
 
     fn name_for(&self, a_lang: Option<&str>) -> Option<String>

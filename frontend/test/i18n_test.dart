@@ -14,7 +14,7 @@ const Map<String, List<String>> dynamicKeys = {
     'RECOGNITION_UNAVAILABLE', 'RECEIPT_UNREADABLE', 'NOT_A_RECEIPT', 'AI_KEY_REJECTED', 'AI_MODEL_REJECTED',
     'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
     'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE', 'SESSION_ACTIVE', 'SESSION_FINISHED', 'TOO_MANY_PROGRAMS',
-    'TOO_MANY_DISHES', 'TOO_MANY_ENTRIES',
+    'TOO_MANY_DISHES', 'TOO_MANY_ENTRIES', 'CAT_EXISTS', 'CAT_IN_USE', 'CAT_HAS_CHILDREN', 'TOO_MANY_CATS',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'metrics': [
@@ -70,6 +70,10 @@ const Map<String, List<String>> dynamicKeys = {
     'stationary_bike', 'rowing_machine', 'elliptical', 'jump_rope', 'swimming', 'stretching', 'yoga',
   ],
   'places': ['err_name_req', 'err_country_req', 'err_city_req'],
+  'cats': [
+    'level_1', 'level_2', 'level_3', 'per_100_g', 'per_100_ml', 'per_100_short_g', 'per_100_short_ml',
+    'items_count.one', 'items_count.other',
+  ],
   'nutrition': [
     'meal_breakfast', 'meal_lunch', 'meal_dinner', 'meal_snack', 'gap_weight', 'gap_height', 'gap_sex', 'gap_activity',
     'activity_sedentary', 'activity_light', 'activity_moderate', 'activity_active', 'activity_very_active',

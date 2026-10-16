@@ -23,6 +23,8 @@ const DEFAULT_OPENAI_API: &str = "https://api.openai.com";
 const DEFAULT_GEMINI_API: &str = "https://generativelanguage.googleapis.com";
 const DEFAULT_ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 const DEFAULT_OFF_API: &str = "https://world.openfoodfacts.org";
+const DEFAULT_CAT_MAX_DEPTH: u64 = 3;
+const MAX_CAT_MAX_DEPTH: u64 = 10;
 pub const DEFAULT_ANDROID_PACKAGE: &str = "com.familyroutine.family_routine";
 const SHA256_BYTES: usize = 32;
 const MAX_PACKAGE_LEN: usize = 255;
@@ -214,6 +216,7 @@ pub struct CatalogConfig
 {
     pub admin_emails: Vec<String>,
     pub off_api_url: Option<String>,
+    pub cat_max_depth: usize,
 }
 
 impl CatalogConfig
@@ -224,6 +227,13 @@ impl CatalogConfig
             admin_emails: parse_admin_emails(&optional("ADMIN_EMAILS").unwrap_or_default())?,
             off_api_url: parse_bool("OFF_ENABLED", true)?
                 .then(|| optional("OFF_API_URL").unwrap_or_else(|| DEFAULT_OFF_API.into())),
+            cat_max_depth: usize::try_from(parse_u64(
+                "PRODUCT_CAT_MAX_DEPTH",
+                DEFAULT_CAT_MAX_DEPTH,
+                1,
+                MAX_CAT_MAX_DEPTH,
+            )?)
+            .map_err(|_| "PRODUCT_CAT_MAX_DEPTH is out of range".to_string())?,
         })
     }
 }

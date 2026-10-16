@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT c.id, c.parent_id, c.code, c.name, c.owner_id,\n               (c.owner_id IS NULL OR COALESCE(LOWER(u.email) = ANY($1), FALSE)) AS \"is_catalog!\"\n        FROM product_cats c\n        LEFT JOIN users u ON u.id = c.owner_id\n        ORDER BY c.parent_id NULLS FIRST, LOWER(c.name), c.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "parent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_catalog!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "bc3e26cbcb234d043459c04522537c0049cbf1d5f145a664ad45222ead5a733e"
+}

@@ -62,6 +62,8 @@ async fn product_lookup_asks_open_food_facts_politely_and_caches(a_db: PgPool)
     assert_eq!(product["kind"], "food");
     assert_eq!(product["nutrition"]["kcal"], "2");
     assert_eq!(product["nutrition"]["fat"], "0.1");
+    assert_eq!(product["net_qty"], "250");
+    assert_eq!(product["net_measure"], "g");
 
     let cached = lookup(OFF_PRODUCT, "en").await;
     assert_eq!(cached.body["product"]["name"], "Ground coffee");
@@ -152,6 +154,8 @@ async fn label_photo_is_read_within_the_scan_quota(a_db: PgPool)
     assert_eq!(info.body["kind"], "food");
     assert_eq!(info.body["nutrition"]["kcal"], "78.4");
     assert_eq!(info.body["nutrition"]["carb"], "11.2");
+    assert_eq!(info.body["net_qty"], "500");
+    assert_eq!(info.body["net_measure"], "g");
     let request = mock.requests.lock().unwrap().last().cloned().unwrap();
     assert!(request["system"].as_str().unwrap().contains("product packaging"));
     assert!(request["output_config"]["format"]["schema"]["properties"]["is_label"].is_object());

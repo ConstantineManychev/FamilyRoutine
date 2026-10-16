@@ -18,6 +18,7 @@ use crate::catalog::off::{
     bounded, clean, suggest_name, OffOutcome, OffProduct, MAX_BRAND_CHARS, MAX_GRAMS, MAX_KCAL, MAX_NAME_CHARS,
     MAX_QUANTITY_CHARS,
 };
+use crate::catalog::quantity::with_quantity;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::clean_barcode;
 use crate::receipt_ai::{RawLabel, ReadError};
@@ -278,7 +279,7 @@ fn label_info(a_label: RawLabel) -> ProductInfoDto
         _ => None,
     };
 
-    ProductInfoDto {
+    with_quantity(ProductInfoDto {
         kind,
         suggested_name: suggest_name(name.as_deref(), brand.as_deref(), quantity.as_deref()),
         name,
@@ -286,7 +287,9 @@ fn label_info(a_label: RawLabel) -> ProductInfoDto
         quantity,
         barcode: clean_barcode(a_label.barcode.as_deref()).ok().flatten(),
         nutrition: (!nutrition.is_empty()).then_some(nutrition),
-    }
+        net_qty: None,
+        net_measure: None,
+    })
 }
 
 async fn load_price_points(

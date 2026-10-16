@@ -12,6 +12,7 @@ import '../ui/dicts/exercise_detail_screen.dart';
 import '../ui/dicts/exercises_screen.dart';
 import '../ui/dicts/item_detail_screen.dart';
 import '../ui/dicts/items_screen.dart';
+import '../ui/dicts/product_cats_screen.dart';
 import '../ui/dicts/streets_dict_screen.dart';
 import '../ui/finance/receipt_detail_screen.dart';
 import '../ui/finance/receipts_screen.dart';
@@ -162,6 +163,8 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                       : MealSlot.parse(aState.uri.queryParameters['meal']),
                 ),
               ),
+              _own('product-cats', (_) => const ProductCatsScreen()),
+              _own('product-cats/:id', (aState) => ProductCatScreen(key: ValueKey(_param(aState, 'id')), catId: _param(aState, 'id')!)),
               _own('dishes', (_) => const DishesScreen()),
               _own('dishes/new', (_) => const DishEditorScreen()),
               _own('dishes/:id', (aState) => DishEditorScreen(key: ValueKey(_param(aState, 'id')), dishId: _param(aState, 'id'))),

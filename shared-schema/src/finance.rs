@@ -3,6 +3,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::NetMeasure;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "bank_provider_t", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -630,6 +632,9 @@ pub struct DictItemDto
     pub unit: ItemUnit,
     pub barcode: Option<String>,
     pub nutrition: Option<NutritionDto>,
+    pub net_qty: Option<Decimal>,
+    pub net_measure: Option<NetMeasure>,
+    pub cat_id: Option<Uuid>,
     pub owner_kind: ItemOwnerKind,
     pub owner_name: Option<String>,
     pub is_editable: bool,
@@ -646,6 +651,12 @@ pub struct SaveItemRequest
     pub barcode: Option<String>,
     #[serde(default)]
     pub nutrition: Option<NutritionDto>,
+    #[serde(default)]
+    pub net_qty: Option<Decimal>,
+    #[serde(default)]
+    pub net_measure: Option<NetMeasure>,
+    #[serde(default)]
+    pub cat_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -661,6 +672,8 @@ pub struct ItemQuery
     pub is_mine: bool,
     #[serde(default)]
     pub kind: Option<ItemKind>,
+    #[serde(default)]
+    pub cat_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -682,6 +695,8 @@ pub struct ProductInfoDto
     pub suggested_name: Option<String>,
     pub barcode: Option<String>,
     pub nutrition: Option<NutritionDto>,
+    pub net_qty: Option<Decimal>,
+    pub net_measure: Option<NetMeasure>,
 }
 
 #[derive(Debug, Clone, Serialize)]

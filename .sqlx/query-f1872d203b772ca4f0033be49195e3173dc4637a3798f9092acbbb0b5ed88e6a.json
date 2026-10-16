@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE product_cats SET parent_id = $2, updated_ts = NOW() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f1872d203b772ca4f0033be49195e3173dc4637a3798f9092acbbb0b5ed88e6a"
+}

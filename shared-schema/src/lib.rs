@@ -1,4 +1,5 @@
 mod ai;
+mod catalog;
 mod finance;
 mod nutrition;
 mod planner;
@@ -7,6 +8,7 @@ mod routine;
 mod training;
 
 pub use ai::*;
+pub use catalog::*;
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
 pub use nutrition::*;

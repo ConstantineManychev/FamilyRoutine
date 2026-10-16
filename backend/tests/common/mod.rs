@@ -53,6 +53,7 @@ pub fn catalog_config(a_admins: &[&str], a_off_url: Option<&str>) -> CatalogConf
     CatalogConfig {
         admin_emails: a_admins.iter().map(|email| email.to_string()).collect(),
         off_api_url: a_off_url.map(str::to_string),
+        cat_max_depth: 3,
     }
 }
 

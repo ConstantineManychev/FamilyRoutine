@@ -7,7 +7,8 @@ use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     DictItemDto, ItemKind, ItemOwnerKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery, ItemUnit,
-    ManualPriceDto, MergeItemRequest, NewItemRequest, NutritionDto, SaveItemRequest, SaveManualPriceRequest,
+    ManualPriceDto, MergeItemRequest, NetMeasure, NewItemRequest, NutritionDto, SaveItemRequest,
+    SaveManualPriceRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -32,6 +33,8 @@ const MAX_PRICE_AGE_DAYS: i64 = 3650;
 const MAX_KCAL: i64 = 1000;
 const MAX_GRAMS: i64 = 100;
 const MAX_PIECE_G: i64 = 10_000;
+const MAX_NET_QTY: i64 = 1_000_000;
+const NET_SCALE: u32 = 1;
 
 pub struct Viewer
 {
@@ -51,6 +54,9 @@ struct ItemRow
     fat: Option<Decimal>,
     carb: Option<Decimal>,
     piece_g: Option<Decimal>,
+    net_qty: Option<Decimal>,
+    net_measure: Option<NetMeasure>,
+    cat_id: Option<Uuid>,
     owner_kind: String,
     owner_name: Option<String>,
     is_editable: bool,
@@ -67,6 +73,7 @@ struct ItemFilter<'a>
     barcode: Option<&'a str>,
     is_mine: bool,
     kind: Option<ItemKind>,
+    cat_id: Option<Uuid>,
 }
 
 struct ItemScope
@@ -122,6 +129,9 @@ impl From<ItemRow> for DictItemDto
             unit: a_row.unit,
             barcode: a_row.barcode,
             nutrition: (!nutrition.is_empty()).then_some(nutrition),
+            net_qty: a_row.net_qty.map(|value| value.normalize()),
+            net_measure: a_row.net_measure,
+            cat_id: a_row.cat_id,
             owner_kind: ItemOwnerKind::parse(&a_row.owner_kind),
             owner_name: a_row.owner_name,
             is_editable: a_row.is_editable,
@@ -153,6 +163,7 @@ pub async fn list_items(
         barcode: barcode.as_deref(),
         is_mine: a_query.is_mine,
         kind: a_query.kind,
+        cat_id: a_query.cat_id,
         ..ItemFilter::default()
     };
 
@@ -181,16 +192,20 @@ pub async fn create_item(
     let name = clean_text(&a_req.name, 1, MAX_ITEM_NAME_LEN, "name")?;
     let barcode = clean_barcode(a_req.barcode.as_deref())?;
     let nutrition = check_nutrition(a_req.nutrition.unwrap_or_default())?;
+    let (net_qty, net_measure) = check_net(a_req.unit, a_req.net_qty, a_req.net_measure)?;
     let mut tx = a_state.db.begin().await?;
     let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
+    require_cat(&mut tx, a_req.cat_id).await?;
 
     require_unique_name(&mut tx, &name, None).await?;
     require_unique_barcode(&mut tx, barcode.as_deref(), None).await?;
 
     let id = sqlx::query_scalar!(
         r#"
-        INSERT INTO items (owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb, piece_g)
-        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO items (
+            owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb, piece_g, net_qty, net_measure, cat_id
+        )
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
         "#,
         a_user.user_id,
@@ -202,7 +217,10 @@ pub async fn create_item(
         nutrition.prot,
         nutrition.fat,
         nutrition.carb,
-        nutrition.piece_g
+        nutrition.piece_g,
+        net_qty,
+        net_measure as Option<NetMeasure>,
+        a_req.cat_id
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -222,9 +240,11 @@ pub async fn update_item(
     let name = clean_text(&a_req.name, 1, MAX_ITEM_NAME_LEN, "name")?;
     let barcode = clean_barcode(a_req.barcode.as_deref())?;
     let nutrition = check_nutrition(a_req.nutrition.unwrap_or_default())?;
+    let (net_qty, net_measure) = check_net(a_req.unit, a_req.net_qty, a_req.net_measure)?;
     let mut tx = a_state.db.begin().await?;
     let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
     let scope = require_editable(&mut tx, &viewer, a_id).await?;
+    require_cat(&mut tx, a_req.cat_id).await?;
 
     let is_renamed = name.to_lowercase() != scope.name.to_lowercase();
     let is_identity_changed = name != scope.name
@@ -248,7 +268,7 @@ pub async fn update_item(
         r#"
         UPDATE items
         SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9,
-            piece_g = $10
+            piece_g = $10, net_qty = $11, net_measure = $12, cat_id = $13
         WHERE id = $1
         "#,
         a_id,
@@ -260,7 +280,10 @@ pub async fn update_item(
         nutrition.prot,
         nutrition.fat,
         nutrition.carb,
-        nutrition.piece_g
+        nutrition.piece_g,
+        net_qty,
+        net_measure as Option<NetMeasure>,
+        a_req.cat_id
     )
     .execute(&mut *tx)
     .await?;
@@ -361,7 +384,10 @@ pub async fn merge_item(
     .await?;
 
     let removed = sqlx::query!(
-        "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb, piece_g",
+        r#"
+        DELETE FROM items WHERE id = $1
+        RETURNING barcode, kcal, prot, fat, carb, piece_g, net_qty, net_measure AS "net_measure: NetMeasure", cat_id
+        "#,
         a_id
     )
     .fetch_one(&mut *tx)
@@ -378,7 +404,10 @@ pub async fn merge_item(
                 prot = COALESCE(prot, $4),
                 fat = COALESCE(fat, $5),
                 carb = COALESCE(carb, $6),
-                piece_g = COALESCE(piece_g, $7)
+                piece_g = COALESCE(piece_g, $7),
+                net_measure = CASE WHEN net_qty IS NULL AND unit = 'piece' THEN $9 ELSE net_measure END,
+                net_qty = CASE WHEN net_qty IS NULL AND unit = 'piece' THEN $8 ELSE net_qty END,
+                cat_id = COALESCE(cat_id, $10)
             WHERE id = $1
             "#,
             a_req.target_id,
@@ -387,7 +416,10 @@ pub async fn merge_item(
             removed.prot,
             removed.fat,
             removed.carb,
-            removed.piece_g
+            removed.piece_g,
+            removed.net_qty,
+            removed.net_measure as Option<NetMeasure>,
+            removed.cat_id
         )
         .execute(&mut *tx)
         .await?;
@@ -753,6 +785,48 @@ async fn lock_key(a_conn: &mut PgConnection, a_key: &str) -> Result<(), ApiError
     Ok(())
 }
 
+fn check_net(
+    a_unit: ItemUnit,
+    a_net_qty: Option<Decimal>,
+    a_net_measure: Option<NetMeasure>,
+) -> Result<(Option<Decimal>, Option<NetMeasure>), ApiError>
+{
+    match (a_net_qty, a_net_measure)
+    {
+        (None, None) => Ok((None, None)),
+        (Some(qty), Some(measure)) if a_unit == ItemUnit::Piece =>
+        {
+            let qty = qty.round_dp(NET_SCALE).normalize();
+            if qty <= Decimal::ZERO || qty > Decimal::from(MAX_NET_QTY)
+            {
+                return Err(ApiError::Validation("net_qty"));
+            }
+            Ok((Some(qty), Some(measure)))
+        }
+        _ => Err(ApiError::Validation("net_qty")),
+    }
+}
+
+async fn require_cat(a_conn: &mut PgConnection, a_cat_id: Option<Uuid>) -> Result<(), ApiError>
+{
+    let Some(cat_id) = a_cat_id
+    else
+    {
+        return Ok(());
+    };
+    let is_known = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM product_cats WHERE id = $1) AS "known!""#,
+        cat_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    if !is_known
+    {
+        return Err(ApiError::Validation("cat_id"));
+    }
+    Ok(())
+}
+
 fn check_nutrition(a_nutrition: NutritionDto) -> Result<NutritionDto, ApiError>
 {
     let bounded = |a_value: Option<Decimal>, a_max: i64, a_field: &'static str| match a_value
@@ -805,6 +879,9 @@ async fn query_items(
             i.fat,
             i.carb,
             i.piece_g,
+            i.net_qty,
+            i.net_measure AS "net_measure: NetMeasure",
+            i.cat_id,
             CASE
                 WHEN i.owner_id = $1 THEN 'me'
                 WHEN i.owner_id IS NULL OR LOWER(ou.email) = ANY($2) THEN 'catalog'
@@ -829,6 +906,17 @@ async fn query_items(
           AND ($7::text IS NULL OR i.barcode = $7)
           AND (NOT $8 OR i.owner_id IS NOT DISTINCT FROM $1)
           AND ($11::item_t IS NULL OR i.type = $11)
+          AND (
+              $12::uuid IS NULL
+              OR i.cat_id IN (
+                  WITH RECURSIVE sub AS (
+                      SELECT id FROM product_cats WHERE id = $12
+                      UNION ALL
+                      SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id
+                  )
+                  SELECT id FROM sub
+              )
+          )
         ORDER BY (i.barcode IS NOT NULL AND i.barcode IS NOT DISTINCT FROM $6) DESC,
                  ($9::text IS NOT NULL AND i.name ILIKE $9) DESC,
                  (i.owner_id IS NOT DISTINCT FROM $1) DESC,
@@ -846,7 +934,8 @@ async fn query_items(
         a_filter.is_mine,
         a_filter.prefix,
         a_limit,
-        a_filter.kind as Option<ItemKind>
+        a_filter.kind as Option<ItemKind>,
+        a_filter.cat_id
     )
     .fetch_all(&mut *a_conn)
     .await?;

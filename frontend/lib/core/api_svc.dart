@@ -428,7 +428,14 @@ class ApiSvc
 
   Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
 
-  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode, bool aIsMine = false, ItemKind? aKind}) async
+  Future<List<DictItemDto>> getItems({
+    String? aQuery,
+    int? aLimit,
+    String? aBarcode,
+    bool aIsMine = false,
+    ItemKind? aKind,
+    String? aCatId,
+  }) async
   {
     final res = await _dio.get('/api/dicts/items', queryParameters: {
       if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
@@ -436,8 +443,42 @@ class ApiSvc
       if (aBarcode != null) 'barcode': aBarcode,
       if (aIsMine) 'is_mine': true,
       if (aKind != null) 'kind': aKind.name,
+      if (aCatId != null) 'cat_id': aCatId,
     });
     return _list(res.data, DictItemDto.fromJson);
+  }
+
+  Future<ProductCatTree> getProductCats() async
+  {
+    final res = await _dio.get('/api/dicts/product-cats');
+    return ProductCatTree.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<ProductCat> saveProductCat(String? aId, String aName, String? aParentId) async
+  {
+    final data = {'name': aName, 'parent_id': aParentId};
+    final res = aId == null
+        ? await _dio.post('/api/dicts/product-cats', data: data)
+        : await _dio.put('/api/dicts/product-cats/$aId', data: data);
+    return ProductCat.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteProductCat(String aId) => _dio.delete('/api/dicts/product-cats/$aId');
+
+  Future<ProductCat> mergeProductCat(String aId, String aTargetId) async
+  {
+    final res = await _dio.post('/api/dicts/product-cats/$aId/merge', data: {'target_id': aTargetId});
+    return ProductCat.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<CatPrices> getCatPrices(String aId, {String? aConvertTo, int? aDays, String? aPlaceId}) async
+  {
+    final res = await _dio.get('/api/dicts/product-cats/$aId/prices', queryParameters: {
+      if (aConvertTo != null) 'convert_to': aConvertTo,
+      if (aDays != null) 'days': aDays,
+      if (aPlaceId != null) 'place_id': aPlaceId,
+    });
+    return CatPrices.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<ProductLookup> lookupProduct(String aBarcode, String aLang) async

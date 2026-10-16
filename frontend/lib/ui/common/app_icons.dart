@@ -44,6 +44,7 @@ abstract final class AppIcons
   static const IconData eye = IconData(0xe0ba, fontFamily: _family);
   static const IconData eyeOff = IconData(0xe0bb, fontFamily: _family);
   static const IconData flame = IconData(0xe0d2, fontFamily: _family);
+  static const IconData folderTree = IconData(0xe33c, fontFamily: _family);
   static const IconData fuel = IconData(0xe2af, fontFamily: _family);
   static const IconData globe = IconData(0xe0e8, fontFamily: _family);
   static const IconData graduationCap = IconData(0xe234, fontFamily: _family);
@@ -61,6 +62,7 @@ abstract final class AppIcons
   static const IconData link = IconData(0xe102, fontFamily: _family);
   static const IconData list = IconData(0xe106, fontFamily: _family);
   static const IconData listChecks = IconData(0xe1d0, fontFamily: _family);
+  static const IconData listTree = IconData(0xe408, fontFamily: _family);
   static const IconData lock = IconData(0xe10b, fontFamily: _family);
   static const IconData logOut = IconData(0xe10e, fontFamily: _family);
   static const IconData mapPin = IconData(0xe111, fontFamily: _family);
@@ -68,6 +70,7 @@ abstract final class AppIcons
   static const IconData minus = IconData(0xe11c, fontFamily: _family);
   static const IconData moon = IconData(0xe11e, fontFamily: _family);
   static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
+  static const IconData move = IconData(0xe121, fontFamily: _family);
   static const IconData navigation = IconData(0xe123, fontFamily: _family);
   static const IconData package = IconData(0xe129, fontFamily: _family);
   static const IconData palette = IconData(0xe1dd, fontFamily: _family);
@@ -80,6 +83,7 @@ abstract final class AppIcons
   static const IconData receipt = IconData(0xe3d3, fontFamily: _family);
   static const IconData refreshCw = IconData(0xe145, fontFamily: _family);
   static const IconData save = IconData(0xe14d, fontFamily: _family);
+  static const IconData scale = IconData(0xe212, fontFamily: _family);
   static const IconData scanBarcode = IconData(0xe535, fontFamily: _family);
   static const IconData search = IconData(0xe151, fontFamily: _family);
   static const IconData settings = IconData(0xe154, fontFamily: _family);
@@ -101,6 +105,7 @@ abstract final class AppIcons
   static const IconData trash = IconData(0xe18d, fontFamily: _family);
   static const IconData trash2 = IconData(0xe18e, fontFamily: _family);
   static const IconData trendingUp = IconData(0xe191, fontFamily: _family);
+  static const IconData trophy = IconData(0xe373, fontFamily: _family);
   static const IconData unlink = IconData(0xe19c, fontFamily: _family);
   static const IconData user = IconData(0xe19f, fontFamily: _family);
   static const IconData userPlus = IconData(0xe1a2, fontFamily: _family);

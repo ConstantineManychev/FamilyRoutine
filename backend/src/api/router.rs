@@ -12,9 +12,9 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
-    fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers, profile_handlers,
-    receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, training_handlers, tx_handlers,
-    user_handlers, wallet_handlers, well_known_handlers,
+    fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers,
+    product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
+    training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -144,6 +144,16 @@ pub fn build_router(a_state: AppState) -> Router
                 .put(item_handlers::update_item)
                 .delete(item_handlers::delete_item),
         )
+        .route(
+            "/dicts/product-cats",
+            get(product_cat_handlers::list_cats).post(product_cat_handlers::create_cat),
+        )
+        .route(
+            "/dicts/product-cats/:id",
+            put(product_cat_handlers::update_cat).delete(product_cat_handlers::delete_cat),
+        )
+        .route("/dicts/product-cats/:id/merge", post(product_cat_handlers::merge_cat))
+        .route("/dicts/product-cats/:id/prices", get(product_cat_handlers::cat_prices))
         .route("/dicts/items/:id/prices", get(item_handlers::item_prices))
         .route("/dicts/items/:id/merge", post(item_handlers::merge_item))
         .route("/dicts/items/:id/price-history", get(catalog_handlers::price_history))

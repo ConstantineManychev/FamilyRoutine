@@ -12,6 +12,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
+import 'product_cats.dart';
 
 const int maxItemNameLen = 200;
 const double _labelMaxSide = 1600;
@@ -20,6 +21,7 @@ const int _maxLabelBytes = 2 * 1024 * 1024;
 const double _maxKcal = 1000;
 const double _maxGrams = 100;
 const double _maxPieceG = 10000;
+const double _maxNetQty = 1000000;
 
 IconData itemKindIcon(ItemKind aKind)
 {
@@ -88,8 +90,11 @@ class ItemDraft extends ChangeNotifier
   final fatCtrl = TextEditingController();
   final carbCtrl = TextEditingController();
   final pieceCtrl = TextEditingController();
+  final netCtrl = TextEditingController();
   ItemKind kind = ItemKind.product;
   ItemUnit unit = ItemUnit.piece;
+  NetMeasure netMeasure = NetMeasure.g;
+  String? catId;
 
   ItemDraft({String aName = '', String? aBarcode})
   {
@@ -113,12 +118,41 @@ class ItemDraft extends ChangeNotifier
     notifyListeners();
   }
 
+  set itemNetMeasure(NetMeasure aMeasure)
+  {
+    netMeasure = aMeasure;
+    notifyListeners();
+  }
+
+  set itemCatId(String? aCatId)
+  {
+    catId = aCatId;
+    notifyListeners();
+  }
+
+  bool get isNetApplicable => unit == ItemUnit.piece;
+
+  double? get netQty => isNetApplicable ? _parse(netCtrl) : null;
+
+  bool get isNetValid
+  {
+    if (!isNetApplicable || netCtrl.text.trim().isEmpty)
+    {
+      return true;
+    }
+    final value = _parse(netCtrl);
+    return value != null && value > 0 && value <= _maxNetQty;
+  }
+
   void load(DictItemDto aItem)
   {
     nameCtrl.text = aItem.name;
     barcodeCtrl.text = aItem.barcode ?? '';
     kind = aItem.kind;
     unit = aItem.unit;
+    catId = aItem.catId;
+    netCtrl.text = aItem.netQty == null ? '' : formatNutrient(aItem.netQty!);
+    netMeasure = aItem.netMeasure ?? NetMeasure.g;
     _fillNutrition(aItem.nutrition, aIsOverwrite: true);
     notifyListeners();
   }
@@ -163,6 +197,10 @@ class ItemDraft extends ChangeNotifier
     {
       return 'items.nutrition_invalid'.tr();
     }
+    if (!isNetValid)
+    {
+      return 'items.net_invalid'.tr();
+    }
     return null;
   }
 
@@ -172,6 +210,9 @@ class ItemDraft extends ChangeNotifier
         unit,
         aBarcode: barcode,
         aNutrition: kind == ItemKind.food ? nutrition : NutritionData.empty,
+        aNetQty: netQty,
+        aNetMeasure: netQty == null ? null : netMeasure,
+        aCatId: catId,
       );
 
   void applyProduct(ProductInfo aInfo, {bool aIsIdentityLocked = false})
@@ -191,6 +232,20 @@ class ItemDraft extends ChangeNotifier
       if (infoKind != null)
       {
         kind = infoKind;
+      }
+    }
+    final net = aInfo.netQty;
+    final measure = aInfo.netMeasure;
+    if (net != null && measure != null && netCtrl.text.trim().isEmpty)
+    {
+      if (!aIsIdentityLocked)
+      {
+        unit = ItemUnit.piece;
+      }
+      if (unit == ItemUnit.piece)
+      {
+        netCtrl.text = formatNutrient(net);
+        netMeasure = measure;
       }
     }
     _fillNutrition(aInfo.nutrition, aIsOverwrite: false);
@@ -227,7 +282,7 @@ class ItemDraft extends ChangeNotifier
   @override
   void dispose()
   {
-    for (final ctrl in [nameCtrl, barcodeCtrl, kcalCtrl, protCtrl, fatCtrl, carbCtrl, pieceCtrl])
+    for (final ctrl in [nameCtrl, barcodeCtrl, kcalCtrl, protCtrl, fatCtrl, carbCtrl, pieceCtrl, netCtrl])
     {
       ctrl.dispose();
     }
@@ -543,6 +598,12 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
                   .toList(),
               onChanged: widget.isIdentityEnabled ? (aValue) => _draft.itemUnit = aValue ?? _draft.unit : null,
             ),
+            if (_draft.isNetApplicable) ...[
+              const SizedBox(height: 16),
+              _NetField(draft: _draft, isEnabled: widget.isNutritionEnabled),
+            ],
+            const SizedBox(height: 16),
+            _CatField(draft: _draft, isEnabled: widget.isNutritionEnabled),
             if (isFood) ...[
               const SizedBox(height: 20),
               Text('items.nutrition'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: aContext.palette.inkSecondary)),
@@ -571,6 +632,100 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
           ],
         );
       },
+    );
+  }
+}
+
+class _NetField extends StatelessWidget
+{
+  final ItemDraft draft;
+  final bool isEnabled;
+
+  const _NetField({required this.draft, required this.isEnabled});
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: TextField(
+            key: const ValueKey('item.net'),
+            controller: draft.netCtrl,
+            enabled: isEnabled,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), LengthLimitingTextInputFormatter(9)],
+            decoration: InputDecoration(
+              labelText: 'items.net'.tr(),
+              helperText: 'items.net_hint'.tr(),
+              helperMaxLines: 3,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SegmentedButton<NetMeasure>(
+          segments: [
+            ButtonSegment(value: NetMeasure.g, label: Text('items.net_g'.tr())),
+            ButtonSegment(value: NetMeasure.ml, label: Text('items.net_ml'.tr())),
+          ],
+          selected: {draft.netMeasure},
+          showSelectedIcon: false,
+          onSelectionChanged: isEnabled ? (aSelected) => draft.itemNetMeasure = aSelected.first : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _CatField extends ConsumerWidget
+{
+  final ItemDraft draft;
+  final bool isEnabled;
+
+  const _CatField({required this.draft, required this.isEnabled});
+
+  @override
+  Widget build(BuildContext aContext, WidgetRef aRef)
+  {
+    final tree = aRef.watch(productCatsProv).valueOrNull;
+    final catId = draft.catId;
+    final label = catId == null ? null : (tree == null ? '…' : catPathLabel(tree, catId));
+
+    return InkWell(
+      key: const ValueKey('item.cat'),
+      borderRadius: BorderRadius.circular(4),
+      onTap: !isEnabled
+          ? null
+          : () async
+          {
+            final picked = await pickProductCat(aContext, aInitialId: catId);
+            if (picked != null)
+            {
+              draft.itemCatId = picked.catId;
+            }
+          },
+      child: InputDecorator(
+        isEmpty: label == null,
+        decoration: InputDecoration(
+          labelText: 'items.category'.tr(),
+          helperText: 'items.category_hint'.tr(),
+          helperMaxLines: 2,
+          border: const OutlineInputBorder(),
+          enabled: isEnabled,
+          prefixIcon: const Icon(AppIcons.listTree, size: 18),
+          suffixIcon: catId == null || !isEnabled
+              ? null
+              : IconButton(
+                  tooltip: 'cats.none'.tr(),
+                  icon: const Icon(AppIcons.x, size: 18),
+                  onPressed: () => draft.itemCatId = null,
+                ),
+        ),
+        child: label == null ? null : Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ),
     );
   }
 }

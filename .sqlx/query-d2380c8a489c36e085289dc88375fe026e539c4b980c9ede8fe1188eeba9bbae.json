@@ -1,14 +1,8 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO items (owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb, piece_g)\n        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        RETURNING id\n        ",
+  "query": "\n        UPDATE items\n        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9,\n            piece_g = $10, net_qty = $11, net_measure = $12, cat_id = $13\n        WHERE id = $1\n        ",
   "describe": {
-    "columns": [
-      {
-        "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
-      }
-    ],
+    "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
@@ -45,12 +39,23 @@
         "Numeric",
         "Numeric",
         "Numeric",
-        "Numeric"
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        },
+        "Uuid"
       ]
     },
-    "nullable": [
-      false
-    ]
+    "nullable": []
   },
-  "hash": "e54a710d2cd9c55f54424fc882b7fd92f4aaaa312f607fca99494dc1f0359bc8"
+  "hash": "d2380c8a489c36e085289dc88375fe026e539c4b980c9ede8fe1188eeba9bbae"
 }
