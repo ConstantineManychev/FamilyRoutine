@@ -290,6 +290,7 @@ class MealEntry
   final bool isMl;
   final Macros? per100;
   final Macros total;
+  final String? statusMarkId;
 
   const MealEntry({
     required this.id,
@@ -305,6 +306,7 @@ class MealEntry
     this.isMl = false,
     this.per100,
     required this.total,
+    this.statusMarkId,
   });
 
   factory MealEntry.fromJson(Map<String, dynamic> aJson) => MealEntry(
@@ -321,6 +323,7 @@ class MealEntry
         isMl: aJson['is_ml'] as bool? ?? false,
         per100: Macros.fromJsonOrNull(aJson['per_100']),
         total: Macros.fromJson(aJson['total']),
+        statusMarkId: aJson['status_mark_id'] as String?,
       );
 }
 

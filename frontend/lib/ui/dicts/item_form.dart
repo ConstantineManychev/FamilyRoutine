@@ -81,6 +81,58 @@ String? nutritionSummary(NutritionData aNutrition)
 
 bool isBarcodeAcceptable(String aValue) => aValue.trim().isEmpty || isValidGtin(aValue);
 
+class ItemFieldAccess
+{
+  final bool isKcal;
+  final bool isProt;
+  final bool isFat;
+  final bool isCarb;
+  final bool isPiece;
+  final bool isNet;
+  final bool isCat;
+
+  const ItemFieldAccess({
+    this.isKcal = false,
+    this.isProt = false,
+    this.isFat = false,
+    this.isCarb = false,
+    this.isPiece = false,
+    this.isNet = false,
+    this.isCat = false,
+  });
+
+  const ItemFieldAccess.all(bool aIsEnabled)
+      : isKcal = aIsEnabled,
+        isProt = aIsEnabled,
+        isFat = aIsEnabled,
+        isCarb = aIsEnabled,
+        isPiece = aIsEnabled,
+        isNet = aIsEnabled,
+        isCat = aIsEnabled;
+
+  factory ItemFieldAccess.forItem(DictItemDto? aItem)
+  {
+    if (aItem == null || aItem.isAdminEdit || (aItem.isEditable && !aItem.isInUse))
+    {
+      return const ItemFieldAccess.all(true);
+    }
+    final nutrition = aItem.nutrition;
+    final isFood = aItem.kind == ItemKind.food;
+    final isOwner = aItem.isEditable;
+    return ItemFieldAccess(
+      isKcal: isOwner || (isFood && nutrition.kcal == null),
+      isProt: isOwner || (isFood && nutrition.prot == null),
+      isFat: isOwner || (isFood && nutrition.fat == null),
+      isCarb: isOwner || (isFood && nutrition.carb == null),
+      isPiece: isFood && nutrition.pieceG == null,
+      isNet: aItem.netQty == null,
+      isCat: aItem.catId == null,
+    );
+  }
+
+  bool get isAny => isKcal || isProt || isFat || isCarb || isPiece || isNet || isCat;
+}
+
 class ItemDraft extends ChangeNotifier
 {
   final nameCtrl = TextEditingController();
@@ -204,6 +256,25 @@ class ItemDraft extends ChangeNotifier
     return null;
   }
 
+  Map<String, dynamic> fillPayload(DictItemDto aItem)
+  {
+    final current = nutrition;
+    final known = aItem.nutrition;
+    final fill = NutritionData(
+      kcal: known.kcal == null ? current.kcal : null,
+      prot: known.prot == null ? current.prot : null,
+      fat: known.fat == null ? current.fat : null,
+      carb: known.carb == null ? current.carb : null,
+      pieceG: known.pieceG == null ? current.pieceG : null,
+    );
+    final net = netQty;
+    return {
+      if (aItem.kind == ItemKind.food && !fill.isEmpty) 'nutrition': fill.toJson(),
+      if (aItem.netQty == null && net != null) ...{'net_qty': net.toString(), 'net_measure': netMeasure.name},
+      if (aItem.catId == null && catId != null) 'cat_id': catId,
+    };
+  }
+
   Map<String, dynamic> payload() => DictItemDto.payload(
         name,
         kind,
@@ -325,6 +396,7 @@ class ItemFormFields extends ConsumerStatefulWidget
   final bool isNameFocused;
   final bool isAutoLookup;
   final String? currentItemId;
+  final ItemFieldAccess? fieldAccess;
 
   const ItemFormFields({
     super.key,
@@ -334,6 +406,7 @@ class ItemFormFields extends ConsumerStatefulWidget
     this.isNameFocused = false,
     this.isAutoLookup = false,
     this.currentItemId,
+    this.fieldAccess,
   });
 
   @override
@@ -489,13 +562,15 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
     }
   }
 
-  Widget _nutrientField(TextEditingController aCtrl, String aLabelKey)
+  ItemFieldAccess get _access => widget.fieldAccess ?? ItemFieldAccess.all(widget.isNutritionEnabled);
+
+  Widget _nutrientField(TextEditingController aCtrl, String aLabelKey, bool aIsEnabled)
   {
     return SizedBox(
       width: 140,
       child: TextField(
         controller: aCtrl,
-        enabled: widget.isNutritionEnabled,
+        enabled: aIsEnabled,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), LengthLimitingTextInputFormatter(7)],
         decoration: InputDecoration(labelText: aLabelKey.tr(), border: const OutlineInputBorder(), isDense: true),
@@ -507,7 +582,8 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
   Widget build(BuildContext aContext)
   {
     final isAiEnabled = ref.watch(aiFeaturesProv).valueOrNull?.isReceiptRecognition ?? false;
-    final isFillEnabled = !_isBusy && (widget.isIdentityEnabled || widget.isNutritionEnabled);
+    final access = _access;
+    final isFillEnabled = !_isBusy && (widget.isIdentityEnabled || access.isAny);
 
     return ListenableBuilder(
       listenable: _draft,
@@ -600,10 +676,10 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
             ),
             if (_draft.isNetApplicable) ...[
               const SizedBox(height: 16),
-              _NetField(draft: _draft, isEnabled: widget.isNutritionEnabled),
+              _NetField(draft: _draft, isEnabled: access.isNet),
             ],
             const SizedBox(height: 16),
-            _CatField(draft: _draft, isEnabled: widget.isNutritionEnabled),
+            _CatField(draft: _draft, isEnabled: access.isCat),
             if (isFood) ...[
               const SizedBox(height: 20),
               Text('items.nutrition'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: aContext.palette.inkSecondary)),
@@ -612,16 +688,16 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _nutrientField(_draft.kcalCtrl, 'items.kcal'),
-                  _nutrientField(_draft.protCtrl, 'items.prot'),
-                  _nutrientField(_draft.fatCtrl, 'items.fat'),
-                  _nutrientField(_draft.carbCtrl, 'items.carb'),
+                  _nutrientField(_draft.kcalCtrl, 'items.kcal', access.isKcal),
+                  _nutrientField(_draft.protCtrl, 'items.prot', access.isProt),
+                  _nutrientField(_draft.fatCtrl, 'items.fat', access.isFat),
+                  _nutrientField(_draft.carbCtrl, 'items.carb', access.isCarb),
                 ],
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  _nutrientField(_draft.pieceCtrl, 'items.piece_g'),
+                  _nutrientField(_draft.pieceCtrl, 'items.piece_g', access.isPiece),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text('items.piece_g_hint'.tr(), style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted)),

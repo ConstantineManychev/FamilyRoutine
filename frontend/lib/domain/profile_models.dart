@@ -158,6 +158,7 @@ class ProfileSharing
   final bool isCompositionShared;
   final bool isMeasuresShared;
   final bool isTrainingShared;
+  final bool isMealsShared;
 
   const ProfileSharing({
     required this.familyId,
@@ -166,6 +167,7 @@ class ProfileSharing
     required this.isCompositionShared,
     required this.isMeasuresShared,
     this.isTrainingShared = true,
+    this.isMealsShared = false,
   });
 
   factory ProfileSharing.fromJson(Map<String, dynamic> aJson) => ProfileSharing(
@@ -175,6 +177,7 @@ class ProfileSharing
         isCompositionShared: aJson['is_composition_shared'] as bool,
         isMeasuresShared: aJson['is_measures_shared'] as bool,
         isTrainingShared: aJson['is_training_shared'] as bool? ?? true,
+        isMealsShared: aJson['is_meals_shared'] as bool? ?? false,
       );
 
   bool isShared(MetricGroup aGroup) => switch (aGroup)
@@ -191,6 +194,7 @@ class ProfileSharing
         isCompositionShared: aGroup == MetricGroup.composition ? aIsShared : isCompositionShared,
         isMeasuresShared: aGroup == MetricGroup.measures ? aIsShared : isMeasuresShared,
         isTrainingShared: isTrainingShared,
+        isMealsShared: isMealsShared,
       );
 
   ProfileSharing withTraining(bool aIsShared) => ProfileSharing(
@@ -200,6 +204,17 @@ class ProfileSharing
         isCompositionShared: isCompositionShared,
         isMeasuresShared: isMeasuresShared,
         isTrainingShared: aIsShared,
+        isMealsShared: isMealsShared,
+      );
+
+  ProfileSharing withMeals(bool aIsShared) => ProfileSharing(
+        familyId: familyId,
+        familyName: familyName,
+        isBodyShared: isBodyShared,
+        isCompositionShared: isCompositionShared,
+        isMeasuresShared: isMeasuresShared,
+        isTrainingShared: isTrainingShared,
+        isMealsShared: aIsShared,
       );
 
   Map<String, dynamic> toJson() => {
@@ -207,6 +222,7 @@ class ProfileSharing
         'is_composition_shared': isCompositionShared,
         'is_measures_shared': isMeasuresShared,
         'is_training_shared': isTrainingShared,
+        'is_meals_shared': isMealsShared,
       };
 }
 

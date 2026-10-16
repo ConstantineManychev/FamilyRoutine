@@ -12,6 +12,7 @@ pub struct ProfileAccess
     pub is_managed: bool,
     shared_groups: Vec<MetricGroup>,
     is_training_shared: bool,
+    is_meals_shared: bool,
 }
 
 impl ProfileAccess
@@ -24,6 +25,11 @@ impl ProfileAccess
     pub fn can_see_training(&self) -> bool
     {
         self.is_manager || self.is_training_shared
+    }
+
+    pub fn can_see_meals(&self) -> bool
+    {
+        self.is_manager || self.is_meals_shared
     }
 
     pub fn require_training(&self) -> Result<(), ApiError>
@@ -110,7 +116,11 @@ pub async fn profile_access(
             EXISTS (
                 SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
                 WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_training_shared
-            ) AS "is_training!"
+            ) AS "is_training!",
+            EXISTS (
+                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
+                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_meals_shared
+            ) AS "is_meals!"
         FROM users u
         WHERE u.id = $2
         "#,
@@ -141,5 +151,6 @@ pub async fn profile_access(
         is_managed: row.is_managed,
         shared_groups,
         is_training_shared: row.is_training,
+        is_meals_shared: row.is_meals,
     })
 }

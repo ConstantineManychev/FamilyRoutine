@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE items\n        SET kcal = COALESCE(kcal, $2),\n            prot = COALESCE(prot, $3),\n            fat = COALESCE(fat, $4),\n            carb = COALESCE(carb, $5),\n            piece_g = COALESCE(piece_g, $6),\n            net_measure = CASE WHEN net_qty IS NULL THEN $8 ELSE net_measure END,\n            net_qty = COALESCE(net_qty, $7),\n            cat_id = COALESCE(cat_id, $9)\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        },
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33f9288d81a0af8550cf11f2bb1a941ca2e945d25102af5f23d2c690d2a0fb40"
+}

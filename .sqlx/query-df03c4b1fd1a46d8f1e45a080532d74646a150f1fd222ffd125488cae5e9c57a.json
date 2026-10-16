@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)\n        RETURNING id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  created_ts\n        ",
+  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)\n        RETURNING id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,11 @@
       },
       {
         "ordinal": 19,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -170,7 +175,8 @@
         "Numeric",
         "Numeric",
         "Numeric",
-        "Numeric"
+        "Numeric",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -193,8 +199,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "ef928ada10e93637c07a204b9ae62e30579d4ae74741486d6cdd0a8613d58286"
+  "hash": "df03c4b1fd1a46d8f1e45a080532d74646a150f1fd222ffd125488cae5e9c57a"
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM family_mems owner\n                JOIN family_mems viewer ON viewer.family_id = owner.family_id\n                WHERE owner.user_id = $1 AND viewer.user_id = $2 AND owner.is_routine_shared\n            ) AS \"is_visible!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_visible!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "06bce8381bb639008bd9d5e2824e43a94cb4fcec917bc27ed4795f2a48bacf9d"
+}

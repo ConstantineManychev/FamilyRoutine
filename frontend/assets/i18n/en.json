@@ -68,7 +68,8 @@
     "CAT_EXISTS": "This category already exists at this level.",
     "CAT_IN_USE": "Others use this category, so only an admin can change it.",
     "CAT_HAS_CHILDREN": "Delete or move the subcategories first.",
-    "TOO_MANY_CATS": "Too many categories: delete the ones you no longer need."
+    "TOO_MANY_CATS": "Too many categories: delete the ones you no longer need.",
+    "MARK_OVERLAP": "The new time fully covers another block. Change or delete that block first."
   },
   "sidebar": {
     "routine": "Routine",
@@ -134,7 +135,9 @@
     "pwd_required": "Fill in all password fields",
     "pwd_mismatch": "The new passwords do not match",
     "pwd_changed": "Password changed",
-    "share_training": "Workouts"
+    "share_training": "Workouts",
+    "share_meals": "Show meals",
+    "share_meals_hint": "Members can open “Meal” blocks on the day timeline"
   },
   "dashboard": {
     "welcome": "Welcome",
@@ -668,7 +671,7 @@
     "only_mine": "Only mine",
     "public_hint": "The catalog is shared: every user sees the name, barcode and nutrition. Keep personal details out of the name. Your receipts and prices stay private.",
     "readonly_hint": "Only its author or an administrator can change this item.",
-    "in_use_hint": "Other users already have this item in their receipts: its name, type, unit and barcode can no longer change and it cannot be deleted. You can still add nutrition facts.",
+    "in_use_hint": "Other users already have this item in receipts: its name, type, unit and barcode can no longer change and it cannot be deleted. Empty net weight, piece weight and category can be filled once; only an admin can change them afterwards. Nutrition can still be refined.",
     "admin_hint": "You are editing as an administrator: every user will see the changes.",
     "nutrition": "Nutrition per 100 g or 100 ml",
     "kcal": "kcal",
@@ -706,7 +709,8 @@
     "net_ml": "ml",
     "net_invalid": "Check the net weight",
     "category": "Category",
-    "category_hint": "For example Dairy › Cheese › Maasdam. Prices per 100 g are compared within it."
+    "category_hint": "For example Dairy › Cheese › Maasdam. Prices per 100 g are compared within it.",
+    "fill_hint": "This is someone else’s item: only its author or an admin can change it, but anyone can fill in empty fields — net weight, piece weight, category and nutrition."
   },
   "routine": {
     "status_home": "Home",
@@ -724,7 +728,6 @@
     "ago": "{} ago",
     "minutes": "{} min",
     "hours_minutes": "{} h {} min",
-    "started": "Started:",
     "pick_time": "Other time…",
     "note": "Note (optional)",
     "my_day": "My day",
@@ -736,10 +739,38 @@
     "you": "you",
     "empty": "No marks for this day. Set a status in the “My status” widget.",
     "tap_to_edit": "Click to edit",
-    "edit_mark": "Status mark",
+    "edit_mark": "Edit block",
     "share_title": "Show my routine to group members",
     "share_hint": "When off, members of this group cannot see your statuses. Other groups are set separately.",
-    "hours": "{} h"
+    "hours": "{} h",
+    "now_label": "Now",
+    "no_status": "No status set",
+    "set_status": "Set status",
+    "change_status": "Status: {}. Tap to change",
+    "start_earlier": "Start earlier",
+    "pick_hint": "The new status starts at the chosen time and ends the previous one there.",
+    "tap_to_open": "Tap to open",
+    "delete_mark": "Delete block?",
+    "delete_mark_confirm": "The “{}” block ({}) will be removed from the day timeline.",
+    "start_at": "Start {}",
+    "end_at": "End {}",
+    "open_end": "No end",
+    "unlink_hint": "Diary entries stay in the food diary but are unlinked from this block.",
+    "hidden_workout": "This member does not share workouts with this group.",
+    "hidden_meals": "This member does not share meals with this group.",
+    "hidden_private": "Work and study details are visible to the owner only.",
+    "work_placeholder": "A to-do list for work time will appear here soon.",
+    "school_placeholder": "Study topics and progress will appear here soon.",
+    "no_workout_mine": "No workout linked. A workout started during this block will show up here automatically.",
+    "no_workout": "No workout recorded.",
+    "no_exercises": "No exercises.",
+    "open_workout": "Open workout",
+    "no_meals_mine": "Nothing yet. Add food or link diary entries from this day.",
+    "no_meals": "Nothing yet.",
+    "link_meals": "Link entries",
+    "add_food": "Add food",
+    "no_day_entries": "The diary has no entries for this day.",
+    "linked_elsewhere": "in another block"
   },
   "catalog": {
     "scope": "Keep in",

@@ -765,6 +765,19 @@ pub struct ShareToFamilyRequest
     pub family_id: Uuid,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct FillItemRequest
+{
+    #[serde(default)]
+    pub nutrition: Option<NutritionDto>,
+    #[serde(default)]
+    pub net_qty: Option<Decimal>,
+    #[serde(default)]
+    pub net_measure: Option<NetMeasure>,
+    #[serde(default)]
+    pub cat_id: Option<Uuid>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct MergeItemRequest
 {

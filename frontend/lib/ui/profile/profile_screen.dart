@@ -582,6 +582,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           value: sharing.isTrainingShared,
           onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withTraining(aValue)),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('profile.share_meals'.tr()),
+          subtitle: Text('profile.share_meals_hint'.tr()),
+          value: sharing.isMealsShared,
+          onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withMeals(aValue)),
+        ),
       ],
     ]);
   }

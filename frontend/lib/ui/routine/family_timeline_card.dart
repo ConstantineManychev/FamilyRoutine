@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models.dart';
@@ -11,6 +10,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import 'dash_card.dart';
+import 'mark_sheet.dart';
 import 'routine_style.dart';
 import '../common/app_theme.dart';
 
@@ -131,36 +131,6 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     _load();
   }
 
-  Future<void> _editMark(StatusMarkDto aMark) async
-  {
-    final result = await showDialog<_MarkEdit>(context: context, builder: (_) => _MarkEditDialog(mark: aMark));
-    if (result == null || !mounted)
-    {
-      return;
-    }
-
-    try
-    {
-      final api = ref.read(apiProv);
-      if (result.isDelete)
-      {
-        await api.deleteMark(aMark.id);
-      }
-      else
-      {
-        await api.updateMark(aMark.id, result.status, result.note);
-      }
-      ref.read(routineRevisionProv.notifier).state++;
-    }
-    catch (aError)
-    {
-      if (mounted)
-      {
-        showErrorSnack(context, aError);
-      }
-    }
-  }
-
   String _dayLabel(BuildContext aContext)
   {
     final today = _dayStart(DateTime.now());
@@ -239,7 +209,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
         _TimelineGrid(
           day: _day,
           members: aData.members,
-          onEditMark: _editMark,
+          onOpenMark: (aMark) => openMarkSheet(context, aMark.id),
         ),
         const SizedBox(height: 12),
         if (!hasMarks)
@@ -267,9 +237,9 @@ class _TimelineGrid extends StatelessWidget
 {
   final DateTime day;
   final List<TimelineMemberDto> members;
-  final ValueChanged<StatusMarkDto> onEditMark;
+  final ValueChanged<StatusMarkDto> onOpenMark;
 
-  const _TimelineGrid({required this.day, required this.members, required this.onEditMark});
+  const _TimelineGrid({required this.day, required this.members, required this.onOpenMark});
 
   @override
   Widget build(BuildContext aContext)
@@ -350,7 +320,7 @@ class _TimelineGrid extends StatelessWidget
                           dayEnd: dayEnd,
                           now: now,
                           xOf: xOf,
-                          onEditMark: onEditMark,
+                          onOpenMark: onOpenMark,
                         ),
                       ),
                     if (isNowVisible)
@@ -427,7 +397,7 @@ class _MemberTrack extends StatelessWidget
   final DateTime dayEnd;
   final DateTime now;
   final double Function(DateTime) xOf;
-  final ValueChanged<StatusMarkDto> onEditMark;
+  final ValueChanged<StatusMarkDto> onOpenMark;
 
   const _MemberTrack({
     required this.member,
@@ -435,7 +405,7 @@ class _MemberTrack extends StatelessWidget
     required this.dayEnd,
     required this.now,
     required this.xOf,
-    required this.onEditMark,
+    required this.onOpenMark,
   });
 
   @override
@@ -462,7 +432,8 @@ class _MemberTrack extends StatelessWidget
           memberName: member.fullName,
           width: width,
           duration: end.difference(mark.startTs),
-          onTap: member.isMe ? () => onEditMark(mark) : null,
+          isMine: member.isMe,
+          onTap: () => onOpenMark(mark),
         ),
       ));
     }
@@ -483,13 +454,15 @@ class _MarkBlock extends StatelessWidget
   final String memberName;
   final double width;
   final Duration duration;
-  final VoidCallback? onTap;
+  final bool isMine;
+  final VoidCallback onTap;
 
   const _MarkBlock({
     required this.mark,
     required this.memberName,
     required this.width,
     required this.duration,
+    required this.isMine,
     required this.onTap,
   });
 
@@ -502,7 +475,7 @@ class _MarkBlock extends StatelessWidget
       '$memberName — ${mark.status.label}',
       '${formatSpan(aContext, mark)} · ${formatDuration(duration)}',
       if (mark.note != null) mark.note!,
-      if (onTap != null) 'routine.tap_to_edit'.tr(),
+      isMine ? 'routine.tap_to_edit'.tr() : 'routine.tap_to_open'.tr(),
     ];
 
     final block = Container(
@@ -513,17 +486,15 @@ class _MarkBlock extends StatelessWidget
 
     return Semantics(
       label: lines.join('. '),
-      button: onTap != null,
+      button: true,
       child: Tooltip(
         message: lines.join('\n'),
-        triggerMode: onTap == null ? TooltipTriggerMode.tap : TooltipTriggerMode.longPress,
+        triggerMode: TooltipTriggerMode.longPress,
         waitDuration: const Duration(milliseconds: 150),
-        child: onTap == null
-            ? block
-            : MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(onTap: onTap, child: block),
-              ),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(onTap: onTap, child: block),
+        ),
       ),
     );
   }
@@ -550,89 +521,6 @@ class _LegendItem extends StatelessWidget
         Icon(status.icon, size: 14, color: aContext.palette.inkSecondary),
         const SizedBox(width: 4),
         Text(status.label, style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary)),
-      ],
-    );
-  }
-}
-
-class _MarkEdit
-{
-  final RoutineStatus status;
-  final String? note;
-  final bool isDelete;
-
-  const _MarkEdit({required this.status, this.note, this.isDelete = false});
-}
-
-class _MarkEditDialog extends StatefulWidget
-{
-  final StatusMarkDto mark;
-
-  const _MarkEditDialog({required this.mark});
-
-  @override
-  State<_MarkEditDialog> createState() => _MarkEditDialogState();
-}
-
-class _MarkEditDialogState extends State<_MarkEditDialog>
-{
-  late RoutineStatus _status = widget.mark.status;
-  late final TextEditingController _noteCtrl = TextEditingController(text: widget.mark.note ?? '');
-
-  @override
-  void dispose()
-  {
-    _noteCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext aContext)
-  {
-    return AlertDialog(
-      scrollable: true,
-      title: Text('routine.edit_mark'.tr()),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(formatSpan(aContext, widget.mark), style: TextStyle(color: context.palette.inkSecondary)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: RoutineStatus.values
-                  .map((aStatus) => ChoiceChip(
-                        avatar: Icon(aStatus.icon, size: 16, color: aStatus.colorOf(context)),
-                        label: Text(aStatus.label),
-                        selected: aStatus == _status,
-                        onSelected: (_) => setState(() => _status = aStatus),
-                      ))
-                  .toList(),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteCtrl,
-              inputFormatters: [LengthLimitingTextInputFormatter(200)],
-              decoration: InputDecoration(labelText: 'routine.note'.tr(), border: const OutlineInputBorder()),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton.icon(
-          style: TextButton.styleFrom(foregroundColor: context.palette.danger),
-          onPressed: () => Navigator.of(aContext).pop(_MarkEdit(status: _status, isDelete: true)),
-          icon: const Icon(AppIcons.trash2, size: 16),
-          label: Text('common.delete'.tr()),
-        ),
-        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
-        ElevatedButton(
-          onPressed: () => Navigator.of(aContext).pop(_MarkEdit(status: _status, note: _noteCtrl.text)),
-          child: Text('common.save'.tr()),
-        ),
       ],
     );
   }

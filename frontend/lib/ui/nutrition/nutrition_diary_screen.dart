@@ -19,8 +19,10 @@ const int _maxFutureDays = 7;
 const double _maxQuickKcal = 10000;
 const double _maxQuickGrams = 1000;
 
-String addFoodPath(DateTime aDate, MealSlot aMeal) =>
-    Uri(path: '/app/nutrition/add', queryParameters: {'date': dateWire(aDate), 'meal': aMeal.name}).toString();
+String addFoodPath(DateTime aDate, MealSlot aMeal, {String? aMarkId}) => Uri(
+      path: '/app/nutrition/add',
+      queryParameters: {'date': dateWire(aDate), 'meal': aMeal.name, if (aMarkId != null) 'mark': aMarkId},
+    ).toString();
 
 class NutritionDiaryScreen extends ConsumerStatefulWidget
 {

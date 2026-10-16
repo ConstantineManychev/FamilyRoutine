@@ -528,6 +528,12 @@ class ApiSvc
 
   Future<void> deleteItem(String aId) => _dio.delete('/api/dicts/items/$aId');
 
+  Future<DictItemDto> fillItem(String aId, Map<String, dynamic> aPayload) async
+  {
+    final res = await _dio.patch('/api/dicts/items/$aId/fill', data: aPayload);
+    return DictItemDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<List<Dish>> getDishes({String? aQuery}) async
   {
     final res = await _dio.get('/api/dishes', queryParameters: {
@@ -703,13 +709,44 @@ class ApiSvc
     return StatusMarkDto.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<StatusMarkDto> updateMark(String aId, RoutineStatus aStatus, String? aNote) async
+  Future<StatusMarkDto> updateMark(
+    String aId,
+    RoutineStatus aStatus,
+    String? aNote,
+    {
+      DateTime? aStartTs,
+      DateTime? aEndTs,
+      bool aIsOpenEnd = false,
+    }
+  ) async
   {
     final res = await _dio.put('/api/routine/marks/$aId', data: {
       'status': aStatus.toJson(),
       if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+      if (aStartTs != null) 'start_ts': aStartTs.toUtc().toIso8601String(),
+      if (aEndTs != null) 'end_ts': aEndTs.toUtc().toIso8601String(),
+      if (aIsOpenEnd) 'is_open_end': true,
     });
     return StatusMarkDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StatusMarkDto?> getCurrentMark() async
+  {
+    final res = await _dio.get('/api/routine/current');
+    final data = res.data;
+    return data is Map<String, dynamic> ? StatusMarkDto.fromJson(data) : null;
+  }
+
+  Future<MarkDetails> getMarkDetails(String aId) async
+  {
+    final res = await _dio.get('/api/routine/marks/$aId');
+    return MarkDetails.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MarkDetails> linkMarkMeals(String aId, List<String> aEntryIds) async
+  {
+    final res = await _dio.put('/api/routine/marks/$aId/meal-entries', data: {'entry_ids': aEntryIds});
+    return MarkDetails.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<void> deleteMark(String aId) => _dio.delete('/api/routine/marks/$aId');

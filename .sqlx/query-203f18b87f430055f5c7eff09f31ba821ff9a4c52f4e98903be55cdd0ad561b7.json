@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE meal_entries\n        SET eaten_on = $2, meal = $3, title = $4, grams = $5, portions = $6, kcal = $7, prot = $8, fat = $9,\n            carb = $10\n        WHERE id = $1\n        RETURNING id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  created_ts\n        ",
+  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND eaten_on = $2\n        ORDER BY created_ts, id\n        ",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,11 @@
       },
       {
         "ordinal": 19,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -130,27 +135,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Date",
-        {
-          "Custom": {
-            "name": "meal_t",
-            "kind": {
-              "Enum": [
-                "breakfast",
-                "lunch",
-                "dinner",
-                "snack"
-              ]
-            }
-          }
-        },
-        "Varchar",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric"
+        "Date"
       ]
     },
     "nullable": [
@@ -173,8 +158,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "1727cc00f186897cd248d40326de94a997ddb3d5da4d75995ebba361ca80d10a"
+  "hash": "203f18b87f430055f5c7eff09f31ba821ff9a4c52f4e98903be55cdd0ad561b7"
 }

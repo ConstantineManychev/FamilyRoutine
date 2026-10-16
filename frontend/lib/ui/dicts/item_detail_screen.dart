@@ -128,7 +128,11 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     setState(() => _isSaving = true);
     try
     {
-      final saved = await ref.read(apiProv).saveItem(widget.itemId, _draft.payload());
+      final item = _item;
+      final api = ref.read(apiProv);
+      final saved = item != null && !item.isEditable
+          ? await api.fillItem(item.id, _draft.fillPayload(item))
+          : await api.saveItem(widget.itemId, _draft.payload());
       ref.invalidate(itemsProv);
       if (!mounted)
       {
@@ -258,6 +262,8 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
     final palette = aContext.palette;
     final isEditable = !_isEdit || (item?.isEditable ?? false);
     final isIdentityEnabled = !_isEdit || (item?.canEditIdentity ?? false);
+    final access = ItemFieldAccess.forItem(_isEdit ? item : null);
+    final canSave = isEditable || access.isAny;
 
     return ListView(
       padding: screenPadding(aContext),
@@ -278,7 +284,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
                 icon: const Icon(AppIcons.trash2, size: 18),
                 label: Text('common.delete'.tr()),
               ),
-            if (isEditable)
+            if (canSave)
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _save,
                 icon: const Icon(AppIcons.save, size: 18),
@@ -299,7 +305,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
             ),
           ),
         if (item != null && !item.isEditable)
-          _hint(AppIcons.lock, 'items.readonly_hint'.tr(), palette.inkMuted)
+          _hint(AppIcons.lock, (access.isAny ? 'items.fill_hint' : 'items.readonly_hint').tr(), palette.inkMuted)
         else if (item != null && item.isAdminEdit)
           _hint(AppIcons.shieldCheck, 'items.admin_hint'.tr(), palette.warning)
         else if (item != null && item.isInUse)
@@ -312,6 +318,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
             draft: _draft,
             isIdentityEnabled: isIdentityEnabled,
             isNutritionEnabled: isEditable,
+            fieldAccess: access,
             isAutoLookup: !_isEdit,
             currentItemId: widget.itemId,
           ),

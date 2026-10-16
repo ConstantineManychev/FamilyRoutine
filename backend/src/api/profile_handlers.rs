@@ -364,7 +364,8 @@ pub async fn set_sharing(
         r#"
         UPDATE family_mems
         SET is_body_shared = $3, is_composition_shared = $4, is_measures_shared = $5,
-            is_training_shared = COALESCE($6, is_training_shared)
+            is_training_shared = COALESCE($6, is_training_shared),
+            is_meals_shared = COALESCE($7, is_meals_shared)
         WHERE family_id = $1 AND user_id = $2
         "#,
         a_family_id,
@@ -372,7 +373,8 @@ pub async fn set_sharing(
         a_req.is_body_shared,
         a_req.is_composition_shared,
         a_req.is_measures_shared,
-        a_req.is_training_shared
+        a_req.is_training_shared,
+        a_req.is_meals_shared
     )
     .execute(&mut *conn)
     .await?;
@@ -491,7 +493,7 @@ async fn person_dto(
             ProfileSharingDto,
             r#"
             SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,
-                   fm.is_measures_shared, fm.is_training_shared
+                   fm.is_measures_shared, fm.is_training_shared, fm.is_meals_shared
             FROM family_mems fm
             JOIN families f ON f.id = fm.family_id
             WHERE fm.user_id = $1

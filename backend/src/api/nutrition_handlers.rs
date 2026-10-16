@@ -104,6 +104,7 @@ struct EntryRow
     prot: Decimal,
     fat: Decimal,
     carb: Decimal,
+    status_mark_id: Option<Uuid>,
     created_ts: DateTime<Utc>,
 }
 
@@ -157,6 +158,7 @@ impl From<EntryRow> for MealEntryDto
                 fat: a_row.fat.normalize(),
                 carb: a_row.carb.normalize(),
             },
+            status_mark_id: a_row.status_mark_id,
             created_ts: a_row.created_ts,
         }
     }
@@ -718,6 +720,46 @@ async fn require_day_capacity(
     Ok(())
 }
 
+pub async fn require_meal_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<(), ApiError>
+{
+    let is_meal = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM status_marks WHERE id = $1 AND user_id = $2 AND status = 'meal') AS "is_meal!""#,
+        a_mark_id,
+        a_user_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    if !is_meal
+    {
+        return Err(ApiError::Validation("status_mark_id"));
+    }
+    Ok(())
+}
+
+pub async fn mark_entries(
+    a_conn: &mut PgConnection,
+    a_owner_id: Uuid,
+    a_mark_id: Uuid,
+) -> Result<Vec<MealEntryDto>, ApiError>
+{
+    let rows = sqlx::query_as!(
+        EntryRow,
+        r#"
+        SELECT id, eaten_on, meal AS "meal: MealSlot", source AS "source: MealSource", item_id, dish_id, title,
+               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
+               status_mark_id, created_ts
+        FROM meal_entries
+        WHERE user_id = $1 AND status_mark_id = $2
+        ORDER BY created_ts, id
+        "#,
+        a_owner_id,
+        a_mark_id
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    Ok(rows.into_iter().map(MealEntryDto::from).collect())
+}
+
 pub async fn create_entry(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -737,6 +779,10 @@ pub async fn create_entry(
         _ => return Err(ApiError::Validation("source")),
     };
     require_day_capacity(&mut tx, a_user.user_id, date, 1).await?;
+    if let Some(mark_id) = a_req.status_mark_id
+    {
+        require_meal_mark(&mut tx, a_user.user_id, mark_id).await?;
+    }
 
     let per_100 = snapshot.per_100;
     let row = sqlx::query_as!(
@@ -744,12 +790,12 @@ pub async fn create_entry(
         r#"
         INSERT INTO meal_entries (
             user_id, eaten_on, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb
+            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         RETURNING id, eaten_on, meal AS "meal: MealSlot", source AS "source: MealSource", item_id, dish_id, title,
                   grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-                  created_ts
+                  status_mark_id, created_ts
         "#,
         a_user.user_id,
         date,
@@ -769,7 +815,8 @@ pub async fn create_entry(
         snapshot.total.kcal,
         snapshot.total.prot,
         snapshot.total.fat,
-        snapshot.total.carb
+        snapshot.total.carb,
+        a_req.status_mark_id
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -792,7 +839,7 @@ pub async fn update_entry(
         r#"
         SELECT id, eaten_on, meal AS "meal: MealSlot", source AS "source: MealSource", item_id, dish_id, title,
                grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-               created_ts
+               status_mark_id, created_ts
         FROM meal_entries
         WHERE id = $1 AND user_id = $2
         FOR UPDATE
@@ -833,7 +880,7 @@ pub async fn update_entry(
         WHERE id = $1
         RETURNING id, eaten_on, meal AS "meal: MealSlot", source AS "source: MealSource", item_id, dish_id, title,
                   grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-                  created_ts
+                  status_mark_id, created_ts
         "#,
         a_id,
         date,
@@ -894,7 +941,7 @@ pub async fn nutrition_day(
         r#"
         SELECT id, eaten_on, meal AS "meal: MealSlot", source AS "source: MealSource", item_id, dish_id, title,
                grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-               created_ts
+               status_mark_id, created_ts
         FROM meal_entries
         WHERE user_id = $1 AND eaten_on = $2
         ORDER BY created_ts, id

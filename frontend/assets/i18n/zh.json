@@ -68,7 +68,8 @@
     "CAT_EXISTS": "该层级已存在同名分类。",
     "CAT_IN_USE": "该分类正被他人使用，仅管理员可修改。",
     "CAT_HAS_CHILDREN": "请先删除或移动子分类。",
-    "TOO_MANY_CATS": "分类过多，请删除不需要的分类。"
+    "TOO_MANY_CATS": "分类过多，请删除不需要的分类。",
+    "MARK_OVERLAP": "新时间完全覆盖了另一个时段。请先修改或删除该时段。"
   },
   "sidebar": {
     "routine": "日常",
@@ -134,7 +135,9 @@
     "pwd_required": "请填写所有密码字段",
     "pwd_mismatch": "两次输入的新密码不一致",
     "pwd_changed": "密码已修改",
-    "share_training": "训练"
+    "share_training": "训练",
+    "share_meals": "显示饮食",
+    "share_meals_hint": "成员可以打开日程时间轴上的“用餐”时段"
   },
   "dashboard": {
     "welcome": "欢迎",
@@ -668,7 +671,7 @@
     "only_mine": "仅我的",
     "public_hint": "目录是公共的：所有用户都能看到名称、条码和营养成分。请勿在名称中填写个人信息。你的小票和价格仍是私密的。",
     "readonly_hint": "只有作者或管理员可以修改此条目。",
-    "in_use_hint": "其他用户的小票中已有此条目：名称、类型、单位和条码无法再修改，也不能删除。仍可补充营养成分。",
+    "in_use_hint": "该商品已出现在其他用户的小票中：名称、类型、单位和条形码不能再改，也不能删除。空白的净含量、单个重量和分类只能填写一次，之后仅管理员可修改。营养成分仍可完善。",
     "admin_hint": "你正以管理员身份编辑：所有用户都会看到更改。",
     "nutrition": "每 100 克或 100 毫升营养成分",
     "kcal": "千卡",
@@ -706,7 +709,8 @@
     "net_ml": "毫升",
     "net_invalid": "请检查净含量",
     "category": "分类",
-    "category_hint": "例如：乳制品 › 奶酪 › 马斯丹。在此分类内比较每 100 克价格。"
+    "category_hint": "例如：乳制品 › 奶酪 › 马斯丹。在此分类内比较每 100 克价格。",
+    "fill_hint": "这是他人创建的商品：只有作者或管理员可以修改，但任何人都可以填写空白字段——净含量、单个重量、分类和营养成分。"
   },
   "routine": {
     "status_home": "在家",
@@ -724,7 +728,6 @@
     "ago": "{} 前",
     "minutes": "{} 分钟",
     "hours_minutes": "{} 小时 {} 分钟",
-    "started": "开始：",
     "pick_time": "其他时间…",
     "note": "备注（可选）",
     "my_day": "我的一天",
@@ -736,10 +739,38 @@
     "you": "你",
     "empty": "这一天没有记录。请在“我的状态”小组件中设置状态。",
     "tap_to_edit": "点击编辑",
-    "edit_mark": "状态记录",
+    "edit_mark": "编辑时段",
     "share_title": "向群组成员显示我的日程",
     "share_hint": "关闭后，该群组成员看不到你的状态。其他群组需单独设置。",
-    "hours": "{} 小时"
+    "hours": "{} 小时",
+    "now_label": "当前",
+    "no_status": "未设置状态",
+    "set_status": "选择状态",
+    "change_status": "状态：{}。点按更改",
+    "start_earlier": "提前开始",
+    "pick_hint": "新状态从所选时间开始，上一个状态在此结束。",
+    "tap_to_open": "点按打开",
+    "delete_mark": "删除时段？",
+    "delete_mark_confirm": "“{}”时段（{}）将从日程时间轴中移除。",
+    "start_at": "开始 {}",
+    "end_at": "结束 {}",
+    "open_end": "不设结束",
+    "unlink_hint": "饮食记录仍保留在日记中，但会与该时段解除关联。",
+    "hidden_workout": "该成员未向此群组公开训练。",
+    "hidden_meals": "该成员未向此群组公开饮食。",
+    "hidden_private": "工作和学习的详情仅本人可见。",
+    "work_placeholder": "工作时间的待办清单即将在这里显示。",
+    "school_placeholder": "学习主题和进度即将在这里显示。",
+    "no_workout_mine": "未关联训练。在此时段内开始的训练会自动显示在这里。",
+    "no_workout": "没有训练记录。",
+    "no_exercises": "没有动作。",
+    "open_workout": "打开训练",
+    "no_meals_mine": "暂无内容。添加食物或关联当天的日记记录。",
+    "no_meals": "暂无内容。",
+    "link_meals": "关联记录",
+    "add_food": "添加食物",
+    "no_day_entries": "当天的日记没有记录。",
+    "linked_elsewhere": "在其他时段"
   },
   "catalog": {
     "scope": "保存位置",

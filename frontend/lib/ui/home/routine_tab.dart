@@ -12,7 +12,6 @@ import '../common/page_frames.dart';
 import '../planner/planner_screen.dart';
 import '../nutrition/nutrition_today_block.dart';
 import '../routine/family_timeline_card.dart';
-import '../routine/my_status_card.dart';
 import '../training/next_workout_card.dart';
 import '../training/training_revision.dart';
 
@@ -43,8 +42,6 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
       key: const PageStorageKey('home.routine'),
       padding: tabPadding(aContext),
       children: [
-        const MyStatusCard(),
-        const SizedBox(height: _blockGap),
         const TodayPlanBlock(),
         for (final fam in fams) ...[
           const SizedBox(height: _blockGap),

@@ -68,7 +68,8 @@
     "CAT_EXISTS": "Diese Kategorie gibt es auf dieser Ebene bereits.",
     "CAT_IN_USE": "Andere nutzen diese Kategorie – nur Admins können sie ändern.",
     "CAT_HAS_CHILDREN": "Löschen oder verschieben Sie zuerst die Unterkategorien.",
-    "TOO_MANY_CATS": "Zu viele Kategorien: Löschen Sie nicht mehr benötigte."
+    "TOO_MANY_CATS": "Zu viele Kategorien: Löschen Sie nicht mehr benötigte.",
+    "MARK_OVERLAP": "Die neue Zeit überdeckt einen anderen Block vollständig. Ändern oder löschen Sie ihn zuerst."
   },
   "sidebar": {
     "routine": "Routine",
@@ -134,7 +135,9 @@
     "pwd_required": "Alle Passwortfelder ausfüllen",
     "pwd_mismatch": "Die neuen Passwörter stimmen nicht überein",
     "pwd_changed": "Passwort geändert",
-    "share_training": "Trainings"
+    "share_training": "Trainings",
+    "share_meals": "Ernährung zeigen",
+    "share_meals_hint": "Mitglieder können „Essen“-Blöcke in der Tagesleiste öffnen"
   },
   "dashboard": {
     "welcome": "Willkommen",
@@ -668,7 +671,7 @@
     "only_mine": "Nur meine",
     "public_hint": "Der Katalog ist gemeinsam: Name, Barcode und Nährwerte sehen alle Nutzer. Schreiben Sie keine persönlichen Daten in den Namen. Ihre Belege und Preise bleiben privat.",
     "readonly_hint": "Nur der Autor oder ein Administrator kann diesen Artikel ändern.",
-    "in_use_hint": "Andere Nutzer haben diesen Artikel bereits in ihren Belegen: Name, Typ, Einheit und Barcode lassen sich nicht mehr ändern, Löschen ist nicht möglich. Nährwerte können Sie ergänzen.",
+    "in_use_hint": "Andere haben diese Position bereits in Belegen: Name, Typ, Einheit und Barcode sind fest, Löschen ist nicht möglich. Leere Nettomenge, Stückgewicht und Kategorie lassen sich einmal ausfüllen, danach ändern nur Admins sie. Nährwerte können weiter präzisiert werden.",
     "admin_hint": "Sie bearbeiten als Administrator: Alle Nutzer sehen die Änderungen.",
     "nutrition": "Nährwerte pro 100 g oder 100 ml",
     "kcal": "kcal",
@@ -706,7 +709,8 @@
     "net_ml": "ml",
     "net_invalid": "Nettomenge prüfen",
     "category": "Kategorie",
-    "category_hint": "Zum Beispiel Milchprodukte › Käse › Maasdamer. Darin werden Preise pro 100 g verglichen."
+    "category_hint": "Zum Beispiel Milchprodukte › Käse › Maasdamer. Darin werden Preise pro 100 g verglichen.",
+    "fill_hint": "Das ist eine fremde Position: Ändern dürfen nur Autor oder Admins, aber leere Felder – Nettomenge, Stückgewicht, Kategorie und Nährwerte – darf jeder ausfüllen."
   },
   "routine": {
     "status_home": "Zuhause",
@@ -724,7 +728,6 @@
     "ago": "vor {}",
     "minutes": "{} Min.",
     "hours_minutes": "{} Std. {} Min.",
-    "started": "Beginn:",
     "pick_time": "Andere Uhrzeit…",
     "note": "Notiz (optional)",
     "my_day": "Mein Tag",
@@ -736,10 +739,38 @@
     "you": "Sie",
     "empty": "Für diesen Tag gibt es keine Einträge. Setzen Sie einen Status im Widget „Mein Status“.",
     "tap_to_edit": "Zum Bearbeiten klicken",
-    "edit_mark": "Statuseintrag",
+    "edit_mark": "Block bearbeiten",
     "share_title": "Meinen Tagesablauf den Gruppenmitgliedern zeigen",
     "share_hint": "Wenn aus, sehen Mitglieder dieser Gruppe Ihre Status nicht. Andere Gruppen werden separat eingestellt.",
-    "hours": "{} Std."
+    "hours": "{} Std.",
+    "now_label": "Jetzt",
+    "no_status": "Kein Status gesetzt",
+    "set_status": "Status wählen",
+    "change_status": "Status: {}. Zum Ändern tippen",
+    "start_earlier": "Früher beginnen",
+    "pick_hint": "Der neue Status beginnt zur gewählten Zeit, der vorherige endet dort.",
+    "tap_to_open": "Zum Öffnen tippen",
+    "delete_mark": "Block löschen?",
+    "delete_mark_confirm": "Der Block „{}“ ({}) wird aus der Tagesleiste entfernt.",
+    "start_at": "Beginn {}",
+    "end_at": "Ende {}",
+    "open_end": "Ohne Ende",
+    "unlink_hint": "Die Einträge bleiben im Ernährungstagebuch, werden aber vom Block gelöst.",
+    "hidden_workout": "Dieses Mitglied teilt Trainings nicht mit dieser Gruppe.",
+    "hidden_meals": "Dieses Mitglied teilt die Ernährung nicht mit dieser Gruppe.",
+    "hidden_private": "Details zu Arbeit und Lernen sieht nur der Besitzer.",
+    "work_placeholder": "Bald erscheint hier eine Aufgabenliste für die Arbeitszeit.",
+    "school_placeholder": "Bald erscheinen hier Lernthemen und der Fortschritt.",
+    "no_workout_mine": "Kein Training verknüpft. Ein in diesem Zeitraum gestartetes Training erscheint hier automatisch.",
+    "no_workout": "Kein Training erfasst.",
+    "no_exercises": "Keine Übungen.",
+    "open_workout": "Training öffnen",
+    "no_meals_mine": "Noch leer. Fügen Sie Essen hinzu oder verknüpfen Sie Tagebucheinträge dieses Tages.",
+    "no_meals": "Noch leer.",
+    "link_meals": "Einträge verknüpfen",
+    "add_food": "Essen hinzufügen",
+    "no_day_entries": "Für diesen Tag gibt es keine Tagebucheinträge.",
+    "linked_elsewhere": "in einem anderen Block"
   },
   "catalog": {
     "scope": "Speichern in",

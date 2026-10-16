@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE meal_entries SET status_mark_id = NULL\n        WHERE user_id = $1 AND status_mark_id = $2 AND NOT (id = ANY($3))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "34c505864f37b2dd67eeaf12a8ad2617b2130e868233df3ad67a8ad8a3c1c359"
+}

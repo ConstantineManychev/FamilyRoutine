@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::{MacrosDto, MealEntryDto, SessionDto};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "curr_status_t", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -46,6 +48,37 @@ pub struct UpdateMarkRequest
     pub status: RoutineStatus,
     #[serde(default)]
     pub note: Option<String>,
+    #[serde(default)]
+    pub start_ts: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub end_ts: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub is_open_end: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MarkMealsDto
+{
+    pub total: MacrosDto,
+    pub entries: Vec<MealEntryDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MarkDetailsDto
+{
+    pub mark: StatusMarkDto,
+    pub owner_id: Uuid,
+    pub owner_name: String,
+    pub is_mine: bool,
+    pub is_details_hidden: bool,
+    pub workout: Option<SessionDto>,
+    pub meals: Option<MarkMealsDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LinkMarkMealsRequest
+{
+    pub entry_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

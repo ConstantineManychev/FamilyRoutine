@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            owner_id,\n            name,\n            type AS \"kind: ItemKind\",\n            unit AS \"unit: ItemUnit\",\n            barcode,\n            item_used_by_others(id, $2) AS \"is_used_by_others!\"\n        FROM items\n        WHERE id = $1\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT\n            owner_id,\n            name,\n            type AS \"kind: ItemKind\",\n            unit AS \"unit: ItemUnit\",\n            barcode,\n            piece_g,\n            net_qty,\n            net_measure AS \"net_measure: NetMeasure\",\n            cat_id,\n            item_used_by_others(id, $2) AS \"is_used_by_others!\"\n        FROM items\n        WHERE id = $1\n        FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
@@ -55,6 +55,36 @@
       },
       {
         "ordinal": 5,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "net_qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "net_measure: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "cat_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
         "name": "is_used_by_others!",
         "type_info": "Bool"
       }
@@ -71,8 +101,12 @@
       false,
       false,
       true,
+      true,
+      true,
+      true,
+      true,
       null
     ]
   },
-  "hash": "5b62701c1d21755748c864caf8326d924a9f92db6d134a0c312193ec08729edf"
+  "hash": "15eae8fd568a01745ea908d4e9bf65f63e912856f68fc3386877144f5752a950"
 }

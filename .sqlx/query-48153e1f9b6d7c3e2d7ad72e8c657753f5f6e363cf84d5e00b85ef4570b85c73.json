@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,\n                   fm.is_measures_shared, fm.is_training_shared\n            FROM family_mems fm\n            JOIN families f ON f.id = fm.family_id\n            WHERE fm.user_id = $1\n            ORDER BY f.name\n            ",
+  "query": "\n            SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,\n                   fm.is_measures_shared, fm.is_training_shared, fm.is_meals_shared\n            FROM family_mems fm\n            JOIN families f ON f.id = fm.family_id\n            WHERE fm.user_id = $1\n            ORDER BY f.name\n            ",
   "describe": {
     "columns": [
       {
@@ -32,6 +32,11 @@
         "ordinal": 5,
         "name": "is_training_shared",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_meals_shared",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -45,8 +50,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "620e9f23f0f3bcc8bff671079f8b175a5c6d3a089502e52c448a3323296eae86"
+  "hash": "48153e1f9b6d7c3e2d7ad72e8c657753f5f6e363cf84d5e00b85ef4570b85c73"
 }

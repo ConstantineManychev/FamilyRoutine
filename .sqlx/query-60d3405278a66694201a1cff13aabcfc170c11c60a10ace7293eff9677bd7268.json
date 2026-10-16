@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               created_ts\n        FROM meal_entries\n        WHERE id = $1 AND user_id = $2\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE id = $1 AND user_id = $2\n        FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,11 @@
       },
       {
         "ordinal": 19,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -153,8 +158,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "3cce9b2efafb596d2ea3f061549ebf9b513c02d466486c1412f1eb0e0cba9cc9"
+  "hash": "60d3405278a66694201a1cff13aabcfc170c11c60a10ace7293eff9677bd7268"
 }

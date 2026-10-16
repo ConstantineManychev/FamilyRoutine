@@ -134,6 +134,7 @@ pub struct ProfileSharingDto
     pub is_composition_shared: bool,
     pub is_measures_shared: bool,
     pub is_training_shared: bool,
+    pub is_meals_shared: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -226,6 +227,8 @@ pub struct ProfileSharingRequest
     pub is_measures_shared: bool,
     #[serde(default)]
     pub is_training_shared: Option<bool>,
+    #[serde(default)]
+    pub is_meals_shared: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

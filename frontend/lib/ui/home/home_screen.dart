@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../common/app_theme.dart';
 import '../common/snap_tab_view.dart';
+import '../routine/status_sheet.dart';
 import 'finance_tab.dart';
 import 'groups_tab.dart';
 import 'routine_tab.dart';
@@ -79,36 +80,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         toolbarHeight: 64,
         titleSpacing: 8,
-        title: Semantics(
-          button: true,
-          label: 'home.open_profile'.tr(),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(28),
-            onTap: () => aContext.push('/app/profile'),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
-              child: Row(
+        title: Row(
+          children: [
+            Semantics(
+              button: true,
+              label: 'home.open_profile'.tr(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => aContext.push('/app/profile'),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: StatusAvatar(initials: initials),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: aContext.colors.primary,
-                    foregroundColor: aContext.colors.onPrimary,
-                    child: Text(initials.isEmpty ? '?' : initials, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Text(
-                      fullName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: aContext.palette.inkPrimary),
+                  Semantics(
+                    button: true,
+                    label: 'home.open_profile'.tr(),
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      onTap: () => aContext.push('/app/profile'),
+                      child: Text(
+                        fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: aContext.palette.inkPrimary),
+                      ),
                     ),
                   ),
+                  const StatusLine(),
                 ],
               ),
             ),
-          ),
+          ],
         ),
         bottom: TabBar(
           controller: _tabs,

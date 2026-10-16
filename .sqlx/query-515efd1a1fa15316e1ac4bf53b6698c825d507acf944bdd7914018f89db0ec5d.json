@@ -1,0 +1,186 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE meal_entries\n        SET eaten_on = $2, meal = $3, title = $4, grams = $5, portions = $6, kcal = $7, prot = $8, fat = $9,\n            carb = $10\n        WHERE id = $1\n        RETURNING id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "eaten_on",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "meal: MealSlot",
+        "type_info": {
+          "Custom": {
+            "name": "meal_t",
+            "kind": {
+              "Enum": [
+                "breakfast",
+                "lunch",
+                "dinner",
+                "snack"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "source: MealSource",
+        "type_info": {
+          "Custom": {
+            "name": "meal_source_t",
+            "kind": {
+              "Enum": [
+                "item",
+                "dish",
+                "quick"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "dish_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "grams",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "portions",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "portion_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "is_ml",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "kcal_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "prot_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "fat_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 14,
+        "name": "carb_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 15,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 16,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 17,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 18,
+        "name": "carb",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 19,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
+        "name": "created_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        {
+          "Custom": {
+            "name": "meal_t",
+            "kind": {
+              "Enum": [
+                "breakfast",
+                "lunch",
+                "dinner",
+                "snack"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "515efd1a1fa15316e1ac4bf53b6698c825d507acf944bdd7914018f89db0ec5d"
+}

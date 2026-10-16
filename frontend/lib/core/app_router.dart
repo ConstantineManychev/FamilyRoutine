@@ -161,6 +161,7 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   meal: aState.uri.queryParameters['meal'] == null
                       ? MealSlot.forHour(DateTime.now().hour)
                       : MealSlot.parse(aState.uri.queryParameters['meal']),
+                  markId: aState.uri.queryParameters['mark'],
                 ),
               ),
               _own('product-cats', (_) => const ProductCatsScreen()),

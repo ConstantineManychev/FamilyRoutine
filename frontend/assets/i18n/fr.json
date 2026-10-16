@@ -68,7 +68,8 @@
     "CAT_EXISTS": "Cette catégorie existe déjà à ce niveau.",
     "CAT_IN_USE": "D’autres utilisent cette catégorie : seul un administrateur peut la modifier.",
     "CAT_HAS_CHILDREN": "Supprimez ou déplacez d’abord les sous-catégories.",
-    "TOO_MANY_CATS": "Trop de catégories : supprimez celles qui ne servent plus."
+    "TOO_MANY_CATS": "Trop de catégories : supprimez celles qui ne servent plus.",
+    "MARK_OVERLAP": "Le nouvel horaire recouvre entièrement un autre bloc. Modifiez-le ou supprimez-le d’abord."
   },
   "sidebar": {
     "routine": "Routine",
@@ -134,7 +135,9 @@
     "pwd_required": "Remplissez tous les champs du mot de passe",
     "pwd_mismatch": "Les nouveaux mots de passe ne correspondent pas",
     "pwd_changed": "Mot de passe modifié",
-    "share_training": "Entraînements"
+    "share_training": "Entraînements",
+    "share_meals": "Afficher l’alimentation",
+    "share_meals_hint": "Les membres pourront ouvrir les blocs « Repas » de la frise du jour"
   },
   "dashboard": {
     "welcome": "Bienvenue",
@@ -668,7 +671,7 @@
     "only_mine": "Les miens",
     "public_hint": "Le catalogue est commun : tous les utilisateurs voient le nom, le code-barres et les valeurs nutritionnelles. N’indiquez pas de données personnelles dans le nom. Vos tickets et vos prix restent privés.",
     "readonly_hint": "Seuls son auteur ou un administrateur peuvent modifier cet article.",
-    "in_use_hint": "D’autres utilisateurs ont déjà cet article dans leurs tickets : son nom, son type, son unité et son code-barres ne peuvent plus changer et il ne peut pas être supprimé. Vous pouvez compléter les valeurs nutritionnelles.",
+    "in_use_hint": "D’autres utilisateurs ont déjà ce produit dans leurs tickets : nom, type, unité et code-barres sont figés et il ne peut pas être supprimé. Poids net, poids unitaire et catégorie vides se remplissent une fois ; ensuite seul un administrateur peut les changer. Les valeurs nutritionnelles restent modifiables.",
     "admin_hint": "Vous modifiez en tant qu’administrateur : tous les utilisateurs verront les changements.",
     "nutrition": "Valeurs nutritionnelles pour 100 g ou 100 ml",
     "kcal": "kcal",
@@ -706,7 +709,8 @@
     "net_ml": "ml",
     "net_invalid": "Vérifiez le poids net",
     "category": "Catégorie",
-    "category_hint": "Par exemple Produits laitiers › Fromage › Maasdam. Les prix aux 100 g y sont comparés."
+    "category_hint": "Par exemple Produits laitiers › Fromage › Maasdam. Les prix aux 100 g y sont comparés.",
+    "fill_hint": "Ce produit appartient à quelqu’un d’autre : seuls son auteur ou un administrateur peuvent le modifier, mais chacun peut remplir les champs vides — poids net, poids unitaire, catégorie et valeurs nutritionnelles."
   },
   "routine": {
     "status_home": "Maison",
@@ -724,7 +728,6 @@
     "ago": "il y a {}",
     "minutes": "{} min",
     "hours_minutes": "{} h {} min",
-    "started": "Début :",
     "pick_time": "Autre heure…",
     "note": "Note (facultatif)",
     "my_day": "Ma journée",
@@ -736,10 +739,38 @@
     "you": "vous",
     "empty": "Aucun statut ce jour-là. Indiquez un statut dans le widget « Mon statut ».",
     "tap_to_edit": "Cliquez pour modifier",
-    "edit_mark": "Statut",
+    "edit_mark": "Modifier le bloc",
     "share_title": "Montrer ma routine aux membres du groupe",
     "share_hint": "Désactivé, les membres de ce groupe ne voient pas vos statuts. Les autres groupes se règlent séparément.",
-    "hours": "{} h"
+    "hours": "{} h",
+    "now_label": "Maintenant",
+    "no_status": "Aucun statut",
+    "set_status": "Choisir un statut",
+    "change_status": "Statut : {}. Touchez pour modifier",
+    "start_earlier": "Commencer plus tôt",
+    "pick_hint": "Le nouveau statut commence à l’heure choisie et termine le précédent à ce moment.",
+    "tap_to_open": "Touchez pour ouvrir",
+    "delete_mark": "Supprimer le bloc ?",
+    "delete_mark_confirm": "Le bloc « {} » ({}) sera retiré de la frise du jour.",
+    "start_at": "Début {}",
+    "end_at": "Fin {}",
+    "open_end": "Sans fin",
+    "unlink_hint": "Les entrées restent dans le journal alimentaire mais sont détachées du bloc.",
+    "hidden_workout": "Ce membre ne partage pas ses entraînements avec ce groupe.",
+    "hidden_meals": "Ce membre ne partage pas son alimentation avec ce groupe.",
+    "hidden_private": "Les détails du travail et des études ne sont visibles que par le propriétaire.",
+    "work_placeholder": "Une liste de tâches pour le temps de travail apparaîtra bientôt ici.",
+    "school_placeholder": "Les sujets d’étude et leur progression apparaîtront bientôt ici.",
+    "no_workout_mine": "Aucun entraînement lié. Un entraînement commencé pendant ce bloc apparaîtra ici automatiquement.",
+    "no_workout": "Aucun entraînement enregistré.",
+    "no_exercises": "Aucun exercice.",
+    "open_workout": "Ouvrir l’entraînement",
+    "no_meals_mine": "Rien pour l’instant. Ajoutez un aliment ou liez des entrées du journal de ce jour.",
+    "no_meals": "Rien pour l’instant.",
+    "link_meals": "Lier des entrées",
+    "add_food": "Ajouter un aliment",
+    "no_day_entries": "Le journal ne contient aucune entrée pour ce jour.",
+    "linked_elsewhere": "dans un autre bloc"
   },
   "catalog": {
     "scope": "Enregistrer dans",

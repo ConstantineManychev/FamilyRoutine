@@ -474,3 +474,133 @@ async fn branch_prices_rank_items_per_100_grams(a_db: PgPool)
         StatusCode::BAD_REQUEST
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn anyone_fills_empty_fields_but_filled_ones_stay_with_the_author(a_db: PgPool)
+{
+    let app = TestApp::with_catalog(
+        a_db,
+        catalog_config(&["admin@example.com"], None),
+        ai_config("http://127.0.0.1:9", None),
+    );
+    let alice = app.user("alice@example.com").await;
+    let bob = app.user("bob@example.com").await;
+    let admin = app.user("admin@example.com").await;
+    let uah = app.currency_by_code(&alice.token, "UAH").await;
+    let seeded = tree(&app, &alice).await;
+    let cheese_id = id(node(&seeded, "dairy_cheese"));
+    let milk_id = id(node(&seeded, "dairy_milk"));
+
+    let item = add_item(
+        &app,
+        &alice,
+        json!({ "name": "Сыр из чека", "kind": "food", "unit": "piece" }),
+    )
+    .await;
+    let item_uri = format!("/api/dicts/items/{item}");
+    let fill_uri = format!("/api/dicts/items/{item}/fill");
+    let (status, filled) = send(
+        &app,
+        &bob,
+        Method::PATCH,
+        &fill_uri,
+        Some(json!({
+            "net_qty": "200", "net_measure": "g", "cat_id": cheese_id,
+            "nutrition": { "kcal": "350", "piece_g": "25" }
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{filled}");
+    assert_eq!(filled["net_qty"], "200");
+    assert_eq!(filled["cat_id"], cheese_id.as_str());
+    assert_eq!(filled["nutrition"]["kcal"], "350");
+    assert_eq!(filled["nutrition"]["piece_g"], "25");
+
+    let (_, again) = send(
+        &app,
+        &bob,
+        Method::PATCH,
+        &fill_uri,
+        Some(json!({ "net_qty": "300", "net_measure": "g", "cat_id": milk_id, "nutrition": { "kcal": "1", "fat": "27" } })),
+    )
+    .await;
+    assert_eq!(again["net_qty"], "200");
+    assert_eq!(again["cat_id"], cheese_id.as_str());
+    assert_eq!(again["nutrition"]["kcal"], "350");
+    assert_eq!(again["nutrition"]["fat"], "27");
+
+    let service = add_item(
+        &app,
+        &alice,
+        json!({ "name": "Доставка", "kind": "service", "unit": "piece" }),
+    )
+    .await;
+    assert_eq!(
+        send(
+            &app,
+            &bob,
+            Method::PATCH,
+            &format!("/api/dicts/items/{service}/fill"),
+            Some(json!({ "nutrition": { "kcal": "10" } }))
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    let save = |a_net: &str, a_cat: &str, a_kcal: &str| {
+        json!({
+            "name": "Сыр из чека", "kind": "food", "unit": "piece", "net_qty": a_net, "net_measure": "g",
+            "cat_id": a_cat, "nutrition": { "kcal": a_kcal, "fat": "27", "piece_g": "25" }
+        })
+    };
+    assert_eq!(
+        send(&app, &bob, Method::PUT, &item_uri, Some(save("200", &cheese_id, "350")))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+
+    let (status, _) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/receipts",
+        Some(json!({
+            "receipt_ts": Utc::now() - Duration::days(1), "merchant_name": "АТБ", "curr_id": uah,
+            "items": [{ "item_id": item, "amount": "80" }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, locked) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &item_uri,
+        Some(save("250", &cheese_id, "350")),
+    )
+    .await;
+    assert_eq!(
+        (status, locked["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ITEM_IN_USE"))
+    );
+    assert_eq!(
+        send(&app, &alice, Method::PUT, &item_uri, Some(save("200", &milk_id, "350")))
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    let (status, kbju) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &item_uri,
+        Some(save("200", &cheese_id, "360")),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{kbju}");
+    assert_eq!(kbju["nutrition"]["kcal"], "360");
+    let (status, curated) = send(&app, &admin, Method::PUT, &item_uri, Some(save("250", &milk_id, "360"))).await;
+    assert_eq!(status, StatusCode::OK, "{curated}");
+    assert_eq!(curated["net_qty"], "250");
+}

@@ -23,8 +23,9 @@ class AddFoodScreen extends ConsumerStatefulWidget
 {
   final DateTime date;
   final MealSlot meal;
+  final String? markId;
 
-  const AddFoodScreen({super.key, required this.date, required this.meal});
+  const AddFoodScreen({super.key, required this.date, required this.meal, this.markId});
 
   @override
   ConsumerState<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -109,7 +110,11 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     setState(() => _isBusy = true);
     try
     {
-      await ref.read(apiProv).addMealEntry({'date': dateWire(widget.date), ...aPayload});
+      await ref.read(apiProv).addMealEntry({
+        'date': dateWire(widget.date),
+        ...aPayload,
+        if (widget.markId != null) 'status_mark_id': widget.markId,
+      });
       if (!mounted)
       {
         return;

@@ -223,6 +223,54 @@ void main()
     draft.dispose();
   });
 
+  testWidgets('strangers may only fill empty fields and send just those', (aTester) async
+  {
+    await aTester.pumpWidget(_app(const SizedBox()));
+    await aTester.pumpAndSettle();
+    const foreign = DictItemDto(
+      id: 'i9',
+      name: 'Cheese from a receipt',
+      kind: ItemKind.food,
+      unit: ItemUnit.piece,
+      nutrition: NutritionData(kcal: 350),
+      catId: 'cheese',
+    );
+    final access = ItemFieldAccess.forItem(foreign);
+    expect(access.isKcal, isFalse);
+    expect(access.isFat, isTrue);
+    expect(access.isNet, isTrue);
+    expect(access.isCat, isFalse);
+    expect(access.isAny, isTrue);
+
+    const owned = DictItemDto(
+      id: 'i8',
+      name: 'Mine',
+      kind: ItemKind.food,
+      unit: ItemUnit.piece,
+      netQty: 200,
+      netMeasure: NetMeasure.g,
+      ownerKind: ItemOwnerKind.me,
+      isEditable: true,
+      isInUse: true,
+    );
+    final ownedAccess = ItemFieldAccess.forItem(owned);
+    expect(ownedAccess.isKcal, isTrue);
+    expect(ownedAccess.isNet, isFalse);
+    expect(ownedAccess.isCat, isTrue);
+    expect(ItemFieldAccess.forItem(null).isNet, isTrue);
+
+    final draft = ItemDraft()..load(foreign);
+    draft.fatCtrl.text = '27';
+    draft.netCtrl.text = '200';
+    draft.kcalCtrl.text = '999';
+    expect(draft.fillPayload(foreign), {
+      'nutrition': {'kcal': null, 'prot': null, 'fat': '27.0', 'carb': null, 'piece_g': null},
+      'net_qty': '200.0',
+      'net_measure': 'g',
+    });
+    draft.dispose();
+  });
+
   testWidgets('category label prefers the translation of seeded nodes', (aTester) async
   {
     await aTester.pumpWidget(_app(const SizedBox()));

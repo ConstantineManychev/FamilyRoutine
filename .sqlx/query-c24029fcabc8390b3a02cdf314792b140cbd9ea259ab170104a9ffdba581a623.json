@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE status_marks SET status = $3, note = $4\n        WHERE id = $1 AND user_id = $2\n        RETURNING id, status AS \"status: RoutineStatus\", note, start_ts, end_ts\n        ",
+  "query": "\n        UPDATE status_marks SET status = $3, note = $4, start_ts = $5, end_ts = $6\n        WHERE id = $1 AND user_id = $2\n        RETURNING id, status AS \"status: RoutineStatus\", note, start_ts, end_ts\n        ",
   "describe": {
     "columns": [
       {
@@ -68,7 +68,9 @@
             }
           }
         },
-        "Varchar"
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -79,5 +81,5 @@
       true
     ]
   },
-  "hash": "81f2fd2c1386e20cf6ec1646eaf11ee4c8068ab73e280b5add7a102a5d464320"
+  "hash": "c24029fcabc8390b3a02cdf314792b140cbd9ea259ab170104a9ffdba581a623"
 }

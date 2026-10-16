@@ -6,8 +6,8 @@ use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
-    DictItemDto, ItemKind, ItemOwnerKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery, ItemUnit,
-    ManualPriceDto, MergeItemRequest, NetMeasure, NewItemRequest, NutritionDto, SaveItemRequest,
+    DictItemDto, FillItemRequest, ItemKind, ItemOwnerKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery,
+    ItemUnit, ManualPriceDto, MergeItemRequest, NetMeasure, NewItemRequest, NutritionDto, SaveItemRequest,
     SaveManualPriceRequest,
 };
 use sqlx::PgConnection;
@@ -83,6 +83,10 @@ struct ItemScope
     kind: ItemKind,
     unit: ItemUnit,
     barcode: Option<String>,
+    piece_g: Option<Decimal>,
+    net_qty: Option<Decimal>,
+    net_measure: Option<NetMeasure>,
+    cat_id: Option<Uuid>,
     is_used_by_others: bool,
 }
 
@@ -251,7 +255,10 @@ pub async fn update_item(
         || a_req.kind != scope.kind
         || a_req.unit != scope.unit
         || (scope.barcode.is_some() && barcode != scope.barcode);
-    if is_identity_changed && scope.is_used_by_others && !viewer.is_admin
+    let is_filled_changed = (scope.net_qty.is_some() && (net_qty != scope.net_qty || net_measure != scope.net_measure))
+        || (scope.piece_g.is_some() && nutrition.piece_g != scope.piece_g)
+        || (scope.cat_id.is_some() && a_req.cat_id != scope.cat_id);
+    if (is_identity_changed || is_filled_changed) && scope.is_used_by_others && !viewer.is_admin
     {
         return Err(ApiError::Conflict("ITEM_IN_USE"));
     }
@@ -318,6 +325,57 @@ pub async fn delete_item(
 
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn fill_item(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<FillItemRequest>,
+) -> Result<Json<DictItemDto>, ApiError>
+{
+    let nutrition = check_nutrition(a_req.nutrition.unwrap_or_default())?;
+    let mut tx = a_state.db.begin().await?;
+    let viewer = load_viewer(&a_state, &mut tx, a_user.user_id).await?;
+    let scope = item_scope(&mut tx, a_id, a_user.user_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    if !nutrition.is_empty() && scope.kind != ItemKind::Food
+    {
+        return Err(ApiError::Validation("nutrition"));
+    }
+    let (net_qty, net_measure) = check_net(scope.unit, a_req.net_qty, a_req.net_measure)?;
+    require_cat(&mut tx, a_req.cat_id).await?;
+
+    sqlx::query!(
+        r#"
+        UPDATE items
+        SET kcal = COALESCE(kcal, $2),
+            prot = COALESCE(prot, $3),
+            fat = COALESCE(fat, $4),
+            carb = COALESCE(carb, $5),
+            piece_g = COALESCE(piece_g, $6),
+            net_measure = CASE WHEN net_qty IS NULL THEN $8 ELSE net_measure END,
+            net_qty = COALESCE(net_qty, $7),
+            cat_id = COALESCE(cat_id, $9)
+        WHERE id = $1
+        "#,
+        a_id,
+        nutrition.kcal,
+        nutrition.prot,
+        nutrition.fat,
+        nutrition.carb,
+        nutrition.piece_g,
+        net_qty,
+        net_measure as Option<NetMeasure>,
+        a_req.cat_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let item = load_item(&a_state, &mut tx, &viewer, a_id).await?;
+    tx.commit().await?;
+    Ok(Json(item))
 }
 
 pub async fn merge_item(
@@ -972,6 +1030,10 @@ async fn item_scope(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) -> R
             type AS "kind: ItemKind",
             unit AS "unit: ItemUnit",
             barcode,
+            piece_g,
+            net_qty,
+            net_measure AS "net_measure: NetMeasure",
+            cat_id,
             item_used_by_others(id, $2) AS "is_used_by_others!"
         FROM items
         WHERE id = $1

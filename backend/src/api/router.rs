@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::extract::DefaultBodyLimit;
 use axum::http::header::{ACCEPT, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE};
 use axum::http::{HeaderName, HeaderValue, Method};
-use axum::routing::{get, post, put};
+use axum::routing::{get, patch, post, put};
 use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -156,6 +156,7 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/dicts/product-cats/:id/prices", get(product_cat_handlers::cat_prices))
         .route("/dicts/items/:id/prices", get(item_handlers::item_prices))
         .route("/dicts/items/:id/merge", post(item_handlers::merge_item))
+        .route("/dicts/items/:id/fill", patch(item_handlers::fill_item))
         .route("/dicts/items/:id/price-history", get(catalog_handlers::price_history))
         .route("/dicts/items/:id/last-price", get(catalog_handlers::last_price))
         .route("/dicts/products/lookup/:barcode", get(catalog_handlers::lookup_product))
@@ -220,8 +221,15 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/routine/marks", post(routine_handlers::create_mark))
         .route(
             "/routine/marks/:id",
-            put(routine_handlers::update_mark).delete(routine_handlers::delete_mark),
+            get(routine_handlers::mark_details)
+                .put(routine_handlers::update_mark)
+                .delete(routine_handlers::delete_mark),
         )
+        .route(
+            "/routine/marks/:id/meal-entries",
+            put(routine_handlers::link_mark_meals),
+        )
+        .route("/routine/current", get(routine_handlers::current_mark))
         .route("/routine/timeline", get(routine_handlers::timeline))
         .route(
             "/dashboards",

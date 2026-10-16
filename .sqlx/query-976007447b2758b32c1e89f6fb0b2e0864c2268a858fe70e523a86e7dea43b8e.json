@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND eaten_on = $2\n        ORDER BY created_ts, id\n        ",
+  "query": "\n        SELECT id, eaten_on, meal AS \"meal: MealSlot\", source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND status_mark_id = $2\n        ORDER BY created_ts, id\n        ",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,11 @@
       },
       {
         "ordinal": 19,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -130,7 +135,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Date"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -153,8 +158,9 @@
       false,
       false,
       false,
+      true,
       false
     ]
   },
-  "hash": "3953117c517af49cb00ab95739a7350788985b4c133690b4d3813542c7bf4365"
+  "hash": "976007447b2758b32c1e89f6fb0b2e0864c2268a858fe70e523a86e7dea43b8e"
 }
