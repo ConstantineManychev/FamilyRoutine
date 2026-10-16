@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(SUM(kcal), 0)::numeric AS \"kcal!\"\n        FROM workout_sessions\n        WHERE user_id = $1 AND finished_ts IS NOT NULL AND started_ts >= $2 AND started_ts < $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kcal!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "177dd6567b8ad831f59e6b067c0ff9ca32829736766dfb07f03d4f7d1bd9d537"
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, created_ts\n        )\n        SELECT user_id, $3, meal, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               NOW() + (ROW_NUMBER() OVER (ORDER BY created_ts, id)) * INTERVAL '1 microsecond'\n        FROM meal_entries\n        WHERE user_id = $1 AND eaten_on = $2 AND ($4::meal_t IS NULL OR meal = $4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date",
+        {
+          "Custom": {
+            "name": "meal_t",
+            "kind": {
+              "Enum": [
+                "breakfast",
+                "lunch",
+                "dinner",
+                "snack"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1a1b38117b9e3fec22516c0a0d10060297d2b2e87db021e2287dd2c84698f694"
+}

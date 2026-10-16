@@ -32,6 +32,9 @@ abstract final class AppIcons
   static const IconData circleDot = IconData(0xe345, fontFamily: _family);
   static const IconData clapperboard = IconData(0xe29b, fontFamily: _family);
   static const IconData clock = IconData(0xe087, fontFamily: _family);
+  static const IconData coffee = IconData(0xe096, fontFamily: _family);
+  static const IconData cookie = IconData(0xe26b, fontFamily: _family);
+  static const IconData cookingPot = IconData(0xe584, fontFamily: _family);
   static const IconData copy = IconData(0xe09e, fontFamily: _family);
   static const IconData creditCard = IconData(0xe0aa, fontFamily: _family);
   static const IconData crown = IconData(0xe1d6, fontFamily: _family);
@@ -40,6 +43,7 @@ abstract final class AppIcons
   static const IconData edit = IconData(0xe172, fontFamily: _family);
   static const IconData eye = IconData(0xe0ba, fontFamily: _family);
   static const IconData eyeOff = IconData(0xe0bb, fontFamily: _family);
+  static const IconData flame = IconData(0xe0d2, fontFamily: _family);
   static const IconData fuel = IconData(0xe2af, fontFamily: _family);
   static const IconData globe = IconData(0xe0e8, fontFamily: _family);
   static const IconData graduationCap = IconData(0xe234, fontFamily: _family);
@@ -61,6 +65,7 @@ abstract final class AppIcons
   static const IconData logOut = IconData(0xe10e, fontFamily: _family);
   static const IconData mapPin = IconData(0xe111, fontFamily: _family);
   static const IconData merge = IconData(0xe43f, fontFamily: _family);
+  static const IconData minus = IconData(0xe11c, fontFamily: _family);
   static const IconData moon = IconData(0xe11e, fontFamily: _family);
   static const IconData moreVertical = IconData(0xe0b7, fontFamily: _family);
   static const IconData navigation = IconData(0xe123, fontFamily: _family);
@@ -83,10 +88,13 @@ abstract final class AppIcons
   static const IconData shoppingBag = IconData(0xe15b, fontFamily: _family);
   static const IconData shoppingCart = IconData(0xe15c, fontFamily: _family);
   static const IconData slidersHorizontal = IconData(0xe29a, fontFamily: _family);
+  static const IconData soup = IconData(0xe3aa, fontFamily: _family);
   static const IconData sparkles = IconData(0xe412, fontFamily: _family);
   static const IconData store = IconData(0xe3e4, fontFamily: _family);
   static const IconData sun = IconData(0xe178, fontFamily: _family);
   static const IconData sunMoon = IconData(0xe2b2, fontFamily: _family);
+  static const IconData sunrise = IconData(0xe179, fontFamily: _family);
+  static const IconData sunset = IconData(0xe17a, fontFamily: _family);
   static const IconData table = IconData(0xe17d, fontFamily: _family);
   static const IconData tag = IconData(0xe17f, fontFamily: _family);
   static const IconData ticket = IconData(0xe20f, fontFamily: _family);

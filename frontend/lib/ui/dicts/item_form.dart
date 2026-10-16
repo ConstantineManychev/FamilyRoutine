@@ -19,6 +19,7 @@ const int _labelQuality = 80;
 const int _maxLabelBytes = 2 * 1024 * 1024;
 const double _maxKcal = 1000;
 const double _maxGrams = 100;
+const double _maxPieceG = 10000;
 
 IconData itemKindIcon(ItemKind aKind)
 {
@@ -86,6 +87,7 @@ class ItemDraft extends ChangeNotifier
   final protCtrl = TextEditingController();
   final fatCtrl = TextEditingController();
   final carbCtrl = TextEditingController();
+  final pieceCtrl = TextEditingController();
   ItemKind kind = ItemKind.product;
   ItemUnit unit = ItemUnit.piece;
 
@@ -126,6 +128,7 @@ class ItemDraft extends ChangeNotifier
         prot: _parse(protCtrl),
         fat: _parse(fatCtrl),
         carb: _parse(carbCtrl),
+        pieceG: _parse(pieceCtrl),
       );
 
   bool get isNutritionValid
@@ -141,7 +144,9 @@ class ItemDraft extends ChangeNotifier
       return value != null && value >= 0 && value <= aMax;
     }
 
-    return isValid(kcalCtrl, _maxKcal) && isValid(protCtrl, _maxGrams) && isValid(fatCtrl, _maxGrams) && isValid(carbCtrl, _maxGrams);
+    final piece = _parse(pieceCtrl);
+    final isPieceValid = pieceCtrl.text.trim().isEmpty || (piece != null && piece > 0 && piece <= _maxPieceG);
+    return isValid(kcalCtrl, _maxKcal) && isValid(protCtrl, _maxGrams) && isValid(fatCtrl, _maxGrams) && isValid(carbCtrl, _maxGrams) && isPieceValid;
   }
 
   String? validate()
@@ -210,6 +215,7 @@ class ItemDraft extends ChangeNotifier
     fill(protCtrl, aNutrition.prot);
     fill(fatCtrl, aNutrition.fat);
     fill(carbCtrl, aNutrition.carb);
+    fill(pieceCtrl, aNutrition.pieceG);
   }
 
   static double? _parse(TextEditingController aCtrl)
@@ -221,7 +227,7 @@ class ItemDraft extends ChangeNotifier
   @override
   void dispose()
   {
-    for (final ctrl in [nameCtrl, barcodeCtrl, kcalCtrl, protCtrl, fatCtrl, carbCtrl])
+    for (final ctrl in [nameCtrl, barcodeCtrl, kcalCtrl, protCtrl, fatCtrl, carbCtrl, pieceCtrl])
     {
       ctrl.dispose();
     }
@@ -551,6 +557,16 @@ class _ItemFormFieldsState extends ConsumerState<ItemFormFields>
                   _nutrientField(_draft.carbCtrl, 'items.carb'),
                 ],
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _nutrientField(_draft.pieceCtrl, 'items.piece_g'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('items.piece_g_hint'.tr(), style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted)),
+                  ),
+                ],
+              ),
             ],
           ],
         );
@@ -563,8 +579,9 @@ class ItemCreateDialog extends ConsumerStatefulWidget
 {
   final String initialName;
   final String? initialBarcode;
+  final ItemKind? initialKind;
 
-  const ItemCreateDialog({super.key, required this.initialName, this.initialBarcode});
+  const ItemCreateDialog({super.key, required this.initialName, this.initialBarcode, this.initialKind});
 
   @override
   ConsumerState<ItemCreateDialog> createState() => _ItemCreateDialogState();
@@ -572,7 +589,8 @@ class ItemCreateDialog extends ConsumerStatefulWidget
 
 class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
 {
-  late final ItemDraft _draft = ItemDraft(aName: widget.initialName.trim(), aBarcode: widget.initialBarcode);
+  late final ItemDraft _draft = ItemDraft(aName: widget.initialName.trim(), aBarcode: widget.initialBarcode)
+    ..kind = widget.initialKind ?? ItemKind.product;
   bool _isSaving = false;
 
   @override
@@ -650,7 +668,7 @@ class _ItemCreateDialogState extends ConsumerState<ItemCreateDialog>
   }
 }
 
-Future<DictItemDto?> showItemCreateDialog(BuildContext aContext, String aInitialName)
+Future<DictItemDto?> showItemCreateDialog(BuildContext aContext, String aInitialName, {ItemKind? aKind})
 {
   final isBarcode = isValidGtin(aInitialName);
   return showDialog<DictItemDto>(
@@ -658,6 +676,7 @@ Future<DictItemDto?> showItemCreateDialog(BuildContext aContext, String aInitial
     builder: (_) => ItemCreateDialog(
       initialName: isBarcode ? '' : aInitialName,
       initialBarcode: isBarcode ? normalizeBarcode(aInitialName) : null,
+      initialKind: aKind,
     ),
   );
 }

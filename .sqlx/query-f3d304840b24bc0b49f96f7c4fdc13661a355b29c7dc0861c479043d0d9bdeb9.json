@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM dish_ingredients WHERE dish_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f3d304840b24bc0b49f96f7c4fdc13661a355b29c7dc0861c479043d0d9bdeb9"
+}

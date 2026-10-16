@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE dishes\n        SET name = $3, note = $4, cooked_g = $5, serving_g = $6, servings = $7, is_shared = $8, updated_ts = NOW()\n        WHERE id = $1 AND owner_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a8703f4fb2107aa16b94558b72d4ebf9fe2ba7153596d93ba1835c95c738118"
+}

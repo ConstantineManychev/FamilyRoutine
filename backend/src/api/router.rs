@@ -12,9 +12,9 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
-    fam_handlers, geo_handlers, item_handlers, place_handlers, planner_handlers, profile_handlers, receipt_handlers,
-    recognize_handlers, routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers,
-    wallet_handlers, well_known_handlers,
+    fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers, profile_handlers,
+    receipt_handlers, recognize_handlers, routine_handlers, stats_handlers, training_handlers, tx_handlers,
+    user_handlers, wallet_handlers, well_known_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -56,7 +56,29 @@ pub fn build_router(a_state: AppState) -> Router
             "/people/:id/training/sessions/:session_id",
             get(training_handlers::person_session),
         )
+        .route(
+            "/people/:id/training/exercises/:ex_id/progress",
+            get(training_handlers::person_exercise_progress),
+        )
         .route("/families/:id/children", post(profile_handlers::create_child))
+        .route(
+            "/dishes",
+            get(nutrition_handlers::list_dishes).post(nutrition_handlers::create_dish),
+        )
+        .route(
+            "/dishes/:id",
+            get(nutrition_handlers::get_dish)
+                .put(nutrition_handlers::update_dish)
+                .delete(nutrition_handlers::delete_dish),
+        )
+        .route("/nutrition/day", get(nutrition_handlers::nutrition_day))
+        .route("/nutrition/entries", post(nutrition_handlers::create_entry))
+        .route(
+            "/nutrition/entries/:id",
+            put(nutrition_handlers::update_entry).delete(nutrition_handlers::delete_entry),
+        )
+        .route("/nutrition/recent", get(nutrition_handlers::recent_foods))
+        .route("/nutrition/copy", post(nutrition_handlers::copy_meals))
         .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),

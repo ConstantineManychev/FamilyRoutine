@@ -31,6 +31,7 @@ const MAX_OBSERVATIONS: i64 = 5000;
 const MAX_PRICE_AGE_DAYS: i64 = 3650;
 const MAX_KCAL: i64 = 1000;
 const MAX_GRAMS: i64 = 100;
+const MAX_PIECE_G: i64 = 10_000;
 
 pub struct Viewer
 {
@@ -49,6 +50,7 @@ struct ItemRow
     prot: Option<Decimal>,
     fat: Option<Decimal>,
     carb: Option<Decimal>,
+    piece_g: Option<Decimal>,
     owner_kind: String,
     owner_name: Option<String>,
     is_editable: bool,
@@ -64,6 +66,7 @@ struct ItemFilter<'a>
     query_barcode: Option<&'a str>,
     barcode: Option<&'a str>,
     is_mine: bool,
+    kind: Option<ItemKind>,
 }
 
 struct ItemScope
@@ -110,6 +113,7 @@ impl From<ItemRow> for DictItemDto
             prot: a_row.prot.map(|value| value.normalize()),
             fat: a_row.fat.map(|value| value.normalize()),
             carb: a_row.carb.map(|value| value.normalize()),
+            piece_g: a_row.piece_g.map(|value| value.normalize()),
         };
         Self {
             id: a_row.id,
@@ -148,6 +152,7 @@ pub async fn list_items(
         query_barcode: query_barcode.as_deref(),
         barcode: barcode.as_deref(),
         is_mine: a_query.is_mine,
+        kind: a_query.kind,
         ..ItemFilter::default()
     };
 
@@ -184,8 +189,8 @@ pub async fn create_item(
 
     let id = sqlx::query_scalar!(
         r#"
-        INSERT INTO items (owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb)
-        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO items (owner_id, created_by, name, type, unit, barcode, kcal, prot, fat, carb, piece_g)
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id
         "#,
         a_user.user_id,
@@ -196,7 +201,8 @@ pub async fn create_item(
         nutrition.kcal,
         nutrition.prot,
         nutrition.fat,
-        nutrition.carb
+        nutrition.carb,
+        nutrition.piece_g
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -241,7 +247,8 @@ pub async fn update_item(
     sqlx::query!(
         r#"
         UPDATE items
-        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9
+        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9,
+            piece_g = $10
         WHERE id = $1
         "#,
         a_id,
@@ -252,7 +259,8 @@ pub async fn update_item(
         nutrition.kcal,
         nutrition.prot,
         nutrition.fat,
-        nutrition.carb
+        nutrition.carb,
+        nutrition.piece_g
     )
     .execute(&mut *tx)
     .await?;
@@ -331,7 +339,14 @@ pub async fn merge_item(
     .execute(&mut *tx)
     .await?;
     sqlx::query!(
-        "UPDATE meal_items SET item_id = $2 WHERE item_id = $1",
+        "UPDATE meal_entries SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE dish_ingredients SET item_id = $2 WHERE item_id = $1",
         a_id,
         a_req.target_id
     )
@@ -346,7 +361,7 @@ pub async fn merge_item(
     .await?;
 
     let removed = sqlx::query!(
-        "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb",
+        "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb, piece_g",
         a_id
     )
     .fetch_one(&mut *tx)
@@ -362,7 +377,8 @@ pub async fn merge_item(
                 kcal = COALESCE(kcal, $3),
                 prot = COALESCE(prot, $4),
                 fat = COALESCE(fat, $5),
-                carb = COALESCE(carb, $6)
+                carb = COALESCE(carb, $6),
+                piece_g = COALESCE(piece_g, $7)
             WHERE id = $1
             "#,
             a_req.target_id,
@@ -370,7 +386,8 @@ pub async fn merge_item(
             removed.kcal,
             removed.prot,
             removed.fat,
-            removed.carb
+            removed.carb,
+            removed.piece_g
         )
         .execute(&mut *tx)
         .await?;
@@ -749,6 +766,14 @@ fn check_nutrition(a_nutrition: NutritionDto) -> Result<NutritionDto, ApiError>
         prot: bounded(a_nutrition.prot, MAX_GRAMS, "nutrition.prot")?,
         fat: bounded(a_nutrition.fat, MAX_GRAMS, "nutrition.fat")?,
         carb: bounded(a_nutrition.carb, MAX_GRAMS, "nutrition.carb")?,
+        piece_g: match a_nutrition.piece_g
+        {
+            Some(value) if value <= Decimal::ZERO || value > Decimal::from(MAX_PIECE_G) =>
+            {
+                return Err(ApiError::Validation("nutrition.piece_g"))
+            }
+            other => other.map(|value| value.round_dp(1).normalize()),
+        },
     })
 }
 
@@ -779,6 +804,7 @@ async fn query_items(
             i.prot,
             i.fat,
             i.carb,
+            i.piece_g,
             CASE
                 WHEN i.owner_id = $1 THEN 'me'
                 WHEN i.owner_id IS NULL OR LOWER(ou.email) = ANY($2) THEN 'catalog'
@@ -802,6 +828,7 @@ async fn query_items(
           AND ($5::text IS NULL OR i.name ILIKE $5 OR i.barcode = $6)
           AND ($7::text IS NULL OR i.barcode = $7)
           AND (NOT $8 OR i.owner_id IS NOT DISTINCT FROM $1)
+          AND ($11::item_t IS NULL OR i.type = $11)
         ORDER BY (i.barcode IS NOT NULL AND i.barcode IS NOT DISTINCT FROM $6) DESC,
                  ($9::text IS NOT NULL AND i.name ILIKE $9) DESC,
                  (i.owner_id IS NOT DISTINCT FROM $1) DESC,
@@ -818,7 +845,8 @@ async fn query_items(
         a_filter.barcode,
         a_filter.is_mine,
         a_filter.prefix,
-        a_limit
+        a_limit,
+        a_filter.kind as Option<ItemKind>
     )
     .fetch_all(&mut *a_conn)
     .await?;

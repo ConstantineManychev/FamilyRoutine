@@ -144,8 +144,22 @@ class _PersonSessionScreenState extends ConsumerState<PersonSessionScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(exerciseName(aExercise.exCode, aExercise.exName), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    exerciseName(aExercise.exCode, aExercise.exName),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'training.progress'.tr(),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => context.push('/app/people/${widget.personId}/exercises/${aExercise.exId}'),
+                  icon: const Icon(AppIcons.trendingUp, size: 18),
+                ),
+              ],
+            ),
             Text(
               done.isEmpty ? 'training.sets_done'.tr(args: ['0']) : describeSets(aContext, done),
               style: TextStyle(color: context.palette.inkSecondary),

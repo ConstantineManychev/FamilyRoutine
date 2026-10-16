@@ -636,12 +636,34 @@ pub async fn exercise_progress(
 ) -> Result<Json<ExerciseProgressDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
+    load_progress(&mut conn, a_user.user_id, a_ex_id).await.map(Json)
+}
+
+pub async fn person_exercise_progress(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_person_id, a_ex_id)): ApiPath<(Uuid, Uuid)>,
+) -> Result<Json<ExerciseProgressDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    profile_access(&mut conn, a_user.user_id, a_person_id)
+        .await?
+        .require_training()?;
+    load_progress(&mut conn, a_person_id, a_ex_id).await.map(Json)
+}
+
+async fn load_progress(
+    a_conn: &mut PgConnection,
+    a_owner_id: Uuid,
+    a_ex_id: Uuid,
+) -> Result<ExerciseProgressDto, ApiError>
+{
     let exercise = sqlx::query!(
         "SELECT id, code, name FROM dict_exs WHERE id = $1 AND (NOT is_custom OR created_by = $2)",
         a_ex_id,
-        a_user.user_id
+        a_owner_id
     )
-    .fetch_optional(&mut *conn)
+    .fetch_optional(&mut *a_conn)
     .await?
     .ok_or(ApiError::NotFound)?;
 
@@ -661,11 +683,11 @@ pub async fn exercise_progress(
         JOIN session_sets ss ON ss.session_exercise_id = se.id AND ss.is_done
         ORDER BY s.started_ts, s.id, se.position, ss.set_index
         "#,
-        a_user.user_id,
+        a_owner_id,
         a_ex_id,
         PROGRESS_SESSIONS
     )
-    .fetch_all(&mut *conn)
+    .fetch_all(&mut *a_conn)
     .await?;
 
     let mut points = Vec::new();
@@ -700,13 +722,13 @@ pub async fn exercise_progress(
         ProgressMeasure::Duration
     };
 
-    Ok(Json(ExerciseProgressDto {
+    Ok(ExerciseProgressDto {
         ex_id: exercise.id,
         ex_code: exercise.code,
         ex_name: exercise.name,
         measure,
         points,
-    }))
+    })
 }
 
 pub async fn get_session(

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meal_entries SET item_id = $2 WHERE item_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1a2f1bf8df65aa539aa2f381d2bd32aee267ec60c0e3f137b2c3300ca84f2f14"
+}

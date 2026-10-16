@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE items\n        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9\n        WHERE id = $1\n        ",
+  "query": "\n        UPDATE items\n        SET name = $2, type = $3, unit = $4, barcode = $5, kcal = $6, prot = $7, fat = $8, carb = $9,\n            piece_g = $10\n        WHERE id = $1\n        ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -38,10 +38,11 @@
         "Numeric",
         "Numeric",
         "Numeric",
+        "Numeric",
         "Numeric"
       ]
     },
     "nullable": []
   },
-  "hash": "1921f3a6c951fd3cf70292bdf2730c9b56549281a158b060bd7a42a67f4ac0cc"
+  "hash": "75f4d818c2ebdde9be8daaa5e84313a7a4ea57486cc8e062b7ab46fc799796db"
 }

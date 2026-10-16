@@ -20,6 +20,11 @@ import '../ui/home/app_frame.dart';
 import '../ui/home/fam_detail_screen.dart';
 import '../ui/home/fam_groups_screen.dart';
 import '../ui/home/home_screen.dart';
+import '../ui/nutrition/add_food_screen.dart';
+import '../ui/nutrition/dish_editor_screen.dart';
+import '../ui/nutrition/dishes_screen.dart';
+import '../ui/nutrition/nutrition_diary_screen.dart';
+import '../ui/nutrition/nutrition_format.dart';
 import '../ui/places/place_detail_screen.dart';
 import '../ui/places/places_screen.dart';
 import '../ui/planner/plan_event_editor_screen.dart';
@@ -131,6 +136,14 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                 ),
               ),
               _sub(
+                'people/:id/exercises/:ex',
+                (aState) => ExerciseProgressScreen(
+                  key: ValueKey(aState.uri.path),
+                  exId: _param(aState, 'ex')!,
+                  personId: _param(aState, 'id'),
+                ),
+              ),
+              _sub(
                 'people/:id/metrics/:metric',
                 (aState) => MetricHistoryScreen(
                   key: ValueKey(aState.uri.path),
@@ -138,6 +151,20 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   metric: BodyMetric.parse(_param(aState, 'metric')) ?? BodyMetric.weight,
                 ),
               ),
+              _own('nutrition', (aState) => NutritionDiaryScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
+              _own(
+                'nutrition/add',
+                (aState) => AddFoodScreen(
+                  key: ValueKey(aState.uri.toString()),
+                  date: dayOnly(DateTime.tryParse(aState.uri.queryParameters['date'] ?? '') ?? DateTime.now()),
+                  meal: aState.uri.queryParameters['meal'] == null
+                      ? MealSlot.forHour(DateTime.now().hour)
+                      : MealSlot.parse(aState.uri.queryParameters['meal']),
+                ),
+              ),
+              _own('dishes', (_) => const DishesScreen()),
+              _own('dishes/new', (_) => const DishEditorScreen()),
+              _own('dishes/:id', (aState) => DishEditorScreen(key: ValueKey(_param(aState, 'id')), dishId: _param(aState, 'id'))),
               _own('exercises', (_) => const ExercisesScreen()),
               _sub('exercises/new', (_) => const ExerciseDetailScreen()),
               _sub('exercises/:id', (aState) => ExerciseDetailScreen(exId: _param(aState, 'id'))),

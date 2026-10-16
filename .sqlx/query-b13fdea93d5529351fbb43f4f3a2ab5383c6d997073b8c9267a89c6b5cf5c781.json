@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE meal_items SET item_id = $2 WHERE item_id = $1",
+  "query": "DELETE FROM dishes WHERE id = $1 AND owner_id = $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "e174c73cd06529d3aeb16b217429bff22d8f1f75a2338fc4b1ad55fbbbc6d6d6"
+  "hash": "b13fdea93d5529351fbb43f4f3a2ab5383c6d997073b8c9267a89c6b5cf5c781"
 }

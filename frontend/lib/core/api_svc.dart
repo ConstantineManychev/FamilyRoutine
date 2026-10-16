@@ -428,13 +428,14 @@ class ApiSvc
 
   Future<void> deleteTransfer(String aTransferId) => _dio.delete('/api/transfers/$aTransferId');
 
-  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode, bool aIsMine = false}) async
+  Future<List<DictItemDto>> getItems({String? aQuery, int? aLimit, String? aBarcode, bool aIsMine = false, ItemKind? aKind}) async
   {
     final res = await _dio.get('/api/dicts/items', queryParameters: {
       if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
       if (aLimit != null) 'limit': aLimit,
       if (aBarcode != null) 'barcode': aBarcode,
       if (aIsMine) 'is_mine': true,
+      if (aKind != null) 'kind': aKind.name,
     });
     return _list(res.data, DictItemDto.fromJson);
   }
@@ -485,6 +486,67 @@ class ApiSvc
   }
 
   Future<void> deleteItem(String aId) => _dio.delete('/api/dicts/items/$aId');
+
+  Future<List<Dish>> getDishes({String? aQuery}) async
+  {
+    final res = await _dio.get('/api/dishes', queryParameters: {
+      if (aQuery != null && aQuery.trim().isNotEmpty) 'q': aQuery.trim(),
+    });
+    return _list(res.data, Dish.fromJson);
+  }
+
+  Future<Dish> getDish(String aId) async
+  {
+    final res = await _dio.get('/api/dishes/$aId');
+    return Dish.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<Dish> saveDish(String? aId, Map<String, dynamic> aPayload) async
+  {
+    final res = aId == null ? await _dio.post('/api/dishes', data: aPayload) : await _dio.put('/api/dishes/$aId', data: aPayload);
+    return Dish.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteDish(String aId) => _dio.delete('/api/dishes/$aId');
+
+  Future<NutritionDay> getNutritionDay(DateTime aDate) async
+  {
+    final res = await _dio.get('/api/nutrition/day', queryParameters: {
+      'date': dateWire(aDate),
+      'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+    });
+    return NutritionDay.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MealEntry> addMealEntry(Map<String, dynamic> aPayload) async
+  {
+    final res = await _dio.post('/api/nutrition/entries', data: aPayload);
+    return MealEntry.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MealEntry> updateMealEntry(String aId, Map<String, dynamic> aPayload) async
+  {
+    final res = await _dio.put('/api/nutrition/entries/$aId', data: aPayload);
+    return MealEntry.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMealEntry(String aId) => _dio.delete('/api/nutrition/entries/$aId');
+
+  Future<List<RecentFood>> getRecentFoods() async
+  {
+    final res = await _dio.get('/api/nutrition/recent');
+    return _list(res.data, RecentFood.fromJson);
+  }
+
+  Future<int> copyMeals(DateTime aFrom, DateTime aTo, {MealSlot? aMeal}) async
+  {
+    final res = await _dio.post('/api/nutrition/copy', data: {
+      'from': dateWire(aFrom),
+      'to': dateWire(aTo),
+      if (aMeal != null) 'meal': aMeal.name,
+    });
+    return ((res.data as Map<String, dynamic>)['copied'] as num?)?.toInt() ?? 0;
+  }
 
   Future<ItemPricesData> getItemPrices(String aId, {String? aConvertTo}) async
   {
@@ -902,6 +964,12 @@ class ApiSvc
   Future<ExerciseProgress> getExerciseProgress(String aExId) async
   {
     final res = await _dio.get('/api/training/exercises/$aExId/progress');
+    return ExerciseProgress.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<ExerciseProgress> getPersonExerciseProgress(String aPersonId, String aExId) async
+  {
+    final res = await _dio.get('/api/people/$aPersonId/training/exercises/$aExId/progress');
     return ExerciseProgress.fromJson(res.data as Map<String, dynamic>);
   }
 

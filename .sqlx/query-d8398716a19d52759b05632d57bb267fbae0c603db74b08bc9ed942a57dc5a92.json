@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            d.id,\n            d.owner_id,\n            d.name,\n            d.note,\n            d.cooked_g,\n            d.serving_g,\n            d.servings,\n            d.is_shared,\n            d.updated_ts,\n            CASE WHEN d.owner_id <> $1 THEN u.first_name || ' ' || u.last_name END AS owner_name\n        FROM dishes d\n        JOIN users u ON u.id = d.owner_id\n        WHERE ($2::uuid IS NULL OR d.id = $2)\n          AND ($3::text IS NULL OR d.name ILIKE $3)\n          AND (\n              d.owner_id = $1\n              OR (d.is_shared AND EXISTS (\n                  SELECT 1\n                  FROM family_mems mine\n                  JOIN family_mems theirs ON theirs.family_id = mine.family_id\n                  WHERE mine.user_id = $1 AND theirs.user_id = d.owner_id\n              ))\n          )\n        ORDER BY (d.owner_id = $1) DESC, LOWER(d.name), d.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cooked_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "serving_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "servings",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "is_shared",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "owner_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "d8398716a19d52759b05632d57bb267fbae0c603db74b08bc9ed942a57dc5a92"
+}

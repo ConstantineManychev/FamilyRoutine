@@ -22,8 +22,9 @@ const int _tickTarget = 4;
 class ExerciseProgressScreen extends ConsumerStatefulWidget
 {
   final String exId;
+  final String? personId;
 
-  const ExerciseProgressScreen({super.key, required this.exId});
+  const ExerciseProgressScreen({super.key, required this.exId, this.personId});
 
   @override
   ConsumerState<ExerciseProgressScreen> createState() => _ExerciseProgressScreenState();
@@ -46,7 +47,11 @@ class _ExerciseProgressScreenState extends ConsumerState<ExerciseProgressScreen>
     setState(() => _error = null);
     try
     {
-      final progress = await ref.read(apiProv).getExerciseProgress(widget.exId);
+      final personId = widget.personId;
+      final api = ref.read(apiProv);
+      final progress = personId == null
+          ? await api.getExerciseProgress(widget.exId)
+          : await api.getPersonExerciseProgress(personId, widget.exId);
       if (mounted)
       {
         setState(() => _progress = progress);

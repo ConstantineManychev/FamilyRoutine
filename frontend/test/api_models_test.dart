@@ -218,13 +218,14 @@ void main()
         'name': 'Молоко',
         'kind': 'food',
         'unit': 'liter',
-        'nutrition': {'kcal': '52', 'prot': '2.8', 'fat': null, 'carb': '4.7'},
+        'nutrition': {'kcal': '52', 'prot': '2.8', 'fat': null, 'carb': '4.7', 'piece_g': '200'},
         'owner_kind': 'me',
         'is_editable': true,
         'is_in_use': true,
       });
       expect(locked.nutrition.kcal, 52);
       expect(locked.nutrition.fat, isNull);
+      expect(locked.nutrition.pieceG, 200);
       expect(locked.canEditIdentity, isFalse);
       expect(locked.canDelete, isFalse);
       final adminView = DictItemDto.fromJson({...{'id': 'i3', 'name': 'Сир', 'kind': 'food', 'unit': 'kilogram'}, 'owner_kind': 'user', 'is_editable': true, 'is_in_use': true});
@@ -239,14 +240,14 @@ void main()
           ItemKind.food,
           ItemUnit.piece,
           aBarcode: ' 4820024700016 ',
-          aNutrition: const NutritionData(kcal: 2, fat: 0.1),
+          aNutrition: const NutritionData(kcal: 2, fat: 0.1, pieceG: 250),
         ),
         {
           'name': 'Кава',
           'kind': 'food',
           'unit': 'piece',
           'barcode': '4820024700016',
-          'nutrition': {'kcal': '2.0', 'prot': null, 'fat': '0.1', 'carb': null},
+          'nutrition': {'kcal': '2.0', 'prot': null, 'fat': '0.1', 'carb': null, 'piece_g': '250.0'},
         },
       );
 

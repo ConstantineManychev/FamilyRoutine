@@ -340,8 +340,52 @@ async fn trainings_are_visible_to_the_group(a_db: PgPool)
     let (_, profile) = send(&app, &boris, Method::GET, &format!("/api/people/{}", anna.id), None).await;
     assert_eq!(profile["is_training_visible"], true);
 
+    let (status, saved) = send(
+        &app,
+        &anna,
+        Method::PUT,
+        &format!("/api/training/sessions/{session_id}"),
+        Some(json!({ "exercises": [{
+            "ex_id": bench, "reps_min": 8, "reps_max": 10,
+            "sets": [{ "reps": 9, "weight_kg": "50", "is_done": true }]
+        }] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    let (status, _) = send(
+        &app,
+        &anna,
+        Method::POST,
+        &format!("/api/training/sessions/{session_id}/finish"),
+        Some(json!({ "intensity": 5 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let progress_uri = format!(
+        "/api/people/{}/training/exercises/{}/progress",
+        anna.id,
+        bench.as_str().unwrap()
+    );
+    let (status, progress) = send(&app, &boris, Method::GET, &progress_uri, None).await;
+    assert_eq!(status, StatusCode::OK, "{progress}");
+    assert_eq!(progress["points"].as_array().unwrap().len(), 1);
+    assert_eq!(progress["points"][0]["top_weight_kg"], "50.00");
+    let (_, own_progress) = send(
+        &app,
+        &boris,
+        Method::GET,
+        &format!("/api/training/exercises/{}/progress", bench.as_str().unwrap()),
+        None,
+    )
+    .await;
+    assert_eq!(own_progress["points"], json!([]));
+
     assert_eq!(
         send(&app, &eve, Method::GET, &overview_uri, None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&app, &eve, Method::GET, &progress_uri, None).await.0,
         StatusCode::NOT_FOUND
     );
 
@@ -363,6 +407,10 @@ async fn trainings_are_visible_to_the_group(a_db: PgPool)
     );
     assert_eq!(
         send(&app, &boris, Method::GET, &session_uri, None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&app, &boris, Method::GET, &progress_uri, None).await.0,
         StatusCode::NOT_FOUND
     );
     let (_, profile) = send(&app, &boris, Method::GET, &format!("/api/people/{}", anna.id), None).await;

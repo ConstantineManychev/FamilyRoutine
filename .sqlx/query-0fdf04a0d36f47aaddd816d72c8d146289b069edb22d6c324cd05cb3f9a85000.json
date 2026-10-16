@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO dish_ingredients (dish_id, position, item_id, grams)\n        SELECT $1, (t.ord - 1)::smallint, t.item_id, t.grams\n        FROM UNNEST($2::uuid[], $3::numeric[]) WITH ORDINALITY AS t(item_id, grams, ord)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "NumericArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0fdf04a0d36f47aaddd816d72c8d146289b069edb22d6c324cd05cb3f9a85000"
+}

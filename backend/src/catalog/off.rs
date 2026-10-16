@@ -189,6 +189,7 @@ fn parse_nutrition(a_nutriments: &Value) -> NutritionDto
         prot: bounded(number(&a_nutriments["proteins_100g"]), MAX_GRAMS),
         fat: bounded(number(&a_nutriments["fat_100g"]), MAX_GRAMS),
         carb: bounded(number(&a_nutriments["carbohydrates_100g"]), MAX_GRAMS),
+        piece_g: None,
     }
 }
 

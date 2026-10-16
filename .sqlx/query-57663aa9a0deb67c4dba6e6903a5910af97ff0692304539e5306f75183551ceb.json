@@ -1,0 +1,90 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            di.dish_id,\n            di.item_id,\n            i.name AS item_name,\n            i.unit AS \"unit: ItemUnit\",\n            i.piece_g,\n            di.grams,\n            i.kcal,\n            i.prot,\n            i.fat,\n            i.carb\n        FROM dish_ingredients di\n        JOIN items i ON i.id = di.item_id\n        WHERE di.dish_id = ANY($1)\n        ORDER BY di.dish_id, di.position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dish_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "item_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "grams",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "carb",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "57663aa9a0deb67c4dba6e6903a5910af97ff0692304539e5306f75183551ceb"
+}

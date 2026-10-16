@@ -49,6 +49,7 @@ class _AppFrameState extends ConsumerState<AppFrame>
     return [
       for (final dict in serverDicts)
         if (_serverDictRoutes[dict.id] case final target?) _DictLink(dict.name.tr(), target.$1, target.$2),
+      _DictLink('dicts.dishes'.tr(), AppIcons.cookingPot, '/app/dishes'),
       _DictLink('sidebar.places'.tr(), AppIcons.mapPin, '/app/places'),
       _DictLink('sidebar.cities'.tr(), AppIcons.building2, '/app/cities'),
       _DictLink('sidebar.streets'.tr(), AppIcons.navigation, '/app/streets'),

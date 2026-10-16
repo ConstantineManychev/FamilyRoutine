@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb",
+  "query": "DELETE FROM items WHERE id = $1 RETURNING barcode, kcal, prot, fat, carb, piece_g",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,11 @@
         "ordinal": 4,
         "name": "carb",
         "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "piece_g",
+        "type_info": "Numeric"
       }
     ],
     "parameters": {
@@ -39,8 +44,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "37cea70aa00abb22c35b8dad3f7c3ce65bca5cad6c3ac374dc19c149ee411a9c"
+  "hash": "b315dec27a2d0c5b7fc1c565a9fa4972cbcf0b39599a8580bb0630dae9576215"
 }

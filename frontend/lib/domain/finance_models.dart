@@ -119,12 +119,13 @@ class NutritionData
   final double? prot;
   final double? fat;
   final double? carb;
+  final double? pieceG;
 
-  const NutritionData({this.kcal, this.prot, this.fat, this.carb});
+  const NutritionData({this.kcal, this.prot, this.fat, this.carb, this.pieceG});
 
   static const NutritionData empty = NutritionData();
 
-  bool get isEmpty => kcal == null && prot == null && fat == null && carb == null;
+  bool get isEmpty => kcal == null && prot == null && fat == null && carb == null && pieceG == null;
 
   factory NutritionData.fromJson(Object? aJson)
   {
@@ -137,6 +138,7 @@ class NutritionData
       prot: parseDecimalOrNull(aJson['prot']),
       fat: parseDecimalOrNull(aJson['fat']),
       carb: parseDecimalOrNull(aJson['carb']),
+      pieceG: parseDecimalOrNull(aJson['piece_g']),
     );
   }
 
@@ -147,6 +149,7 @@ class NutritionData
         'prot': _wire(prot),
         'fat': _wire(fat),
         'carb': _wire(carb),
+        'piece_g': _wire(pieceG),
       };
 }
 

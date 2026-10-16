@@ -1,16 +1,15 @@
 use axum::extract::State;
 use axum::Json;
 use chrono::{Datelike, NaiveDate, Utc};
-use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, Sex, UserDto};
+use shared_schema::{DictMetaDto, EnergyEventType, EnergyGraphQuery, EnergyNodeDto, MealSlot, Sex, UserDto};
 
 use crate::api::extract::{ApiQuery, AuthUser};
 use crate::domain::errors::ApiError;
+use crate::services::nutrition::{bmr, slot_hour};
 use crate::state::AppState;
 
 const DEF_WEIGHT_KG: f64 = 75.0;
 const DEF_HEIGHT_CM: f64 = 170.0;
-const MALE_BMR_CONST: f64 = 5.0;
-const FEMALE_BMR_CONST: f64 = -161.0;
 
 pub async fn get_me(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<UserDto>, ApiError>
 {
@@ -53,19 +52,6 @@ pub fn age_on(a_birth_date: NaiveDate, a_date: NaiveDate) -> i32
     age.max(0)
 }
 
-fn calc_bmr(a_weight_kg: f64, a_height_cm: f64, a_age: f64, a_is_male: bool) -> f64
-{
-    let base = (10.0 * a_weight_kg) + (6.25 * a_height_cm) - (5.0 * a_age);
-    if a_is_male
-    {
-        base + MALE_BMR_CONST
-    }
-    else
-    {
-        base + FEMALE_BMR_CONST
-    }
-}
-
 pub async fn get_energy_timeline(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -96,11 +82,11 @@ pub async fn get_energy_timeline(
 
     let age = f64::from(age_on(profile.birth_date, Utc::now().date_naive()));
     let is_male = profile.sex != Some(Sex::Female);
-    let bmr_per_hour = calc_bmr(
+    let bmr_per_hour = bmr(
+        is_male,
         profile.weight_kg.unwrap_or(DEF_WEIGHT_KG),
         profile.height_cm.unwrap_or(DEF_HEIGHT_CM),
         age,
-        is_male,
     ) / 24.0;
 
     let day_start = a_query
@@ -112,13 +98,13 @@ pub async fn get_energy_timeline(
 
     let meals = sqlx::query!(
         r#"
-        SELECT consumed_ts, total_kcal::float8 AS "kcal!"
-        FROM user_meals
-        WHERE user_id = $1 AND consumed_ts >= $2 AND consumed_ts < $3
+        SELECT meal AS "meal: MealSlot", SUM(kcal)::float8 AS "kcal!"
+        FROM meal_entries
+        WHERE user_id = $1 AND eaten_on = $2
+        GROUP BY meal
         "#,
         a_user.user_id,
-        day_start,
-        day_end
+        a_query.target_date
     )
     .fetch_all(&a_state.db)
     .await?;
@@ -149,7 +135,7 @@ pub async fn get_energy_timeline(
     }
 
     nodes.extend(meals.into_iter().map(|meal| EnergyNodeDto {
-        ts: meal.consumed_ts,
+        ts: day_start + chrono::Duration::hours(slot_hour(meal.meal)),
         event_type: EnergyEventType::Meal,
         val: meal.kcal,
         cum_val: 0.0,

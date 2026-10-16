@@ -605,13 +605,19 @@ pub struct NutritionDto
     pub fat: Option<Decimal>,
     #[serde(default)]
     pub carb: Option<Decimal>,
+    #[serde(default)]
+    pub piece_g: Option<Decimal>,
 }
 
 impl NutritionDto
 {
     pub fn is_empty(&self) -> bool
     {
-        self.kcal.is_none() && self.prot.is_none() && self.fat.is_none() && self.carb.is_none()
+        self.kcal.is_none()
+            && self.prot.is_none()
+            && self.fat.is_none()
+            && self.carb.is_none()
+            && self.piece_g.is_none()
     }
 }
 
@@ -653,6 +659,8 @@ pub struct ItemQuery
     pub limit: Option<i64>,
     #[serde(default)]
     pub is_mine: bool,
+    #[serde(default)]
+    pub kind: Option<ItemKind>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

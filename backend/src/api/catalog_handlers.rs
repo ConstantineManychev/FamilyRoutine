@@ -269,6 +269,7 @@ fn label_info(a_label: RawLabel) -> ProductInfoDto
         prot: bounded(a_label.protein, MAX_GRAMS),
         fat: bounded(a_label.fat, MAX_GRAMS),
         carb: bounded(a_label.carbohydrates, MAX_GRAMS),
+        piece_g: None,
     };
     let kind = match a_label.kind.as_deref()
     {
