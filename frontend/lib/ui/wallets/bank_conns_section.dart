@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -295,7 +296,11 @@ class _ConnectBankDialogState extends ConsumerState<ConnectBankDialog>
     try
     {
       final url = await ref.read(apiProv).startBankAuth(aspspName, defaultAspspCountry);
-      await launchUrl(Uri.parse(url), webOnlyWindowName: '_self');
+      await launchUrl(
+        Uri.parse(url),
+        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+        webOnlyWindowName: '_self',
+      );
     }
     catch (aError)
     {

@@ -8,7 +8,9 @@ use axum::Router;
 use axum_extra::extract::cookie::SameSite;
 use std::time::Duration;
 
-use backend::config::{AiEndpoints, AppConfig, BankConfig, CatalogConfig, ReceiptAiConfig, ServerAiConfig};
+use backend::config::{
+    AiEndpoints, AndroidLinks, AppConfig, BankConfig, CatalogConfig, ReceiptAiConfig, ServerAiConfig,
+};
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -87,12 +89,24 @@ impl TestApp
             a_banks,
             ai_config("http://127.0.0.1:9", None),
             catalog_config(&[], None),
+            None,
+        )
+    }
+
+    pub fn with_android_links(a_db: PgPool, a_links: Option<AndroidLinks>) -> Self
+    {
+        Self::build(
+            a_db,
+            bank_config("http://127.0.0.1:9"),
+            ai_config("http://127.0.0.1:9", None),
+            catalog_config(&[], None),
+            a_links,
         )
     }
 
     pub fn with_catalog(a_db: PgPool, a_catalog: CatalogConfig, a_receipt_ai: ReceiptAiConfig) -> Self
     {
-        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai, a_catalog)
+        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai, a_catalog, None)
     }
 
     pub fn with_receipt_ai(a_db: PgPool, a_api_url: &str, a_daily_limit: i32) -> Self
@@ -114,10 +128,17 @@ impl TestApp
             bank_config("http://127.0.0.1:9"),
             a_receipt_ai,
             catalog_config(&[], None),
+            None,
         )
     }
 
-    fn build(a_db: PgPool, a_banks: BankConfig, a_receipt_ai: ReceiptAiConfig, a_catalog: CatalogConfig) -> Self
+    fn build(
+        a_db: PgPool,
+        a_banks: BankConfig,
+        a_receipt_ai: ReceiptAiConfig,
+        a_catalog: CatalogConfig,
+        a_android_links: Option<AndroidLinks>,
+    ) -> Self
     {
         let cfg = AppConfig {
             database_url: String::new(),
@@ -131,6 +152,7 @@ impl TestApp
             banks: a_banks,
             receipt_ai: a_receipt_ai,
             catalog: a_catalog,
+            android_links: a_android_links,
         };
 
         let state = AppState::new(a_db, cfg).unwrap();

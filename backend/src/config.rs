@@ -23,6 +23,9 @@ const DEFAULT_OPENAI_API: &str = "https://api.openai.com";
 const DEFAULT_GEMINI_API: &str = "https://generativelanguage.googleapis.com";
 const DEFAULT_ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 const DEFAULT_OFF_API: &str = "https://world.openfoodfacts.org";
+pub const DEFAULT_ANDROID_PACKAGE: &str = "com.familyroutine.family_routine";
+const SHA256_BYTES: usize = 32;
+const MAX_PACKAGE_LEN: usize = 255;
 
 pub struct BankConfig
 {
@@ -225,6 +228,106 @@ impl CatalogConfig
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AndroidLinks
+{
+    pub package_name: String,
+    pub cert_fingerprints: Vec<String>,
+}
+
+impl AndroidLinks
+{
+    fn from_env() -> Result<Option<Self>, String>
+    {
+        parse_android_links(
+            optional("ANDROID_PACKAGE_NAME").as_deref(),
+            &optional("ANDROID_CERT_SHA256").unwrap_or_default(),
+        )
+    }
+}
+
+pub fn parse_android_links(a_package: Option<&str>, a_fingerprints: &str) -> Result<Option<AndroidLinks>, String>
+{
+    let cert_fingerprints = parse_cert_fingerprints(a_fingerprints)?;
+    if cert_fingerprints.is_empty()
+    {
+        return Ok(None);
+    }
+
+    let package_name = a_package
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or(DEFAULT_ANDROID_PACKAGE);
+    if !is_android_package(package_name)
+    {
+        return Err("ANDROID_PACKAGE_NAME must be an Android application id such as com.example.app".into());
+    }
+
+    Ok(Some(AndroidLinks {
+        package_name: package_name.to_string(),
+        cert_fingerprints,
+    }))
+}
+
+fn is_android_package(a_name: &str) -> bool
+{
+    let is_segment = |segment: &str| {
+        let mut chars = segment.chars();
+        chars.next().is_some_and(|first| first.is_ascii_alphabetic())
+            && chars.all(|rest| rest.is_ascii_alphanumeric() || rest == '_')
+    };
+    a_name.len() <= MAX_PACKAGE_LEN && a_name.split('.').count() >= 2 && a_name.split('.').all(is_segment)
+}
+
+pub fn parse_cert_fingerprints(a_value: &str) -> Result<Vec<String>, String>
+{
+    let mut fingerprints: Vec<String> = Vec::new();
+    for raw in a_value
+        .split(|ch: char| ch == ',' || ch.is_whitespace())
+        .filter(|item| !item.is_empty())
+    {
+        let hex = normalize_fingerprint(raw).ok_or_else(|| {
+            "ANDROID_CERT_SHA256 must list SHA-256 certificate fingerprints: 32 hex bytes, with or without colons"
+                .to_string()
+        })?;
+        if !fingerprints.contains(&hex)
+        {
+            fingerprints.push(hex);
+        }
+    }
+    Ok(fingerprints)
+}
+
+fn normalize_fingerprint(a_raw: &str) -> Option<String>
+{
+    let bytes: Vec<&str> = if a_raw.contains(':')
+    {
+        a_raw.split(':').collect()
+    }
+    else
+    {
+        (0..a_raw.len())
+            .step_by(2)
+            .filter_map(|start| a_raw.get(start..start + 2))
+            .collect()
+    };
+
+    let is_valid = bytes.len() == SHA256_BYTES
+        && a_raw.len()
+            == if a_raw.contains(':')
+            {
+                SHA256_BYTES * 3 - 1
+            }
+            else
+            {
+                SHA256_BYTES * 2
+            }
+        && bytes
+            .iter()
+            .all(|byte| byte.len() == 2 && byte.chars().all(|ch| ch.is_ascii_hexdigit()));
+    is_valid.then(|| bytes.join(":").to_ascii_uppercase())
+}
+
 pub struct AppConfig
 {
     pub database_url: String,
@@ -238,6 +341,7 @@ pub struct AppConfig
     pub banks: BankConfig,
     pub receipt_ai: ReceiptAiConfig,
     pub catalog: CatalogConfig,
+    pub android_links: Option<AndroidLinks>,
 }
 
 impl AppConfig
@@ -276,6 +380,7 @@ impl AppConfig
             banks: BankConfig::from_env(a_env_dir)?,
             receipt_ai: ReceiptAiConfig::from_env()?,
             catalog: CatalogConfig::from_env()?,
+            android_links: AndroidLinks::from_env()?,
         })
     }
 }
@@ -434,6 +539,40 @@ mod tests
         let emails = parse_admin_emails(" Admin@Example.com, ops@example.org ,,admin@example.com ").unwrap();
         assert_eq!(emails, ["admin@example.com", "ops@example.org"]);
         assert!(parse_admin_emails("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn android_links_need_fingerprints_and_normalize_them()
+    {
+        let colons = "ab:".repeat(31) + "ab";
+        let plain = "Cd".repeat(32);
+        let links = parse_android_links(None, &format!(" {colons}, {plain}\n{colons} "))
+            .unwrap()
+            .unwrap();
+        assert_eq!(links.package_name, DEFAULT_ANDROID_PACKAGE);
+        assert_eq!(
+            links.cert_fingerprints,
+            [colons.to_uppercase(), "CD:".repeat(31) + "CD"]
+        );
+
+        let custom = parse_android_links(Some(" org.example.app_2 "), &plain)
+            .unwrap()
+            .unwrap();
+        assert_eq!(custom.package_name, "org.example.app_2");
+        assert_eq!(parse_android_links(Some("org.example.app"), " ").unwrap(), None);
+    }
+
+    #[test]
+    fn malformed_android_links_are_rejected()
+    {
+        let plain = "ab".repeat(32);
+        assert!(parse_android_links(None, &"ab".repeat(31)).is_err());
+        assert!(parse_android_links(None, &"zz".repeat(32)).is_err());
+        assert!(parse_android_links(None, &format!("{}a:b", "ab:".repeat(30))).is_err());
+        assert!(parse_android_links(None, &format!("SHA256:{plain}")).is_err());
+        assert!(parse_android_links(Some("app"), &plain).is_err());
+        assert!(parse_android_links(Some("com.1example.app"), &plain).is_err());
+        assert!(parse_android_links(Some("com.example..app"), &plain).is_err());
     }
 
     #[test]

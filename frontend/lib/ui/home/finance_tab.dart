@@ -11,6 +11,7 @@ import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/money.dart';
 import '../common/page_frames.dart';
+import '../common/snap_tab_view.dart';
 import '../finance/cashflow_chart.dart';
 import '../finance/category_view.dart';
 import '../finance/finance_dialogs.dart';
@@ -285,25 +286,27 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
         padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 6),
         child: Row(
           children: [
+            Expanded(
+              child: HorizontalScrollZone(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final chip in chips)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ActionChip(label: Text(chip), onPressed: () => _openFilters(aWallets)),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             IconButton.filledTonal(
               tooltip: 'finance.filters'.tr(),
               icon: const Icon(AppIcons.slidersHorizontal, size: 20),
               onPressed: () => _openFilters(aWallets),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final chip in chips)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ActionChip(label: Text(chip), onPressed: () => _openFilters(aWallets)),
-                      ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),

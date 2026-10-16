@@ -8,6 +8,7 @@ import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/money.dart';
+import '../common/snap_tab_view.dart';
 
 const double _chartHeight = 220;
 const double _axisWidth = 52;
@@ -236,27 +237,30 @@ class _CashflowChartState extends State<CashflowChart>
                     dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad, PointerDeviceKind.stylus},
                     scrollbars: false,
                   ),
-                  child: SingleChildScrollView(
-                    controller: _scroll,
-                    scrollDirection: Axis.horizontal,
-                    physics: isScrollable
-                        ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
-                        : const NeverScrollableScrollPhysics(),
-                    child: SizedBox(
-                      width: contentWidth,
-                      child: MouseRegion(
-                        onHover: (aEvent) => _select(aEvent.localPosition.dx, columnWidth),
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapDown: (aDetails) => _select(aDetails.localPosition.dx, columnWidth),
-                          child: CustomPaint(
-                            painter: _BarsPainter(
-                              palette: palette,
-                              points: points,
-                              columnWidth: columnWidth,
-                              scaleMax: scaleMax,
-                              selected: _readoutIndex,
-                              bucketLabel: (aTs) => _bucketLabel(aContext, aTs),
+                  child: HorizontalScrollZone(
+                    isEnabled: isScrollable,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      scrollDirection: Axis.horizontal,
+                      physics: isScrollable
+                          ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+                          : const NeverScrollableScrollPhysics(),
+                      child: SizedBox(
+                        width: contentWidth,
+                        child: MouseRegion(
+                          onHover: (aEvent) => _select(aEvent.localPosition.dx, columnWidth),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapDown: (aDetails) => _select(aDetails.localPosition.dx, columnWidth),
+                            child: CustomPaint(
+                              painter: _BarsPainter(
+                                palette: palette,
+                                points: points,
+                                columnWidth: columnWidth,
+                                scaleMax: scaleMax,
+                                selected: _readoutIndex,
+                                bucketLabel: (aTs) => _bucketLabel(aContext, aTs),
+                              ),
                             ),
                           ),
                         ),
@@ -285,22 +289,24 @@ class _CashflowChartState extends State<CashflowChart>
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingTextStyle: TextStyle(color: aContext.palette.inkSecondary, fontWeight: FontWeight.w600),
-        columns: [
-          DataColumn(label: Text('finance.period'.tr())),
-          DataColumn(label: Text('finance.income'.tr()), numeric: true),
-          DataColumn(label: Text('finance.expense'.tr()), numeric: true),
-        ],
-        rows: rows
-            .map((aPoint) => DataRow(cells: [
-                  DataCell(Text(_bucketTitle(aContext, aPoint.ts))),
-                  DataCell(Text(formatMoney(aContext, aPoint.income, currCode))),
-                  DataCell(Text(formatMoney(aContext, aPoint.expense, currCode))),
-                ]))
-            .toList(),
+    return HorizontalScrollZone(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingTextStyle: TextStyle(color: aContext.palette.inkSecondary, fontWeight: FontWeight.w600),
+          columns: [
+            DataColumn(label: Text('finance.period'.tr())),
+            DataColumn(label: Text('finance.income'.tr()), numeric: true),
+            DataColumn(label: Text('finance.expense'.tr()), numeric: true),
+          ],
+          rows: rows
+              .map((aPoint) => DataRow(cells: [
+                    DataCell(Text(_bucketTitle(aContext, aPoint.ts))),
+                    DataCell(Text(formatMoney(aContext, aPoint.income, currCode))),
+                    DataCell(Text(formatMoney(aContext, aPoint.expense, currCode))),
+                  ]))
+              .toList(),
+        ),
       ),
     );
   }

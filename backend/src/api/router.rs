@@ -14,7 +14,7 @@ use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
     fam_handlers, geo_handlers, item_handlers, place_handlers, planner_handlers, profile_handlers, receipt_handlers,
     recognize_handlers, routine_handlers, stats_handlers, training_handlers, tx_handlers, user_handlers,
-    wallet_handlers,
+    wallet_handlers, well_known_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -314,6 +314,7 @@ pub fn build_router(a_state: AppState) -> Router
     let router = Router::new()
         .route("/", get(|| async { "FamilyRoutine API" }))
         .route("/health", get(|| async { "ok" }))
+        .route("/.well-known/assetlinks.json", get(well_known_handlers::asset_links))
         .nest("/api", api)
         .fallback(|| async { ApiError::NotFound })
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))

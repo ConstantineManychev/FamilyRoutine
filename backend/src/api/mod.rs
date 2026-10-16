@@ -21,3 +21,4 @@ pub mod training_handlers;
 pub mod tx_handlers;
 pub mod user_handlers;
 pub mod wallet_handlers;
+pub mod well_known_handlers;
