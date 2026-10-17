@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT u.id, ns.tz AS \"tz?\", ns.lang AS \"lang?\", COALESCE(ns.is_plan, TRUE) AS \"is_plan!\",\n               COALESCE(ns.plan_lead_min, $2) AS \"plan_lead_min!\", COALESCE(ns.is_workout, TRUE) AS \"is_workout!\",\n               COALESCE(ns.workout_lead_min, $3) AS \"workout_lead_min!\",\n               COALESCE(ns.is_expiring, TRUE) AS \"is_expiring!\", COALESCE(ns.is_expired, TRUE) AS \"is_expired!\"\n        FROM users u\n        LEFT JOIN notify_settings ns ON ns.user_id = u.id\n        WHERE u.id = ANY($1)\n        ORDER BY u.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tz?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "lang?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_plan!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "plan_lead_min!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_workout!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "workout_lead_min!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "is_expiring!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_expired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "0a773e7ac5c2d1460b92d91f3de0a4c06ebb1bf9408803e7c097e35bb8d4a18a"
+}

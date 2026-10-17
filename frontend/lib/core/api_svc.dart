@@ -665,6 +665,7 @@ class ApiSvc
     double? aCost,
     String? aCurrId,
     DateTime? aAcquiredOn,
+    DateTime? aExpiresOn,
   }) async
   {
     final res = await _dio.post('/api/stock/lots', data: {
@@ -675,7 +676,14 @@ class ApiSvc
       if (aCost != null && aCurrId != null) 'cost': aCost.toStringAsFixed(2),
       if (aCost != null && aCurrId != null) 'curr_id': aCurrId,
       if (aAcquiredOn != null) 'acquired_on': dateWire(aAcquiredOn),
+      if (aExpiresOn != null) 'expires_on': dateWire(aExpiresOn),
     });
+    return StockLot.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StockLot> setStockLotExpiry(String aId, DateTime? aExpiresOn) async
+  {
+    final res = await _dio.patch('/api/stock/lots/$aId', data: {'expires_on': aExpiresOn == null ? null : dateWire(aExpiresOn)});
     return StockLot.fromJson(res.data as Map<String, dynamic>);
   }
 
@@ -697,6 +705,7 @@ class ApiSvc
     required double aCookedG,
     required List<CookIngredient> aIngredients,
     String? aNote,
+    DateTime? aExpiresOn,
   }) async
   {
     final res = await _dio.post('/api/stock/cook', data: {
@@ -707,6 +716,7 @@ class ApiSvc
         for (final ingredient in aIngredients) {'item_id': ingredient.itemId, 'grams': ingredient.grams.toString()},
       ],
       if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+      if (aExpiresOn != null) 'expires_on': dateWire(aExpiresOn),
     });
     return CookBatch.fromJson(res.data as Map<String, dynamic>);
   }
@@ -727,6 +737,44 @@ class ApiSvc
       'limit': aLimit,
     });
     return StockMoves.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NotifySettings> getNotifySettings() async
+  {
+    final res = await _dio.get('/api/notifications/settings');
+    return NotifySettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NotifySettings> saveNotifySettings(Map<String, Object?> aPatch) async
+  {
+    final res = await _dio.put('/api/notifications/settings', data: aPatch);
+    return NotifySettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<NoticeInbox> getNotices({int aLimit = 50}) async
+  {
+    final res = await _dio.get('/api/notifications', queryParameters: {'limit': aLimit});
+    return NoticeInbox.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> markNoticesRead({List<String> aIds = const [], bool aIsAll = false}) =>
+      _dio.post('/api/notifications/read', data: {'ids': aIds, 'is_all': aIsAll});
+
+  Future<String?> getPushKey() async
+  {
+    final res = await _dio.get('/api/notifications/push-key');
+    return (res.data as Map<String, dynamic>)['public_key'] as String?;
+  }
+
+  Future<void> addPushSub({required String aEndpoint, required String aP256dh, required String aAuth}) =>
+      _dio.post('/api/notifications/push-subs', data: {'endpoint': aEndpoint, 'p256dh': aP256dh, 'auth': aAuth});
+
+  Future<void> removePushSub(String aEndpoint) => _dio.post('/api/notifications/push-subs/remove', data: {'endpoint': aEndpoint});
+
+  Future<List<UpcomingNotice>> getUpcomingNotices({int aHours = 48}) async
+  {
+    final res = await _dio.get('/api/notifications/upcoming', queryParameters: {'hours': aHours});
+    return _list(res.data, UpcomingNotice.fromJson);
   }
 
   Future<WorkDay> getWorkDay(DateTime aDate) async

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO plan_remind_due (user_id, due_ts) VALUES ($1, $2)\n        ON CONFLICT (user_id) DO UPDATE SET due_ts = EXCLUDED.due_ts\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "92bf993661858aded4b11aaf90a503b7bf04fb343ec652718f62f1415af7cfe4"
+}

@@ -52,6 +52,7 @@ pub enum WasteReason
     Spoiled,
     Leftovers,
     Other,
+    Expired,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -107,6 +108,8 @@ pub struct StockLotDto
     pub is_touched: bool,
     pub piece_g: Option<Decimal>,
     pub per_100: Option<MacrosDto>,
+    pub expires_on: Option<NaiveDate>,
+    pub is_expired: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -134,6 +137,15 @@ pub struct NewStockLotRequest
     pub curr_id: Option<Uuid>,
     #[serde(default)]
     pub acquired_on: Option<NaiveDate>,
+    #[serde(default)]
+    pub expires_on: Option<NaiveDate>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetLotExpiryRequest
+{
+    #[serde(default)]
+    pub expires_on: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -164,6 +176,8 @@ pub struct CookRequest
     pub ingredients: Vec<CookIngredientRequest>,
     #[serde(default)]
     pub note: Option<String>,
+    #[serde(default)]
+    pub expires_on: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -192,6 +206,7 @@ pub struct CookBatchDto
     pub cost: Option<Decimal>,
     pub curr_code: Option<String>,
     pub note: Option<String>,
+    pub expires_on: Option<NaiveDate>,
     pub ingredients: Vec<CookBatchItemDto>,
 }
 

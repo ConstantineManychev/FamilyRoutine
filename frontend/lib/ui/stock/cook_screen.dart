@@ -10,6 +10,7 @@ import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import '../nutrition/nutrition_format.dart';
+import 'stock_dialogs.dart';
 import 'stock_format.dart';
 
 const double _maxIngredientG = 20000;
@@ -46,6 +47,7 @@ class _CookScreenState extends ConsumerState<CookScreen>
   final _noteCtrl = TextEditingController();
   double _scale = 1;
   bool _isBusy = false;
+  DateTime? _expiresOn;
 
   @override
   void initState()
@@ -74,7 +76,7 @@ class _CookScreenState extends ConsumerState<CookScreen>
       final dish = await api.getDish(widget.dishId);
       final stock = await api.getStock(aStore: widget.store);
       final available = <String, double>{};
-      for (final lot in stock.lots.where((aLot) => aLot.kind == StockKind.item && aLot.itemId != null))
+      for (final lot in stock.lots.where((aLot) => aLot.kind == StockKind.item && aLot.itemId != null && !aLot.isExpired))
       {
         final grams = lot.measure.isMass ? lot.leftQty : (lot.pieceG == null ? 0.0 : lot.leftQty * lot.pieceG!);
         available.update(lot.itemId!, (aValue) => aValue + grams, ifAbsent: () => grams);
@@ -179,6 +181,7 @@ class _CookScreenState extends ConsumerState<CookScreen>
                 CookIngredient(itemId: dish.ingredients[index].itemId, itemName: dish.ingredients[index].itemName, grams: grams[index]!),
             ],
             aNote: _noteCtrl.text,
+            aExpiresOn: _expiresOn,
           );
       notifyStockChanged(ref);
       if (mounted)
@@ -308,6 +311,14 @@ class _CookScreenState extends ConsumerState<CookScreen>
                     controller: _noteCtrl,
                     inputFormatters: [LengthLimitingTextInputFormatter(500)],
                     decoration: InputDecoration(labelText: 'stock.note'.tr(), border: const OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('stock.expiry'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkSecondary)),
+                  const SizedBox(height: 6),
+                  ExpiryPicker(
+                    value: _expiresOn,
+                    firstDate: DateTime.now(),
+                    onChanged: (aValue) => setState(() => _expiresOn = aValue),
                   ),
                   const SizedBox(height: 16),
                   Container(

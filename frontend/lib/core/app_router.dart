@@ -26,6 +26,7 @@ import '../ui/nutrition/goal_screen.dart';
 import '../ui/nutrition/dish_editor_screen.dart';
 import '../ui/nutrition/dishes_screen.dart';
 import '../ui/nutrition/nutrition_diary_screen.dart';
+import '../ui/notify/notifications_screen.dart';
 import '../ui/nutrition/nutrition_format.dart';
 import '../ui/places/place_detail_screen.dart';
 import '../ui/places/places_screen.dart';
@@ -163,6 +164,7 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               _own('work', (aState) => WorkScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
               _own('study', (_) => const StudyScreen()),
               _own('stock', (_) => const StockScreen()),
+              _own('notifications', (_) => const NotificationsScreen()),
               _own('stock/history', (aState) => StockHistoryScreen.fromQuery(aState.uri.queryParameters)),
               _own('study/:id', (aState) => TopicScreen(key: ValueKey(_param(aState, 'id')), topicId: _param(aState, 'id')!)),
               _own(

@@ -9,8 +9,9 @@ use axum_extra::extract::cookie::SameSite;
 use std::time::Duration;
 
 use backend::config::{
-    AiEndpoints, AndroidLinks, AppConfig, BankConfig, CatalogConfig, ReceiptAiConfig, ServerAiConfig,
+    AiEndpoints, AndroidLinks, AppConfig, BankConfig, CatalogConfig, PushConfig, ReceiptAiConfig, ServerAiConfig,
 };
+use backend::notify::web_push::VapidKeys;
 use backend::{build_router, AppState};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -59,6 +60,14 @@ pub fn catalog_config(a_admins: &[&str], a_off_url: Option<&str>) -> CatalogConf
 
 pub const DEFAULT_STUDY_DEPTH: usize = 5;
 
+pub fn push_config(a_vapid: Option<VapidKeys>, a_hosts: &[&str]) -> PushConfig
+{
+    PushConfig {
+        vapid: a_vapid,
+        hosts: a_hosts.iter().map(|host| host.to_string()).collect(),
+    }
+}
+
 pub struct TestApp
 {
     pub router: Router,
@@ -94,6 +103,20 @@ impl TestApp
             catalog_config(&[], None),
             None,
             DEFAULT_STUDY_DEPTH,
+            push_config(None, &["fcm.googleapis.com"]),
+        )
+    }
+
+    pub fn with_push(a_db: PgPool, a_push: PushConfig) -> Self
+    {
+        Self::build(
+            a_db,
+            bank_config("http://127.0.0.1:9"),
+            ai_config("http://127.0.0.1:9", None),
+            catalog_config(&[], None),
+            None,
+            DEFAULT_STUDY_DEPTH,
+            a_push,
         )
     }
 
@@ -106,6 +129,7 @@ impl TestApp
             catalog_config(&[], None),
             None,
             a_depth,
+            push_config(None, &["fcm.googleapis.com"]),
         )
     }
 
@@ -118,6 +142,7 @@ impl TestApp
             catalog_config(&[], None),
             a_links,
             DEFAULT_STUDY_DEPTH,
+            push_config(None, &["fcm.googleapis.com"]),
         )
     }
 
@@ -130,6 +155,7 @@ impl TestApp
             a_catalog,
             None,
             DEFAULT_STUDY_DEPTH,
+            push_config(None, &["fcm.googleapis.com"]),
         )
     }
 
@@ -154,6 +180,7 @@ impl TestApp
             catalog_config(&[], None),
             None,
             DEFAULT_STUDY_DEPTH,
+            push_config(None, &["fcm.googleapis.com"]),
         )
     }
 
@@ -164,6 +191,7 @@ impl TestApp
         a_catalog: CatalogConfig,
         a_android_links: Option<AndroidLinks>,
         a_study_depth: usize,
+        a_push: PushConfig,
     ) -> Self
     {
         let cfg = AppConfig {
@@ -180,6 +208,7 @@ impl TestApp
             catalog: a_catalog,
             android_links: a_android_links,
             study_max_depth: a_study_depth,
+            push: a_push,
         };
 
         let state = AppState::new(a_db, cfg).unwrap();

@@ -9,6 +9,7 @@ pub mod extract;
 pub mod fam_handlers;
 pub mod geo_handlers;
 pub mod item_handlers;
+pub mod notify_handlers;
 pub mod nutrition_handlers;
 pub mod place_handlers;
 pub mod planner_handlers;

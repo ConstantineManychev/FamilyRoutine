@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT l.owner_id, l.family_id, l.source AS \"source: StockSource\", l.batch_id\n        FROM stock_lots l\n        WHERE l.id = $1\n          AND (l.owner_id = $2 OR l.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))\n        ",
+  "query": "\n        SELECT l.owner_id, l.family_id, l.source AS \"source: StockSource\", l.batch_id, l.acquired_ts\n        FROM stock_lots l\n        WHERE l.id = $1\n          AND (l.owner_id = $2 OR l.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))\n        ",
   "describe": {
     "columns": [
       {
@@ -33,6 +33,11 @@
         "ordinal": 3,
         "name": "batch_id",
         "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "acquired_ts",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -45,8 +50,9 @@
       true,
       true,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "1268e1cb54f3fda8f4b52f943a41d5280cbc12a461e7da23511682d539a69dd5"
+  "hash": "7908713533f3667ed1316ff4d08259c6d3b0ec8b54816fd2ad511d50950856ac"
 }

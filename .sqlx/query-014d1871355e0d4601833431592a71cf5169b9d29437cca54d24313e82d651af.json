@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE notifications SET created_ts = NOW() - INTERVAL '1 day' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "014d1871355e0d4601833431592a71cf5169b9d29437cca54d24313e82d651af"
+}

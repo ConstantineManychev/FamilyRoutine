@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.id, l.owner_id, l.family_id, l.expires_on AS \"expires_on!\", f.name AS \"family_name?\", ns.tz AS \"tz?\"\n        FROM stock_lots l\n        LEFT JOIN families f ON f.id = l.family_id\n        LEFT JOIN notify_settings ns ON ns.user_id = COALESCE(l.owner_id, f.owner_id)\n        WHERE l.expires_on IS NOT NULL AND NOT l.is_expiry_done AND l.expires_on <= $1\n          AND (NOT $2 OR l.warned_on IS DISTINCT FROM l.expires_on)\n        ORDER BY l.expires_on, l.id\n        LIMIT $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "expires_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 4,
+        "name": "family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "tz?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "47a14123b82203c32df52e593932c4e73b8e62ac55b735cee04d64e5a4054229"
+}

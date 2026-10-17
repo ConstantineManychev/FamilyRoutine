@@ -10,6 +10,7 @@ use chrono_tz::Tz;
 use jsonwebtoken::EncodingKey;
 use shared_schema::AiProvider;
 
+use crate::notify::web_push::VapidKeys;
 use crate::receipt_ai::is_valid_model_id;
 
 pub const DATA_KEY_LEN: usize = 32;
@@ -29,6 +30,7 @@ const DEFAULT_STUDY_MAX_DEPTH: u64 = 5;
 const MAX_STUDY_MAX_DEPTH: u64 = 10;
 pub const DEFAULT_ANDROID_PACKAGE: &str = "com.familyroutine.family_routine";
 const SHA256_BYTES: usize = 32;
+const DEFAULT_PUSH_HOSTS: &str = "fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com";
 const MAX_PACKAGE_LEN: usize = 255;
 
 pub struct BankConfig
@@ -340,6 +342,55 @@ fn normalize_fingerprint(a_raw: &str) -> Option<String>
     is_valid.then(|| bytes.join(":").to_ascii_uppercase())
 }
 
+pub struct PushConfig
+{
+    pub vapid: Option<VapidKeys>,
+    pub hosts: Vec<String>,
+}
+
+impl PushConfig
+{
+    fn from_env() -> Result<Self, String>
+    {
+        let vapid = match (optional("VAPID_PUBLIC_KEY"), optional("VAPID_PRIVATE_KEY"))
+        {
+            (None, None) => None,
+            (Some(public), Some(private)) =>
+            {
+                let subject = required("VAPID_SUBJECT")?;
+                Some(VapidKeys::from_base64(&public, &private, &subject)?)
+            }
+            _ => return Err("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be set together".into()),
+        };
+        Ok(Self {
+            vapid,
+            hosts: parse_push_hosts(&optional("WEB_PUSH_HOSTS").unwrap_or_else(|| DEFAULT_PUSH_HOSTS.into()))?,
+        })
+    }
+}
+
+pub fn parse_push_hosts(a_value: &str) -> Result<Vec<String>, String>
+{
+    let mut hosts: Vec<String> = a_value
+        .split(',')
+        .map(|host| host.trim().trim_start_matches('.').to_ascii_lowercase())
+        .filter(|host| !host.is_empty())
+        .collect();
+    let is_host = |host: &String| {
+        host.len() <= MAX_PACKAGE_LEN
+            && host
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '.' || ch == '-')
+    };
+    if hosts.is_empty() || !hosts.iter().all(is_host)
+    {
+        return Err("WEB_PUSH_HOSTS must be a comma-separated list of host names".into());
+    }
+    hosts.sort_unstable();
+    hosts.dedup();
+    Ok(hosts)
+}
+
 pub struct AppConfig
 {
     pub database_url: String,
@@ -355,6 +406,7 @@ pub struct AppConfig
     pub catalog: CatalogConfig,
     pub android_links: Option<AndroidLinks>,
     pub study_max_depth: usize,
+    pub push: PushConfig,
 }
 
 impl AppConfig
@@ -402,6 +454,7 @@ impl AppConfig
             catalog: CatalogConfig::from_env()?,
             android_links: AndroidLinks::from_env()?,
             study_max_depth,
+            push: PushConfig::from_env()?,
         })
     }
 }
@@ -594,6 +647,17 @@ mod tests
         assert!(parse_android_links(Some("app"), &plain).is_err());
         assert!(parse_android_links(Some("com.1example.app"), &plain).is_err());
         assert!(parse_android_links(Some("com.example..app"), &plain).is_err());
+    }
+
+    #[test]
+    fn push_hosts_are_normalized_and_validated()
+    {
+        assert_eq!(
+            parse_push_hosts(" FCM.googleapis.com, .push.apple.com,fcm.googleapis.com ").unwrap(),
+            ["fcm.googleapis.com", "push.apple.com"]
+        );
+        assert!(parse_push_hosts(" , ").is_err());
+        assert!(parse_push_hosts("https://fcm.googleapis.com").is_err());
     }
 
     #[test]

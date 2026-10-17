@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO notifications (user_id, kind, dedup_key, title, body, link)\n        VALUES ($1, 'plan', $2, 'Созвон', 'Начало в 10:00', '/app/planner')\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ab722d6405c06415670794d25eff496ef83a1bfdfdfb9a431829fb20e341b15f"
+}

@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT tz, lang, is_plan, plan_lead_min, is_workout, workout_lead_min, is_expiring, is_expired\n        FROM notify_settings WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tz",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "lang",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_plan",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "plan_lead_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_workout",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "workout_lead_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_expiring",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "is_expired",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8917feaf3d0b6ad2a2c95d002c50d49b1580bf9e1626150fc80f7aa99f7cedc2"
+}

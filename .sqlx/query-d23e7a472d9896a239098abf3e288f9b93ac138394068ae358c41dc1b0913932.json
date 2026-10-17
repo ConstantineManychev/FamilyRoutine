@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO stock_lots (\n            owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts\n        )\n        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10)\n        RETURNING id\n        ",
+  "query": "\n        INSERT INTO stock_lots (\n            owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts,\n            expires_on\n        )\n        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10, $11)\n        RETURNING id\n        ",
   "describe": {
     "columns": [
       {
@@ -31,12 +31,13 @@
         "Numeric",
         "Uuid",
         "Uuid",
-        "Timestamptz"
+        "Timestamptz",
+        "Date"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "55c2dc7124a6d0e6460afa9e9437e227b2d85d275bbe2c5ba35b5fadec9a3d38"
+  "hash": "d23e7a472d9896a239098abf3e288f9b93ac138394068ae358c41dc1b0913932"
 }

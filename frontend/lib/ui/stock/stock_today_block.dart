@@ -20,6 +20,24 @@ final AutoDisposeFutureProvider<StockData> activeStockProv = FutureProvider.auto
   return aRef.read(apiProv).getStock();
 });
 
+Widget? _urgentExpiry(BuildContext aContext, StockGroup aGroup)
+{
+  final lot = aGroup.soonest;
+  if (lot == null)
+  {
+    return null;
+  }
+  final today = DateTime.now();
+  final tone = expiryTone(lot, today);
+  final label = expiryLabel(aContext, lot, today);
+  if (label == null || (tone != ExpiryTone.soon && tone != ExpiryTone.expired))
+  {
+    return null;
+  }
+  final color = tone == ExpiryTone.expired ? aContext.palette.danger : aContext.palette.warning;
+  return Text(label, style: TextStyle(fontSize: 12, color: color));
+}
+
 class StockTodayBlock extends ConsumerWidget
 {
   const StockTodayBlock({super.key});
@@ -59,6 +77,7 @@ class StockTodayBlock extends ConsumerWidget
                   onTap: () => aContext.push(stockPath),
                   leading: Icon(group.kind == StockKind.dish ? AppIcons.cookingPot : AppIcons.shoppingBag, size: 18, color: palette.inkSecondary),
                   title: Text(group.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: _urgentExpiry(aContext, group),
                   trailing: Text(formatStockQty(aContext, group.leftQty, group.measure), style: TextStyle(color: palette.inkSecondary)),
                 ),
             if (groups.length > _shownGroups)

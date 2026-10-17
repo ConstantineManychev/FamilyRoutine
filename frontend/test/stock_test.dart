@@ -47,6 +47,8 @@ Map<String, dynamic> _lot(
     bool aIsTouched = false,
     String? aCost,
     String? aKcal,
+    String? aExpires,
+    bool aIsExpired = false,
   }
 ) => {
       'id': aId,
@@ -67,7 +69,15 @@ Map<String, dynamic> _lot(
       'is_touched': aIsTouched,
       'piece_g': null,
       'per_100': aKcal == null ? null : _macros(aKcal),
+      'expires_on': aExpires,
+      'is_expired': aIsExpired,
     };
+
+String _day(int aOffset)
+{
+  final day = DateTime.now().add(Duration(days: aOffset));
+  return '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+}
 
 Map<String, dynamic> _stockJson({String? aFamilyId}) => {
       'family_id': aFamilyId,
@@ -76,8 +86,8 @@ Map<String, dynamic> _stockJson({String? aFamilyId}) => {
       'lots': [
         _lot('l1', 'Buckwheat', '1000', '1000', aItemId: 'i1', aCost: '54.00', aKcal: '343'),
         _lot('l2', 'Buckwheat', '500', '500', aItemId: 'i1', aAcquired: '2026-10-12T10:00:00Z', aIsTouched: true),
-        _lot('l3', 'Milk', '1860', '930', aItemId: 'i2', aMeasure: 'ml', aSource: 'manual'),
-        _lot('l4', 'Pilaf', '800', '500', aKind: 'dish', aSource: 'cooked', aKcal: '187.5'),
+        _lot('l3', 'Milk', '1860', '930', aItemId: 'i2', aMeasure: 'ml', aSource: 'manual', aExpires: _day(1)),
+        _lot('l4', 'Pilaf', '800', '500', aKind: 'dish', aSource: 'cooked', aKcal: '187.5', aExpires: _day(-1), aIsExpired: true),
       ],
     };
 
@@ -136,8 +146,9 @@ class _Cooked
   final String dishId;
   final double cookedG;
   final List<double> grams;
+  final DateTime? expiresOn;
 
-  const _Cooked(this.dishId, this.cookedG, this.grams);
+  const _Cooked(this.dishId, this.cookedG, this.grams, this.expiresOn);
 }
 
 class _FakeApi extends ApiSvc
@@ -146,6 +157,7 @@ class _FakeApi extends ApiSvc
   final List<String?> activated = [];
   final List<_Cooked> cooked = [];
   final List<StockStoreRef?> loaded = [];
+  final List<(String, DateTime?)> expiries = [];
 
   _FakeApi() : super(Dio(), TokenStore(const FlutterSecureStorage()));
 
@@ -175,6 +187,13 @@ class _FakeApi extends ApiSvc
   }
 
   @override
+  Future<StockLot> setStockLotExpiry(String aId, DateTime? aExpiresOn) async
+  {
+    expiries.add((aId, aExpiresOn));
+    return StockLot.fromJson(_lot(aId, 'Milk', '1860', '930'));
+  }
+
+  @override
   Future<Dish> getDish(String aId) async => Dish.fromJson(_dishJson());
 
   @override
@@ -184,9 +203,10 @@ class _FakeApi extends ApiSvc
     required double aCookedG,
     required List<CookIngredient> aIngredients,
     String? aNote,
+    DateTime? aExpiresOn,
   }) async
   {
-    cooked.add(_Cooked(aDishId, aCookedG, aIngredients.map((aItem) => aItem.grams).toList()));
+    cooked.add(_Cooked(aDishId, aCookedG, aIngredients.map((aItem) => aItem.grams).toList(), aExpiresOn));
     return CookBatch.fromJson(_batchJson('b9', '330', '800'));
   }
 
@@ -392,6 +412,66 @@ void main()
     expect(api.cooked.single.dishId, 'd1');
     expect(api.cooked.single.cookedG, 900);
     expect(api.cooked.single.grams, [400, 600]);
+    expect(api.cooked.single.expiresOn, isNull);
+  });
+
+  testWidgets('lots show their best before date and can change it', (aTester) async
+  {
+    final api = _FakeApi();
+    await _pump(aTester, _routed(const StockScreen(), api));
+
+    expect(find.text('Expires tomorrow'), findsOneWidget);
+    expect(find.textContaining('Expired ('), findsOneWidget);
+    await aTester.tap(find.text('Milk'));
+    await aTester.pumpAndSettle();
+    expect(find.text('Expires tomorrow'), findsNWidgets(2));
+    await aTester.tap(find.byKey(const ValueKey('stock.lot_menu.l3')));
+    await aTester.pumpAndSettle();
+    await aTester.tap(find.text('Best before date'));
+    await aTester.pumpAndSettle();
+    expect(find.text('Best before: Milk'), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('expiry.plus.7')));
+    await aTester.pump();
+    await aTester.tap(find.byKey(const ValueKey('expiry.save')));
+    await aTester.pumpAndSettle();
+    final today = DateTime.now();
+    expect(api.expiries.single, ('l3', DateTime(today.year, today.month, today.day + 7)));
+
+    await aTester.tap(find.byKey(const ValueKey('stock.lot_menu.l3')));
+    await aTester.pumpAndSettle();
+    await aTester.tap(find.text('Best before date'));
+    await aTester.pumpAndSettle();
+    await aTester.tap(find.byKey(const ValueKey('expiry.clear')));
+    await aTester.pump();
+    expect(find.text('Best before: not set'), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('expiry.save')));
+    await aTester.pumpAndSettle();
+    expect(api.expiries.last, ('l3', null));
+  });
+
+  testWidgets('a cooked batch gets a best before date', (aTester) async
+  {
+    final api = _FakeApi();
+    await _pump(aTester, _routed(const CookScreen(dishId: 'd1', store: StockStoreRef.personal), api));
+    await aTester.enterText(find.byKey(const ValueKey('cook.cooked')), '400');
+    await aTester.pump();
+    await aTester.ensureVisible(find.byKey(const ValueKey('expiry.plus.3')));
+    await aTester.tap(find.byKey(const ValueKey('expiry.plus.3')));
+    await aTester.pump();
+    await aTester.ensureVisible(find.byKey(const ValueKey('cook.save')));
+    await aTester.tap(find.byKey(const ValueKey('cook.save')));
+    await aTester.pumpAndSettle();
+    final today = DateTime.now();
+    expect(api.cooked.single.expiresOn, DateTime(today.year, today.month, today.day + 3));
+  });
+
+  test('days left count calendar days', ()
+  {
+    final lot = StockLot.fromJson(_lot('x', 'Milk', '1', '1', aExpires: '2026-03-30'));
+    expect(lot.daysLeft(DateTime(2026, 3, 29, 23, 30)), 1);
+    expect(lot.daysLeft(DateTime(2026, 3, 30, 0, 10)), 0);
+    expect(lot.daysLeft(DateTime(2026, 4, 1)), -2);
+    expect(StockLot.fromJson(_lot('y', 'Milk', '1', '1')).daysLeft(DateTime(2026, 3, 29)), isNull);
   });
 
   testWidgets('diary amount sheet takes nutrition from the chosen batch', (aTester) async

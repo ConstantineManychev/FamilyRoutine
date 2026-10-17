@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE stock_lots\n        SET expires_on = $2, warned_on = NULL, is_expiry_done = FALSE\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "da82a7c9495652d4af995e5c691c34e8811e6446c879adfa0b6d5a947d680a79"
+}

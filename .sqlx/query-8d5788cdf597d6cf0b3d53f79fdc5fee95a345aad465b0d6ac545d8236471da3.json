@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT b.id, l.id AS lot_id, b.dish_id, b.family_id, b.title, b.cooked_ts, b.raw_g, b.cooked_g,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left_g!\",\n               b.kcal_100, b.prot_100, b.fat_100, b.carb_100, b.missing_count, l.cost, c.code AS \"curr_code?\", b.note\n        FROM cook_batches b\n        JOIN stock_lots l ON l.batch_id = b.id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE (b.owner_id = $1 OR b.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n          AND ($2::uuid IS NULL OR b.id = $2)\n          AND ($3::uuid IS NULL OR b.dish_id = $3)\n        ORDER BY b.cooked_ts, b.id\n        ",
+  "query": "\n        SELECT b.id, l.id AS lot_id, b.dish_id, b.family_id, b.title, b.cooked_ts, b.raw_g, b.cooked_g,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left_g!\",\n               b.kcal_100, b.prot_100, b.fat_100, b.carb_100, b.missing_count, l.cost, c.code AS \"curr_code?\", b.note,\n               l.expires_on\n        FROM cook_batches b\n        JOIN stock_lots l ON l.batch_id = b.id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE (b.owner_id = $1 OR b.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n          AND ($2::uuid IS NULL OR b.id = $2)\n          AND ($3::uuid IS NULL OR b.dish_id = $3)\n        ORDER BY b.cooked_ts, b.id\n        ",
   "describe": {
     "columns": [
       {
@@ -87,6 +87,11 @@
         "ordinal": 16,
         "name": "note",
         "type_info": "Varchar"
+      },
+      {
+        "ordinal": 17,
+        "name": "expires_on",
+        "type_info": "Date"
       }
     ],
     "parameters": {
@@ -113,8 +118,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "dc6fc41b06abb0e68dde890322463ae042df01b07141f4a28d98b54abf3213f7"
+  "hash": "8d5788cdf597d6cf0b3d53f79fdc5fee95a345aad465b0d6ac545d8236471da3"
 }

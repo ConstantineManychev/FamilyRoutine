@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_error.dart';
 import '../core/app_config.dart';
+import '../core/push/push_platform.dart';
 import '../domain/models.dart';
 import 'api_prov.dart';
+import 'push_prov.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
@@ -74,7 +76,16 @@ class AuthNotifier extends Notifier<AuthState>
 
   Future<void> logout() async
   {
-    await ref.read(apiProv).logout();
+    final api = ref.read(apiProv);
+    try
+    {
+      await ref.read(pushPlatformProv).signOut(api);
+    }
+    catch (_)
+    {
+      await rememberPushUser(null);
+    }
+    await api.logout();
     state = const AuthState(AuthStatus.unauthenticated, isSignedOutByUser: true);
   }
 

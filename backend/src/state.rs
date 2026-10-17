@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use crate::banking::BankClients;
 use crate::catalog::off::OffClient;
 use crate::config::AppConfig;
+use crate::notify::sender::PushClient;
 use crate::receipt_ai::ReceiptReader;
 use crate::security::crypto::SecretBox;
 use crate::security::password::PasswordService;
@@ -21,6 +22,7 @@ pub struct AppState
     pub banks: Arc<BankClients>,
     pub receipt_ai: Arc<ReceiptReader>,
     pub off: Arc<OffClient>,
+    pub push: Arc<PushClient>,
 }
 
 impl AppState
@@ -32,6 +34,7 @@ impl AppState
         let banks = BankClients::new(&a_cfg.banks)?;
         let receipt_ai = Arc::new(ReceiptReader::new(&a_cfg.receipt_ai.endpoints)?);
         let off = Arc::new(OffClient::new(a_cfg.catalog.off_api_url.as_deref())?);
+        let push = Arc::new(PushClient::new()?);
 
         Ok(Self {
             db: a_db,
@@ -42,6 +45,7 @@ impl AppState
             banks: Arc::new(banks),
             receipt_ai,
             off,
+            push,
         })
     }
 }

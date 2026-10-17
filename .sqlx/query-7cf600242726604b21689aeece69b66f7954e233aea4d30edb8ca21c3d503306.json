@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE notifications SET push_state = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "push_state_t",
+            "kind": {
+              "Enum": [
+                "pending",
+                "sending",
+                "sent",
+                "skipped",
+                "failed"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7cf600242726604b21689aeece69b66f7954e233aea4d30edb8ca21c3d503306"
+}

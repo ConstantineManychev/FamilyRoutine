@@ -40,6 +40,50 @@ String formatStockQty(BuildContext aContext, double aQty, StockMeasure aMeasure)
   return '${NumberFormat('#,##0.#', locale).format(aQty)} ${measureLabel(aMeasure)}';
 }
 
+enum ExpiryTone
+{
+  none,
+  fresh,
+  soon,
+  expired,
+}
+
+ExpiryTone expiryTone(StockLot aLot, DateTime aToday)
+{
+  final daysLeft = aLot.daysLeft(aToday);
+  if (daysLeft == null)
+  {
+    return ExpiryTone.none;
+  }
+  if (aLot.isExpired || daysLeft < 0)
+  {
+    return ExpiryTone.expired;
+  }
+  return daysLeft <= 1 ? ExpiryTone.soon : ExpiryTone.fresh;
+}
+
+String formatExpiryDate(BuildContext aContext, DateTime aDate) => DateFormat.yMMMd(aContext.locale.toLanguageTag()).format(aDate);
+
+String? expiryLabel(BuildContext aContext, StockLot aLot, DateTime aToday)
+{
+  final expiresOn = aLot.expiresOn;
+  final daysLeft = aLot.daysLeft(aToday);
+  if (expiresOn == null || daysLeft == null)
+  {
+    return null;
+  }
+  if (aLot.isExpired || daysLeft < 0)
+  {
+    return 'stock.expired_on'.tr(args: [formatExpiryDate(aContext, expiresOn)]);
+  }
+  return switch (daysLeft)
+  {
+    0 => 'stock.expires_today'.tr(),
+    1 => 'stock.expires_tomorrow'.tr(),
+    _ => 'stock.expires_on'.tr(args: [formatExpiryDate(aContext, expiresOn)]),
+  };
+}
+
 String sourceLabel(StockSource aSource) => 'stock.source_${aSource.name}'.tr();
 
 String reasonLabel(WasteReason aReason) => 'stock.reason_${aReason.name}'.tr();

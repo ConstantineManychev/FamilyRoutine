@@ -50,6 +50,10 @@ services:
       STUDY_MAX_DEPTH: ${STUDY_MAX_DEPTH:-5}
       ANDROID_PACKAGE_NAME: ${ANDROID_PACKAGE_NAME:-com.familyroutine.family_routine}
       ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      WEB_PUSH_HOSTS: ${WEB_PUSH_HOSTS:-fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com}
     secrets:
       - enable_banking_key
     depends_on:

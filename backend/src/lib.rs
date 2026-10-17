@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod config;
 pub mod domain;
 pub mod infrastructure;
+pub mod notify;
 pub mod receipt_ai;
 pub mod security;
 pub mod services;

@@ -12,6 +12,8 @@ import 'stock_format.dart';
 const int _maxNoteLen = 500;
 const double _maxLotQty = 1000000;
 const int _maxDaysBack = 3650;
+const int _maxShelfDays = 3650;
+const List<int> _quickShelfDays = [1, 3, 7, 30];
 
 final RegExp _numberInput = RegExp(r'[0-9.,]');
 
@@ -143,6 +145,157 @@ class _WasteDialogState extends State<WasteDialog>
   }
 }
 
+DateTime _dayOf(DateTime aValue) => DateTime(aValue.year, aValue.month, aValue.day);
+
+class ExpiryPicker extends StatelessWidget
+{
+  final DateTime? value;
+  final DateTime firstDate;
+  final ValueChanged<DateTime?> onChanged;
+
+  const ExpiryPicker({super.key, required this.value, required this.firstDate, required this.onChanged});
+
+  Future<void> _pick(BuildContext aContext) async
+  {
+    final today = _dayOf(DateTime.now());
+    final first = _dayOf(firstDate);
+    final last = today.add(const Duration(days: _maxShelfDays));
+    final current = value;
+    final picked = await showDatePicker(
+      context: aContext,
+      helpText: 'stock.expiry'.tr(),
+      initialDate: current == null || current.isBefore(first) ? (today.isBefore(first) ? first : today) : current,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked != null)
+    {
+      onChanged(_dayOf(picked));
+    }
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final current = value;
+    final today = _dayOf(DateTime.now());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ActionChip(
+              key: const ValueKey('expiry.pick'),
+              avatar: const Icon(AppIcons.hourglass, size: 16),
+              label: Text(current == null
+                  ? 'stock.expiry_none'.tr()
+                  : 'stock.expires_on'.tr(args: [formatExpiryDate(aContext, current)])),
+              onPressed: () => _pick(aContext),
+            ),
+            if (current != null)
+              IconButton(
+                key: const ValueKey('expiry.clear'),
+                tooltip: 'stock.expiry_clear'.tr(),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(AppIcons.x, size: 18),
+                onPressed: () => onChanged(null),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final days in _quickShelfDays)
+              ChoiceChip(
+                key: ValueKey('expiry.plus.$days'),
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                label: Text('stock.expiry_plus_days'.tr(args: ['$days'])),
+                selected: current != null && current == today.add(Duration(days: days)),
+                onSelected: (_) => onChanged(today.add(Duration(days: days))),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class ExpiryChoice
+{
+  final DateTime? expiresOn;
+
+  const ExpiryChoice(this.expiresOn);
+}
+
+Future<ExpiryChoice?> showExpiryDialog(BuildContext aContext, StockLot aLot)
+{
+  return showDialog<ExpiryChoice>(context: aContext, builder: (_) => ExpiryDialog(lot: aLot));
+}
+
+class ExpiryDialog extends StatefulWidget
+{
+  final StockLot lot;
+
+  const ExpiryDialog({super.key, required this.lot});
+
+  @override
+  State<ExpiryDialog> createState() => _ExpiryDialogState();
+}
+
+class _ExpiryDialogState extends State<ExpiryDialog>
+{
+  late DateTime? _expiresOn = widget.lot.expiresOn;
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final today = _dayOf(DateTime.now());
+    final expiresOn = _expiresOn;
+    final isPast = expiresOn != null && expiresOn.isBefore(today);
+
+    return AlertDialog(
+      scrollable: true,
+      title: Text('stock.expiry_title'.tr(args: [widget.lot.title])),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExpiryPicker(
+              value: expiresOn,
+              firstDate: widget.lot.acquiredTs,
+              onChanged: (aValue) => setState(() => _expiresOn = aValue),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              isPast ? 'stock.expiry_past_hint'.tr() : 'stock.expiry_hint'.tr(),
+              style: TextStyle(fontSize: 12, color: isPast ? palette.danger : palette.inkMuted),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
+        ElevatedButton(
+          key: const ValueKey('expiry.save'),
+          onPressed: () => Navigator.of(aContext).pop(ExpiryChoice(_expiresOn)),
+          child: Text('common.save'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
 class LotDraft
 {
   final double qty;
@@ -150,8 +303,9 @@ class LotDraft
   final double? cost;
   final String? currId;
   final DateTime acquiredOn;
+  final DateTime? expiresOn;
 
-  const LotDraft({required this.qty, required this.unit, this.cost, this.currId, required this.acquiredOn});
+  const LotDraft({required this.qty, required this.unit, this.cost, this.currId, required this.acquiredOn, this.expiresOn});
 }
 
 Future<LotDraft?> showAddLotDialog(BuildContext aContext, DictItemDto aItem, List<CurrencyDto> aCurrencies, String? aCurrId)
@@ -182,6 +336,7 @@ class _AddLotDialogState extends State<AddLotDialog>
   late StockMeasure? _unit = _measure;
   late String? _currId = widget.currId ?? widget.currencies.firstOrNull?.id;
   DateTime _acquiredOn = DateTime.now();
+  DateTime? _expiresOn;
 
   @override
   void dispose()
@@ -315,6 +470,14 @@ class _AddLotDialogState extends State<AddLotDialog>
                       onPressed: _pickDate,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Text('stock.expiry'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkSecondary)),
+                  const SizedBox(height: 6),
+                  ExpiryPicker(
+                    value: _expiresOn,
+                    firstDate: DateTime.now(),
+                    onChanged: (aValue) => setState(() => _expiresOn = aValue),
+                  ),
                 ],
               ),
       ),
@@ -329,6 +492,7 @@ class _AddLotDialogState extends State<AddLotDialog>
                     cost: _cost,
                     currId: _cost == null ? null : _currId,
                     acquiredOn: _acquiredOn,
+                    expiresOn: _expiresOn,
                   ))
               : null,
           child: Text('stock.add_to_stock'.tr()),

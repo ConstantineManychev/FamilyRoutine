@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE push_subs SET fail_count = fail_count + 1 WHERE id = $1 RETURNING fail_count",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fail_count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e895e4125dca57397c038c626aa0c47f1d6bf33849d3b0a15975da213914096f"
+}

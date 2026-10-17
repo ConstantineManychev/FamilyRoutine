@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../common/app_theme.dart';
 import '../common/snap_tab_view.dart';
+import '../notify/notify_bell.dart';
 import '../routine/status_sheet.dart';
 import 'finance_tab.dart';
 import 'groups_tab.dart';
@@ -120,6 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
           ],
         ),
+        actions: const [NotifyBell(), SizedBox(width: 4)],
         bottom: TabBar(
           controller: _tabs,
           tabs: [

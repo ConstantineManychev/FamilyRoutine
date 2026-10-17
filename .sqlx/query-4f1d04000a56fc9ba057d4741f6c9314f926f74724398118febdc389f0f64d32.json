@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT ns.tz\n        FROM notify_settings ns\n        WHERE ns.user_id = COALESCE($1, (SELECT f.owner_id FROM families f WHERE f.id = $2))\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tz",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4f1d04000a56fc9ba057d4741f6c9314f926f74724398118febdc389f0f64d32"
+}

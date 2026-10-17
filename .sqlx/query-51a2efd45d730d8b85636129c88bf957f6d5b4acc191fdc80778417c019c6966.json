@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO plan_remind_due (user_id, due_ts) VALUES ($1, NOW())\n        ON CONFLICT (user_id) DO UPDATE SET due_ts = LEAST(plan_remind_due.due_ts, EXCLUDED.due_ts)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "51a2efd45d730d8b85636129c88bf957f6d5b4acc191fdc80778417c019c6966"
+}

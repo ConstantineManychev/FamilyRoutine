@@ -67,6 +67,7 @@ Future<bool> addLotFlow(BuildContext aContext, WidgetRef aRef, StockStoreRef aSt
       aCost: draft.cost,
       aCurrId: draft.currId,
       aAcquiredOn: draft.acquiredOn,
+      aExpiresOn: draft.expiresOn,
     ),
   );
   if (isDone && aContext.mounted)
@@ -84,6 +85,16 @@ Future<bool> wasteLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) 
     return false;
   }
   return _run(aContext, aRef, () => aRef.read(apiProv).wasteStockLot(aLot.id, draft.qty, draft.reason, draft.note));
+}
+
+Future<bool> expiryLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) async
+{
+  final choice = await showExpiryDialog(aContext, aLot);
+  if (choice == null || !aContext.mounted)
+  {
+    return false;
+  }
+  return _run(aContext, aRef, () => aRef.read(apiProv).setStockLotExpiry(aLot.id, choice.expiresOn));
 }
 
 Future<bool> deleteLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) async

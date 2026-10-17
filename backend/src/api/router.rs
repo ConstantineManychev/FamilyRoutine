@@ -12,7 +12,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
-    fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers,
+    fam_handlers, geo_handlers, item_handlers, notify_handlers, nutrition_handlers, place_handlers, planner_handlers,
     product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
     stock_handlers, study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
     well_known_handlers, work_handlers,
@@ -117,11 +117,24 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/stock", get(stock_handlers::list_stock))
         .route("/stock/lots", post(stock_handlers::create_lot))
-        .route("/stock/lots/:id", delete(stock_handlers::delete_lot))
+        .route(
+            "/stock/lots/:id",
+            delete(stock_handlers::delete_lot).patch(stock_handlers::set_lot_expiry),
+        )
         .route("/stock/lots/:id/waste", post(stock_handlers::waste_lot))
         .route("/stock/cook", post(stock_handlers::cook))
         .route("/stock/batches", get(stock_handlers::list_batches))
         .route("/stock/moves", get(stock_handlers::list_moves))
+        .route(
+            "/notifications/settings",
+            get(notify_handlers::get_settings).put(notify_handlers::save_settings),
+        )
+        .route("/notifications", get(notify_handlers::list))
+        .route("/notifications/read", post(notify_handlers::mark_read))
+        .route("/notifications/push-key", get(notify_handlers::push_key))
+        .route("/notifications/push-subs", post(notify_handlers::subscribe))
+        .route("/notifications/push-subs/remove", post(notify_handlers::unsubscribe))
+        .route("/notifications/upcoming", get(notify_handlers::upcoming))
         .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),

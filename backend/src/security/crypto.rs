@@ -70,6 +70,13 @@ pub fn bank_conn_aad(a_conn_id: Uuid) -> Vec<u8>
     aad
 }
 
+pub fn push_sub_aad(a_user_id: Uuid) -> Vec<u8>
+{
+    let mut aad = b"family-routine/push-subscription/v1/".to_vec();
+    aad.extend_from_slice(a_user_id.as_bytes());
+    aad
+}
+
 pub fn ai_key_aad(a_user_id: Uuid, a_provider: &str) -> Vec<u8>
 {
     let mut aad = b"family-routine/ai-key/v1/".to_vec();

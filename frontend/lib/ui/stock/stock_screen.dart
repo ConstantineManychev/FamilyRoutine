@@ -207,8 +207,14 @@ class _StockScreenState extends ConsumerState<StockScreen>
       key: ValueKey('stock.lot_menu.${aLot.id}'),
       tooltip: 'common.actions'.tr(),
       icon: const Icon(AppIcons.moreVertical, size: 18),
-      onSelected: (aAction) => aAction == 'waste' ? wasteLotFlow(context, ref, aLot) : deleteLotFlow(context, ref, aLot),
+      onSelected: (aAction) => switch (aAction)
+      {
+        'waste' => wasteLotFlow(context, ref, aLot),
+        'expiry' => expiryLotFlow(context, ref, aLot),
+        _ => deleteLotFlow(context, ref, aLot),
+      },
       itemBuilder: (_) => [
+        PopupMenuItem(value: 'expiry', child: Text('stock.expiry_action'.tr())),
         PopupMenuItem(value: 'waste', child: Text('stock.waste'.tr())),
         if (aLot.isRemovable)
           PopupMenuItem(
@@ -231,6 +237,33 @@ class _StockScreenState extends ConsumerState<StockScreen>
     ].join(' · ');
   }
 
+  Color _toneColor(BuildContext aContext, ExpiryTone aTone) => switch (aTone)
+  {
+    ExpiryTone.expired => aContext.palette.danger,
+    ExpiryTone.soon => aContext.palette.warning,
+    _ => aContext.palette.inkMuted,
+  };
+
+  Widget? _expiryLine(BuildContext aContext, StockLot aLot)
+  {
+    final today = DateTime.now();
+    final label = expiryLabel(aContext, aLot, today);
+    if (label == null)
+    {
+      return null;
+    }
+    final color = _toneColor(aContext, expiryTone(aLot, today));
+    return Row(
+      key: ValueKey('stock.expiry.${aLot.id}'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(AppIcons.hourglass, size: 13, color: color),
+        const SizedBox(width: 4),
+        Flexible(child: Text(label, style: TextStyle(fontSize: 12, color: color))),
+      ],
+    );
+  }
+
   Widget _lotTile(BuildContext aContext, StockLot aLot)
   {
     return ListTile(
@@ -239,6 +272,7 @@ class _StockScreenState extends ConsumerState<StockScreen>
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: Icon(sourceIcon(aLot.source), size: 18, color: aContext.palette.inkMuted),
       title: Text(_lotLine(aContext, aLot), style: const TextStyle(fontSize: 13)),
+      subtitle: _expiryLine(aContext, aLot),
       trailing: _lotMenu(aLot),
     );
   }
@@ -248,17 +282,26 @@ class _StockScreenState extends ConsumerState<StockScreen>
     final palette = aContext.palette;
     final first = aGroup.first;
     final per100 = first.per100;
+    final nearest = aGroup.soonest;
+    final nearestLine = nearest == null ? null : _expiryLine(aContext, nearest);
     return ExpansionTile(
       key: ValueKey('stock.group.${aGroup.key}'),
       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
       title: Text(aGroup.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          formatStockQty(aContext, aGroup.leftQty, aGroup.measure),
-          'stock.lots_count'.plural(aGroup.lots.length),
-          if (per100 != null) per100Line(aContext, per100, aIsMl: aGroup.measure == StockMeasure.ml),
-        ].join(' · '),
-        style: TextStyle(fontSize: 12, color: palette.inkMuted),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            [
+              formatStockQty(aContext, aGroup.leftQty, aGroup.measure),
+              'stock.lots_count'.plural(aGroup.lots.length),
+              if (per100 != null) per100Line(aContext, per100, aIsMl: aGroup.measure == StockMeasure.ml),
+            ].join(' · '),
+            style: TextStyle(fontSize: 12, color: palette.inkMuted),
+          ),
+          if (nearestLine != null) nearestLine,
+        ],
       ),
       children: [for (final lot in aGroup.lots) _lotTile(aContext, lot)],
     );
@@ -275,14 +318,21 @@ class _StockScreenState extends ConsumerState<StockScreen>
       contentPadding: const EdgeInsets.only(left: 12, right: 4),
       leading: Icon(AppIcons.cookingPot, color: palette.inkSecondary),
       title: Text(aLot.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          'stock.cooked_on'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aLot.acquiredTs)]),
-          'stock.left_of_total'.tr(args: [formatStockQty(aContext, aLot.leftQty, aLot.measure), formatStockQty(aContext, aLot.qty, aLot.measure)]),
-          if (per100 != null) per100Line(aContext, per100),
-          if (cost != null && currCode != null) formatMoney(aContext, cost, currCode),
-        ].join(' · '),
-        style: TextStyle(fontSize: 12, color: palette.inkMuted),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            [
+              'stock.cooked_on'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aLot.acquiredTs)]),
+              'stock.left_of_total'.tr(args: [formatStockQty(aContext, aLot.leftQty, aLot.measure), formatStockQty(aContext, aLot.qty, aLot.measure)]),
+              if (per100 != null) per100Line(aContext, per100),
+              if (cost != null && currCode != null) formatMoney(aContext, cost, currCode),
+            ].join(' · '),
+            style: TextStyle(fontSize: 12, color: palette.inkMuted),
+          ),
+          if (_expiryLine(aContext, aLot) case final line?) line,
+        ],
       ),
       trailing: _lotMenu(aLot),
     );

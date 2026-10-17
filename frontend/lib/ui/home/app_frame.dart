@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
+import '../notify/notify_agent.dart';
 
 class _DictLink
 {
@@ -68,6 +69,7 @@ class _AppFrameState extends ConsumerState<AppFrame>
     return Stack(
       children: [
         widget.child,
+        const NotifyAgent(),
         if (_isOpen)
           Positioned.fill(
             child: GestureDetector(

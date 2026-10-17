@@ -145,7 +145,7 @@ pub fn cost_share(a_cost: Option<Decimal>, a_lot_qty: Decimal, a_take: Decimal) 
     )
 }
 
-pub fn plan_fifo(a_lots: &[LotLeft], a_grams: Decimal) -> (Vec<Take>, Decimal)
+pub fn plan_takes(a_lots: &[LotLeft], a_grams: Decimal) -> (Vec<Take>, Decimal)
 {
     let mut need = qty(a_grams);
     let mut takes = Vec::new();
@@ -255,13 +255,13 @@ mod tests
     }
 
     #[test]
-    fn fifo_takes_oldest_lots_first_and_reports_shortage()
+    fn takes_follow_lot_order_and_report_shortage()
     {
         let lots = [
             lot(1, "500", "120", Some("1"), Some("50.00")),
             lot(2, "500", "500", Some("1"), Some("60.00")),
         ];
-        let (takes, short) = plan_fifo(&lots, dec("300"));
+        let (takes, short) = plan_takes(&lots, dec("300"));
         assert_eq!(
             takes,
             vec![
@@ -279,7 +279,7 @@ mod tests
         );
         assert_eq!(short, Decimal::ZERO);
 
-        let (all, missing) = plan_fifo(&lots, dec("700"));
+        let (all, missing) = plan_takes(&lots, dec("700"));
         assert_eq!(all.iter().map(|take| take.qty).sum::<Decimal>(), dec("620"));
         assert_eq!(missing, dec("80"));
     }
@@ -291,13 +291,13 @@ mod tests
             lot(1, "6", "6", None, None),
             lot(2, "10", "2", Some("60"), Some("30.00")),
         ];
-        let (takes, short) = plan_fifo(&lots, dec("150"));
+        let (takes, short) = plan_takes(&lots, dec("150"));
         assert_eq!(takes.len(), 1);
         assert_eq!(takes[0].qty, dec("2"));
         assert_eq!(takes[0].cost, Some(dec("6.00")));
         assert_eq!(short, dec("30"));
 
-        let (partial, rest) = plan_fifo(&[lot(3, "10", "10", Some("60"), None)], dec("150"));
+        let (partial, rest) = plan_takes(&[lot(3, "10", "10", Some("60"), None)], dec("150"));
         assert_eq!(partial[0].qty, dec("2.5"));
         assert_eq!(rest, Decimal::ZERO);
     }
@@ -305,7 +305,7 @@ mod tests
     #[test]
     fn empty_stock_leaves_the_whole_amount_short()
     {
-        let (takes, short) = plan_fifo(&[lot(1, "100", "0", Some("1"), None)], dec("80"));
+        let (takes, short) = plan_takes(&[lot(1, "100", "0", Some("1"), None)], dec("80"));
         assert!(takes.is_empty());
         assert_eq!(short, dec("80"));
     }

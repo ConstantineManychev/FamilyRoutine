@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE notifications SET read_ts = NOW()\n        WHERE user_id = $1 AND read_ts IS NULL AND ($2 OR id = ANY($3))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6799140d3ae620fd76ae75ed7e32175ac3309da210fa52b73f19a251c6cd96d0"
+}

@@ -1,5 +1,6 @@
 import 'finance_models.dart';
 import 'nutrition_models.dart';
+import 'planner_models.dart';
 
 T _parseEnum<T extends Enum>(List<T> aValues, Object? aValue, T aFallback) =>
     aValues.where((aItem) => aItem.name == aValue).firstOrNull ?? aFallback;
@@ -45,7 +46,8 @@ enum WasteReason
 {
   spoiled,
   leftovers,
-  other;
+  other,
+  expired;
 
   static WasteReason? parseOrNull(Object? aValue) => values.where((aItem) => aItem.name == aValue).firstOrNull;
 }
@@ -118,6 +120,8 @@ class StockLot
   final bool isTouched;
   final double? pieceG;
   final Macros? per100;
+  final DateTime? expiresOn;
+  final bool isExpired;
 
   const StockLot({
     required this.id,
@@ -138,9 +142,24 @@ class StockLot
     this.isTouched = false,
     this.pieceG,
     this.per100,
+    this.expiresOn,
+    this.isExpired = false,
   });
 
   bool get isRemovable => !isTouched && source != StockSource.receipt;
+
+  int? daysLeft(DateTime aToday)
+  {
+    final expiresOn = this.expiresOn;
+    if (expiresOn == null)
+    {
+      return null;
+    }
+    final today = DateTime(aToday.year, aToday.month, aToday.day);
+    return DateTime.utc(expiresOn.year, expiresOn.month, expiresOn.day)
+        .difference(DateTime.utc(today.year, today.month, today.day))
+        .inDays;
+  }
 
   String get groupKey => kind == StockKind.dish ? 'dish:$id' : 'item:${itemId ?? title}';
 
@@ -163,6 +182,8 @@ class StockLot
         isTouched: aJson['is_touched'] as bool? ?? false,
         pieceG: parseDecimalOrNull(aJson['piece_g']),
         per100: Macros.fromJsonOrNull(aJson['per_100']),
+        expiresOn: aJson['expires_on'] == null ? null : parseDateWire(aJson['expires_on']),
+        isExpired: aJson['is_expired'] as bool? ?? false,
       );
 }
 
@@ -182,6 +203,21 @@ class StockGroup
   StockMeasure get measure => first.measure;
 
   double get leftQty => lots.where((aLot) => aLot.measure == measure).fold(0, (aSum, aLot) => aSum + aLot.leftQty);
+
+  StockLot? get soonest
+  {
+    StockLot? found;
+    for (final lot in lots)
+    {
+      final expiresOn = lot.expiresOn;
+      final current = found?.expiresOn;
+      if (expiresOn != null && (current == null || expiresOn.isBefore(current)))
+      {
+        found = lot;
+      }
+    }
+    return found;
+  }
 }
 
 class StockData
@@ -244,6 +280,7 @@ class CookBatch
   final double? cost;
   final String? currCode;
   final String? note;
+  final DateTime? expiresOn;
   final List<CookBatchItem> ingredients;
 
   const CookBatch({
@@ -261,6 +298,7 @@ class CookBatch
     this.cost,
     this.currCode,
     this.note,
+    this.expiresOn,
     this.ingredients = const [],
   });
 
@@ -281,6 +319,7 @@ class CookBatch
         cost: parseDecimalOrNull(aJson['cost']),
         currCode: aJson['curr_code'] as String?,
         note: aJson['note'] as String?,
+        expiresOn: aJson['expires_on'] == null ? null : parseDateWire(aJson['expires_on']),
         ingredients: (aJson['ingredients'] as List? ?? const [])
             .map((aItem) => CookBatchItem.fromJson(aItem as Map<String, dynamic>))
             .toList(),

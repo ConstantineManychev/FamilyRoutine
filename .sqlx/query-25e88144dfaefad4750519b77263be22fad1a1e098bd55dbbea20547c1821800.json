@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO push_subs (user_id, endpoint_hash, sealed) VALUES ($1, $2, $3)\n        ON CONFLICT (endpoint_hash) DO UPDATE\n        SET user_id = EXCLUDED.user_id, sealed = EXCLUDED.sealed, fail_count = 0, created_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "25e88144dfaefad4750519b77263be22fad1a1e098bd55dbbea20547c1821800"
+}

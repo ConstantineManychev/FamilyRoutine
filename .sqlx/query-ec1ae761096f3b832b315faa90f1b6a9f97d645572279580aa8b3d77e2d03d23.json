@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT l.id, l.owner_id, l.family_id, l.title, l.measure AS \"measure: StockMeasure\",\n                   l.expires_on AS \"expires_on!\", l.warned_on, f.name AS \"family_name?\", ns.tz AS \"tz?\",\n                   l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left!\"\n            FROM stock_lots l\n            LEFT JOIN families f ON f.id = l.family_id\n            LEFT JOIN notify_settings ns ON ns.user_id = COALESCE(l.owner_id, f.owner_id)\n            WHERE (l.owner_id = $1 OR l.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n              AND l.expires_on IS NOT NULL AND NOT l.is_expiry_done AND l.expires_on <= $2\n            ORDER BY l.expires_on, LOWER(l.title), l.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "expires_on!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 6,
+        "name": "warned_on",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "tz?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "ec1ae761096f3b832b315faa90f1b6a9f97d645572279580aa8b3d77e2d03d23"
+}

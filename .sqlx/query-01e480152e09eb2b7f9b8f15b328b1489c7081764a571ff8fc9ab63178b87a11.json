@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.id, l.title, l.measure AS \"measure: StockMeasure\", l.qty, l.cost,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left!\"\n        FROM stock_lots l\n        WHERE l.id = ANY($1) AND NOT l.is_expiry_done\n        ORDER BY LOWER(l.title), l.id\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "01e480152e09eb2b7f9b8f15b328b1489c7081764a571ff8fc9ab63178b87a11"
+}

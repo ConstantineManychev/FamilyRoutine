@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE notifications SET push_state = 'skipped' WHERE push_state IN ('pending', 'sending')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "f39fca1d96faa9975699ba4e467bbd31923ee7a622443d4a5b1c56b1d80dcd01"
+}

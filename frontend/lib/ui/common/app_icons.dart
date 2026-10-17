@@ -13,6 +13,9 @@ abstract final class AppIcons
   static const IconData arrowUp = IconData(0xe04a, fontFamily: _family);
   static const IconData arrowUpRight = IconData(0xe04d, fontFamily: _family);
   static const IconData banknote = IconData(0xe052, fontFamily: _family);
+  static const IconData bell = IconData(0xe059, fontFamily: _family);
+  static const IconData bellOff = IconData(0xe05a, fontFamily: _family);
+  static const IconData bellRing = IconData(0xe224, fontFamily: _family);
   static const IconData bookOpen = IconData(0xe05f, fontFamily: _family);
   static const IconData briefcase = IconData(0xe062, fontFamily: _family);
   static const IconData building2 = IconData(0xe290, fontFamily: _family);
@@ -24,6 +27,7 @@ abstract final class AppIcons
   static const IconData chartColumn = IconData(0xe2a3, fontFamily: _family);
   static const IconData chartPie = IconData(0xe06b, fontFamily: _family);
   static const IconData check = IconData(0xe06c, fontFamily: _family);
+  static const IconData checkCheck = IconData(0xe38e, fontFamily: _family);
   static const IconData checkCircle = IconData(0xe226, fontFamily: _family);
   static const IconData chevronDown = IconData(0xe06d, fontFamily: _family);
   static const IconData chevronLeft = IconData(0xe06e, fontFamily: _family);
@@ -51,6 +55,7 @@ abstract final class AppIcons
   static const IconData heartPulse = IconData(0xe36e, fontFamily: _family);
   static const IconData history = IconData(0xe1f5, fontFamily: _family);
   static const IconData home = IconData(0xe0f5, fontFamily: _family);
+  static const IconData hourglass = IconData(0xe296, fontFamily: _family);
   static const IconData house = IconData(0xe0f5, fontFamily: _family);
   static const IconData image = IconData(0xe0f6, fontFamily: _family);
   static const IconData key = IconData(0xe0fd, fontFamily: _family);

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE notifications SET push_state = 'sending', push_ts = NOW() - INTERVAL '10 minutes' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ab7871129ceea35ac59f5b82ac8737b1872bb9fd21fcbe1c70612708381bbd4"
+}

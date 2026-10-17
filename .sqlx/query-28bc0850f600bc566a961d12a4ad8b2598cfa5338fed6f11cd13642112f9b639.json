@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT u.id\n        FROM users u\n        WHERE u.id = $1 OR u.id IN (SELECT fm.user_id FROM family_mems fm WHERE fm.family_id = $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "28bc0850f600bc566a961d12a4ad8b2598cfa5338fed6f11cd13642112f9b639"
+}

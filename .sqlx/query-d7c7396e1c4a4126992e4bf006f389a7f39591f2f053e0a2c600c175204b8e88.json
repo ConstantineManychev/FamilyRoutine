@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            l.id,\n            l.kind AS \"kind: StockKind\",\n            l.item_id,\n            b.dish_id AS \"dish_id?\",\n            l.batch_id,\n            l.title,\n            l.measure AS \"measure: StockMeasure\",\n            l.qty,\n            l.qty - COALESCE(mv.used, 0) AS \"left_qty!\",\n            l.cost,\n            c.code AS \"curr_code?\",\n            l.source AS \"source: StockSource\",\n            l.receipt_id,\n            l.acquired_ts,\n            (mv.used IS NOT NULL) AS \"is_touched!\",\n            i.piece_g AS \"piece_g?\",\n            i.kcal AS \"item_kcal?\",\n            i.prot AS \"item_prot?\",\n            i.fat AS \"item_fat?\",\n            i.carb AS \"item_carb?\",\n            b.kcal_100 AS \"batch_kcal?\",\n            b.prot_100 AS \"batch_prot?\",\n            b.fat_100 AS \"batch_fat?\",\n            b.carb_100 AS \"batch_carb?\"\n        FROM stock_lots l\n        LEFT JOIN (SELECT lot_id, SUM(qty) AS used FROM stock_moves GROUP BY lot_id) mv ON mv.lot_id = l.id\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND ($3::uuid IS NULL OR l.id = $3)\n          AND ($4 OR l.qty > COALESCE(mv.used, 0))\n        ORDER BY l.kind, LOWER(l.title), l.acquired_ts, l.id\n        ",
+  "query": "\n        SELECT\n            l.id,\n            l.kind AS \"kind: StockKind\",\n            l.item_id,\n            b.dish_id AS \"dish_id?\",\n            l.batch_id,\n            l.title,\n            l.measure AS \"measure: StockMeasure\",\n            l.qty,\n            l.qty - COALESCE(mv.used, 0) AS \"left_qty!\",\n            l.cost,\n            c.code AS \"curr_code?\",\n            l.source AS \"source: StockSource\",\n            l.receipt_id,\n            l.acquired_ts,\n            (mv.used IS NOT NULL) AS \"is_touched!\",\n            i.piece_g AS \"piece_g?\",\n            i.kcal AS \"item_kcal?\",\n            i.prot AS \"item_prot?\",\n            i.fat AS \"item_fat?\",\n            i.carb AS \"item_carb?\",\n            b.kcal_100 AS \"batch_kcal?\",\n            b.prot_100 AS \"batch_prot?\",\n            b.fat_100 AS \"batch_fat?\",\n            b.carb_100 AS \"batch_carb?\",\n            l.expires_on\n        FROM stock_lots l\n        LEFT JOIN (SELECT lot_id, SUM(qty) AS used FROM stock_moves GROUP BY lot_id) mv ON mv.lot_id = l.id\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND ($3::uuid IS NULL OR l.id = $3)\n          AND ($4 OR l.qty > COALESCE(mv.used, 0))\n        ORDER BY l.kind, LOWER(l.title), l.expires_on NULLS LAST, l.acquired_ts, l.id\n        ",
   "describe": {
     "columns": [
       {
@@ -154,6 +154,11 @@
         "ordinal": 23,
         "name": "batch_carb?",
         "type_info": "Numeric"
+      },
+      {
+        "ordinal": 24,
+        "name": "expires_on",
+        "type_info": "Date"
       }
     ],
     "parameters": {
@@ -188,8 +193,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "cb0a1d92f94744a93a4affe6ed68891a8c30f7e5e2ca12929eabea1b244a56af"
+  "hash": "d7c7396e1c4a4126992e4bf006f389a7f39591f2f053e0a2c600c175204b8e88"
 }

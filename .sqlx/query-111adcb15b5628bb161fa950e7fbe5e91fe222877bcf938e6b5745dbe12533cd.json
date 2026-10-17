@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE stock_lots SET is_expiry_done = TRUE WHERE id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "111adcb15b5628bb161fa950e7fbe5e91fe222877bcf938e6b5745dbe12533cd"
+}

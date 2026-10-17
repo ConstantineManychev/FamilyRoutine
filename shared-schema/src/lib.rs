@@ -1,6 +1,7 @@
 mod ai;
 mod catalog;
 mod finance;
+mod notify;
 mod nutrition;
 mod planner;
 mod profile;
@@ -14,6 +15,7 @@ pub use ai::*;
 pub use catalog::*;
 use chrono::{DateTime, NaiveDate, Utc};
 pub use finance::*;
+pub use notify::*;
 pub use nutrition::*;
 pub use planner::*;
 pub use profile::*;

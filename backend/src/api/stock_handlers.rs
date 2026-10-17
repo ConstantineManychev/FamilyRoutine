@@ -3,13 +3,14 @@ use std::collections::BTreeMap;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Duration, NaiveTime, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
+use chrono_tz::Tz;
 use rust_decimal::Decimal;
 use shared_schema::{
     BatchQuery, CookBatchDto, CookBatchItemDto, CookRequest, ItemKind, ItemUnit, MacrosDto, MoneyTotalDto, NetMeasure,
-    NewStockLotRequest, SaveStockSettingsRequest, StockDto, StockKind, StockLotDto, StockMeasure, StockMoveDto,
-    StockMoveKind, StockMovesDto, StockMovesQuery, StockQuery, StockSettingsDto, StockSource, StockStoreDto,
-    WasteReason, WasteRequest,
+    NewStockLotRequest, SaveStockSettingsRequest, SetLotExpiryRequest, StockDto, StockKind, StockLotDto, StockMeasure,
+    StockMoveDto, StockMoveKind, StockMovesDto, StockMovesQuery, StockQuery, StockSettingsDto, StockSource,
+    StockStoreDto, WasteReason, WasteRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -23,8 +24,9 @@ use crate::domain::errors::ApiError;
 use crate::domain::validation::{check_money, clean_optional_text};
 use crate::security::authz::require_member;
 use crate::services::nutrition::{dish_math, Ingredient};
+use crate::services::planner::{local_date, parse_zone};
 use crate::services::stock::{
-    cost_share, grams_per_unit, intake_qty, manual_qty, plan_fifo, qty, ItemShape, LotLeft, COST_SCALE,
+    cost_share, grams_per_unit, intake_qty, manual_qty, plan_takes, qty, ItemShape, LotLeft, COST_SCALE,
 };
 use crate::state::AppState;
 
@@ -33,6 +35,7 @@ const MAX_NOTE_LEN: usize = 500;
 const MAX_PAST_DAYS: i64 = 3_660;
 const DEFAULT_MOVES: i64 = 100;
 const MAX_MOVES: i64 = 500;
+const MAX_SHELF_DAYS: i64 = 3_660;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Store
@@ -59,7 +62,7 @@ impl Store
         }
     }
 
-    fn of(a_owner_id: Option<Uuid>, a_family_id: Option<Uuid>) -> Self
+    pub fn of(a_owner_id: Option<Uuid>, a_family_id: Option<Uuid>) -> Self
     {
         Self {
             owner_id: a_owner_id,
@@ -106,37 +109,40 @@ struct LotRow
     batch_prot: Option<Decimal>,
     batch_fat: Option<Decimal>,
     batch_carb: Option<Decimal>,
+    expires_on: Option<NaiveDate>,
 }
 
-impl From<LotRow> for StockLotDto
+impl LotRow
 {
-    fn from(a_row: LotRow) -> Self
+    fn into_dto(self, a_today: NaiveDate) -> StockLotDto
     {
-        let per_100 = match a_row.kind
+        let per_100 = match self.kind
         {
-            StockKind::Item => item_per_100(a_row.item_kcal, a_row.item_prot, a_row.item_fat, a_row.item_carb),
-            StockKind::Dish => item_per_100(a_row.batch_kcal, a_row.batch_prot, a_row.batch_fat, a_row.batch_carb),
+            StockKind::Item => item_per_100(self.item_kcal, self.item_prot, self.item_fat, self.item_carb),
+            StockKind::Dish => item_per_100(self.batch_kcal, self.batch_prot, self.batch_fat, self.batch_carb),
         };
-        let left_qty = a_row.left_qty.max(Decimal::ZERO);
-        Self {
-            id: a_row.id,
-            kind: a_row.kind,
-            item_id: a_row.item_id,
-            dish_id: a_row.dish_id,
-            batch_id: a_row.batch_id,
-            title: a_row.title,
-            measure: a_row.measure,
-            qty: a_row.qty.normalize(),
+        let left_qty = self.left_qty.max(Decimal::ZERO);
+        StockLotDto {
+            id: self.id,
+            kind: self.kind,
+            item_id: self.item_id,
+            dish_id: self.dish_id,
+            batch_id: self.batch_id,
+            title: self.title,
+            measure: self.measure,
+            qty: self.qty.normalize(),
             left_qty: left_qty.normalize(),
-            cost: a_row.cost,
-            left_cost: cost_share(a_row.cost, a_row.qty, left_qty),
-            curr_code: a_row.curr_code,
-            source: a_row.source,
-            receipt_id: a_row.receipt_id,
-            acquired_ts: a_row.acquired_ts,
-            is_touched: a_row.is_touched,
-            piece_g: a_row.piece_g.map(|value| value.normalize()),
+            cost: self.cost,
+            left_cost: cost_share(self.cost, self.qty, left_qty),
+            curr_code: self.curr_code,
+            source: self.source,
+            receipt_id: self.receipt_id,
+            acquired_ts: self.acquired_ts,
+            is_touched: self.is_touched,
+            piece_g: self.piece_g.map(|value| value.normalize()),
             per_100,
+            is_expired: self.expires_on.is_some_and(|expires_on| expires_on < a_today),
+            expires_on: self.expires_on,
         }
     }
 }
@@ -147,6 +153,39 @@ pub async fn lock_store(a_conn: &mut PgConnection, a_store: Store) -> Result<(),
         .execute(&mut *a_conn)
         .await?;
     Ok(())
+}
+
+pub async fn store_zone(a_conn: &mut PgConnection, a_store: Store) -> Result<Tz, ApiError>
+{
+    let name = sqlx::query_scalar!(
+        r#"
+        SELECT ns.tz
+        FROM notify_settings ns
+        WHERE ns.user_id = COALESCE($1, (SELECT f.owner_id FROM families f WHERE f.id = $2))
+        "#,
+        a_store.owner_id,
+        a_store.family_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    Ok(name.as_deref().and_then(parse_zone).unwrap_or(Tz::UTC))
+}
+
+pub async fn store_today(a_conn: &mut PgConnection, a_store: Store) -> Result<NaiveDate, ApiError>
+{
+    Ok(local_date(store_zone(a_conn, a_store).await?, Utc::now()))
+}
+
+fn check_expiry(a_expires_on: Option<NaiveDate>, a_earliest: NaiveDate, a_today: NaiveDate) -> Result<(), ApiError>
+{
+    match a_expires_on
+    {
+        Some(expires_on) if expires_on < a_earliest || expires_on > a_today + Duration::days(MAX_SHELF_DAYS) =>
+        {
+            Err(ApiError::Validation("expires_on"))
+        }
+        _ => Ok(()),
+    }
 }
 
 pub async fn active_store(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<Store, ApiError>
@@ -262,6 +301,7 @@ pub async fn consume_item(
 ) -> Result<Decimal, ApiError>
 {
     lock_store(a_conn, a_store).await?;
+    let today = store_today(a_conn, a_store).await?;
     let rows = sqlx::query!(
         r#"
         SELECT l.id, l.measure AS "measure: StockMeasure", l.qty, l.cost, i.piece_g,
@@ -270,11 +310,13 @@ pub async fn consume_item(
         JOIN items i ON i.id = l.item_id
         WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2
           AND l.kind = 'item' AND l.item_id = $3
-        ORDER BY l.acquired_ts, l.created_ts, l.id
+          AND (l.expires_on IS NULL OR l.expires_on >= $4)
+        ORDER BY l.expires_on NULLS LAST, l.acquired_ts, l.created_ts, l.id
         "#,
         a_store.owner_id,
         a_store.family_id,
-        a_item_id
+        a_item_id,
+        today
     )
     .fetch_all(&mut *a_conn)
     .await?;
@@ -288,7 +330,7 @@ pub async fn consume_item(
             cost: row.cost,
         })
         .collect();
-    let (takes, short) = plan_fifo(&lots, a_grams);
+    let (takes, short) = plan_takes(&lots, a_grams);
     insert_moves(a_conn, &takes, a_consumer, a_user_id).await?;
     Ok(short)
 }
@@ -319,7 +361,7 @@ pub async fn consume_batch(
     )
     .fetch_one(&mut *a_conn)
     .await?;
-    let (takes, short) = plan_fifo(
+    let (takes, short) = plan_takes(
         &[LotLeft {
             id: lot.id,
             qty: lot.qty,
@@ -566,7 +608,8 @@ async fn query_lots(
             b.kcal_100 AS "batch_kcal?",
             b.prot_100 AS "batch_prot?",
             b.fat_100 AS "batch_fat?",
-            b.carb_100 AS "batch_carb?"
+            b.carb_100 AS "batch_carb?",
+            l.expires_on
         FROM stock_lots l
         LEFT JOIN (SELECT lot_id, SUM(qty) AS used FROM stock_moves GROUP BY lot_id) mv ON mv.lot_id = l.id
         LEFT JOIN items i ON i.id = l.item_id
@@ -575,7 +618,7 @@ async fn query_lots(
         WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2
           AND ($3::uuid IS NULL OR l.id = $3)
           AND ($4 OR l.qty > COALESCE(mv.used, 0))
-        ORDER BY l.kind, LOWER(l.title), l.acquired_ts, l.id
+        ORDER BY l.kind, LOWER(l.title), l.expires_on NULLS LAST, l.acquired_ts, l.id
         "#,
         a_store.owner_id,
         a_store.family_id,
@@ -584,7 +627,8 @@ async fn query_lots(
     )
     .fetch_all(&mut *a_conn)
     .await?;
-    Ok(rows.into_iter().map(StockLotDto::from).collect())
+    let today = store_today(a_conn, a_store).await?;
+    Ok(rows.into_iter().map(|row| row.into_dto(today)).collect())
 }
 
 struct VisibleLot
@@ -592,13 +636,14 @@ struct VisibleLot
     store: Store,
     source: StockSource,
     batch_id: Option<Uuid>,
+    acquired_ts: DateTime<Utc>,
 }
 
 async fn visible_lot(a_conn: &mut PgConnection, a_lot_id: Uuid, a_user_id: Uuid) -> Result<VisibleLot, ApiError>
 {
     let row = sqlx::query!(
         r#"
-        SELECT l.owner_id, l.family_id, l.source AS "source: StockSource", l.batch_id
+        SELECT l.owner_id, l.family_id, l.source AS "source: StockSource", l.batch_id, l.acquired_ts
         FROM stock_lots l
         WHERE l.id = $1
           AND (l.owner_id = $2 OR l.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))
@@ -613,6 +658,7 @@ async fn visible_lot(a_conn: &mut PgConnection, a_lot_id: Uuid, a_user_id: Uuid)
         store: Store::of(row.owner_id, row.family_id),
         source: row.source,
         batch_id: row.batch_id,
+        acquired_ts: row.acquired_ts,
     })
 }
 
@@ -775,13 +821,16 @@ pub async fn create_lot(
         }
     }
     lock_store(&mut tx, store).await?;
+    let store_day = store_today(&mut tx, store).await?;
+    check_expiry(a_req.expires_on, store_day, store_day)?;
     require_room(&mut tx, store, 1).await?;
     let id = sqlx::query_scalar!(
         r#"
         INSERT INTO stock_lots (
-            owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts
+            owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts,
+            expires_on
         )
-        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10)
+        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10, $11)
         RETURNING id
         "#,
         store.owner_id,
@@ -793,7 +842,8 @@ pub async fn create_lot(
         cost,
         a_req.curr_id,
         a_user.user_id,
-        acquired_ts
+        acquired_ts,
+        a_req.expires_on
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -839,6 +889,35 @@ pub async fn delete_lot(
     }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn set_lot_expiry(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_id): ApiPath<Uuid>,
+    ApiJson(a_req): ApiJson<SetLotExpiryRequest>,
+) -> Result<Json<StockLotDto>, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    let lot = visible_lot(&mut tx, a_id, a_user.user_id).await?;
+    lock_store(&mut tx, lot.store).await?;
+    let zone = store_zone(&mut tx, lot.store).await?;
+    let acquired_on = local_date(zone, lot.acquired_ts);
+    check_expiry(a_req.expires_on, acquired_on, local_date(zone, Utc::now()))?;
+    sqlx::query!(
+        r#"
+        UPDATE stock_lots
+        SET expires_on = $2, warned_on = NULL, is_expiry_done = FALSE
+        WHERE id = $1
+        "#,
+        a_id,
+        a_req.expires_on
+    )
+    .execute(&mut *tx)
+    .await?;
+    let updated = load_lot(&mut tx, lot.store, a_id).await?;
+    tx.commit().await?;
+    Ok(Json(updated))
 }
 
 pub async fn waste_lot(
@@ -892,7 +971,8 @@ async fn load_batches(
         r#"
         SELECT b.id, l.id AS lot_id, b.dish_id, b.family_id, b.title, b.cooked_ts, b.raw_g, b.cooked_g,
                l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS "left_g!",
-               b.kcal_100, b.prot_100, b.fat_100, b.carb_100, b.missing_count, l.cost, c.code AS "curr_code?", b.note
+               b.kcal_100, b.prot_100, b.fat_100, b.carb_100, b.missing_count, l.cost, c.code AS "curr_code?", b.note,
+               l.expires_on
         FROM cook_batches b
         JOIN stock_lots l ON l.batch_id = b.id
         LEFT JOIN currencies c ON c.id = l.curr_id
@@ -952,6 +1032,7 @@ async fn load_batches(
             cost: row.cost,
             curr_code: row.curr_code,
             note: row.note,
+            expires_on: row.expires_on,
         })
         .collect())
 }
@@ -1046,6 +1127,8 @@ pub async fn cook(
     );
 
     lock_store(&mut tx, store).await?;
+    let store_day = store_today(&mut tx, store).await?;
+    check_expiry(a_req.expires_on, store_day, store_day)?;
     require_room(&mut tx, store, 1).await?;
     let batch_id = sqlx::query_scalar!(
         r#"
@@ -1120,9 +1203,10 @@ pub async fn cook(
     sqlx::query!(
         r#"
         INSERT INTO stock_lots (
-            owner_id, family_id, kind, batch_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts
+            owner_id, family_id, kind, batch_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts,
+            expires_on
         )
-        VALUES ($1, $2, 'dish', $3, $4, 'g', $5, $6, $7, 'cooked', $8, NOW())
+        VALUES ($1, $2, 'dish', $3, $4, 'g', $5, $6, $7, 'cooked', $8, NOW(), $9)
         "#,
         store.owner_id,
         store.family_id,
@@ -1131,7 +1215,8 @@ pub async fn cook(
         cooked_g,
         cost,
         curr_id,
-        a_user.user_id
+        a_user.user_id,
+        a_req.expires_on
     )
     .execute(&mut *tx)
     .await?;

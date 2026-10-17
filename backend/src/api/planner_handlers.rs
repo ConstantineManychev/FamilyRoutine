@@ -16,6 +16,7 @@ use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::training_handlers::{begin_session, load_session, program_plan};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text};
+use crate::notify::replan;
 use crate::services::planner::{analyze, local_date, parse_zone, resolve_local, weekday_bit, Rule, Slot};
 use crate::state::AppState;
 
@@ -232,6 +233,7 @@ pub async fn create_event(
     .fetch_one(&mut *tx)
     .await?;
 
+    replan(&mut tx, a_user.user_id).await?;
     let event = load_event(&mut tx, a_user.user_id, id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(event.into_dto())))
@@ -277,6 +279,7 @@ pub async fn update_event(
     .execute(&mut *tx)
     .await?;
 
+    replan(&mut tx, a_user.user_id).await?;
     let event = load_event(&mut tx, a_user.user_id, a_id).await?;
     tx.commit().await?;
     Ok(Json(event.into_dto()))
@@ -288,17 +291,20 @@ pub async fn delete_event(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
+    let mut tx = a_state.db.begin().await?;
     let deleted = sqlx::query!(
         "DELETE FROM plan_events WHERE id = $1 AND user_id = $2",
         a_id,
         a_user.user_id
     )
-    .execute(&a_state.db)
+    .execute(&mut *tx)
     .await?;
     if deleted.rows_affected() == 0
     {
         return Err(ApiError::NotFound);
     }
+    replan(&mut tx, a_user.user_id).await?;
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -367,6 +373,7 @@ pub async fn save_occurrence(
     .execute(&mut *tx)
     .await?;
 
+    replan(&mut tx, a_user.user_id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -638,7 +645,7 @@ async fn load_event(a_conn: &mut PgConnection, a_user_id: Uuid, a_id: Uuid) -> R
         .ok_or(ApiError::NotFound)
 }
 
-async fn load_occurrences(
+pub async fn load_occurrences(
     a_conn: &mut PgConnection,
     a_user_id: Uuid,
     a_from: NaiveDate,

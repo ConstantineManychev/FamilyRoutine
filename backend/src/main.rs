@@ -5,6 +5,7 @@ use std::time::Duration;
 use backend::banking;
 use backend::config::AppConfig;
 use backend::infrastructure::database;
+use backend::notify;
 use backend::security::session;
 use backend::{build_router, AppState};
 use tokio::net::TcpListener;
@@ -12,9 +13,17 @@ use tracing_subscriber::EnvFilter;
 
 const MAINTENANCE_PERIOD: Duration = Duration::from_secs(600);
 
+const GEN_VAPID_COMMAND: &str = "gen-vapid";
+
 #[tokio::main]
 async fn main()
 {
+    if std::env::args().nth(1).as_deref() == Some(GEN_VAPID_COMMAND)
+    {
+        print_vapid_keys();
+        return;
+    }
+
     let env_dir = dotenvy::dotenv()
         .ok()
         .and_then(|env_file| env_file.parent().map(Path::to_path_buf));
@@ -65,6 +74,7 @@ async fn main()
     banking::spawn_self_check(state.clone());
     banking::spawn_backfill(state.clone());
     banking::fx::spawn(state.clone());
+    notify::worker::spawn(state.clone());
 
     let listener = match TcpListener::bind(bind_addr).await
     {
@@ -86,6 +96,23 @@ async fn main()
     {
         tracing::error!("server error: {err}");
         std::process::exit(1);
+    }
+}
+
+fn print_vapid_keys()
+{
+    match notify::web_push::generate_vapid()
+    {
+        Ok((public, private)) =>
+        {
+            println!("VAPID_PUBLIC_KEY={public}");
+            println!("VAPID_PRIVATE_KEY={private}");
+        }
+        Err(err) =>
+        {
+            eprintln!("cannot generate VAPID keys: {err}");
+            std::process::exit(1);
+        }
     }
 }
 

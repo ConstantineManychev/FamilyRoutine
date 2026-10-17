@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO notify_settings (\n            user_id, tz, lang, is_plan, plan_lead_min, is_workout, workout_lead_min, is_expiring, is_expired\n        )\n        VALUES (\n            $1, COALESCE($2::text, $10::text), COALESCE($3::text, $11::text), COALESCE($4::bool, TRUE),\n            COALESCE($5::int, $12::int), COALESCE($6::bool, TRUE), COALESCE($7::int, $13::int),\n            COALESCE($8::bool, TRUE), COALESCE($9::bool, TRUE)\n        )\n        ON CONFLICT (user_id) DO UPDATE\n        SET tz = COALESCE($2::text, notify_settings.tz),\n            lang = COALESCE($3::text, notify_settings.lang),\n            is_plan = COALESCE($4::bool, notify_settings.is_plan),\n            plan_lead_min = COALESCE($5::int, notify_settings.plan_lead_min),\n            is_workout = COALESCE($6::bool, notify_settings.is_workout),\n            workout_lead_min = COALESCE($7::int, notify_settings.workout_lead_min),\n            is_expiring = COALESCE($8::bool, notify_settings.is_expiring),\n            is_expired = COALESCE($9::bool, notify_settings.is_expired),\n            updated_ts = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Bool",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ca416a923c26de90346c19fa4fb98c25467009f707abac5315b178dca6ce7bf9"
+}

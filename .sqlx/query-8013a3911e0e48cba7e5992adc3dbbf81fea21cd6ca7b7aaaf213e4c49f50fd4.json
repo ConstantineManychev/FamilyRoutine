@@ -15,7 +15,8 @@
               "Enum": [
                 "spoiled",
                 "leftovers",
-                "other"
+                "other",
+                "expired"
               ]
             }
           }

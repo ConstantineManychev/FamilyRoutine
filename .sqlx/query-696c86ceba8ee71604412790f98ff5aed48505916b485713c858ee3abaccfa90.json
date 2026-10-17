@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE push_subs SET last_ok_ts = $2, fail_count = 0 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "696c86ceba8ee71604412790f98ff5aed48505916b485713c858ee3abaccfa90"
+}
