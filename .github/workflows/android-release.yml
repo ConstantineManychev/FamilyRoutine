@@ -139,20 +139,27 @@ jobs:
           BUILD_NUMBER: ${{ steps.meta.outputs.build }}
           API_URL: ${{ steps.meta.outputs.url }}
           APP_LINK_HOST: ${{ steps.meta.outputs.host }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           apk=build/app/outputs/flutter-apk/app-release.apk
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          echo "Using $apksigner"
+
+          expected="$(keytool -exportcert -alias "$KEY_ALIAS" -keystore android/app/upload-keystore.jks -storepass:env STORE_PASSWORD | sha256sum | cut -d' ' -f1)"
           "$apksigner" verify --print-certs "$apk" > signature.txt
-          digest="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signature.txt)"
-          if [[ -z "$digest" ]]; then
-            echo "::error::The APK is not signed"
+          cat signature.txt
+
+          digests="$(grep -i 'sha-256 digest' signature.txt | grep -Eio '[0-9a-f]{64}' | tr 'A-F' 'a-f' || true)"
+          if [[ -z "$digests" ]]; then
+            echo "::error::apksigner did not report any signing certificate"
             exit 1
           fi
-          if grep -q "CN=Android Debug" signature.txt; then
-            echo "::error::The APK is signed with the debug key instead of the release key"
+          if ! grep -qx "$expected" <<< "$digests"; then
+            echo "::error::The APK is not signed with the key from ANDROID_KEYSTORE_BASE64 (alias ANDROID_KEY_ALIAS)"
             exit 1
           fi
-          fingerprint="$(echo "$digest" | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')"
+          fingerprint="$(echo "$expected" | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')"
 
           mkdir -p dist
           name="family-routine-$VERSION-$BUILD_NUMBER.apk"
