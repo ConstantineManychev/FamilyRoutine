@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            u.is_managed,\n            can_manage_person($1, u.id) AS \"is_manager!\",\n            EXISTS (\n                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id\n                WHERE t.user_id = u.id AND v.user_id = $1\n            ) AS \"is_relative!\"\n        FROM users u\n        WHERE u.id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_managed",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_manager!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_relative!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "6c1a5e2813580b283bbe115e2f922d8e698eebf090c8b858c0575182b8fd22da"
+}

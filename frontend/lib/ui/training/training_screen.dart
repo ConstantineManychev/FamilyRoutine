@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import 'next_workout_card.dart';
 import 'training_format.dart';
 import 'training_revision.dart';
 import '../common/app_theme.dart';
@@ -16,7 +17,9 @@ const int _upcomingLimit = 10;
 
 class TrainingScreen extends ConsumerStatefulWidget
 {
-  const TrainingScreen({super.key});
+  final String? personId;
+
+  const TrainingScreen({super.key, this.personId});
 
   @override
   ConsumerState<TrainingScreen> createState() => _TrainingScreenState();
@@ -43,9 +46,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
     try
     {
       final api = ref.read(apiProv);
-      final plan = await api.getTrainingPlan();
-      final programs = await api.getPrograms();
-      final sessions = await api.getSessions();
+      final plan = await api.getTrainingPlan(aPersonId: widget.personId);
+      final programs = await api.getPrograms(aPersonId: widget.personId);
+      final sessions = await api.getSessions(aPersonId: widget.personId);
       if (mounted)
       {
         setState(()
@@ -92,7 +95,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
   {
     await _run(() async
     {
-      final session = await ref.read(apiProv).startSession(aDayId);
+      final session = await ref.read(apiProv).startSession(aDayId, aPersonId: widget.personId);
       if (mounted)
       {
         notifyTrainingChanged(ref);
@@ -135,7 +138,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
       );
       if (dayId != null)
       {
-        await ref.read(apiProv).setTrainingToday(dayId);
+        await ref.read(apiProv).setTrainingToday(dayId, aPersonId: widget.personId);
         await _load();
       }
     });
@@ -152,7 +155,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
 
   Future<void> _openEditor(String? aProgramId) async
   {
-    await context.push(aProgramId == null ? '/app/training/programs/new' : '/app/training/programs/$aProgramId');
+    await context.push(aProgramId == null ? newProgramPath(aPersonId: widget.personId) : '/app/training/programs/$aProgramId');
     await _load();
   }
 
@@ -162,6 +165,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
     aContext.locale;
     ref.listen<int>(trainingRevisionProv, (_, __) => _load());
     final plan = _plan;
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final person = people.where((aPerson) => aPerson.id == widget.personId).firstOrNull;
     if (plan == null)
     {
       return _loadError != null
@@ -180,7 +185,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ScreenHeader(
-                  title: 'training.title'.tr(),
+                  title: person == null ? 'training.title'.tr() : '${'training.title'.tr()} · ${person.fullName}',
                   actions: [
                     OutlinedButton.icon(
                       onPressed: _isBusy ? null : () => _openEditor(null),

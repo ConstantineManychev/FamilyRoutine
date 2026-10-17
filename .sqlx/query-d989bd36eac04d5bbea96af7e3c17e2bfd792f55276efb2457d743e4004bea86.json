@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT user_id, started_ts, finished_ts AS \"finished_ts!\", kcal::float8 AS \"kcal!\"\n        FROM workout_sessions\n        WHERE user_id = ANY($1) AND finished_ts IS NOT NULL AND kcal IS NOT NULL\n          AND started_ts < $3 AND finished_ts > $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "finished_ts!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "kcal!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "d989bd36eac04d5bbea96af7e3c17e2bfd792f55276efb2457d743e4004bea86"
+}

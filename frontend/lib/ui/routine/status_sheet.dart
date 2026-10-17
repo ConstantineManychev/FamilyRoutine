@@ -24,6 +24,13 @@ final FutureProvider<StatusMarkDto?> currentMarkProv = FutureProvider<StatusMark
   return aRef.read(apiProv).getCurrentMark();
 });
 
+final AutoDisposeFutureProviderFamily<StatusMarkDto?, String> personMarkProv =
+    FutureProvider.autoDispose.family<StatusMarkDto?, String>((aRef, aPersonId)
+{
+  aRef.watch(routineRevisionProv);
+  return aRef.read(apiProv).getCurrentMark(aPersonId: aPersonId);
+});
+
 String statusCaption(BuildContext aContext, StatusMarkDto? aMark)
 {
   if (aMark == null)
@@ -129,20 +136,23 @@ class StatusLine extends ConsumerWidget
   }
 }
 
-Future<void> showStatusSheet(BuildContext aContext)
+Future<void> showStatusSheet(BuildContext aContext, {String? aPersonId, String? aPersonName})
 {
   return showModalBottomSheet<void>(
     context: aContext,
     useRootNavigator: true,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => const StatusSheet(),
+    builder: (_) => StatusSheet(personId: aPersonId, personName: aPersonName),
   );
 }
 
 class StatusSheet extends ConsumerStatefulWidget
 {
-  const StatusSheet({super.key});
+  final String? personId;
+  final String? personName;
+
+  const StatusSheet({super.key, this.personId, this.personName});
 
   @override
   ConsumerState<StatusSheet> createState() => _StatusSheetState();
@@ -189,7 +199,12 @@ class _StatusSheetState extends ConsumerState<StatusSheet>
     try
     {
       final isNow = _offset == 0 && _customTime == null;
-      await ref.read(apiProv).createMark(aStatus, aNote: _noteCtrl.text, aStartTs: isNow ? null : _startTs());
+      await ref.read(apiProv).createMark(
+        aStatus,
+        aNote: _noteCtrl.text,
+        aStartTs: isNow ? null : _startTs(),
+        aPersonId: widget.personId,
+      );
       ref.read(routineRevisionProv.notifier).state++;
       if (mounted)
       {
@@ -212,7 +227,9 @@ class _StatusSheetState extends ConsumerState<StatusSheet>
     aContext.locale;
     final media = MediaQuery.of(aContext);
     final palette = aContext.palette;
-    final current = ref.watch(currentMarkProv).valueOrNull;
+    final personId = widget.personId;
+    final current = personId == null ? ref.watch(currentMarkProv).valueOrNull : ref.watch(personMarkProv(personId)).valueOrNull;
+    final personName = widget.personName;
 
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
@@ -224,7 +241,10 @@ class _StatusSheetState extends ConsumerState<StatusSheet>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('routine.my_status'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                personId == null || personName == null ? 'routine.my_status'.tr() : 'routine.status_of'.tr(args: [personName]),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 4),
               Text(
                 current == null

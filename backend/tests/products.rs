@@ -97,21 +97,8 @@ async fn get(a_app: &TestApp, a_user: &TestUser, a_uri: &str) -> Value
     reply.body
 }
 
-async fn set_price_sharing(a_app: &TestApp, a_user: &TestUser, a_family: &str, a_is_shared: bool)
-{
-    let reply = a_app
-        .call(
-            Method::PUT,
-            &format!("/api/families/{a_family}/price-sharing"),
-            Some(&a_user.token),
-            Some(json!({ "is_shared": a_is_shared })),
-        )
-        .await;
-    assert_eq!(reply.status, StatusCode::NO_CONTENT);
-}
-
 #[sqlx::test(migrations = "./migrations")]
-async fn catalog_prices_are_shared_only_with_consent(a_db: PgPool)
+async fn group_members_share_catalog_prices(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let alice = app.user("alice@example.com").await;
@@ -127,13 +114,14 @@ async fn catalog_prices_are_shared_only_with_consent(a_db: PgPool)
         json!({ "name": "Молоко", "kind": "product", "unit": "liter" }),
     )
     .await;
-    for viewer in [&bob, &eve]
-    {
-        let view = get(&app, viewer, &format!("/api/dicts/items/{milk}")).await;
-        assert_eq!(view["owner_kind"], "user");
-        assert_eq!(view["owner_name"], Value::Null);
-        assert_eq!(view["is_editable"], false);
-    }
+    let as_member = get(&app, &bob, &format!("/api/dicts/items/{milk}")).await;
+    assert_eq!(as_member["owner_kind"], "member");
+    assert_eq!(as_member["owner_name"], "Test alice");
+    assert_eq!(as_member["is_editable"], false);
+    let as_stranger = get(&app, &eve, &format!("/api/dicts/items/{milk}")).await;
+    assert_eq!(as_stranger["owner_kind"], "user");
+    assert_eq!(as_stranger["owner_name"], Value::Null);
+    assert_eq!(as_stranger["is_editable"], false);
 
     let bob_edit = app
         .call(
@@ -185,13 +173,6 @@ async fn catalog_prices_are_shared_only_with_consent(a_db: PgPool)
     .await;
     assert_eq!(eve_status, StatusCode::CREATED);
 
-    assert_eq!(prices(&app, &alice, &milk, None).await["prices"], json!([]));
-    assert_eq!(
-        get(&app, &alice, &format!("/api/dicts/items/{milk}/price-history")).await,
-        json!([])
-    );
-
-    set_price_sharing(&app, &bob, &home, true).await;
     let shared = prices(&app, &alice, &milk, None).await;
     assert_eq!(shared["prices"].as_array().unwrap().len(), 1, "{shared}");
     assert_eq!(shared["prices"][0]["store_name"], "АТБ");
@@ -203,23 +184,21 @@ async fn catalog_prices_are_shared_only_with_consent(a_db: PgPool)
     assert_eq!(history[0]["unit_price"], "40.00");
     assert_eq!(history[0]["is_shared"], true);
 
-    set_price_sharing(&app, &alice, &home, true).await;
-    let as_member = get(&app, &bob, &format!("/api/dicts/items/{milk}")).await;
-    assert_eq!(as_member["owner_kind"], "member");
-    assert_eq!(as_member["owner_name"], "Test alice");
-    assert_eq!(
-        get(&app, &eve, &format!("/api/dicts/items/{milk}")).await["owner_name"],
-        Value::Null
+    let eve_view = prices(&app, &eve, &milk, None).await;
+    assert!(
+        eve_view["prices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|price| price["store_name"] != "АТБ"),
+        "{eve_view}"
     );
-
-    let detail = get(&app, &bob, &format!("/api/families/{home}")).await;
-    assert_eq!(detail["is_prices_shared"], true);
     assert_eq!(
         app.call(
             Method::PUT,
             &format!("/api/families/{home}/price-sharing"),
-            Some(&eve.token),
-            Some(json!({ "is_shared": true }))
+            Some(&bob.token),
+            Some(json!({ "is_shared": false }))
         )
         .await
         .status,

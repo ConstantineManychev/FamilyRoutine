@@ -5,8 +5,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use shared_schema::{
-    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkDetailsQuery, MarkMealsDto, RoutineStatus,
-    SharingRequest, StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery, UpdateMarkRequest,
+    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkDetailsQuery, MarkMealsDto, PersonQuery,
+    RoutineStatus, StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery, UpdateMarkRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -19,7 +19,7 @@ use crate::api::work_handlers::mark_work;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::clean_optional_text;
 use crate::security::authz::require_member;
-use crate::security::profile_access::profile_access;
+use crate::security::profile_access::{acting_for, is_editor, require_editor};
 use crate::services::nutrition::sum;
 use crate::state::AppState;
 
@@ -58,6 +58,8 @@ struct MemberRow
     user_id: Uuid,
     first_name: String,
     last_name: String,
+    is_managed: bool,
+    can_edit: bool,
 }
 
 pub async fn create_mark(
@@ -80,11 +82,12 @@ pub async fn create_mark(
     }
 
     let mut tx = a_state.db.begin().await?;
-    lock_user_marks(&mut tx, a_user.user_id).await?;
+    let person_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
+    lock_user_marks(&mut tx, person_id).await?;
 
     let recent = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM status_marks WHERE user_id = $1 AND start_ts > $2"#,
-        a_user.user_id,
+        person_id,
         now - Duration::days(MAX_PAST_DAYS + 1)
     )
     .fetch_one(&mut *tx)
@@ -94,7 +97,7 @@ pub async fn create_mark(
         return Err(ApiError::Validation("marks"));
     }
 
-    let mark = place_mark(&mut tx, a_user.user_id, a_req.status, note, start, a_req.end_ts).await?;
+    let mark = place_mark(&mut tx, person_id, a_req.status, note, start, a_req.end_ts).await?;
 
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(mark)))
@@ -109,7 +112,8 @@ pub async fn update_mark(
 {
     let note = clean_optional_text(a_req.note.as_deref(), MAX_NOTE_LEN, "note")?;
     let mut tx = a_state.db.begin().await?;
-    lock_user_marks(&mut tx, a_user.user_id).await?;
+    let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
+    lock_user_marks(&mut tx, owner_id).await?;
     let current = sqlx::query_as!(
         StatusMarkDto,
         r#"
@@ -119,7 +123,7 @@ pub async fn update_mark(
         FOR UPDATE
         "#,
         a_id,
-        a_user.user_id
+        owner_id
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -137,7 +141,7 @@ pub async fn update_mark(
         {
             a_req.end_ts.or(current.end_ts)
         };
-        reschedule(&mut tx, a_user.user_id, a_id, start, end).await?
+        reschedule(&mut tx, owner_id, a_id, start, end).await?
     }
     else
     {
@@ -148,7 +152,7 @@ pub async fn update_mark(
     {
         sqlx::query!(
             "UPDATE meal_entries SET status_mark_id = NULL WHERE user_id = $1 AND status_mark_id = $2",
-            a_user.user_id,
+            owner_id,
             a_id
         )
         .execute(&mut *tx)
@@ -163,7 +167,7 @@ pub async fn update_mark(
         RETURNING id, status AS "status: RoutineStatus", note, start_ts, end_ts
         "#,
         a_id,
-        a_user.user_id,
+        owner_id,
         a_req.status as RoutineStatus,
         note,
         start,
@@ -253,8 +257,11 @@ async fn reschedule(
 pub async fn current_mark(
     State(a_state): State<AppState>,
     a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<PersonQuery>,
 ) -> Result<Json<Option<StatusMarkDto>>, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let person_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
     let mark = sqlx::query_as!(
         StatusMarkDto,
         r#"
@@ -264,9 +271,9 @@ pub async fn current_mark(
         ORDER BY start_ts DESC
         LIMIT 1
         "#,
-        a_user.user_id
+        person_id
     )
-    .fetch_optional(&a_state.db)
+    .fetch_optional(&mut *conn)
     .await?;
     Ok(Json(mark))
 }
@@ -304,10 +311,11 @@ pub async fn link_mark_meals(
     }
 
     let mut tx = a_state.db.begin().await?;
-    require_meal_mark(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
+    require_meal_mark(&mut tx, owner_id, a_id).await?;
     let found = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM meal_entries WHERE user_id = $1 AND id = ANY($2)"#,
-        a_user.user_id,
+        owner_id,
         &ids
     )
     .fetch_one(&mut *tx)
@@ -322,7 +330,7 @@ pub async fn link_mark_meals(
         UPDATE meal_entries SET status_mark_id = NULL
         WHERE user_id = $1 AND status_mark_id = $2 AND NOT (id = ANY($3))
         "#,
-        a_user.user_id,
+        owner_id,
         a_id,
         &ids
     )
@@ -330,7 +338,7 @@ pub async fn link_mark_meals(
     .await?;
     sqlx::query!(
         "UPDATE meal_entries SET status_mark_id = $2 WHERE user_id = $1 AND id = ANY($3)",
-        a_user.user_id,
+        owner_id,
         a_id,
         &ids
     )
@@ -365,33 +373,7 @@ async fn build_details(
     .ok_or(ApiError::NotFound)?;
 
     let is_mine = row.user_id == a_viewer_id;
-    let (can_see_training, can_see_meals) = if is_mine
-    {
-        (true, true)
-    }
-    else
-    {
-        let is_visible = sqlx::query_scalar!(
-            r#"
-            SELECT EXISTS (
-                SELECT 1
-                FROM family_mems owner
-                JOIN family_mems viewer ON viewer.family_id = owner.family_id
-                WHERE owner.user_id = $1 AND viewer.user_id = $2 AND owner.is_routine_shared
-            ) AS "is_visible!"
-            "#,
-            row.user_id,
-            a_viewer_id
-        )
-        .fetch_one(&mut *a_conn)
-        .await?;
-        if !is_visible
-        {
-            return Err(ApiError::NotFound);
-        }
-        let access = profile_access(a_conn, a_viewer_id, row.user_id).await?;
-        (access.can_see_training(), access.can_see_meals())
-    };
+    let can_edit = is_editor(a_conn, a_viewer_id, row.user_id).await?;
 
     let mut is_details_hidden = false;
     let mut workout = None;
@@ -400,7 +382,7 @@ async fn build_details(
     let mut study = None;
     match row.status
     {
-        RoutineStatus::Gym if can_see_training =>
+        RoutineStatus::Gym =>
         {
             let session_id = sqlx::query_scalar!(
                 r#"
@@ -423,7 +405,7 @@ async fn build_details(
                 workout = Some(load_session(a_conn, row.user_id, session_id).await?);
             }
         }
-        RoutineStatus::Meal if can_see_meals =>
+        RoutineStatus::Meal =>
         {
             let entries = mark_entries(a_conn, row.user_id, row.id).await?;
             let (norm, _) = load_norm(a_conn, row.user_id, row.start_ts.date_naive(), row.start_ts).await?;
@@ -433,7 +415,6 @@ async fn build_details(
                 day_norm: norm.map(|norm| norm.target),
             });
         }
-        RoutineStatus::Gym | RoutineStatus::Meal => is_details_hidden = true,
         RoutineStatus::Work if is_mine =>
         {
             let local_day = (row.start_ts + Duration::minutes(i64::from(a_tz_offset_min))).date_naive();
@@ -459,6 +440,7 @@ async fn build_details(
         owner_id: row.user_id,
         owner_name: format!("{} {}", row.first_name, row.last_name),
         is_mine,
+        can_edit,
         is_details_hidden,
         workout,
         meals,
@@ -473,12 +455,14 @@ pub async fn delete_mark(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = mark_owner(&mut conn, a_user.user_id, a_id).await?;
     let deleted = sqlx::query!(
         "DELETE FROM status_marks WHERE id = $1 AND user_id = $2",
         a_id,
-        a_user.user_id
+        owner_id
     )
-    .execute(&a_state.db)
+    .execute(&mut *conn)
     .await?;
 
     if deleted.rows_affected() == 0
@@ -504,18 +488,19 @@ pub async fn timeline(
     {
         Some(family_id) =>
         {
-            require_member(&a_state.db, family_id, a_user.user_id).await?;
             let name = sqlx::query_scalar!("SELECT name FROM families WHERE id = $1", family_id)
                 .fetch_one(&a_state.db)
                 .await?;
+            require_member(&a_state.db, family_id, a_user.user_id).await?;
             let members = sqlx::query_as!(
                 MemberRow,
                 r#"
-                SELECT u.id AS user_id, u.first_name, u.last_name
+                SELECT u.id AS user_id, u.first_name, u.last_name, u.is_managed,
+                       can_manage_person($2, u.id) AS "can_edit!"
                 FROM family_mems fm
                 JOIN users u ON u.id = fm.user_id
-                WHERE fm.family_id = $1 AND (fm.user_id = $2 OR fm.is_routine_shared) AND NOT u.is_managed
-                ORDER BY (fm.user_id = $2) DESC, u.first_name, u.last_name
+                WHERE fm.family_id = $1
+                ORDER BY (fm.user_id = $2) DESC, u.is_managed, u.first_name, u.last_name
                 "#,
                 family_id,
                 a_user.user_id
@@ -528,7 +513,10 @@ pub async fn timeline(
         {
             let me = sqlx::query_as!(
                 MemberRow,
-                "SELECT id AS user_id, first_name, last_name FROM users WHERE id = $1",
+                r#"
+                SELECT id AS user_id, first_name, last_name, is_managed, TRUE AS "can_edit!"
+                FROM users WHERE id = $1
+                "#,
                 a_user.user_id
             )
             .fetch_one(&a_state.db)
@@ -573,6 +561,8 @@ pub async fn timeline(
             user_id: member.user_id,
             first_name: member.first_name,
             last_name: member.last_name,
+            is_managed: member.is_managed,
+            can_edit: member.can_edit,
         })
         .collect();
 
@@ -581,30 +571,6 @@ pub async fn timeline(
         family_name,
         members,
     }))
-}
-
-pub async fn set_routine_sharing(
-    State(a_state): State<AppState>,
-    a_user: AuthUser,
-    ApiPath(a_family_id): ApiPath<Uuid>,
-    ApiJson(a_req): ApiJson<SharingRequest>,
-) -> Result<StatusCode, ApiError>
-{
-    let updated = sqlx::query!(
-        "UPDATE family_mems SET is_routine_shared = $3 WHERE family_id = $1 AND user_id = $2",
-        a_family_id,
-        a_user.user_id,
-        a_req.is_shared
-    )
-    .execute(&a_state.db)
-    .await?;
-
-    if updated.rows_affected() == 0
-    {
-        return Err(ApiError::NotFound);
-    }
-
-    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn place_mark(
@@ -702,6 +668,16 @@ pub async fn place_mark(
     }
 
     Ok(mark)
+}
+
+async fn mark_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>
+{
+    let owner_id = sqlx::query_scalar!("SELECT user_id FROM status_marks WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    require_editor(a_conn, a_viewer_id, owner_id).await?;
+    Ok(owner_id)
 }
 
 async fn lock_user_marks(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<(), ApiError>

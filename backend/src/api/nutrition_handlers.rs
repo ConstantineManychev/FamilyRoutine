@@ -7,8 +7,8 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     ActivityLevel, CopyMealsDto, CopyMealsRequest, DayMealDto, DishDto, DishIngredientDto, DishQuery, GoalMode,
-    ItemKind, ItemUnit, MacrosDto, MealEntryDto, MealSource, MetricGroup, NewMealEntryRequest, NormGap,
-    NutritionDayDto, NutritionDayQuery, NutritionGoalDto, NutritionNormDto, PersonNormDto, PersonNormQuery,
+    ItemKind, ItemUnit, MacrosDto, MealEntryDto, MealSource, NewMealEntryRequest, NormGap, NutritionDayDto,
+    NutritionDayQuery, NutritionGoalDto, NutritionNormDto, PersonNormDto, PersonNormQuery, PersonQuery,
     QuickEntryRequest, RecentFoodDto, RoutineStatus, SaveDishRequest, SaveGoalRequest, Sex, StatusMarkDto,
     UpdateMealEntryRequest,
 };
@@ -21,7 +21,7 @@ use crate::api::stock_handlers::{
 };
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text, contains_pattern};
-use crate::security::profile_access::profile_access;
+use crate::security::profile_access::{acting_for, is_editor, profile_access, require_editor};
 use crate::services::nutrition::{
     amount, clean_custom, clean_goal, daily_norm, dish_math, for_grams, is_child, portion_grams, sum, BodyProfile,
     GoalSettings, Ingredient,
@@ -727,6 +727,16 @@ async fn dish_snapshot(
     })
 }
 
+async fn entry_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>
+{
+    let owner_id = sqlx::query_scalar!("SELECT user_id FROM meal_entries WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    require_editor(a_conn, a_viewer_id, owner_id).await?;
+    Ok(owner_id)
+}
+
 async fn take_from_stock(
     a_conn: &mut PgConnection,
     a_user_id: Uuid,
@@ -857,6 +867,7 @@ pub async fn create_entry(
 {
     let date = check_date(a_req.date, "date")?;
     let mut tx = a_state.db.begin().await?;
+    let person_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
     let snapshot = match (a_req.item_id, a_req.dish_id, a_req.quick.as_ref())
     {
         (Some(item_id), None, None) if a_req.batch_id.is_none() =>
@@ -881,9 +892,9 @@ pub async fn create_entry(
         }
         _ => return Err(ApiError::Validation("source")),
     };
-    let mark_start = meal_mark_start(&mut tx, a_user.user_id, a_req.status_mark_id).await?;
+    let mark_start = meal_mark_start(&mut tx, person_id, a_req.status_mark_id).await?;
     require_near(date, mark_start)?;
-    require_day_capacity(&mut tx, a_user.user_id, date, 1).await?;
+    require_day_capacity(&mut tx, person_id, date, 1).await?;
 
     let per_100 = snapshot.per_100;
     let row = sqlx::query_as!(
@@ -898,7 +909,7 @@ pub async fn create_entry(
                   grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
                   status_mark_id, batch_id, stock_short, created_ts
         "#,
-        a_user.user_id,
+        person_id,
         date,
         snapshot.source as MealSource,
         snapshot.item_id,
@@ -949,6 +960,7 @@ pub async fn update_entry(
 {
     let date = check_date(a_req.date, "date")?;
     let mut tx = a_state.db.begin().await?;
+    let owner_id = entry_owner(&mut tx, a_user.user_id, a_id).await?;
     let current = sqlx::query_as!(
         EntryRow,
         r#"
@@ -960,7 +972,7 @@ pub async fn update_entry(
         FOR UPDATE
         "#,
         a_id,
-        a_user.user_id
+        owner_id
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -985,7 +997,7 @@ pub async fn update_entry(
     {
         Some(mark_id) =>
         {
-            let mark_start = meal_mark_start(&mut tx, a_user.user_id, mark_id).await?;
+            let mark_start = meal_mark_start(&mut tx, owner_id, mark_id).await?;
             require_near(date, mark_start)?;
             Some(mark_id)
         }
@@ -993,7 +1005,7 @@ pub async fn update_entry(
     };
     if date != current.eaten_on
     {
-        require_day_capacity(&mut tx, a_user.user_id, date, 1).await?;
+        require_day_capacity(&mut tx, owner_id, date, 1).await?;
     }
 
     let row = sqlx::query_as!(
@@ -1045,12 +1057,14 @@ pub async fn delete_entry(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = entry_owner(&mut conn, a_user.user_id, a_id).await?;
     let deleted = sqlx::query!(
         "DELETE FROM meal_entries WHERE id = $1 AND user_id = $2",
         a_id,
-        a_user.user_id
+        owner_id
     )
-    .execute(&a_state.db)
+    .execute(&mut *conn)
     .await?;
     if deleted.rows_affected() == 0
     {
@@ -1074,6 +1088,8 @@ pub async fn nutrition_day(
         - Duration::minutes(i64::from(a_query.tz_offset_min));
     let day_end = day_start + Duration::days(1);
     let mut conn = a_state.db.acquire().await?;
+    let person_id = a_query.person_id.unwrap_or(a_user.user_id);
+    let can_edit = is_editor(&mut conn, a_user.user_id, person_id).await?;
 
     let rows = sqlx::query_as!(
         EntryRow,
@@ -1085,7 +1101,7 @@ pub async fn nutrition_day(
         WHERE user_id = $1 AND eaten_on = $2
         ORDER BY created_ts, id
         "#,
-        a_user.user_id,
+        person_id,
         date
     )
     .fetch_all(&mut *conn)
@@ -1100,7 +1116,7 @@ pub async fn nutrition_day(
         WHERE user_id = $1 AND status = 'meal' AND ((start_ts >= $2 AND start_ts < $3) OR id = ANY($4))
         ORDER BY start_ts
         "#,
-        a_user.user_id,
+        person_id,
         day_start,
         day_end,
         &linked
@@ -1127,7 +1143,7 @@ pub async fn nutrition_day(
         .filter(|entry| !meals.iter().any(|meal| entry.status_mark_id == Some(meal.mark.id)))
         .cloned()
         .collect();
-    let (norm, norm_gaps) = load_norm(&mut conn, a_user.user_id, date, day_end).await?;
+    let (norm, norm_gaps) = load_norm(&mut conn, person_id, date, day_end).await?;
 
     let workout_kcal = sqlx::query_scalar!(
         r#"
@@ -1135,7 +1151,7 @@ pub async fn nutrition_day(
         FROM workout_sessions
         WHERE user_id = $1 AND finished_ts IS NOT NULL AND started_ts >= $2 AND started_ts < $3
         "#,
-        a_user.user_id,
+        person_id,
         day_start,
         day_end
     )
@@ -1151,6 +1167,8 @@ pub async fn nutrition_day(
         norm,
         norm_gaps,
         workout_kcal: workout_kcal.round_dp(0).normalize(),
+        person_id,
+        can_edit,
     }))
 }
 
@@ -1333,11 +1351,16 @@ async fn today_body(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<BodyPr
     load_body(a_conn, a_user_id, now.date_naive(), now).await
 }
 
-pub async fn get_goal(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<NutritionGoalDto>, ApiError>
+pub async fn get_goal(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<PersonQuery>,
+) -> Result<Json<NutritionGoalDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    let body = today_body(&mut conn, a_user.user_id).await?;
-    let goal = load_goal(&mut conn, a_user.user_id).await?;
+    let person_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
+    let body = today_body(&mut conn, person_id).await?;
+    let goal = load_goal(&mut conn, person_id).await?;
     Ok(Json(goal_dto(&goal, &body)))
 }
 
@@ -1348,7 +1371,8 @@ pub async fn preview_goal(
 ) -> Result<Json<NutritionGoalDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    let body = today_body(&mut conn, a_user.user_id).await?;
+    let person_id = acting_for(&mut conn, a_user.user_id, a_req.person_id).await?;
+    let body = today_body(&mut conn, person_id).await?;
     let goal = clean_goal_request(a_req, is_child(body.birth_date, body.on))?;
     Ok(Json(goal_dto(&goal, &body)))
 }
@@ -1360,7 +1384,8 @@ pub async fn save_goal(
 ) -> Result<Json<NutritionGoalDto>, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let body = today_body(&mut tx, a_user.user_id).await?;
+    let person_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
+    let body = today_body(&mut tx, person_id).await?;
     let goal = clean_goal_request(a_req, is_child(body.birth_date, body.on))?;
     let custom = goal.custom;
     sqlx::query!(
@@ -1374,7 +1399,7 @@ pub async fn save_goal(
             is_custom = EXCLUDED.is_custom, custom_kcal = EXCLUDED.custom_kcal, custom_prot = EXCLUDED.custom_prot,
             custom_fat = EXCLUDED.custom_fat, custom_carb = EXCLUDED.custom_carb, updated_ts = NOW()
         "#,
-        a_user.user_id,
+        person_id,
         goal.mode as GoalMode,
         goal.pace_kg,
         goal.target_kg,
@@ -1402,28 +1427,14 @@ pub async fn person_norm(
         return Err(ApiError::Validation("tz_offset_min"));
     }
     let mut conn = a_state.db.acquire().await?;
-    let access = profile_access(&mut conn, a_user.user_id, a_id).await?;
-    if !access.can_see_meals()
-    {
-        return Err(ApiError::NotFound);
-    }
+    profile_access(&mut conn, a_user.user_id, a_id).await?;
     let date = a_query.date;
     let day_end = date.and_hms_opt(0, 0, 0).ok_or(ApiError::Validation("date"))?.and_utc()
         - Duration::minutes(i64::from(a_query.tz_offset_min))
         + Duration::days(1);
     let body = load_body(&mut conn, a_id, date, day_end).await?;
     let goal = load_goal(&mut conn, a_id).await?;
-    let (mut norm, norm_gaps) = norm_result(daily_norm(&body, &goal.settings()));
-    if !access.can_see(MetricGroup::Body)
-    {
-        if let Some(norm) = norm.as_mut()
-        {
-            norm.weight_kg = None;
-            norm.target_kg = None;
-            norm.bmr = None;
-            norm.weeks_to_target = None;
-        }
-    }
+    let (norm, norm_gaps) = norm_result(daily_norm(&body, &goal.settings()));
     let eaten = sqlx::query!(
         r#"
         SELECT COALESCE(SUM(kcal), 0) AS "kcal!", COALESCE(SUM(prot), 0) AS "prot!",
@@ -1452,8 +1463,11 @@ pub async fn person_norm(
 pub async fn recent_foods(
     State(a_state): State<AppState>,
     a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<PersonQuery>,
 ) -> Result<Json<Vec<RecentFoodDto>>, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let person_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
     let rows = sqlx::query!(
         r#"
         SELECT
@@ -1493,10 +1507,10 @@ pub async fn recent_foods(
         ORDER BY r.created_ts DESC
         LIMIT $2
         "#,
-        a_user.user_id,
+        person_id,
         RECENT_LIMIT
     )
-    .fetch_all(&a_state.db)
+    .fetch_all(&mut *conn)
     .await?;
 
     Ok(Json(
@@ -1524,7 +1538,8 @@ pub async fn copy_meals(
 {
     let date = check_date(a_req.date, "date")?;
     let mut tx = a_state.db.begin().await?;
-    let start = meal_mark_start(&mut tx, a_user.user_id, a_req.status_mark_id).await?;
+    let person_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
+    let start = meal_mark_start(&mut tx, person_id, a_req.status_mark_id).await?;
     require_near(date, start)?;
     let same_time = start - Duration::hours(COPY_BACK_HOURS);
     let source = sqlx::query!(
@@ -1536,7 +1551,7 @@ pub async fn copy_meals(
         ORDER BY ABS(EXTRACT(EPOCH FROM (m.start_ts - $5))), m.start_ts
         LIMIT 1
         "#,
-        a_user.user_id,
+        person_id,
         a_req.status_mark_id,
         same_time - Duration::hours(COPY_WINDOW_HOURS),
         same_time + Duration::hours(COPY_WINDOW_HOURS),
@@ -1555,12 +1570,12 @@ pub async fn copy_meals(
 
     let pending = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM meal_entries WHERE user_id = $1 AND status_mark_id = $2"#,
-        a_user.user_id,
+        person_id,
         source.id
     )
     .fetch_one(&mut *tx)
     .await?;
-    require_day_capacity(&mut tx, a_user.user_id, date, pending).await?;
+    require_day_capacity(&mut tx, person_id, date, pending).await?;
 
     let copied = sqlx::query!(
         r#"
@@ -1575,7 +1590,7 @@ pub async fn copy_meals(
         WHERE user_id = $1 AND status_mark_id = $2
         RETURNING id, source AS "source: MealSource", item_id, batch_id, grams
         "#,
-        a_user.user_id,
+        person_id,
         source.id,
         date,
         a_req.status_mark_id

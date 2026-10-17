@@ -1,4 +1,3 @@
-use shared_schema::MetricGroup;
 use sqlx::PgConnection;
 use uuid::Uuid;
 
@@ -10,60 +9,10 @@ pub struct ProfileAccess
     pub is_self: bool,
     pub is_manager: bool,
     pub is_managed: bool,
-    shared_groups: Vec<MetricGroup>,
-    is_training_shared: bool,
-    is_meals_shared: bool,
 }
 
 impl ProfileAccess
 {
-    pub fn can_see(&self, a_group: MetricGroup) -> bool
-    {
-        self.is_manager || self.shared_groups.contains(&a_group)
-    }
-
-    pub fn can_see_training(&self) -> bool
-    {
-        self.is_manager || self.is_training_shared
-    }
-
-    pub fn can_see_meals(&self) -> bool
-    {
-        self.is_manager || self.is_meals_shared
-    }
-
-    pub fn require_training(&self) -> Result<(), ApiError>
-    {
-        if self.can_see_training()
-        {
-            Ok(())
-        }
-        else
-        {
-            Err(ApiError::NotFound)
-        }
-    }
-
-    pub fn visible_groups(&self) -> Vec<MetricGroup>
-    {
-        [MetricGroup::Body, MetricGroup::Composition, MetricGroup::Measures]
-            .into_iter()
-            .filter(|group| self.can_see(*group))
-            .collect()
-    }
-
-    pub fn require_group(&self, a_group: MetricGroup) -> Result<(), ApiError>
-    {
-        if self.can_see(a_group)
-        {
-            Ok(())
-        }
-        else
-        {
-            Err(ApiError::NotFound)
-        }
-    }
-
     pub fn require_manager(&self) -> Result<(), ApiError>
     {
         if self.is_manager
@@ -87,40 +36,11 @@ pub async fn profile_access(
         r#"
         SELECT
             u.is_managed,
-            (u.id = $1 OR (u.is_managed AND (
-                u.managed_by = $1
-                OR EXISTS (
-                    SELECT 1
-                    FROM family_mems child
-                    JOIN family_mems actor ON actor.family_id = child.family_id
-                    JOIN families f ON f.id = child.family_id
-                    WHERE child.user_id = u.id AND actor.user_id = $1 AND (actor.role = 'admin' OR f.owner_id = $1)
-                )
-            ))) AS "is_manager!",
+            can_manage_person($1, u.id) AS "is_manager!",
             EXISTS (
                 SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
                 WHERE t.user_id = u.id AND v.user_id = $1
-            ) AS "is_relative!",
-            EXISTS (
-                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
-                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_body_shared
-            ) AS "is_body!",
-            EXISTS (
-                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
-                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_composition_shared
-            ) AS "is_composition!",
-            EXISTS (
-                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
-                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_measures_shared
-            ) AS "is_measures!",
-            EXISTS (
-                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
-                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_training_shared
-            ) AS "is_training!",
-            EXISTS (
-                SELECT 1 FROM family_mems t JOIN family_mems v ON v.family_id = t.family_id
-                WHERE t.user_id = u.id AND v.user_id = $1 AND t.is_meals_shared
-            ) AS "is_meals!"
+            ) AS "is_relative!"
         FROM users u
         WHERE u.id = $2
         "#,
@@ -136,21 +56,49 @@ pub async fn profile_access(
         return Err(ApiError::NotFound);
     }
 
-    let shared_groups = [
-        (row.is_body, MetricGroup::Body),
-        (row.is_composition, MetricGroup::Composition),
-        (row.is_measures, MetricGroup::Measures),
-    ]
-    .into_iter()
-    .filter_map(|(is_shared, group)| is_shared.then_some(group))
-    .collect();
-
     Ok(ProfileAccess {
         is_self: a_viewer_id == a_target_id,
         is_manager: row.is_manager,
         is_managed: row.is_managed,
-        shared_groups,
-        is_training_shared: row.is_training,
-        is_meals_shared: row.is_meals,
     })
+}
+
+pub async fn acting_for(
+    a_conn: &mut PgConnection,
+    a_viewer_id: Uuid,
+    a_person_id: Option<Uuid>,
+) -> Result<Uuid, ApiError>
+{
+    match a_person_id
+    {
+        Some(person_id) if person_id != a_viewer_id =>
+        {
+            profile_access(a_conn, a_viewer_id, person_id)
+                .await?
+                .require_manager()?;
+            Ok(person_id)
+        }
+        _ => Ok(a_viewer_id),
+    }
+}
+
+pub async fn is_editor(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_owner_id: Uuid) -> Result<bool, ApiError>
+{
+    if a_viewer_id == a_owner_id
+    {
+        return Ok(true);
+    }
+    Ok(profile_access(a_conn, a_viewer_id, a_owner_id).await?.is_manager)
+}
+
+pub async fn require_editor(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_owner_id: Uuid) -> Result<(), ApiError>
+{
+    if is_editor(a_conn, a_viewer_id, a_owner_id).await?
+    {
+        Ok(())
+    }
+    else
+    {
+        Err(ApiError::Forbidden)
+    }
 }

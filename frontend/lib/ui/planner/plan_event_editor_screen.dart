@@ -26,8 +26,9 @@ class PlanEventEditorScreen extends ConsumerStatefulWidget
 {
   final String? eventId;
   final DateTime? initialDate;
+  final String? personId;
 
-  const PlanEventEditorScreen({super.key, this.eventId, this.initialDate});
+  const PlanEventEditorScreen({super.key, this.eventId, this.initialDate, this.personId});
 
   @override
   ConsumerState<PlanEventEditorScreen> createState() => _PlanEventEditorScreenState();
@@ -51,6 +52,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
   String _tz = deviceTimeZone();
   List<String> _timeZones = const [];
   List<ProgramListItem> _programs = const [];
+  late String? _ownerId = widget.personId;
   String? _programId;
   List<ProgramDay> _programDays = const [];
   String? _dayId;
@@ -90,13 +92,18 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
     try
     {
       final api = ref.read(apiProv);
-      final programsFuture = api.getPrograms();
       final zonesFuture = api.getTimeZones();
-      _programs = await programsFuture;
-      _timeZones = await zonesFuture;
-      if (_isEdit)
+      final event = _isEdit ? await api.getPlanEvent(widget.eventId!) : null;
+      final ownerId = event?.ownerId;
+      if (event != null)
       {
-        _apply(await api.getPlanEvent(widget.eventId!));
+        _ownerId = ownerId == null || ownerId == ref.read(sessionUserIdProv) ? null : ownerId;
+      }
+      _programs = await api.getPrograms(aPersonId: _ownerId);
+      _timeZones = await zonesFuture;
+      if (event != null)
+      {
+        _apply(event);
       }
       if (_programId != null)
       {
@@ -322,7 +329,10 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
     setState(() => _isSaving = true);
     try
     {
-      await ref.read(apiProv).savePlanEvent(widget.eventId, payload);
+      await ref.read(apiProv).savePlanEvent(widget.eventId, {
+        ...payload,
+        if (!_isEdit && _ownerId != null) 'person_id': _ownerId,
+      });
       notifyPlannerChanged(ref);
       if (mounted)
       {
@@ -394,12 +404,15 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
     final localeTag = aContext.locale.toLanguageTag();
     const gap = SizedBox(height: 16);
     const fieldWidth = 160.0;
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final owner = people.where((aPerson) => aPerson.id == _ownerId).firstOrNull;
+    final title = _isEdit ? 'planner.event'.tr() : 'planner.new_event'.tr();
 
     return ListView(
       padding: screenPadding(aContext),
       children: [
         ScreenHeader(
-          title: _isEdit ? 'planner.event'.tr() : 'planner.new_event'.tr(),
+          title: owner == null ? title : '$title · ${owner.fullName}',
           actions: [
             if (_isEdit)
               OutlinedButton.icon(

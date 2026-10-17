@@ -61,7 +61,6 @@ async fn own_profile_can_be_edited_and_password_changed(a_db: PgPool)
     assert_eq!(profile["can_edit"], true);
     assert_eq!(profile["email"], "alice@example.com");
     assert_eq!(profile["sex"], Value::Null);
-    assert_eq!(profile["visible_groups"], json!(["body", "composition", "measures"]));
 
     let updated = app
         .call(
@@ -248,29 +247,40 @@ async fn body_entries_keep_history_and_latest_values(a_db: PgPool)
     let (_, profile) = person(&app, &alice, &id).await;
     assert_eq!(latest(&profile, "weight").unwrap()["value"], "82.40");
 
-    let timeline = app
+    let profiled = app
+        .call(
+            Method::PUT,
+            &format!("/api/people/{id}"),
+            Some(&alice.token),
+            Some(json!({
+                "first_name": "Alice", "last_name": "Smith", "birth_date": "1990-05-17",
+                "sex": "female", "activity": "light"
+            })),
+        )
+        .await;
+    assert_eq!(profiled.status, StatusCode::OK, "{}", profiled.body);
+    let goal = app
+        .call(Method::GET, "/api/nutrition/goal", Some(&alice.token), None)
+        .await;
+    let maintenance = goal.body["norm"]["maintenance_kcal"].clone();
+    assert!(maintenance.is_string(), "{}", goal.body);
+    let energy = app
         .call(
             Method::GET,
-            &format!("/api/user/energy-timeline?target_date={}", Utc::now().date_naive()),
+            &format!("/api/energy/day?date={}&tz=UTC", Utc::now().date_naive()),
             Some(&alice.token),
             None,
         )
         .await;
-    let bmr_per_hour = -timeline.body[0]["val"].as_f64().unwrap();
-    let age = f64::from(timeline_age());
-    let expected = (10.0 * 82.4 + 6.25 * 180.0 - 5.0 * age + 5.0) / 24.0;
-    assert!((bmr_per_hour - expected).abs() < 0.01, "{bmr_per_hour} vs {expected}");
-}
-
-fn timeline_age() -> i32
-{
-    let today = Utc::now().date_naive();
-    let birth = chrono::NaiveDate::from_ymd_opt(1990, 5, 17).unwrap();
-    backend::api::user_handlers::age_on(birth, today)
+    assert_eq!(energy.status, StatusCode::OK, "{}", energy.body);
+    let me = &energy.body["people"][0];
+    assert_eq!(me["is_me"], true);
+    assert_eq!(me["daily_burn"], maintenance);
+    assert!(me["burned_base"].as_i64().unwrap() >= 0);
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn family_sees_shared_sections_only(a_db: PgPool)
+async fn family_sees_the_whole_profile_but_cannot_edit(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let alice = app.user("alice@example.com").await;
@@ -296,7 +306,6 @@ async fn family_sees_shared_sections_only(a_db: PgPool)
     assert_eq!(seen["birth_date"], Value::Null);
     assert!(seen["age"].as_i64().unwrap() > 30);
     assert_eq!(seen["latest"].as_array().unwrap().len(), 3);
-    assert_eq!(seen["sharing"], json!([]));
     assert_eq!(person(&app, &carol, &id).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
         add_entry(&app, &bob, &id, 0, json!([{ "metric": "weight", "value": 1 }]))
@@ -305,29 +314,6 @@ async fn family_sees_shared_sections_only(a_db: PgPool)
         StatusCode::FORBIDDEN
     );
 
-    let (_, own) = person(&app, &alice, &id).await;
-    assert_eq!(own["sharing"][0]["family_name"], "Home");
-    assert_eq!(own["sharing"][0]["is_composition_shared"], true);
-    let hidden = app
-        .call(
-            Method::PUT,
-            &format!("/api/people/{id}/sharing/{fam}"),
-            Some(&alice.token),
-            Some(json!({ "is_body_shared": false, "is_composition_shared": false, "is_measures_shared": true })),
-        )
-        .await;
-    assert_eq!(hidden.status, StatusCode::NO_CONTENT);
-
-    let (_, seen) = person(&app, &bob, &id).await;
-    assert_eq!(seen["visible_groups"], json!(["measures"]));
-    assert_eq!(seen["age"], Value::Null);
-    let metrics: Vec<&str> = seen["latest"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|value| value["metric"].as_str().unwrap())
-        .collect();
-    assert_eq!(metrics, ["hips"]);
     let history = app
         .call(
             Method::GET,
@@ -336,28 +322,17 @@ async fn family_sees_shared_sections_only(a_db: PgPool)
             None,
         )
         .await;
-    assert_eq!(history.status, StatusCode::NOT_FOUND);
-    let entries = app
-        .call(
-            Method::GET,
-            &format!("/api/people/{id}/entries"),
-            Some(&bob.token),
-            None,
-        )
-        .await;
-    assert_eq!(
-        entries.body[0]["values"],
-        json!([{ "metric": "hips", "value": "96.00" }])
-    );
-    let foreign = app
+    assert_eq!(history.status, StatusCode::OK);
+    assert_eq!(history.body.as_array().unwrap().len(), 1);
+    let removed = app
         .call(
             Method::PUT,
             &format!("/api/people/{id}/sharing/{fam}"),
-            Some(&bob.token),
-            Some(json!({ "is_body_shared": true, "is_composition_shared": true, "is_measures_shared": true })),
+            Some(&alice.token),
+            Some(json!({ "is_body_shared": false, "is_composition_shared": false, "is_measures_shared": true })),
         )
         .await;
-    assert_eq!(foreign.status, StatusCode::FORBIDDEN);
+    assert_eq!(removed.status, StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -457,7 +432,15 @@ async fn child_profiles_are_managed_by_admins(a_db: PgPool)
         )
         .await;
     assert_eq!(timeline.status, StatusCode::OK, "{}", timeline.body);
-    assert!(!timeline.body.to_string().contains(&child));
+    let kid = timeline.body["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|member| member["user_id"] == child.as_str())
+        .unwrap()
+        .clone();
+    assert_eq!(kid["is_managed"], true);
+    assert_eq!(kid["can_edit"], true);
 
     let no_login: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id = $1::uuid")
         .bind(&child)

@@ -375,7 +375,6 @@ async fn branch_prices_rank_items_per_100_grams(a_db: PgPool)
 
     manual_price(&app, &alice, &pack, &uah, "99", 10).await;
     manual_price(&app, &alice, &pack, &uah, "89.90", 40).await;
-    manual_price(&app, &bob, &bulk, &uah, "420", 3).await;
     manual_price(&app, &alice, &unmeasured, &uah, "50", 2).await;
     manual_price(&app, &alice, &bulk, &uah, "300", 400).await;
     manual_price(&app, &alice, &can, &uah, "45", 5).await;
@@ -403,15 +402,7 @@ async fn branch_prices_rank_items_per_100_grams(a_db: PgPool)
     assert_eq!(rows[0]["count"], 3);
     assert_eq!(without_bob["unmeasured"][0]["name"], "Маасдам кусок");
 
-    let (status, _) = send(
-        &app,
-        &bob,
-        Method::PUT,
-        &format!("/api/families/{home}/price-sharing"),
-        Some(json!({ "is_shared": true })),
-    )
-    .await;
-    assert!(status.is_success());
+    manual_price(&app, &bob, &bulk, &uah, "420", 3).await;
 
     let (_, ranked) = send(&app, &alice, Method::GET, &prices_uri, None).await;
     let order: Vec<&str> = ranked["rows"]

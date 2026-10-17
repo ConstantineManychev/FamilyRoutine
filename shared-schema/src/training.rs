@@ -80,6 +80,8 @@ pub struct ProgramListItemDto
 #[derive(Debug, Clone, Deserialize)]
 pub struct SaveProgramRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub name: String,
     pub schedule_mode: ScheduleMode,
     pub days: Vec<ProgramDayDto>,
@@ -129,6 +131,8 @@ pub struct TrainingPlanDto
 pub struct PlanQuery
 {
     #[serde(default)]
+    pub person_id: Option<Uuid>,
+    #[serde(default)]
     pub tz_offset_min: i32,
     #[serde(default)]
     pub days: Option<i64>,
@@ -139,6 +143,8 @@ pub struct PlanQuery
 #[derive(Debug, Clone, Deserialize)]
 pub struct SetTodayRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub day_id: Uuid,
     pub date: NaiveDate,
 }
@@ -146,6 +152,8 @@ pub struct SetTodayRequest
 #[derive(Debug, Clone, Deserialize)]
 pub struct StartSessionRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     #[serde(default)]
     pub day_id: Option<Uuid>,
     #[serde(default)]
@@ -292,4 +300,6 @@ pub struct SessionsQuery
 {
     #[serde(default)]
     pub limit: Option<i64>,
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
 }

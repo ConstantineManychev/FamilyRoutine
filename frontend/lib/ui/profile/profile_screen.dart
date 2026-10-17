@@ -202,20 +202,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     });
   }
 
-  Future<void> _saveSharing(ProfileSharing aUpdated) async
-  {
-    final profile = _profile;
-    if (profile == null)
-    {
-      return;
-    }
-    await _run(() async
-    {
-      await ref.read(apiProv).setProfileSharing(profile.id, aUpdated);
-      _apply(await ref.read(apiProv).getPerson(profile.id));
-    });
-  }
-
   Future<void> _addEntry() async
   {
     final profile = _profile;
@@ -282,21 +268,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 _buildHeader(aContext, profile),
                 const SizedBox(height: 24),
                 _buildMetrics(aContext, profile),
-                if (profile.isSelf || profile.isMealsVisible) ...[
-                  const SizedBox(height: 24),
-                  PersonNormCard(key: ValueKey('norm:${profile.id}'), personId: profile.id, isSelf: profile.isSelf),
-                ],
-                if (!profile.isSelf && profile.isTrainingVisible) ...[
+                const SizedBox(height: 24),
+                PersonNormCard(
+                  key: ValueKey('norm:${profile.id}'),
+                  personId: profile.id,
+                  isSelf: profile.isSelf,
+                  canEdit: profile.canEdit,
+                ),
+                if (!profile.isSelf) ...[
                   const SizedBox(height: 24),
                   PersonTrainingCard(personId: profile.id),
                 ],
                 if (profile.canEdit) ...[
                   const SizedBox(height: 24),
                   _buildPersonal(aContext, profile),
-                ],
-                if (profile.canEdit && profile.sharing.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildSharing(profile),
                 ],
                 if (profile.isSelf) ...[
                   const SizedBox(height: 24),
@@ -387,12 +372,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Widget _buildMetrics(BuildContext aContext, PersonProfile aProfile)
   {
-    if (aProfile.visibleGroups.isEmpty)
-    {
-      return Text('metrics.hidden'.tr(), style: TextStyle(color: context.palette.inkSecondary));
-    }
-
-    final groups = aProfile.visibleGroups.where((aGroup) => aProfile.canEdit || aProfile.latest.any((aValue) => aValue.metric.group == aGroup));
+    final groups = MetricGroup.values.where((aGroup) => aProfile.canEdit || aProfile.latest.any((aValue) => aValue.metric.group == aGroup));
     if (aProfile.latest.isEmpty)
     {
       return _card([
@@ -557,45 +537,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         alignment: Alignment.centerLeft,
         child: FilledButton(onPressed: _isBusy ? null : _savePersonal, child: Text('common.save'.tr())),
       ),
-    ]);
-  }
-
-  Widget _buildSharing(PersonProfile aProfile)
-  {
-    return _card([
-      _sectionTitle('profile.sharing_title'.tr()),
-      const SizedBox(height: 4),
-      Text(
-        aProfile.isSelf ? 'profile.sharing_hint'.tr() : 'profile.sharing_hint_child'.tr(),
-        style: TextStyle(color: context.palette.inkSecondary),
-      ),
-      for (final sharing in aProfile.sharing) ...[
-        const SizedBox(height: 12),
-        Text(sharing.familyName, style: const TextStyle(fontWeight: FontWeight.w600)),
-        for (final group in MetricGroup.values)
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(metricGroupName(group)),
-            value: sharing.isShared(group),
-            onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withGroup(group, aValue)),
-          ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('profile.share_training'.tr()),
-          value: sharing.isTrainingShared,
-          onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withTraining(aValue)),
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('profile.share_meals'.tr()),
-          subtitle: Text('profile.share_meals_hint'.tr()),
-          value: sharing.isMealsShared,
-          onChanged: _isBusy ? null : (aValue) => _saveSharing(sharing.withMeals(aValue)),
-        ),
-      ],
     ]);
   }
 

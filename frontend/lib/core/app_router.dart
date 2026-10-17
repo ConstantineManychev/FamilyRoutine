@@ -120,14 +120,21 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               _own('planner', (_) => const PlannerScreen()),
               _sub(
                 'planner/events/new',
-                (aState) => PlanEventEditorScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? '')),
+                (aState) => PlanEventEditorScreen(
+                  key: ValueKey(aState.uri.toString()),
+                  initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''),
+                  personId: aState.uri.queryParameters['person'],
+                ),
               ),
               _sub('planner/events/:id', (aState) => PlanEventEditorScreen(key: ValueKey(_param(aState, 'id')), eventId: _param(aState, 'id'))),
               _sub(
                 'training',
-                (_) => const TrainingScreen(),
+                (aState) => TrainingScreen(key: ValueKey(aState.uri.toString()), personId: aState.uri.queryParameters['person']),
                 aRoutes: [
-                  _sub('programs/new', (_) => const ProgramEditorScreen()),
+                  _sub(
+                    'programs/new',
+                    (aState) => ProgramEditorScreen(key: ValueKey(aState.uri.toString()), personId: aState.uri.queryParameters['person']),
+                  ),
                   _sub('programs/:id', (aState) => ProgramEditorScreen(key: ValueKey(_param(aState, 'id')), programId: _param(aState, 'id'))),
                   _sub('sessions/:id', (aState) => WorkoutSessionScreen(key: ValueKey(_param(aState, 'id')), sessionId: _param(aState, 'id')!)),
                   _sub('exercises/:id', (aState) => ExerciseProgressScreen(key: ValueKey(_param(aState, 'id')), exId: _param(aState, 'id')!)),
@@ -159,8 +166,18 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   metric: BodyMetric.parse(_param(aState, 'metric')) ?? BodyMetric.weight,
                 ),
               ),
-              _own('nutrition', (aState) => NutritionDiaryScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
-              _own('nutrition/goal', (_) => const GoalScreen()),
+              _own(
+                'nutrition',
+                (aState) => NutritionDiaryScreen(
+                  key: ValueKey(aState.uri.toString()),
+                  initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''),
+                  personId: aState.uri.queryParameters['person'],
+                ),
+              ),
+              _own(
+                'nutrition/goal',
+                (aState) => GoalScreen(key: ValueKey(aState.uri.toString()), personId: aState.uri.queryParameters['person']),
+              ),
               _own('work', (aState) => WorkScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
               _own('study', (_) => const StudyScreen()),
               _own('stock', (_) => const StockScreen()),
@@ -173,6 +190,7 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
                   key: ValueKey(aState.uri.toString()),
                   date: dayOnly(DateTime.tryParse(aState.uri.queryParameters['date'] ?? '') ?? DateTime.now()),
                   markId: aState.uri.queryParameters['mark'],
+                  personId: aState.uri.queryParameters['person'],
                 ),
               ),
               _own('product-cats', (_) => const ProductCatsScreen()),

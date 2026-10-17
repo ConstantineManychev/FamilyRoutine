@@ -6,8 +6,8 @@ use axum::Json;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Offset, Timelike, Utc};
 use chrono_tz::{Tz, TZ_VARIANTS};
 use shared_schema::{
-    AgendaDto, AgendaQuery, OccurrenceDto, OccurrenceRefDto, OverloadDto, PlanEventDto, PlanRepeat, PlanSlotDto,
-    PlanState, PlanTiming, RoutineStatus, SaveOccurrenceRequest, SavePlanEventRequest, SessionDto,
+    AgendaDto, AgendaQuery, OccurrenceDto, OccurrenceRefDto, OverloadDto, PersonQuery, PlanEventDto, PlanRepeat,
+    PlanSlotDto, PlanState, PlanTiming, RoutineStatus, SaveOccurrenceRequest, SavePlanEventRequest, SessionDto,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -17,6 +17,7 @@ use crate::api::training_handlers::{begin_session, load_session, program_plan};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text};
 use crate::notify::replan;
+use crate::security::profile_access::{acting_for, require_editor};
 use crate::services::planner::{analyze, local_date, parse_zone, resolve_local, weekday_bit, Rule, Slot};
 use crate::state::AppState;
 
@@ -38,6 +39,7 @@ const DAYS_PER_YEAR: i64 = 366;
 struct EventRow
 {
     id: Uuid,
+    owner_id: Uuid,
     title: String,
     note: Option<String>,
     category: Option<RoutineStatus>,
@@ -114,6 +116,7 @@ impl EventRow
     {
         PlanEventDto {
             id: self.id,
+            owner_id: self.owner_id,
             title: self.title,
             note: self.note,
             category: self.category,
@@ -156,7 +159,8 @@ pub async fn agenda(
     let low = resolve_local(viewer, a_query.from, NaiveTime::MIN);
     let high = resolve_local(viewer, a_query.to + Duration::days(1), NaiveTime::MIN);
     let mut conn = a_state.db.acquire().await?;
-    let occurrences = load_occurrences(&mut conn, a_user.user_id, a_query.from, a_query.to)
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
+    let occurrences = load_occurrences(&mut conn, owner_id, a_query.from, a_query.to)
         .await?
         .into_iter()
         .filter(|occurrence| occurrence.start_ts < high && occurrence.end_ts > low)
@@ -165,11 +169,15 @@ pub async fn agenda(
     Ok(Json(AgendaDto { occurrences }))
 }
 
-pub async fn list_events(State(a_state): State<AppState>, a_user: AuthUser)
-    -> Result<Json<Vec<PlanEventDto>>, ApiError>
+pub async fn list_events(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<PersonQuery>,
+) -> Result<Json<Vec<PlanEventDto>>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    let events = load_events(&mut conn, a_user.user_id, None).await?;
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
+    let events = load_events(&mut conn, owner_id, None).await?;
     Ok(Json(events.into_iter().map(EventRow::into_dto).collect()))
 }
 
@@ -180,7 +188,8 @@ pub async fn get_event(
 ) -> Result<Json<PlanEventDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_event(&mut conn, a_user.user_id, a_id)
+    let owner_id = event_owner(&mut conn, a_user.user_id, a_id).await?;
+    load_event(&mut conn, owner_id, a_id)
         .await
         .map(|event| Json(event.into_dto()))
 }
@@ -192,10 +201,11 @@ pub async fn create_event(
 ) -> Result<(StatusCode, Json<PlanEventDto>), ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let clean = clean_event(&mut tx, a_user.user_id, &a_req).await?;
+    let owner_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
+    let clean = clean_event(&mut tx, owner_id, &a_req).await?;
     let count = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM plan_events WHERE user_id = $1"#,
-        a_user.user_id
+        owner_id
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -213,7 +223,7 @@ pub async fn create_event(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING id
         "#,
-        a_user.user_id,
+        owner_id,
         clean.title,
         clean.note,
         clean.category as Option<RoutineStatus>,
@@ -233,8 +243,8 @@ pub async fn create_event(
     .fetch_one(&mut *tx)
     .await?;
 
-    replan(&mut tx, a_user.user_id).await?;
-    let event = load_event(&mut tx, a_user.user_id, id).await?;
+    replan(&mut tx, owner_id).await?;
+    let event = load_event(&mut tx, owner_id, id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(event.into_dto())))
 }
@@ -247,8 +257,9 @@ pub async fn update_event(
 ) -> Result<Json<PlanEventDto>, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    load_event(&mut tx, a_user.user_id, a_id).await?;
-    let clean = clean_event(&mut tx, a_user.user_id, &a_req).await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    load_event(&mut tx, owner_id, a_id).await?;
+    let clean = clean_event(&mut tx, owner_id, &a_req).await?;
 
     sqlx::query!(
         r#"
@@ -259,7 +270,7 @@ pub async fn update_event(
         WHERE id = $1 AND user_id = $2
         "#,
         a_id,
-        a_user.user_id,
+        owner_id,
         clean.title,
         clean.note,
         clean.category as Option<RoutineStatus>,
@@ -279,8 +290,8 @@ pub async fn update_event(
     .execute(&mut *tx)
     .await?;
 
-    replan(&mut tx, a_user.user_id).await?;
-    let event = load_event(&mut tx, a_user.user_id, a_id).await?;
+    replan(&mut tx, owner_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
     tx.commit().await?;
     Ok(Json(event.into_dto()))
 }
@@ -292,18 +303,15 @@ pub async fn delete_event(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let deleted = sqlx::query!(
-        "DELETE FROM plan_events WHERE id = $1 AND user_id = $2",
-        a_id,
-        a_user.user_id
-    )
-    .execute(&mut *tx)
-    .await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    let deleted = sqlx::query!("DELETE FROM plan_events WHERE id = $1 AND user_id = $2", a_id, owner_id)
+        .execute(&mut *tx)
+        .await?;
     if deleted.rows_affected() == 0
     {
         return Err(ApiError::NotFound);
     }
-    replan(&mut tx, a_user.user_id).await?;
+    replan(&mut tx, owner_id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -316,7 +324,8 @@ pub async fn save_occurrence(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let event = load_event(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
     if !event.rule().occurs_on(a_date)
     {
         return Err(ApiError::NotFound);
@@ -373,7 +382,7 @@ pub async fn save_occurrence(
     .execute(&mut *tx)
     .await?;
 
-    replan(&mut tx, a_user.user_id).await?;
+    replan(&mut tx, owner_id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -385,7 +394,8 @@ pub async fn start_occurrence(
 ) -> Result<(StatusCode, Json<SessionDto>), ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let event = load_event(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
     if !event.rule().occurs_on(a_date)
     {
         return Err(ApiError::NotFound);
@@ -398,13 +408,13 @@ pub async fn start_occurrence(
         None =>
         {
             let offset = zone_offset(event.zone(), Utc::now());
-            program_plan(&mut tx, a_user.user_id, Some(program_id), offset, PLAN_HORIZON_DAYS)
+            program_plan(&mut tx, owner_id, Some(program_id), offset, PLAN_HORIZON_DAYS)
                 .await?
                 .and_then(|(_, upcoming)| upcoming.first().map(|planned| planned.day_id))
         }
     };
 
-    let session_id = begin_session(&mut tx, a_user.user_id, day_id, None).await?;
+    let session_id = begin_session(&mut tx, owner_id, day_id, None).await?;
     sqlx::query!(
         r#"
         INSERT INTO plan_instances (event_id, occ_date, state, session_id, updated_ts)
@@ -419,9 +429,19 @@ pub async fn start_occurrence(
     .execute(&mut *tx)
     .await?;
 
-    let dto = load_session(&mut tx, a_user.user_id, session_id).await?;
+    let dto = load_session(&mut tx, owner_id, session_id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(dto)))
+}
+
+async fn event_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>
+{
+    let owner_id = sqlx::query_scalar!("SELECT user_id FROM plan_events WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    require_editor(a_conn, a_viewer_id, owner_id).await?;
+    Ok(owner_id)
 }
 
 pub async fn complete_session_slot(
@@ -618,7 +638,7 @@ async fn load_events(
         EventRow,
         r#"
         SELECT
-            e.id, e.title, e.note, e.category AS "category: RoutineStatus", e.timing AS "timing: PlanTiming",
+            e.id, e.user_id AS owner_id, e.title, e.note, e.category AS "category: RoutineStatus", e.timing AS "timing: PlanTiming",
             e.start_date, e.start_time, e.window_min, e.duration_min, e.tz, e.repeat AS "repeat: PlanRepeat",
             e.repeat_every, e.weekday_mask, e.until_date, e.program_id, p.name AS "program_name?", e.day_id,
             d.name AS "day_name?"

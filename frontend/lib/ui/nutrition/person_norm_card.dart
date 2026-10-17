@@ -16,8 +16,9 @@ class PersonNormCard extends ConsumerStatefulWidget
 {
   final String personId;
   final bool isSelf;
+  final bool canEdit;
 
-  const PersonNormCard({super.key, required this.personId, this.isSelf = false});
+  const PersonNormCard({super.key, required this.personId, this.isSelf = false, bool? canEdit}) : canEdit = canEdit ?? isSelf;
 
   @override
   ConsumerState<PersonNormCard> createState() => _PersonNormCardState();
@@ -60,7 +61,7 @@ class _PersonNormCardState extends ConsumerState<PersonNormCard>
 
   Future<void> _openGoal() async
   {
-    await context.push(goalPath);
+    await context.push(goalPathFor(widget.isSelf ? null : widget.personId));
     await _load();
   }
 
@@ -118,7 +119,7 @@ class _PersonNormCardState extends ConsumerState<PersonNormCard>
                 Expanded(
                   child: Text('goal.card_title'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
-                if (widget.isSelf)
+                if (widget.canEdit)
                   TextButton.icon(
                     key: const ValueKey('person.norm.goal'),
                     onPressed: _openGoal,

@@ -337,8 +337,6 @@ async fn trainings_are_visible_to_the_group(a_db: PgPool)
     let (status, seen) = send(&app, &boris, Method::GET, &session_uri, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(seen["exercises"][0]["sets"].as_array().unwrap().len(), 3);
-    let (_, profile) = send(&app, &boris, Method::GET, &format!("/api/people/{}", anna.id), None).await;
-    assert_eq!(profile["is_training_visible"], true);
 
     let (status, saved) = send(
         &app,
@@ -387,53 +385,5 @@ async fn trainings_are_visible_to_the_group(a_db: PgPool)
     assert_eq!(
         send(&app, &eve, Method::GET, &progress_uri, None).await.0,
         StatusCode::NOT_FOUND
-    );
-
-    let (status, _) = send(
-        &app,
-        &anna,
-        Method::PUT,
-        &format!("/api/people/{}/sharing/{home}", anna.id),
-        Some(json!({
-            "is_body_shared": true, "is_composition_shared": true, "is_measures_shared": true,
-            "is_training_shared": false
-        })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    assert_eq!(
-        send(&app, &boris, Method::GET, &overview_uri, None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        send(&app, &boris, Method::GET, &session_uri, None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        send(&app, &boris, Method::GET, &progress_uri, None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    let (_, profile) = send(&app, &boris, Method::GET, &format!("/api/people/{}", anna.id), None).await;
-    assert_eq!(profile["is_training_visible"], false);
-    let (_, own) = send(&app, &anna, Method::GET, &format!("/api/people/{}", anna.id), None).await;
-    assert_eq!(own["sharing"][0]["is_training_shared"], false);
-    assert_eq!(
-        send(&app, &anna, Method::GET, &overview_uri, None).await.0,
-        StatusCode::OK
-    );
-
-    let (status, _) = send(
-        &app,
-        &anna,
-        Method::PUT,
-        &format!("/api/people/{}/sharing/{home}", anna.id),
-        Some(json!({ "is_body_shared": false, "is_composition_shared": true, "is_measures_shared": true })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    let (_, own) = send(&app, &anna, Method::GET, &format!("/api/people/{}", anna.id), None).await;
-    assert_eq!(
-        own["sharing"][0]["is_training_shared"], false,
-        "omitted flag keeps its value"
     );
 }

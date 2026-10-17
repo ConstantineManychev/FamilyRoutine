@@ -80,8 +80,9 @@ class _DayDraft
 class ProgramEditorScreen extends ConsumerStatefulWidget
 {
   final String? programId;
+  final String? personId;
 
-  const ProgramEditorScreen({super.key, this.programId});
+  const ProgramEditorScreen({super.key, this.programId, this.personId});
 
   @override
   ConsumerState<ProgramEditorScreen> createState() => _ProgramEditorScreenState();
@@ -247,7 +248,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen>
     setState(() => _isBusy = true);
     try
     {
-      await ref.read(apiProv).saveProgram(widget.programId, _nameCtrl.text.trim(), _mode, days);
+      await ref.read(apiProv).saveProgram(widget.programId, _nameCtrl.text.trim(), _mode, days, aPersonId: widget.personId);
       if (mounted)
       {
         showInfoSnack(context, 'training.program_saved'.tr());

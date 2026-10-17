@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT u.id AS user_id, u.first_name, u.last_name, u.is_managed,\n                       can_manage_person($2, u.id) AS \"can_edit!\"\n                FROM family_mems fm\n                JOIN users u ON u.id = fm.user_id\n                WHERE fm.family_id = $1\n                ORDER BY (fm.user_id = $2) DESC, u.is_managed, u.first_name, u.last_name\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "first_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_managed",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "can_edit!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "272813f80cdeccdfc6724b990d51a49386ad574d375e9b81f52d2df4c0d57f52"
+}

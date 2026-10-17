@@ -9,12 +9,15 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../common/person_switcher.dart';
+import '../energy/energy_chart_block.dart';
 import '../planner/planner_screen.dart';
 import '../nutrition/nutrition_today_block.dart';
 import '../routine/family_timeline_card.dart';
 import '../stock/stock_today_block.dart';
 import '../study/study_today_block.dart';
 import '../training/next_workout_card.dart';
+import '../training/person_training_card.dart';
 import '../training/training_revision.dart';
 import '../work/work_today_block.dart';
 
@@ -55,27 +58,95 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
           FamilyTimelineCard(key: ValueKey('timeline:${fam.id}'), familyId: fam.id, title: fam.name),
         ],
         const SizedBox(height: _blockGap),
+        const EnergyChartBlock(),
+        const SizedBox(height: _blockGap),
         const NutritionTodayBlock(),
         const SizedBox(height: _blockGap),
         const StockTodayBlock(),
         const SizedBox(height: _blockGap),
-        const NextWorkoutCard(),
-        const SizedBox(height: _blockGap),
-        const ProgramsBlock(),
+        const TrainingPeopleBlock(),
       ],
     );
   }
 }
 
-class ProgramsBlock extends ConsumerStatefulWidget
+class TrainingPeopleBlock extends ConsumerStatefulWidget
 {
-  const ProgramsBlock({super.key});
+  const TrainingPeopleBlock({super.key});
 
   @override
-  ConsumerState<ProgramsBlock> createState() => _ProgramsBlockState();
+  ConsumerState<TrainingPeopleBlock> createState() => _TrainingPeopleBlockState();
 }
 
-class _ProgramsBlockState extends ConsumerState<ProgramsBlock>
+class _TrainingPeopleBlockState extends ConsumerState<TrainingPeopleBlock>
+{
+  String? _personId;
+  int _generation = 0;
+
+  Future<void> _open(String aPath) async
+  {
+    await context.push(aPath);
+    if (mounted)
+    {
+      setState(() => _generation++);
+    }
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    aContext.locale;
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final index = people.indexWhere((aPerson) => personQuery(aPerson) == _personId);
+    final person = index < 0 ? null : people[index];
+    final personId = personQuery(person);
+    final canEdit = person?.canEdit ?? true;
+    final tag = '${personId ?? 'me'}:$_generation';
+    final Widget content = canEdit
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: NextWorkoutCard(key: ValueKey('next:$tag'), personId: personId, isBare: true),
+              ),
+              ProgramList(key: ValueKey('programs:$tag'), personId: personId, onOpen: _open),
+            ],
+          )
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: PersonTrainingCard(key: ValueKey('person:$tag'), personId: person!.id, isBare: true),
+          );
+
+    return BlockCard(
+      title: 'training.title'.tr(),
+      onAdd: canEdit ? () => _open(newProgramPath(aPersonId: personId)) : null,
+      addTooltip: 'training.new_program'.tr(),
+      onExpand: () => _open(canEdit ? trainingPath(aPersonId: personId) : '/app/people/${person!.id}'),
+      child: person == null
+          ? content
+          : PersonSwipe(
+              people: people,
+              index: index,
+              onChanged: (aIndex) => setState(() => _personId = personQuery(people[aIndex])),
+              child: content,
+            ),
+    );
+  }
+}
+
+class ProgramList extends ConsumerStatefulWidget
+{
+  final String? personId;
+  final Future<void> Function(String aPath) onOpen;
+
+  const ProgramList({super.key, this.personId, required this.onOpen});
+
+  @override
+  ConsumerState<ProgramList> createState() => _ProgramListState();
+}
+
+class _ProgramListState extends ConsumerState<ProgramList>
 {
   List<ProgramListItem>? _programs;
   Object? _error;
@@ -91,7 +162,7 @@ class _ProgramsBlockState extends ConsumerState<ProgramsBlock>
   {
     try
     {
-      final programs = await ref.read(apiProv).getPrograms();
+      final programs = await ref.read(apiProv).getPrograms(aPersonId: widget.personId);
       final epoch = DateTime.fromMillisecondsSinceEpoch(0);
       programs.sort((aLeft, aRight) => (aRight.updatedTs ?? epoch).compareTo(aLeft.updatedTs ?? epoch));
       if (mounted)
@@ -112,61 +183,43 @@ class _ProgramsBlockState extends ConsumerState<ProgramsBlock>
     }
   }
 
-  Future<void> _open(String aPath) async
-  {
-    await context.push(aPath);
-    await _load();
-  }
-
   @override
   Widget build(BuildContext aContext)
   {
     ref.listen<int>(trainingRevisionProv, (_, __) => _load());
     final programs = _programs;
-    final Widget content;
     if (_error != null)
     {
-      content = ErrorRetry(error: _error!, onRetry: _load);
+      return ErrorRetry(error: _error!, onRetry: _load);
     }
-    else if (programs == null)
+    if (programs == null)
     {
-      content = const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
+      return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
     }
-    else if (programs.isEmpty)
+    if (programs.isEmpty)
     {
-      content = BlockEmpty('training.no_programs'.tr());
+      return BlockEmpty('training.no_programs'.tr());
     }
-    else
-    {
-      content = Column(
-        children: [
-          for (final program in programs.take(_recentProgramCount))
-            ListTile(
-              onTap: () => _open('/app/training/programs/${program.id}'),
-              leading: Icon(
-                program.isActive ? AppIcons.checkCircle : AppIcons.dumbbell,
-                color: program.isActive ? aContext.palette.positive : aContext.palette.inkSecondary,
-              ),
-              title: Text(program.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                [
-                  'training.mode_${program.mode.name}'.tr(),
-                  'training.days_count'.plural(program.dayCount),
-                  if (program.isActive) 'training.active'.tr(),
-                ].join(' · '),
-              ),
-              trailing: const Icon(AppIcons.chevronRight, size: 18),
+    return Column(
+      children: [
+        for (final program in programs.take(_recentProgramCount))
+          ListTile(
+            onTap: () => widget.onOpen('/app/training/programs/${program.id}'),
+            leading: Icon(
+              program.isActive ? AppIcons.checkCircle : AppIcons.dumbbell,
+              color: program.isActive ? aContext.palette.positive : aContext.palette.inkSecondary,
             ),
-        ],
-      );
-    }
-
-    return BlockCard(
-      title: 'training.programs'.tr(),
-      onAdd: () => _open('/app/training/programs/new'),
-      addTooltip: 'training.new_program'.tr(),
-      onExpand: () => _open('/app/training'),
-      child: content,
+            title: Text(program.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(
+              [
+                'training.mode_${program.mode.name}'.tr(),
+                'training.days_count'.plural(program.dayCount),
+                if (program.isActive) 'training.active'.tr(),
+              ].join(' · '),
+            ),
+            trailing: const Icon(AppIcons.chevronRight, size: 18),
+          ),
+      ],
     );
   }
 }

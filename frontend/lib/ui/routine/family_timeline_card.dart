@@ -12,6 +12,7 @@ import '../common/feedback.dart';
 import 'dash_card.dart';
 import 'mark_sheet.dart';
 import 'routine_style.dart';
+import 'status_sheet.dart';
 import '../common/app_theme.dart';
 
 const Duration _pollInterval = Duration(seconds: 30);
@@ -279,7 +280,18 @@ class _TimelineGrid extends StatelessWidget
                     for (final member in members)
                       SizedBox(
                         height: _rowHeight,
-                        child: _MemberLabel(member: member, isNowVisible: isNowVisible, now: now),
+                        child: _MemberLabel(
+                          member: member,
+                          isNowVisible: isNowVisible,
+                          now: now,
+                          onSetStatus: member.canEdit
+                              ? () => showStatusSheet(
+                                    aContext,
+                                    aPersonId: member.isMe ? null : member.userId,
+                                    aPersonName: member.fullName,
+                                  )
+                              : null,
+                        ),
                       ),
                   ],
                 ),
@@ -348,24 +360,36 @@ class _MemberLabel extends StatelessWidget
   final TimelineMemberDto member;
   final bool isNowVisible;
   final DateTime now;
+  final VoidCallback? onSetStatus;
 
-  const _MemberLabel({required this.member, required this.isNowVisible, required this.now});
+  const _MemberLabel({required this.member, required this.isNowVisible, required this.now, this.onSetStatus});
 
   @override
   Widget build(BuildContext aContext)
   {
     final current = isNowVisible ? member.markAt(now) : null;
     final name = member.isMe ? '${member.fName} (${'routine.you'.tr()})' : member.fullName;
+    final setStatus = onSetStatus;
 
-    return Column(
+    final label = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontWeight: member.isMe ? FontWeight.bold : FontWeight.w600, color: aContext.palette.inkPrimary),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: member.isMe ? FontWeight.bold : FontWeight.w600, color: aContext.palette.inkPrimary),
+              ),
+            ),
+            if (setStatus != null && !member.isMe) ...[
+              const SizedBox(width: 4),
+              Icon(AppIcons.pencil, size: 12, color: aContext.palette.inkMuted),
+            ],
+          ],
         ),
         if (current != null)
           Padding(
@@ -386,6 +410,17 @@ class _MemberLabel extends StatelessWidget
             ),
           ),
       ],
+    );
+
+    if (setStatus == null)
+    {
+      return label;
+    }
+    return InkWell(
+      key: ValueKey('timeline.status.${member.userId}'),
+      borderRadius: BorderRadius.circular(6),
+      onTap: setStatus,
+      child: Tooltip(message: 'routine.set_status_for'.tr(args: [member.fullName]), child: label),
     );
   }
 }
@@ -432,7 +467,7 @@ class _MemberTrack extends StatelessWidget
           memberName: member.fullName,
           width: width,
           duration: end.difference(mark.startTs),
-          isMine: member.isMe,
+          isMine: member.canEdit,
           onTap: () => onOpenMark(mark),
         ),
       ));

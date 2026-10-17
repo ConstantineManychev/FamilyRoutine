@@ -313,7 +313,7 @@ async fn receipts_teach_places_and_new_items_join_the_catalog(a_db: PgPool)
     assert_eq!(linked["is_merchant_linked"], true);
 
     let item_id = saved["items"][0]["item_id"].as_str().unwrap();
-    for (viewer, owner_kind, is_editable) in [(&alice, "me", true), (&bob, "user", false), (&eve, "user", false)]
+    for (viewer, owner_kind, is_editable) in [(&alice, "me", true), (&bob, "member", false), (&eve, "user", false)]
     {
         let milk = app
             .call(
@@ -326,33 +326,16 @@ async fn receipts_teach_places_and_new_items_join_the_catalog(a_db: PgPool)
         assert_eq!(milk.status, StatusCode::OK, "{}", milk.body);
         assert_eq!(milk.body["owner_kind"], owner_kind);
         assert_eq!(milk.body["is_editable"], is_editable);
+        let owner_name = if owner_kind == "member"
+        {
+            json!("Test alice")
+        }
+        else
+        {
+            Value::Null
+        };
+        assert_eq!(milk.body["owner_name"], owner_name);
     }
-    app.call(
-        Method::PUT,
-        &format!("/api/families/{home}/price-sharing"),
-        Some(&alice.token),
-        Some(json!({ "is_shared": true })),
-    )
-    .await;
-    let shared = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items/{item_id}"),
-            Some(&bob.token),
-            None,
-        )
-        .await;
-    assert_eq!(shared.body["owner_kind"], "member");
-    assert_eq!(shared.body["owner_name"], "Test alice");
-    let stranger = app
-        .call(
-            Method::GET,
-            &format!("/api/dicts/items/{item_id}"),
-            Some(&eve.token),
-            None,
-        )
-        .await;
-    assert_eq!(stranger.body["owner_name"], Value::Null);
 
     let later = bank_tx(&a_db, card, "-3.10", "VDP-TESCO STORES 3092", None).await;
     recategorize_pending(&a_db).await.unwrap();

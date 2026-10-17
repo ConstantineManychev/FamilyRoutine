@@ -69,22 +69,6 @@ async fn profile(a_app: &TestApp, a_actor: &TestUser, a_person_id: &str, a_body:
     assert_eq!(status, StatusCode::CREATED, "{body}");
 }
 
-async fn sharing(a_app: &TestApp, a_user: &TestUser, a_family: &str, a_is_body: bool, a_is_meals: bool)
-{
-    let (status, _) = send(
-        a_app,
-        a_user,
-        Method::PUT,
-        &format!("/api/people/{}/sharing/{a_family}", a_user.id),
-        Some(json!({
-            "is_body_shared": a_is_body, "is_composition_shared": false, "is_measures_shared": false,
-            "is_meals_shared": a_is_meals
-        })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-}
-
 fn norm_uri(a_person_id: &str) -> String
 {
     format!(
@@ -94,7 +78,7 @@ fn norm_uri(a_person_id: &str) -> String
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn members_see_norms_only_with_meals_shared(a_db: PgPool)
+async fn group_members_see_each_others_norms(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let anna = app.user("anna@example.com").await;
@@ -130,20 +114,9 @@ async fn members_see_norms_only_with_meals_shared(a_db: PgPool)
     assert_eq!(own["norm"]["weight_kg"], "64");
     assert_eq!(own["norm"]["weeks_to_target"], 14);
 
-    sharing(&app, &anna, &home, false, false).await;
-    assert_eq!(
-        send(&app, &boris, Method::GET, &norm_uri(&anna_id), None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    sharing(&app, &anna, &home, false, true).await;
     let (status, member) = send(&app, &boris, Method::GET, &norm_uri(&anna_id), None).await;
     assert_eq!(status, StatusCode::OK, "{member}");
     assert_eq!(member["norm"]["target"], own["norm"]["target"]);
-    assert_eq!(member["norm"]["weight_kg"], Value::Null);
-    assert_eq!(member["norm"]["target_kg"], Value::Null);
-    assert_eq!(member["norm"]["bmr"], Value::Null);
-    sharing(&app, &anna, &home, true, true).await;
-    let (_, member) = send(&app, &boris, Method::GET, &norm_uri(&anna_id), None).await;
     assert_eq!(member["norm"]["weight_kg"], "64");
     assert_eq!(
         send(&app, &eve, Method::GET, &norm_uri(&anna_id), None).await.0,

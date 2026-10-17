@@ -39,6 +39,7 @@ pub enum PlanState
 pub struct PlanEventDto
 {
     pub id: Uuid,
+    pub owner_id: Uuid,
     pub title: String,
     pub note: Option<String>,
     pub category: Option<RoutineStatus>,
@@ -61,6 +62,8 @@ pub struct PlanEventDto
 #[derive(Debug, Clone, Deserialize)]
 pub struct SavePlanEventRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub title: String,
     #[serde(default)]
     pub note: Option<String>,
@@ -95,6 +98,8 @@ fn default_every() -> i32
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgendaQuery
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub from: NaiveDate,
     pub to: NaiveDate,
     pub tz: String,

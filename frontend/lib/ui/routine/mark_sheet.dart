@@ -83,6 +83,12 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
   DateTime? _end;
   bool _isBusy = false;
 
+  String? get _personId
+  {
+    final details = _details;
+    return details == null || details.isMine ? null : details.ownerId;
+  }
+
   @override
   void initState()
   {
@@ -233,7 +239,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     try
     {
       final api = ref.read(apiProv);
-      final result = await api.copyMealFromYesterday(aMark.id, dayOnly(aMark.startTs));
+      final result = await api.copyMealFromYesterday(aMark.id, dayOnly(aMark.startTs), aPersonId: _personId);
       final details = await api.getMarkDetails(aMark.id);
       notifyNutritionChanged(ref);
       if (mounted)
@@ -268,7 +274,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     final Map<String, String> labels;
     try
     {
-      final day = await api.getNutritionDay(dayOnly(aMark.startTs));
+      final day = await api.getNutritionDay(dayOnly(aMark.startTs), aPersonId: _personId);
       if (!mounted)
       {
         return;
@@ -381,7 +387,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
               children: [
                 _MarkHeader(details: aDetails),
                 _buildPanel(aContext, aDetails),
-                if (aDetails.isMine) ...[
+                if (aDetails.canEdit) ...[
                   const SizedBox(height: 20),
                   Text('routine.edit_mark'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
@@ -425,7 +431,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
             ),
           ),
         ),
-        if (aDetails.isMine)
+        if (aDetails.canEdit)
           Padding(
             padding: EdgeInsets.fromLTRB(12, 4, 20, 12 + aMedia.padding.bottom),
             child: Row(
@@ -532,7 +538,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     {
       return _PanelNote(
         icon: AppIcons.dumbbell,
-        text: aDetails.isMine ? 'routine.no_workout_mine'.tr() : 'routine.no_workout'.tr(),
+        text: aDetails.canEdit ? 'routine.no_workout_mine'.tr() : 'routine.no_workout'.tr(),
       );
     }
 
@@ -544,7 +550,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
           ? 'training.not_finished'.tr()
           : formatDuration(finished.difference(session.startedTs)),
     ];
-    final path = aDetails.isMine
+    final path = aDetails.canEdit
         ? '/app/training/sessions/${session.id}'
         : '/app/people/${aDetails.ownerId}/sessions/${session.id}';
 
@@ -643,7 +649,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
         const SizedBox(height: 8),
         if (meals.entries.isEmpty)
           Text(
-            aDetails.isMine ? 'routine.no_meals_mine'.tr() : 'routine.no_meals'.tr(),
+            aDetails.canEdit ? 'routine.no_meals_mine'.tr() : 'routine.no_meals'.tr(),
             style: TextStyle(color: palette.inkMuted),
           )
         else
@@ -668,7 +674,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                 ],
               ),
             ),
-        if (aDetails.isMine)
+        if (aDetails.canEdit)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Wrap(
@@ -692,7 +698,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                   key: const ValueKey('mark.add_food'),
                   onPressed: _isBusy
                       ? null
-                      : () => _leaveTo(addFoodPath(dayOnly(mark.startTs), aMarkId: mark.id)),
+                      : () => _leaveTo(addFoodPath(dayOnly(mark.startTs), aMarkId: mark.id, aPersonId: _personId)),
                   icon: const Icon(AppIcons.plus, size: 16),
                   label: Text('routine.add_food'.tr()),
                 ),

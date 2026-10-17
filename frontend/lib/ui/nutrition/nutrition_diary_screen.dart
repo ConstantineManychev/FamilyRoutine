@@ -10,6 +10,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../common/person_switcher.dart';
 import '../routine/mark_sheet.dart';
 import 'amount_sheet.dart';
 import 'meal_target.dart';
@@ -22,18 +23,34 @@ const int _maxFutureDays = 7;
 const double _maxQuickKcal = 10000;
 const double _maxQuickGrams = 1000;
 
-String addFoodPath(DateTime aDate, {String? aMarkId}) => Uri(
+String addFoodPath(DateTime aDate, {String? aMarkId, String? aPersonId}) => Uri(
       path: '/app/nutrition/add',
-      queryParameters: {'date': dateWire(aDate), if (aMarkId != null) 'mark': aMarkId},
+      queryParameters: {
+        'date': dateWire(aDate),
+        if (aMarkId != null) 'mark': aMarkId,
+        if (aPersonId != null) 'person': aPersonId,
+      },
     ).toString();
 
 const String goalPath = '/app/nutrition/goal';
 
+String goalPathFor(String? aPersonId) =>
+    aPersonId == null ? goalPath : Uri(path: goalPath, queryParameters: {'person': aPersonId}).toString();
+
+String diaryPath({String? aPersonId, DateTime? aDate}) => Uri(
+      path: '/app/nutrition',
+      queryParameters: {
+        if (aPersonId != null) 'person': aPersonId,
+        if (aDate != null) 'date': dateWire(aDate),
+      },
+    ).toString();
+
 class NutritionDiaryScreen extends ConsumerStatefulWidget
 {
   final DateTime? initialDate;
+  final String? personId;
 
-  const NutritionDiaryScreen({super.key, this.initialDate});
+  const NutritionDiaryScreen({super.key, this.initialDate, this.personId});
 
   @override
   ConsumerState<NutritionDiaryScreen> createState() => _NutritionDiaryScreenState();
@@ -42,6 +59,7 @@ class NutritionDiaryScreen extends ConsumerStatefulWidget
 class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
 {
   late DateTime _date = dayOnly(widget.initialDate ?? DateTime.now());
+  late String? _personId = widget.personId;
   NutritionDay? _day;
   Object? _error;
   bool _isBusy = false;
@@ -53,13 +71,16 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     _load();
   }
 
+  bool get _canEdit => _day?.canEdit ?? false;
+
   Future<void> _load() async
   {
     final date = _date;
+    final personId = _personId;
     try
     {
-      final day = await ref.read(apiProv).getNutritionDay(date);
-      if (mounted && date == _date)
+      final day = await ref.read(apiProv).getNutritionDay(date, aPersonId: personId);
+      if (mounted && date == _date && personId == _personId)
       {
         setState(()
         {
@@ -70,11 +91,27 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     }
     catch (aError)
     {
-      if (mounted && date == _date)
+      if (mounted && date == _date && personId == _personId)
       {
         setState(() => _error = aError);
       }
     }
+  }
+
+  void _setPerson(PersonRef aPerson)
+  {
+    final personId = personQuery(aPerson);
+    if (personId == _personId)
+    {
+      return;
+    }
+    setState(()
+    {
+      _personId = personId;
+      _day = null;
+      _error = null;
+    });
+    _load();
   }
 
   DateTime get _lastDate => dayOnly(DateTime.now()).add(const Duration(days: _maxFutureDays));
@@ -111,13 +148,13 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
 
   Future<void> _add({String? aMarkId}) async
   {
-    await context.push(addFoodPath(_date, aMarkId: aMarkId));
+    await context.push(addFoodPath(_date, aMarkId: aMarkId, aPersonId: _personId));
     await _load();
   }
 
   Future<void> _openGoal() async
   {
-    await context.push(goalPath);
+    await context.push(goalPathFor(_personId));
     await _load();
   }
 
@@ -132,7 +169,7 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     setState(() => _isBusy = true);
     try
     {
-      final result = await ref.read(apiProv).copyMealFromYesterday(aMeal.mark.id, _date);
+      final result = await ref.read(apiProv).copyMealFromYesterday(aMeal.mark.id, _date, aPersonId: _personId);
       if (!mounted)
       {
         return;
@@ -197,7 +234,7 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     {
       return {'date': dateWire(_date)};
     }
-    final markId = await ensureMealBlock(ref.read(apiProv), aTarget);
+    final markId = await ensureMealBlock(ref.read(apiProv), aTarget, aPersonId: _personId);
     return {'date': dateWire(_date), 'status_mark_id': markId};
   }
 
@@ -266,12 +303,39 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     );
   }
 
+  Widget _peopleBar(List<PersonRef> aPeople)
+  {
+    final index = aPeople.indexWhere((aPerson) => personQuery(aPerson) == _personId);
+    if (aPeople.length < 2 || index < 0)
+    {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: PersonStrip(people: aPeople, index: index, onChanged: (aIndex) => _setPerson(aPeople[aIndex])),
+    );
+  }
+
+  void _swipePerson(List<PersonRef> aPeople, DragEndDetails aDetails)
+  {
+    final index = aPeople.indexWhere((aPerson) => personQuery(aPerson) == _personId);
+    final velocity = aDetails.primaryVelocity ?? 0;
+    final next = velocity < 0 ? index + 1 : index - 1;
+    if (index >= 0 && velocity.abs() > 250 && next >= 0 && next < aPeople.length)
+    {
+      _setPerson(aPeople[next]);
+    }
+  }
+
   @override
   Widget build(BuildContext aContext)
   {
     aContext.locale;
     ref.listen<int>(nutritionRevisionProv, (_, __) => _load());
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final person = people.where((aPerson) => personQuery(aPerson) == _personId).firstOrNull;
     final day = _day;
+    final canEdit = _canEdit;
     final Widget body;
     if (_error != null)
     {
@@ -298,7 +362,7 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
                       margin: EdgeInsets.zero,
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: NutritionSummary(day: day, onOpenGoal: _openGoal),
+                        child: NutritionSummary(day: day, onOpenGoal: canEdit ? _openGoal : null),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -313,9 +377,9 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
                         icon: mealIcon(meal.kind),
                         total: meal.total,
                         entries: meal.entries,
-                        onAdd: () => _add(aMarkId: meal.mark.id),
-                        onEdit: _edit,
-                        onCopy: _isBusy ? null : () => _copyFromYesterday(meal),
+                        onAdd: canEdit ? () => _add(aMarkId: meal.mark.id) : null,
+                        onEdit: canEdit ? _edit : null,
+                        onCopy: _isBusy || !canEdit ? null : () => _copyFromYesterday(meal),
                         onOpenBlock: () => _openBlock(meal),
                       ),
                       const SizedBox(height: 12),
@@ -327,19 +391,22 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
                         total: day.unlinkedTotal,
                         entries: day.unlinked,
                         hint: 'nutrition.unlinked_hint'.tr(),
-                        onEdit: _edit,
+                        onEdit: canEdit ? _edit : null,
                       ),
                       const SizedBox(height: 12),
                     ],
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('nutrition.add_meal'),
-                        onPressed: () => _add(),
-                        icon: const Icon(AppIcons.plus, size: 18),
-                        label: Text('nutrition.add_food'.tr()),
-                      ),
-                    ),
+                    if (canEdit)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('nutrition.add_meal'),
+                          onPressed: () => _add(),
+                          icon: const Icon(AppIcons.plus, size: 18),
+                          label: Text('nutrition.add_food'.tr()),
+                        ),
+                      )
+                    else
+                      Text('people.view_only_hint'.tr(), style: TextStyle(color: aContext.palette.inkMuted)),
                   ],
                 ),
               ),
@@ -350,9 +417,10 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     }
 
     return SubPage(
-      title: 'nutrition.title'.tr(),
+      title: person == null || person.isMe ? 'nutrition.title'.tr() : '${'nutrition.title'.tr()} · ${person.fullName}',
       actions: [
-        IconButton(tooltip: 'goal.title'.tr(), onPressed: _openGoal, icon: const Icon(AppIcons.slidersHorizontal)),
+        if (canEdit)
+          IconButton(tooltip: 'goal.title'.tr(), onPressed: _openGoal, icon: const Icon(AppIcons.slidersHorizontal)),
         IconButton(tooltip: 'nutrition.dishes'.tr(), onPressed: () => aContext.push('/app/dishes'), icon: const Icon(AppIcons.cookingPot)),
         IconButton(
           key: const ValueKey('diary.stock'),
@@ -365,7 +433,14 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: _dateBar(aContext)),
-          Expanded(child: body),
+          _peopleBar(people),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (aDetails) => _swipePerson(people, aDetails),
+              child: body,
+            ),
+          ),
         ],
       ),
     );
@@ -380,7 +455,7 @@ class _MealSection extends StatelessWidget
   final List<MealEntry> entries;
   final String? hint;
   final VoidCallback? onAdd;
-  final ValueChanged<MealEntry> onEdit;
+  final ValueChanged<MealEntry>? onEdit;
   final VoidCallback? onCopy;
   final VoidCallback? onOpenBlock;
 
@@ -389,7 +464,7 @@ class _MealSection extends StatelessWidget
     required this.icon,
     required this.total,
     required this.entries,
-    required this.onEdit,
+    this.onEdit,
     this.hint,
     this.onAdd,
     this.onCopy,
@@ -462,7 +537,7 @@ class _MealSection extends StatelessWidget
               for (final entry in entries)
                 ListTile(
                   dense: true,
-                  onTap: () => onEdit(entry),
+                  onTap: onEdit == null ? null : () => onEdit!(entry),
                   title: Text(entryTitle(entry), maxLines: 2, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
                     [

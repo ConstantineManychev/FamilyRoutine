@@ -11,6 +11,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../common/person_switcher.dart';
 import '../training/training_revision.dart';
 import 'planner_common.dart';
 
@@ -18,9 +19,12 @@ const Duration _clockTick = Duration(minutes: 1);
 
 DateTime _mondayOf(DateTime aDate) => shiftDays(aDate, DateTime.monday - aDate.weekday);
 
-Future<void> openNewPlanEvent(BuildContext aContext, WidgetRef aRef, DateTime aDate) async
+Future<void> openNewPlanEvent(BuildContext aContext, WidgetRef aRef, DateTime aDate, {String? aPersonId}) async
 {
-  await aContext.push('/app/planner/events/new?date=${dateWire(aDate)}');
+  await aContext.push(Uri(
+    path: '/app/planner/events/new',
+    queryParameters: {'date': dateWire(aDate), if (aPersonId != null) 'person': aPersonId},
+  ).toString());
   notifyPlannerChanged(aRef);
 }
 
@@ -35,6 +39,8 @@ mixin _AgendaLoader<T extends ConsumerStatefulWidget> on ConsumerState<T>
   DateTime get rangeFrom;
 
   DateTime get rangeTo;
+
+  String? get agendaPersonId => null;
 
   void startAgenda()
   {
@@ -55,7 +61,7 @@ mixin _AgendaLoader<T extends ConsumerStatefulWidget> on ConsumerState<T>
     final request = ++_request;
     try
     {
-      final items = await ref.read(apiProv).getAgenda(rangeFrom, rangeTo);
+      final items = await ref.read(apiProv).getAgenda(rangeFrom, rangeTo, aPersonId: agendaPersonId);
       if (mounted && request == _request)
       {
         setState(()
@@ -278,12 +284,27 @@ class TodayPlanBlock extends ConsumerStatefulWidget
 class _TodayPlanBlockState extends ConsumerState<TodayPlanBlock> with _AgendaLoader<TodayPlanBlock>
 {
   DateTime _day = dayOnly(DateTime.now());
+  String? _personId;
 
   @override
   DateTime get rangeFrom => _day;
 
   @override
   DateTime get rangeTo => _day;
+
+  @override
+  String? get agendaPersonId => _personId;
+
+  void _select(PersonRef aPerson)
+  {
+    setState(()
+    {
+      _personId = personQuery(aPerson);
+      occurrences = null;
+      loadError = null;
+    });
+    loadAgenda();
+  }
 
   @override
   void initState()
@@ -317,6 +338,8 @@ class _TodayPlanBlockState extends ConsumerState<TodayPlanBlock> with _AgendaLoa
     }
 
     final items = occurrences;
+    final people = (ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[]).where((aPerson) => aPerson.canEdit).toList();
+    final index = people.indexWhere((aPerson) => personQuery(aPerson) == _personId);
     final Widget content;
     if (items == null)
     {
@@ -335,10 +358,12 @@ class _TodayPlanBlockState extends ConsumerState<TodayPlanBlock> with _AgendaLoa
 
     return BlockCard(
       title: 'planner.today_block'.tr(),
-      onAdd: () => openNewPlanEvent(aContext, ref, _day),
+      onAdd: () => openNewPlanEvent(aContext, ref, _day, aPersonId: _personId),
       addTooltip: 'planner.add'.tr(),
-      onExpand: _openPlanner,
-      child: content,
+      onExpand: _personId == null ? _openPlanner : null,
+      child: index < 0
+          ? content
+          : PersonSwipe(people: people, index: index, onChanged: (aIndex) => _select(people[aIndex]), child: content),
     );
   }
 }

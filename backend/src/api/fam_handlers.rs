@@ -4,7 +4,7 @@ use axum::Json;
 use chrono::{Duration, Utc};
 use shared_schema::{
     AcceptInviteRequest, AcceptInviteResponse, CreateFamilyRequest, CreateInviteRequest, CreatedInviteDto,
-    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest, SharingRequest,
+    FamDetailDto, FamInviteDto, FamListItemDto, FamMemberDto, MemberRole, RenameFamilyRequest,
     TransferOwnershipRequest, UpdateMemberRoleRequest,
 };
 use sqlx::{PgConnection, PgPool};
@@ -83,8 +83,6 @@ pub async fn create_family(
     let owner_access = FamAccess {
         role: MemberRole::Admin,
         is_owner: true,
-        is_routine_shared: true,
-        is_prices_shared: false,
     };
 
     let detail = load_family_detail(&a_state.db, fam_id, owner_access).await?;
@@ -536,34 +534,8 @@ async fn load_family_detail(a_db: &PgPool, a_fam_id: Uuid, a_access: FamAccess) 
         name,
         my_role: a_access.role,
         is_owner: a_access.is_owner,
-        is_routine_shared: a_access.is_routine_shared,
-        is_prices_shared: a_access.is_prices_shared,
         members,
     })
-}
-
-pub async fn set_price_sharing(
-    State(a_state): State<AppState>,
-    a_user: AuthUser,
-    ApiPath(a_fam_id): ApiPath<Uuid>,
-    ApiJson(a_req): ApiJson<SharingRequest>,
-) -> Result<StatusCode, ApiError>
-{
-    let updated = sqlx::query!(
-        "UPDATE family_mems SET is_prices_shared = $3 WHERE family_id = $1 AND user_id = $2",
-        a_fam_id,
-        a_user.user_id,
-        a_req.is_shared
-    )
-    .execute(&a_state.db)
-    .await?;
-
-    if updated.rows_affected() == 0
-    {
-        return Err(ApiError::NotFound);
-    }
-
-    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn remove_family(a_conn: &mut PgConnection, a_fam_id: Uuid, a_owner_id: Uuid) -> Result<(), ApiError>

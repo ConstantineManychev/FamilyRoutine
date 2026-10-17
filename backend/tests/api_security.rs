@@ -15,10 +15,7 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
 
     let endpoints = [
         (Method::GET, "/api/user/me".to_string()),
-        (
-            Method::GET,
-            "/api/user/energy-timeline?target_date=2026-01-01".to_string(),
-        ),
+        (Method::GET, "/api/energy/day?date=2026-01-01&tz=UTC".to_string()),
         (Method::GET, "/api/families".to_string()),
         (Method::GET, "/api/wallets".to_string()),
         (Method::GET, "/api/currencies".to_string()),
@@ -34,7 +31,6 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
             Method::GET,
             "/api/routine/timeline?from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z".to_string(),
         ),
-        (Method::PUT, format!("/api/families/{nil}/routine-sharing")),
         (Method::GET, "/api/dashboards".to_string()),
         (Method::DELETE, format!("/api/dashboards/{nil}")),
         (Method::POST, format!("/api/dashboards/{nil}/widgets")),
@@ -58,7 +54,6 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
         (Method::POST, "/api/dicts/products/label".to_string()),
         (Method::POST, format!("/api/dicts/items/{nil}/merge")),
         (Method::GET, format!("/api/dicts/items/{nil}/manual-prices")),
-        (Method::PUT, format!("/api/families/{nil}/price-sharing")),
         (Method::PUT, format!("/api/places/{nil}/family")),
         (Method::PUT, format!("/api/merchants/{nil}/place")),
         (Method::PUT, format!("/api/wallets/{nil}/shares/{nil}")),
@@ -141,7 +136,6 @@ async fn protected_endpoints_require_a_session(a_db: PgPool)
         (Method::POST, format!("/api/people/{nil}/entries")),
         (Method::DELETE, format!("/api/people/{nil}/entries/{nil}")),
         (Method::GET, format!("/api/people/{nil}/metrics/weight")),
-        (Method::PUT, format!("/api/people/{nil}/sharing/{nil}")),
         (Method::POST, format!("/api/families/{nil}/children")),
         (Method::GET, "/api/training/programs".to_string()),
         (Method::POST, "/api/training/programs".to_string()),

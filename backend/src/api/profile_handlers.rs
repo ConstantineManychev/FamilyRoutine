@@ -7,8 +7,8 @@ use chrono::{Duration, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     ActivityLevel, BodyEntryDto, BodyMetric, BodySource, BodyValueDto, ChangePasswordRequest, CreateChildRequest,
-    EntriesQuery, MetricPointDto, MetricValueDto, ProfileDto, ProfileSharingDto, ProfileSharingRequest,
-    SaveBodyEntryRequest, Sex, UpdateProfileRequest,
+    EntriesQuery, MetricPointDto, MetricValueDto, PersonRefDto, ProfileDto, SaveBodyEntryRequest, Sex,
+    UpdateProfileRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -28,6 +28,40 @@ const DEFAULT_ENTRIES_LIMIT: i64 = 100;
 const MAX_ENTRIES_LIMIT: i64 = 500;
 const MAX_HISTORY_POINTS: i64 = 3000;
 const VALUE_SCALE: u32 = 2;
+const MAX_GROUP_PEOPLE: i64 = 30;
+
+pub async fn group_people(a_conn: &mut PgConnection, a_viewer_id: Uuid) -> Result<Vec<PersonRefDto>, ApiError>
+{
+    let people = sqlx::query_as!(
+        PersonRefDto,
+        r#"
+        SELECT u.id, u.first_name, u.last_name, u.id = $1 AS "is_me!", u.is_managed,
+               can_manage_person($1, u.id) AS "can_edit!"
+        FROM users u
+        WHERE u.id = $1
+           OR u.id IN (
+               SELECT theirs.user_id
+               FROM family_mems mine
+               JOIN family_mems theirs ON theirs.family_id = mine.family_id
+               WHERE mine.user_id = $1
+           )
+        ORDER BY (u.id = $1) DESC, u.is_managed, u.first_name, u.last_name, u.id
+        LIMIT $2
+        "#,
+        a_viewer_id,
+        MAX_GROUP_PEOPLE
+    )
+    .fetch_all(a_conn)
+    .await?;
+    Ok(people)
+}
+
+pub async fn list_people(State(a_state): State<AppState>, a_user: AuthUser)
+    -> Result<Json<Vec<PersonRefDto>>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    Ok(Json(group_people(&mut conn, a_user.user_id).await?))
+}
 
 struct PersonRow
 {
@@ -160,7 +194,7 @@ pub async fn list_entries(
         .clamp(1, MAX_ENTRIES_LIMIT);
 
     let mut conn = a_state.db.acquire().await?;
-    let access = profile_access(&mut conn, a_user.user_id, a_person_id).await?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
 
     let entries = sqlx::query_as!(
         EntryRow,
@@ -184,7 +218,7 @@ pub async fn list_entries(
     Ok(Json(
         entries
             .into_iter()
-            .map(|entry| entry_dto(entry, &values, &access))
+            .map(|entry| entry_dto(entry, &values))
             .filter(|entry| !entry.values.is_empty())
             .collect(),
     ))
@@ -197,11 +231,11 @@ pub async fn get_entry(
 ) -> Result<Json<BodyEntryDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    let access = profile_access(&mut conn, a_user.user_id, a_person_id).await?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
     let entry = load_entry(&mut conn, a_person_id, a_entry_id).await?;
     let values = load_values(&mut conn, &[a_entry_id]).await?;
 
-    let dto = entry_dto(entry, &values, &access);
+    let dto = entry_dto(entry, &values);
     if dto.values.is_empty()
     {
         return Err(ApiError::NotFound);
@@ -220,8 +254,9 @@ pub async fn create_entry(
     let note = clean_optional_text(a_req.note.as_deref(), MAX_ENTRY_NOTE_LEN, "note")?;
 
     let mut tx = a_state.db.begin().await?;
-    let access = profile_access(&mut tx, a_user.user_id, a_person_id).await?;
-    access.require_manager()?;
+    profile_access(&mut tx, a_user.user_id, a_person_id)
+        .await?
+        .require_manager()?;
     check_measured_ts(&mut tx, a_person_id, a_req.measured_ts).await?;
 
     let entry_id = sqlx::query_scalar!(
@@ -243,7 +278,7 @@ pub async fn create_entry(
     let rows = load_values(&mut tx, &[entry_id]).await?;
     tx.commit().await?;
 
-    Ok((StatusCode::CREATED, Json(entry_dto(entry, &rows, &access))))
+    Ok((StatusCode::CREATED, Json(entry_dto(entry, &rows))))
 }
 
 pub async fn update_entry(
@@ -257,8 +292,9 @@ pub async fn update_entry(
     let note = clean_optional_text(a_req.note.as_deref(), MAX_ENTRY_NOTE_LEN, "note")?;
 
     let mut tx = a_state.db.begin().await?;
-    let access = profile_access(&mut tx, a_user.user_id, a_person_id).await?;
-    access.require_manager()?;
+    profile_access(&mut tx, a_user.user_id, a_person_id)
+        .await?
+        .require_manager()?;
     check_measured_ts(&mut tx, a_person_id, a_req.measured_ts).await?;
 
     let updated = sqlx::query!(
@@ -284,7 +320,7 @@ pub async fn update_entry(
     let rows = load_values(&mut tx, &[a_entry_id]).await?;
     tx.commit().await?;
 
-    Ok(Json(entry_dto(entry, &rows, &access)))
+    Ok(Json(entry_dto(entry, &rows)))
 }
 
 pub async fn delete_entry(
@@ -320,9 +356,7 @@ pub async fn metric_history(
 ) -> Result<Json<Vec<MetricPointDto>>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    profile_access(&mut conn, a_user.user_id, a_person_id)
-        .await?
-        .require_group(a_metric.group())?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
 
     let points = sqlx::query_as!(
         MetricPointDto,
@@ -346,44 +380,6 @@ pub async fn metric_history(
     .await?;
 
     Ok(Json(points))
-}
-
-pub async fn set_sharing(
-    State(a_state): State<AppState>,
-    a_user: AuthUser,
-    ApiPath((a_person_id, a_family_id)): ApiPath<(Uuid, Uuid)>,
-    ApiJson(a_req): ApiJson<ProfileSharingRequest>,
-) -> Result<StatusCode, ApiError>
-{
-    let mut conn = a_state.db.acquire().await?;
-    profile_access(&mut conn, a_user.user_id, a_person_id)
-        .await?
-        .require_manager()?;
-
-    let updated = sqlx::query!(
-        r#"
-        UPDATE family_mems
-        SET is_body_shared = $3, is_composition_shared = $4, is_measures_shared = $5,
-            is_training_shared = COALESCE($6, is_training_shared),
-            is_meals_shared = COALESCE($7, is_meals_shared)
-        WHERE family_id = $1 AND user_id = $2
-        "#,
-        a_family_id,
-        a_person_id,
-        a_req.is_body_shared,
-        a_req.is_composition_shared,
-        a_req.is_measures_shared,
-        a_req.is_training_shared,
-        a_req.is_meals_shared
-    )
-    .execute(&mut *conn)
-    .await?;
-    if updated.rows_affected() == 0
-    {
-        return Err(ApiError::NotFound);
-    }
-
-    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn create_child(
@@ -482,51 +478,21 @@ async fn person_dto(
         a_person_id
     )
     .fetch_all(&mut *a_conn)
-    .await?
-    .into_iter()
-    .filter(|value| a_access.can_see(value.metric.group()))
-    .collect();
+    .await?;
 
-    let sharing = if a_access.is_manager
-    {
-        sqlx::query_as!(
-            ProfileSharingDto,
-            r#"
-            SELECT f.id AS family_id, f.name AS family_name, fm.is_body_shared, fm.is_composition_shared,
-                   fm.is_measures_shared, fm.is_training_shared, fm.is_meals_shared
-            FROM family_mems fm
-            JOIN families f ON f.id = fm.family_id
-            WHERE fm.user_id = $1
-            ORDER BY f.name
-            "#,
-            a_person_id
-        )
-        .fetch_all(&mut *a_conn)
-        .await?
-    }
-    else
-    {
-        Vec::new()
-    };
-
-    let is_body_visible = a_access.can_see(shared_schema::MetricGroup::Body);
     Ok(ProfileDto {
         id: a_person_id,
         first_name: person.first_name,
         last_name: person.last_name,
         email: person.email.filter(|_| a_access.is_self),
         birth_date: a_access.is_manager.then_some(person.birth_date),
-        age: is_body_visible.then(|| age_on(person.birth_date, Utc::now().date_naive())),
-        sex: person.sex.filter(|_| is_body_visible),
+        age: Some(age_on(person.birth_date, Utc::now().date_naive())),
+        sex: person.sex,
         activity: person.activity.filter(|_| a_access.is_manager),
         is_self: a_access.is_self,
         is_managed: a_access.is_managed,
         can_edit: a_access.is_manager,
-        visible_groups: a_access.visible_groups(),
-        is_training_visible: a_access.can_see_training(),
-        is_meals_visible: a_access.can_see_meals(),
         latest,
-        sharing,
     })
 }
 
@@ -623,7 +589,7 @@ fn clean_values(a_values: &[BodyValueDto]) -> Result<Vec<BodyValueDto>, ApiError
         .collect()
 }
 
-fn entry_dto(a_entry: EntryRow, a_values: &[ValueRow], a_access: &ProfileAccess) -> BodyEntryDto
+fn entry_dto(a_entry: EntryRow, a_values: &[ValueRow]) -> BodyEntryDto
 {
     BodyEntryDto {
         id: a_entry.id,
@@ -632,7 +598,7 @@ fn entry_dto(a_entry: EntryRow, a_values: &[ValueRow], a_access: &ProfileAccess)
         note: a_entry.note,
         values: a_values
             .iter()
-            .filter(|row| row.entry_id == a_entry.id && a_access.can_see(row.metric.group()))
+            .filter(|row| row.entry_id == a_entry.id)
             .map(|row| BodyValueDto {
                 metric: row.metric,
                 value: row.value,

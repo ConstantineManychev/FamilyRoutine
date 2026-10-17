@@ -2,6 +2,7 @@ import 'finance_models.dart';
 
 export 'ai_models.dart';
 export 'catalog_models.dart';
+export 'energy_models.dart';
 export 'finance_models.dart';
 export 'notify_models.dart';
 export 'nutrition_models.dart';
@@ -142,8 +143,6 @@ class FamDetailDto
   final String name;
   final MemberRole myRole;
   final bool isOwner;
-  final bool isRoutineShared;
-  final bool isPricesShared;
   final List<FamMemberDto> members;
 
   const FamDetailDto({
@@ -151,8 +150,6 @@ class FamDetailDto
     required this.name,
     required this.myRole,
     required this.isOwner,
-    this.isRoutineShared = true,
-    this.isPricesShared = false,
     required this.members,
   });
 
@@ -165,8 +162,6 @@ class FamDetailDto
         name: aJson['name'] as String,
         myRole: MemberRole.fromJson(aJson['my_role']),
         isOwner: aJson['is_owner'] as bool? ?? false,
-        isRoutineShared: aJson['is_routine_shared'] as bool? ?? true,
-        isPricesShared: aJson['is_prices_shared'] as bool? ?? false,
         members: (aJson['members'] as List? ?? const [])
             .map((aItem) => FamMemberDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),

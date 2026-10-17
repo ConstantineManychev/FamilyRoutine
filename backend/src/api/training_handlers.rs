@@ -7,11 +7,11 @@ use chrono::{DateTime, Duration, Utc};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use shared_schema::{
-    ExType, ExerciseProgressDto, FinishSessionRequest, PersonTrainingDto, PlanQuery, PlannedWorkoutDto, ProgramDayDto,
-    ProgramDto, ProgramExerciseDto, ProgramListItemDto, ProgressMeasure, ProgressionAdviceDto, ProgressionKind,
-    RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest, ScheduleMode, SessionDto,
-    SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest, StartSessionRequest,
-    TrainingPlanDto,
+    ExType, ExerciseProgressDto, FinishSessionRequest, PersonQuery, PersonTrainingDto, PlanQuery, PlannedWorkoutDto,
+    ProgramDayDto, ProgramDto, ProgramExerciseDto, ProgramListItemDto, ProgressMeasure, ProgressionAdviceDto,
+    ProgressionKind, RoutineStatus, SaveProgramRequest, SaveSessionExercise, SaveSessionRequest, ScheduleMode,
+    SessionDto, SessionExerciseDto, SessionSetDto, SessionSummaryDto, SessionsQuery, SetTodayRequest,
+    StartSessionRequest, TrainingPlanDto,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -21,7 +21,7 @@ use crate::api::planner_handlers::{complete_session_slot, next_training_slot, re
 use crate::api::routine_handlers::place_mark;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_name, clean_optional_text};
-use crate::security::profile_access::profile_access;
+use crate::security::profile_access::{acting_for, profile_access, require_editor};
 use crate::services::planner::parse_zone;
 use crate::services::progression::{progress_point, suggest, ExerciseTraits, PlannedExercise};
 use crate::services::training_schedule::{plan, Planned, Reference, ScheduleDay};
@@ -138,8 +138,11 @@ struct PastExercise
 pub async fn list_programs(
     State(a_state): State<AppState>,
     a_user: AuthUser,
+    ApiQuery(a_query): ApiQuery<PersonQuery>,
 ) -> Result<Json<Vec<ProgramListItemDto>>, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
     let programs = sqlx::query_as!(
         ProgramListItemDto,
         r#"
@@ -150,9 +153,9 @@ pub async fn list_programs(
         WHERE p.user_id = $1
         ORDER BY p.is_active DESC, p.name
         "#,
-        a_user.user_id
+        owner_id
     )
-    .fetch_all(&a_state.db)
+    .fetch_all(&mut *conn)
     .await?;
 
     Ok(Json(programs))
@@ -165,7 +168,8 @@ pub async fn get_program(
 ) -> Result<Json<ProgramDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_program(&mut conn, a_user.user_id, a_id).await.map(Json)
+    let owner_id = program_owner(&mut conn, a_user.user_id, a_id).await?;
+    load_program(&mut conn, owner_id, a_id).await.map(Json)
 }
 
 pub async fn create_program(
@@ -175,11 +179,12 @@ pub async fn create_program(
 ) -> Result<(StatusCode, Json<ProgramDto>), ApiError>
 {
     let mut tx = a_state.db.begin().await?;
+    let owner_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
     let program = clean_program(&mut tx, a_user.user_id, a_req).await?;
 
     let count = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM training_programs WHERE user_id = $1"#,
-        a_user.user_id
+        owner_id
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -194,7 +199,7 @@ pub async fn create_program(
         VALUES ($1, $2, $3, NOT EXISTS (SELECT 1 FROM training_programs WHERE user_id = $1 AND is_active))
         RETURNING id
         "#,
-        a_user.user_id,
+        owner_id,
         program.name,
         program.schedule_mode as ScheduleMode
     )
@@ -202,7 +207,7 @@ pub async fn create_program(
     .await?;
     save_days(&mut tx, program_id, &program.days).await?;
 
-    let dto = load_program(&mut tx, a_user.user_id, program_id).await?;
+    let dto = load_program(&mut tx, owner_id, program_id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(dto)))
 }
@@ -215,6 +220,7 @@ pub async fn update_program(
 ) -> Result<Json<ProgramDto>, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
+    let owner_id = program_owner(&mut tx, a_user.user_id, a_id).await?;
     let program = clean_program(&mut tx, a_user.user_id, a_req).await?;
 
     let updated = sqlx::query!(
@@ -223,7 +229,7 @@ pub async fn update_program(
         WHERE id = $1 AND user_id = $2
         "#,
         a_id,
-        a_user.user_id,
+        owner_id,
         program.name,
         program.schedule_mode as ScheduleMode
     )
@@ -235,7 +241,7 @@ pub async fn update_program(
     }
     save_days(&mut tx, a_id, &program.days).await?;
 
-    let dto = load_program(&mut tx, a_user.user_id, a_id).await?;
+    let dto = load_program(&mut tx, owner_id, a_id).await?;
     tx.commit().await?;
     Ok(Json(dto))
 }
@@ -246,12 +252,14 @@ pub async fn delete_program(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = program_owner(&mut conn, a_user.user_id, a_id).await?;
     let deleted = sqlx::query!(
         "DELETE FROM training_programs WHERE id = $1 AND user_id = $2",
         a_id,
-        a_user.user_id
+        owner_id
     )
-    .execute(&a_state.db)
+    .execute(&mut *conn)
     .await?;
     if deleted.rows_affected() == 0
     {
@@ -267,10 +275,11 @@ pub async fn activate_program(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
+    let owner_id = program_owner(&mut tx, a_user.user_id, a_id).await?;
     let exists = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM training_programs WHERE id = $1 AND user_id = $2) AS "exists!""#,
         a_id,
-        a_user.user_id
+        owner_id
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -281,7 +290,7 @@ pub async fn activate_program(
 
     sqlx::query!(
         "UPDATE training_programs SET is_active = FALSE WHERE user_id = $1 AND is_active AND id <> $2",
-        a_user.user_id,
+        owner_id,
         a_id
     )
     .execute(&mut *tx)
@@ -306,6 +315,8 @@ pub async fn set_today(
         return Err(ApiError::Validation("date"));
     }
 
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_req.person_id).await?;
     let updated = sqlx::query!(
         r#"
         UPDATE training_programs p
@@ -313,11 +324,11 @@ pub async fn set_today(
         WHERE p.user_id = $1 AND p.is_active
           AND EXISTS (SELECT 1 FROM program_days d WHERE d.id = $2 AND d.program_id = p.id)
         "#,
-        a_user.user_id,
+        owner_id,
         a_req.day_id,
         a_req.date
     )
-    .execute(&a_state.db)
+    .execute(&mut *conn)
     .await?;
     if updated.rows_affected() == 0
     {
@@ -338,10 +349,11 @@ pub async fn get_plan(
         None => None,
     };
     let mut conn = a_state.db.acquire().await?;
-    let mut plan = build_plan(&mut conn, a_user.user_id, &a_query).await?;
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
+    let mut plan = build_plan(&mut conn, owner_id, &a_query).await?;
     if let Some(viewer) = viewer
     {
-        plan.next_slot = next_training_slot(&mut conn, a_user.user_id, viewer, Utc::now())
+        plan.next_slot = next_training_slot(&mut conn, owner_id, viewer, Utc::now())
             .await?
             .map(|mut slot| {
                 if slot.day_name.is_none()
@@ -362,9 +374,7 @@ pub async fn person_training(
 ) -> Result<Json<PersonTrainingDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    profile_access(&mut conn, a_user.user_id, a_person_id)
-        .await?
-        .require_training()?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
 
     let plan = build_plan(&mut conn, a_person_id, &a_query).await?;
     let program = match plan.program.as_ref()
@@ -388,9 +398,7 @@ pub async fn person_session(
 ) -> Result<Json<SessionDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    profile_access(&mut conn, a_user.user_id, a_person_id)
-        .await?
-        .require_training()?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
     load_session(&mut conn, a_person_id, a_session_id).await.map(Json)
 }
 
@@ -542,7 +550,8 @@ pub async fn list_sessions(
         .unwrap_or(DEFAULT_SESSIONS_LIMIT)
         .clamp(1, MAX_SESSIONS_LIMIT);
     let mut conn = a_state.db.acquire().await?;
-    load_summaries(&mut conn, a_user.user_id, limit, false).await.map(Json)
+    let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
+    load_summaries(&mut conn, owner_id, limit, false).await.map(Json)
 }
 
 pub async fn start_session(
@@ -552,8 +561,9 @@ pub async fn start_session(
 ) -> Result<(StatusCode, Json<SessionDto>), ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let session_id = begin_session(&mut tx, a_user.user_id, a_req.day_id, a_req.started_ts).await?;
-    let dto = load_session(&mut tx, a_user.user_id, session_id).await?;
+    let owner_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
+    let session_id = begin_session(&mut tx, owner_id, a_req.day_id, a_req.started_ts).await?;
+    let dto = load_session(&mut tx, owner_id, session_id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(dto)))
 }
@@ -646,9 +656,7 @@ pub async fn person_exercise_progress(
 ) -> Result<Json<ExerciseProgressDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    profile_access(&mut conn, a_user.user_id, a_person_id)
-        .await?
-        .require_training()?;
+    profile_access(&mut conn, a_user.user_id, a_person_id).await?;
     load_progress(&mut conn, a_person_id, a_ex_id).await.map(Json)
 }
 
@@ -738,7 +746,8 @@ pub async fn get_session(
 ) -> Result<Json<SessionDto>, ApiError>
 {
     let mut conn = a_state.db.acquire().await?;
-    load_session(&mut conn, a_user.user_id, a_id).await.map(Json)
+    let owner_id = session_owner(&mut conn, a_user.user_id, a_id).await?;
+    load_session(&mut conn, owner_id, a_id).await.map(Json)
 }
 
 pub async fn save_session(
@@ -752,7 +761,8 @@ pub async fn save_session(
     let exercises = clean_session_exercises(a_req.exercises)?;
 
     let mut tx = a_state.db.begin().await?;
-    let session = load_session_row(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = session_owner(&mut tx, a_user.user_id, a_id).await?;
+    let session = load_session_row(&mut tx, owner_id, a_id).await?;
     let ex_ids: Vec<Uuid> = exercises.iter().map(|exercise| exercise.ex_id).collect();
     visible_exercises(&mut tx, a_user.user_id, &ex_ids).await?;
 
@@ -770,18 +780,10 @@ pub async fn save_session(
 
     if let (Some(finished_ts), Some(intensity)) = (session.finished_ts, session.intensity)
     {
-        update_kcal(
-            &mut tx,
-            a_user.user_id,
-            a_id,
-            session.started_ts,
-            finished_ts,
-            intensity,
-        )
-        .await?;
+        update_kcal(&mut tx, owner_id, a_id, session.started_ts, finished_ts, intensity).await?;
     }
 
-    let dto = load_session(&mut tx, a_user.user_id, a_id).await?;
+    let dto = load_session(&mut tx, owner_id, a_id).await?;
     tx.commit().await?;
     Ok(Json(dto))
 }
@@ -800,7 +802,8 @@ pub async fn finish_session(
 
     let now = Utc::now();
     let mut tx = a_state.db.begin().await?;
-    let session = load_session_row(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = session_owner(&mut tx, a_user.user_id, a_id).await?;
+    let session = load_session_row(&mut tx, owner_id, a_id).await?;
     if session.finished_ts.is_some()
     {
         return Err(ApiError::Conflict("SESSION_FINISHED"));
@@ -822,7 +825,7 @@ pub async fn finish_session(
     .await?;
     update_kcal(
         &mut tx,
-        a_user.user_id,
+        owner_id,
         a_id,
         session.started_ts,
         finished_ts,
@@ -835,7 +838,7 @@ pub async fn finish_session(
         sqlx::query!(
             "UPDATE status_marks SET end_ts = $3 WHERE id = $1 AND user_id = $2 AND end_ts IS NULL",
             mark_id,
-            a_user.user_id,
+            owner_id,
             finished_ts
         )
         .execute(&mut *tx)
@@ -843,7 +846,7 @@ pub async fn finish_session(
     }
     complete_session_slot(
         &mut tx,
-        a_user.user_id,
+        owner_id,
         a_id,
         session.program_id,
         session.started_ts,
@@ -851,7 +854,7 @@ pub async fn finish_session(
     )
     .await?;
 
-    let dto = load_session(&mut tx, a_user.user_id, a_id).await?;
+    let dto = load_session(&mut tx, owner_id, a_id).await?;
     tx.commit().await?;
     Ok(Json(dto))
 }
@@ -863,7 +866,8 @@ pub async fn delete_session(
 ) -> Result<StatusCode, ApiError>
 {
     let mut tx = a_state.db.begin().await?;
-    let session = load_session_row(&mut tx, a_user.user_id, a_id).await?;
+    let owner_id = session_owner(&mut tx, a_user.user_id, a_id).await?;
+    let session = load_session_row(&mut tx, owner_id, a_id).await?;
     reopen_session_slot(&mut tx, a_id).await?;
     sqlx::query!("DELETE FROM workout_sessions WHERE id = $1", a_id)
         .execute(&mut *tx)
@@ -873,7 +877,7 @@ pub async fn delete_session(
         sqlx::query!(
             "DELETE FROM status_marks WHERE id = $1 AND user_id = $2",
             mark_id,
-            a_user.user_id
+            owner_id
         )
         .execute(&mut *tx)
         .await?;
@@ -933,6 +937,7 @@ async fn clean_program(
     visible_exercises(a_conn, a_user_id, &ex_ids).await?;
 
     Ok(SaveProgramRequest {
+        person_id: a_req.person_id,
         name,
         schedule_mode: a_req.schedule_mode,
         days,
@@ -1500,6 +1505,26 @@ fn set_dto(a_row: &SetRow) -> SessionSetDto
         duration_sec: a_row.duration_sec,
         is_done: a_row.is_done,
     }
+}
+
+async fn program_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>
+{
+    let owner_id = sqlx::query_scalar!("SELECT user_id FROM training_programs WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    require_editor(a_conn, a_viewer_id, owner_id).await?;
+    Ok(owner_id)
+}
+
+async fn session_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>
+{
+    let owner_id = sqlx::query_scalar!("SELECT user_id FROM workout_sessions WHERE id = $1", a_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    require_editor(a_conn, a_viewer_id, owner_id).await?;
+    Ok(owner_id)
 }
 
 async fn load_session_row(

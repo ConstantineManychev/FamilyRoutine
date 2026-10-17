@@ -453,7 +453,7 @@ pub async fn cat_prices(
             SELECT DISTINCT theirs.user_id
             FROM family_mems mine
             JOIN family_mems theirs ON theirs.family_id = mine.family_id
-            WHERE mine.user_id = $2 AND theirs.user_id <> $2 AND theirs.is_prices_shared
+            WHERE mine.user_id = $2 AND theirs.user_id <> $2
         ),
         obs AS (
             SELECT ri.item_id, r.place_id, r.place_addr_id, r.merchant_id, r.merchant_name, r.curr_id,

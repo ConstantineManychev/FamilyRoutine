@@ -77,3 +77,13 @@ final AutoDisposeFutureProvider<AiFeatures> aiFeaturesProv = FutureProvider.auto
   }
   return aRef.read(apiProv).getFeatures();
 });
+
+final AutoDisposeFutureProvider<List<PersonRef>> peopleProv = FutureProvider.autoDispose<List<PersonRef>>((aRef) async
+{
+  if (aRef.watch(sessionUserIdProv) == null)
+  {
+    return const [];
+  }
+  await aRef.watch(famsProv.future);
+  return aRef.read(apiProv).getPeople();
+});

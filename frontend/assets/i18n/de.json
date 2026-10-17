@@ -137,9 +137,6 @@
     "activity_active": "Körperliche Arbeit oder über 10.000 Schritte",
     "activity_very_active": "Schwere körperliche Arbeit",
     "activity_hint": "Ohne Training: dessen Verbrauch wird separat gezählt.",
-    "sharing_title": "Wer meine Daten sieht",
-    "sharing_hint": "Mitglieder jeder Gruppe sehen die hier aktivierten Bereiche: zuerst die aktuellen Werte, dann den Verlauf.",
-    "sharing_hint_child": "Gruppenmitglieder sehen die hier aktivierten Bereiche.",
     "password": "Passwort",
     "pwd_hint": "Nach dem Ändern des Passworts werden alle anderen Geräte abgemeldet.",
     "pwd_current": "Aktuelles Passwort",
@@ -148,10 +145,7 @@
     "pwd_change": "Passwort ändern",
     "pwd_required": "Alle Passwortfelder ausfüllen",
     "pwd_mismatch": "Die neuen Passwörter stimmen nicht überein",
-    "pwd_changed": "Passwort geändert",
-    "share_training": "Trainings",
-    "share_meals": "Ernährung zeigen",
-    "share_meals_hint": "Mitglieder können „Essen“-Blöcke in der Tagesleiste öffnen"
+    "pwd_changed": "Passwort geändert"
   },
   "dashboard": {
     "welcome": "Willkommen",
@@ -247,7 +241,8 @@
       "other": "{} Mitglieder"
     },
     "my_groups": "Meine Gruppen",
-    "no_groups": "Noch keine Gruppen. Erstellen Sie eine oder treten Sie mit einem Einladungscode bei."
+    "no_groups": "Noch keine Gruppen. Erstellen Sie eine oder treten Sie mit einem Einladungscode bei.",
+    "open_sharing_hint": "Gruppenmitglieder sehen automatisch Tagesablauf, Mahlzeiten, Trainings, Körperwerte und Preise der anderen. Kinder werden von Eigentümer und Admins der Gruppe verwaltet. Geldbörsen und Transaktionen sind nur mit der Freigabe unten sichtbar."
   },
   "common": {
     "save": "Speichern",
@@ -676,7 +671,7 @@
     "barcode_invalid": "Ungültiger Barcode: Ziffern prüfen",
     "search_barcode": "Name oder Barcode",
     "add_price": "Preis erfassen",
-    "family_prices_hint": "Preise anderer Mitglieder erscheinen, wenn sie in den Gruppeneinstellungen „Preise aus meinen Belegen teilen“ aktivieren.",
+    "family_prices_hint": "Hier fließen auch Preise aus Belegen anderer Mitglieder Ihrer Gruppen ein.",
     "my_prices": "Meine erfassten Preise",
     "observations": "Preise: {}",
     "shared_prices_hint": "Einschließlich Preisen von Gruppenmitgliedern",
@@ -771,8 +766,6 @@
     "tap_to_edit": "Zum Bearbeiten klicken",
     "edit_mark": "Block bearbeiten",
     "event_kind": "Art des Ereignisses",
-    "share_title": "Meinen Tagesablauf den Gruppenmitgliedern zeigen",
-    "share_hint": "Wenn aus, sehen Mitglieder dieser Gruppe Ihre Status nicht. Andere Gruppen werden separat eingestellt.",
     "hours": "{} Std.",
     "now_label": "Jetzt",
     "no_status": "Kein Status gesetzt",
@@ -801,7 +794,9 @@
     "add_food": "Essen hinzufügen",
     "no_day_entries": "Für diesen Tag gibt es keine Tagebucheinträge.",
     "norm_share": "{} % des Tagesbedarfs ({} kcal)",
-    "delete_meal_hint": "Die Einträge bleiben im Tagebuch unter „Ohne Mahlzeit“."
+    "delete_meal_hint": "Die Einträge bleiben im Tagebuch unter „Ohne Mahlzeit“.",
+    "status_of": "Status: {}",
+    "set_status_for": "Status setzen für {}"
   },
   "catalog": {
     "scope": "Speichern in",
@@ -812,9 +807,7 @@
     "share_action": "Verschieben",
     "share_place": "In Gruppe verschieben",
     "branch": "Filiale",
-    "branch_any": "Nicht angegeben",
-    "prices_share_title": "Preise aus meinen Belegen teilen",
-    "prices_share_hint": "Mitglieder sehen Geschäft, Preis und Datum Ihrer Käufe von Katalogartikeln sowie Ihren Namen als Autor der von Ihnen angelegten Artikel. Belegsummen und andere Käufe bleiben verborgen."
+    "branch_any": "Nicht angegeben"
   },
   "scanner": {
     "title": "Barcode scannen",
@@ -932,7 +925,6 @@
     "err_fix_fields": "Markierte Felder korrigieren",
     "err_empty": "Mindestens einen Wert ausfüllen",
     "saved": "Messung gespeichert",
-    "hidden": "Diese Person hat ihre Messwerte nicht für Ihre Gruppen freigegeben.",
     "empty": "Noch keine Messungen.",
     "group_empty": "Noch keine Messungen",
     "delta_since": "{} seit {}",
@@ -1786,5 +1778,22 @@
     "channel": "Erinnerungen",
     "tz_hint": "Zeitzone für Erinnerungen und Haltbarkeit: {}",
     "settings_tooltip": "Benachrichtigungseinstellungen"
+  },
+  "people": {
+    "me": "Ich",
+    "prev": "Vorherige Person",
+    "next": "Nächste Person",
+    "view_only": "Nur ansehen",
+    "view_only_hint": "Nur ansehen: Ändern können Sie Ihre eigenen Daten und die Ihrer Kinder, wenn Sie Eigentümer oder Admin der Gruppe sind.",
+    "child": "Kind"
+  },
+  "energy": {
+    "title": "Kalorienbilanz",
+    "empty": "Für diesen Tag gibt es noch keine Daten.",
+    "hint": "Essen hebt die Linie, über den Tag werden Kalorien gleichmäßig nach Erhaltungsbedarf verbraucht, Trainings verbrennen zusätzlich. Tippen Sie auf einen Namen, um die Linie auszublenden.",
+    "eaten": "gegessen {}",
+    "burned": "verbraucht {}",
+    "workouts": "Training {}",
+    "no_norm": "kein Bedarf — Verbrauch nicht berechnet"
   }
 }

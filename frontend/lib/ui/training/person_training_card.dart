@@ -15,8 +15,9 @@ const int _shownSessions = 5;
 class PersonTrainingCard extends ConsumerStatefulWidget
 {
   final String personId;
+  final bool isBare;
 
-  const PersonTrainingCard({super.key, required this.personId});
+  const PersonTrainingCard({super.key, required this.personId, this.isBare = false});
 
   @override
   ConsumerState<PersonTrainingCard> createState() => _PersonTrainingCardState();
@@ -63,6 +64,20 @@ class _PersonTrainingCardState extends ConsumerState<PersonTrainingCard>
   Widget build(BuildContext aContext)
   {
     final training = _training;
+    if (widget.isBare)
+    {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null)
+            ErrorRetry(error: _error!, onRetry: _load)
+          else if (training == null)
+            const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
+          else
+            ..._buildBody(aContext, training),
+        ],
+      );
+    }
 
     return Card(
       elevation: 0,

@@ -137,9 +137,6 @@
     "activity_active": "Physical job or over 10,000 steps",
     "activity_very_active": "Heavy physical labour",
     "activity_hint": "Excluding workouts: their energy will be counted separately.",
-    "sharing_title": "Who sees my data",
-    "sharing_hint": "Members of each group see the sections enabled here: current values first, then the history.",
-    "sharing_hint_child": "Group members see the sections enabled here.",
     "password": "Password",
     "pwd_hint": "Changing the password signs out all your other devices.",
     "pwd_current": "Current password",
@@ -148,10 +145,7 @@
     "pwd_change": "Change password",
     "pwd_required": "Fill in all password fields",
     "pwd_mismatch": "The new passwords do not match",
-    "pwd_changed": "Password changed",
-    "share_training": "Workouts",
-    "share_meals": "Show meals",
-    "share_meals_hint": "Members can open “Meal” blocks on the day timeline"
+    "pwd_changed": "Password changed"
   },
   "dashboard": {
     "welcome": "Welcome",
@@ -247,7 +241,8 @@
       "other": "{} members"
     },
     "my_groups": "My groups",
-    "no_groups": "No groups yet. Create one or join with an invite code."
+    "no_groups": "No groups yet. Create one or join with an invite code.",
+    "open_sharing_hint": "Group members automatically see each other's routine, meals, workouts, body metrics and prices. Children are managed by the group owner and admins. Wallets and transactions are visible only with the permission below."
   },
   "common": {
     "save": "Save",
@@ -676,7 +671,7 @@
     "barcode_invalid": "Invalid barcode: check the digits",
     "search_barcode": "Name or barcode",
     "add_price": "Record a price",
-    "family_prices_hint": "Other members’ prices show up when they turn on “Share prices from my receipts” in the group settings.",
+    "family_prices_hint": "Prices from other members of your groups are included here too.",
     "my_prices": "My recorded prices",
     "observations": "prices: {}",
     "shared_prices_hint": "Includes prices from group members",
@@ -771,8 +766,6 @@
     "tap_to_edit": "Click to edit",
     "edit_mark": "Edit block",
     "event_kind": "Event type",
-    "share_title": "Show my routine to group members",
-    "share_hint": "When off, members of this group cannot see your statuses. Other groups are set separately.",
     "hours": "{} h",
     "now_label": "Now",
     "no_status": "No status set",
@@ -801,7 +794,9 @@
     "add_food": "Add food",
     "no_day_entries": "The diary has no entries for this day.",
     "norm_share": "{}% of the daily norm ({} kcal)",
-    "delete_meal_hint": "Food entries stay in the diary under “Not in a meal”."
+    "delete_meal_hint": "Food entries stay in the diary under “Not in a meal”.",
+    "status_of": "Status: {}",
+    "set_status_for": "Set status for {}"
   },
   "catalog": {
     "scope": "Keep in",
@@ -812,9 +807,7 @@
     "share_action": "Move",
     "share_place": "Move to group",
     "branch": "Branch",
-    "branch_any": "Not specified",
-    "prices_share_title": "Share prices from my receipts",
-    "prices_share_hint": "Members see the shop, price and date of your purchases of catalog items, and your name as the author of items you added. Receipt totals and other purchases stay hidden."
+    "branch_any": "Not specified"
   },
   "scanner": {
     "title": "Scan barcode",
@@ -932,7 +925,6 @@
     "err_fix_fields": "Fix the highlighted fields",
     "err_empty": "Fill in at least one value",
     "saved": "Measurement saved",
-    "hidden": "This person has not shared their measurements with your groups.",
     "empty": "No measurements yet.",
     "group_empty": "No measurements yet",
     "delta_since": "{} since {}",
@@ -1786,5 +1778,22 @@
     "channel": "Reminders",
     "tz_hint": "Time zone for reminders and expiry dates: {}",
     "settings_tooltip": "Notification settings"
+  },
+  "people": {
+    "me": "Me",
+    "prev": "Previous person",
+    "next": "Next person",
+    "view_only": "View only",
+    "view_only_hint": "View only: you can change your own data and your children's data if you own or administer the group.",
+    "child": "child"
+  },
+  "energy": {
+    "title": "Calorie balance",
+    "empty": "No data for this day yet.",
+    "hint": "Food raises the line, calories burn evenly through the day at maintenance level, workouts burn extra. Tap a name to hide its line.",
+    "eaten": "eaten {}",
+    "burned": "burned {}",
+    "workouts": "workouts {}",
+    "no_norm": "no norm — burn not counted"
   }
 }

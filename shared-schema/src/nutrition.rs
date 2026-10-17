@@ -195,6 +195,8 @@ pub struct NutritionDayDto
     pub norm: Option<NutritionNormDto>,
     pub norm_gaps: Vec<NormGap>,
     pub workout_kcal: Decimal,
+    pub person_id: Uuid,
+    pub can_edit: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -213,6 +215,8 @@ pub struct NutritionGoalDto
 #[derive(Debug, Clone, Deserialize)]
 pub struct SaveGoalRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub mode: GoalMode,
     #[serde(default)]
     pub pace_kg: Option<Decimal>,
@@ -247,6 +251,8 @@ pub struct NutritionDayQuery
     pub date: NaiveDate,
     #[serde(default)]
     pub tz_offset_min: i32,
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -266,6 +272,8 @@ pub struct QuickEntryRequest
 #[derive(Debug, Clone, Deserialize)]
 pub struct NewMealEntryRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub date: NaiveDate,
     pub status_mark_id: Uuid,
     #[serde(default)]
@@ -299,6 +307,8 @@ pub struct UpdateMealEntryRequest
 #[derive(Debug, Clone, Deserialize)]
 pub struct CopyMealsRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub status_mark_id: Uuid,
     pub date: NaiveDate,
 }

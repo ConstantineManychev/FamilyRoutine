@@ -137,9 +137,6 @@
     "activity_active": "体力工作或超过 10000 步",
     "activity_very_active": "重体力劳动",
     "activity_hint": "不含训练：训练消耗将单独计算。",
-    "sharing_title": "谁能看到我的数据",
-    "sharing_hint": "各群组成员可以看到这里开启的部分：先显示当前数值，再显示历史。",
-    "sharing_hint_child": "群组成员可以看到这里开启的部分。",
     "password": "密码",
     "pwd_hint": "修改密码后，你的其他设备都会退出登录。",
     "pwd_current": "当前密码",
@@ -148,10 +145,7 @@
     "pwd_change": "修改密码",
     "pwd_required": "请填写所有密码字段",
     "pwd_mismatch": "两次输入的新密码不一致",
-    "pwd_changed": "密码已修改",
-    "share_training": "训练",
-    "share_meals": "显示饮食",
-    "share_meals_hint": "成员可以打开日程时间轴上的“用餐”时段"
+    "pwd_changed": "密码已修改"
   },
   "dashboard": {
     "welcome": "欢迎",
@@ -247,7 +241,8 @@
       "other": "{} 名成员"
     },
     "my_groups": "我的群组",
-    "no_groups": "还没有群组。创建一个或使用邀请码加入。"
+    "no_groups": "还没有群组。创建一个或使用邀请码加入。",
+    "open_sharing_hint": "群组成员会自动看到彼此的日程、饮食、训练、身体数据和价格。孩子由群组所有者和管理员管理。钱包和交易仅在下方授权后可见。"
   },
   "common": {
     "save": "保存",
@@ -676,7 +671,7 @@
     "barcode_invalid": "条形码无效：请检查数字",
     "search_barcode": "名称或条形码",
     "add_price": "记录价格",
-    "family_prices_hint": "其他成员在群组设置中开启“共享我收据中的价格”后，其价格才会显示。",
+    "family_prices_hint": "这里也包含你所在群组其他成员收据中的价格。",
     "my_prices": "我记录的价格",
     "observations": "价格：{}",
     "shared_prices_hint": "包含群组成员的价格",
@@ -771,8 +766,6 @@
     "tap_to_edit": "点击编辑",
     "edit_mark": "编辑时段",
     "event_kind": "事件类型",
-    "share_title": "向群组成员显示我的日程",
-    "share_hint": "关闭后，该群组成员看不到你的状态。其他群组需单独设置。",
     "hours": "{} 小时",
     "now_label": "当前",
     "no_status": "未设置状态",
@@ -801,7 +794,9 @@
     "add_food": "添加食物",
     "no_day_entries": "当天的日记没有记录。",
     "norm_share": "每日标准的 {}%（{} 千卡）",
-    "delete_meal_hint": "饮食记录会保留在日记的“未归入用餐”中。"
+    "delete_meal_hint": "饮食记录会保留在日记的“未归入用餐”中。",
+    "status_of": "状态：{}",
+    "set_status_for": "为{}设置状态"
   },
   "catalog": {
     "scope": "保存位置",
@@ -812,9 +807,7 @@
     "share_action": "移动",
     "share_place": "移至群组",
     "branch": "门店",
-    "branch_any": "未指定",
-    "prices_share_title": "共享我收据中的价格",
-    "prices_share_hint": "成员可以看到你购买目录条目的商店、价格和日期，以及你作为所添加条目作者的姓名。小票总额和其他购买不会显示。"
+    "branch_any": "未指定"
   },
   "scanner": {
     "title": "扫描条形码",
@@ -932,7 +925,6 @@
     "err_fix_fields": "请修正标出的字段",
     "err_empty": "请至少填写一个数值",
     "saved": "测量已保存",
-    "hidden": "此人未向你的群组公开测量数据。",
     "empty": "还没有测量。",
     "group_empty": "还没有测量",
     "delta_since": "{}（自 {}）",
@@ -1786,5 +1778,22 @@
     "channel": "提醒",
     "tz_hint": "提醒和保质期使用的时区：{}",
     "settings_tooltip": "通知设置"
+  },
+  "people": {
+    "me": "我",
+    "prev": "上一位",
+    "next": "下一位",
+    "view_only": "仅查看",
+    "view_only_hint": "仅查看：你可以修改自己的数据；如果你是群组所有者或管理员，也可以修改孩子的数据。",
+    "child": "孩子"
+  },
+  "energy": {
+    "title": "热量平衡",
+    "empty": "这一天还没有数据。",
+    "hint": "进食会抬高曲线，全天按维持热量均匀消耗，训练会额外消耗。点击名字可隐藏对应曲线。",
+    "eaten": "摄入 {}",
+    "burned": "消耗 {}",
+    "workouts": "训练 {}",
+    "no_norm": "无标准 — 未计算消耗"
   }
 }

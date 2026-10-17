@@ -33,6 +33,8 @@ pub struct StatusMarkDto
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateMarkRequest
 {
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
     pub status: RoutineStatus,
     #[serde(default)]
     pub note: Option<String>,
@@ -71,11 +73,19 @@ pub struct MarkDetailsDto
     pub owner_id: Uuid,
     pub owner_name: String,
     pub is_mine: bool,
+    pub can_edit: bool,
     pub is_details_hidden: bool,
     pub workout: Option<SessionDto>,
     pub meals: Option<MarkMealsDto>,
     pub work: Option<MarkWorkDto>,
     pub study: Option<MarkStudyDto>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PersonQuery
+{
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -107,6 +117,8 @@ pub struct TimelineMemberDto
     pub first_name: String,
     pub last_name: String,
     pub is_me: bool,
+    pub is_managed: bool,
+    pub can_edit: bool,
     pub marks: Vec<StatusMarkDto>,
 }
 
@@ -116,12 +128,6 @@ pub struct TimelineDto
     pub family_id: Option<Uuid>,
     pub family_name: Option<String>,
     pub members: Vec<TimelineMemberDto>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct SharingRequest
-{
-    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]

@@ -369,6 +369,10 @@ async fn remind_user(a_state: &AppState, a_user_id: Uuid, a_now: DateTime<Utc>) 
     let Some(prefs) = load_prefs(&mut tx, &[a_user_id]).await?.into_iter().next()
     else
     {
+        sqlx::query!("DELETE FROM plan_remind_due WHERE user_id = $1", a_user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
         return Ok(0);
     };
     if !is_due

@@ -147,36 +147,6 @@ async fn family_timeline_respects_membership_and_sharing(a_db: PgPool)
     let (status, _) = timeline(&app, &eve, Some(&fam_id), now).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
-    let hidden = app
-        .call(
-            Method::PUT,
-            &format!("/api/families/{fam_id}/routine-sharing"),
-            Some(&anna.token),
-            Some(json!({ "is_shared": false })),
-        )
-        .await;
-    assert_eq!(hidden.status, StatusCode::NO_CONTENT);
-
-    let (_, body) = timeline(&app, &boris, Some(&fam_id), now).await;
-    assert_eq!(member_names(&body), vec!["boris", "vera"]);
-    let (_, body) = timeline(&app, &anna, Some(&fam_id), now).await;
-    assert_eq!(member_names(&body), vec!["anna", "boris", "vera"]);
-
-    let detail = app
-        .call(Method::GET, &format!("/api/families/{fam_id}"), Some(&anna.token), None)
-        .await;
-    assert_eq!(detail.body["is_routine_shared"], false);
-
-    let outsider_sharing = app
-        .call(
-            Method::PUT,
-            &format!("/api/families/{fam_id}/routine-sharing"),
-            Some(&eve.token),
-            Some(json!({ "is_shared": true })),
-        )
-        .await;
-    assert_eq!(outsider_sharing.status, StatusCode::NOT_FOUND);
-
     let mark_uri = format!("/api/routine/marks/{}", boris_mark["id"].as_str().unwrap());
     let foreign_update = app
         .call(
@@ -186,9 +156,11 @@ async fn family_timeline_respects_membership_and_sharing(a_db: PgPool)
             Some(json!({ "status": "work" })),
         )
         .await;
-    assert_eq!(foreign_update.status, StatusCode::NOT_FOUND);
+    assert_eq!(foreign_update.status, StatusCode::FORBIDDEN);
     let foreign_delete = app.call(Method::DELETE, &mark_uri, Some(&anna.token), None).await;
-    assert_eq!(foreign_delete.status, StatusCode::NOT_FOUND);
+    assert_eq!(foreign_delete.status, StatusCode::FORBIDDEN);
+    let outsider_delete = app.call(Method::DELETE, &mark_uri, Some(&eve.token), None).await;
+    assert_eq!(outsider_delete.status, StatusCode::NOT_FOUND);
 
     let own_update = app
         .call(

@@ -1,4 +1,5 @@
 pub mod auth_service;
+pub mod energy;
 pub mod nutrition;
 pub mod planner;
 pub mod progression;

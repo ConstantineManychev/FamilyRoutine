@@ -55,14 +55,14 @@ MealTarget defaultMealTarget(DateTime aDate, List<DayMeal> aMeals, {String? aMar
   return MealTarget.fresh(DateTime(aDate.year, aDate.month, aDate.day, _pastDayHour));
 }
 
-Future<String> ensureMealBlock(ApiSvc aApi, MealTarget aTarget) async
+Future<String> ensureMealBlock(ApiSvc aApi, MealTarget aTarget, {String? aPersonId}) async
 {
   final markId = aTarget.markId;
   if (markId != null)
   {
     return markId;
   }
-  final mark = await aApi.createMark(RoutineStatus.meal, aStartTs: aTarget.start, aEndTs: aTarget.end);
+  final mark = await aApi.createMark(RoutineStatus.meal, aStartTs: aTarget.start, aEndTs: aTarget.end, aPersonId: aPersonId);
   return mark.id;
 }
 

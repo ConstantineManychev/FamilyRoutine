@@ -137,9 +137,6 @@
     "activity_active": "Travail physique ou plus de 10 000 pas",
     "activity_very_active": "Travail physique intense",
     "activity_hint": "Hors entraînements : leur dépense sera comptée à part.",
-    "sharing_title": "Qui voit mes données",
-    "sharing_hint": "Les membres de chaque groupe voient les sections activées ici : d'abord les valeurs actuelles, puis l'historique.",
-    "sharing_hint_child": "Les membres des groupes voient les sections activées ici.",
     "password": "Mot de passe",
     "pwd_hint": "Changer le mot de passe déconnecte tous vos autres appareils.",
     "pwd_current": "Mot de passe actuel",
@@ -148,10 +145,7 @@
     "pwd_change": "Changer le mot de passe",
     "pwd_required": "Remplissez tous les champs du mot de passe",
     "pwd_mismatch": "Les nouveaux mots de passe ne correspondent pas",
-    "pwd_changed": "Mot de passe modifié",
-    "share_training": "Entraînements",
-    "share_meals": "Afficher l’alimentation",
-    "share_meals_hint": "Les membres pourront ouvrir les blocs « Repas » de la frise du jour"
+    "pwd_changed": "Mot de passe modifié"
   },
   "dashboard": {
     "welcome": "Bienvenue",
@@ -247,7 +241,8 @@
       "other": "{} membres"
     },
     "my_groups": "Mes groupes",
-    "no_groups": "Aucun groupe pour le moment. Créez-en un ou rejoignez-en un avec un code d’invitation."
+    "no_groups": "Aucun groupe pour le moment. Créez-en un ou rejoignez-en un avec un code d’invitation.",
+    "open_sharing_hint": "Les membres du groupe voient automatiquement la routine, les repas, les entraînements, les mesures et les prix des autres. Les enfants sont gérés par le propriétaire et les admins du groupe. Les portefeuilles et transactions ne sont visibles qu'avec l'autorisation ci-dessous."
   },
   "common": {
     "save": "Enregistrer",
@@ -676,7 +671,7 @@
     "barcode_invalid": "Code-barres invalide : vérifiez les chiffres",
     "search_barcode": "Nom ou code-barres",
     "add_price": "Noter un prix",
-    "family_prices_hint": "Les prix des autres membres apparaissent s’ils activent « Partager les prix de mes tickets » dans les réglages du groupe.",
+    "family_prices_hint": "Les prix des tickets des autres membres de vos groupes sont aussi pris en compte.",
     "my_prices": "Mes prix notés",
     "observations": "prix : {}",
     "shared_prices_hint": "Y compris les prix des membres du groupe",
@@ -771,8 +766,6 @@
     "tap_to_edit": "Cliquez pour modifier",
     "edit_mark": "Modifier le bloc",
     "event_kind": "Type d’événement",
-    "share_title": "Montrer ma routine aux membres du groupe",
-    "share_hint": "Désactivé, les membres de ce groupe ne voient pas vos statuts. Les autres groupes se règlent séparément.",
     "hours": "{} h",
     "now_label": "Maintenant",
     "no_status": "Aucun statut",
@@ -801,7 +794,9 @@
     "add_food": "Ajouter un aliment",
     "no_day_entries": "Le journal ne contient aucune entrée pour ce jour.",
     "norm_share": "{} % des besoins du jour ({} kcal)",
-    "delete_meal_hint": "Les entrées restent dans le journal, dans « Hors repas »."
+    "delete_meal_hint": "Les entrées restent dans le journal, dans « Hors repas ».",
+    "status_of": "Statut : {}",
+    "set_status_for": "Définir le statut de {}"
   },
   "catalog": {
     "scope": "Enregistrer dans",
@@ -812,9 +807,7 @@
     "share_action": "Déplacer",
     "share_place": "Déplacer vers le groupe",
     "branch": "Magasin",
-    "branch_any": "Non précisé",
-    "prices_share_title": "Partager les prix de mes tickets",
-    "prices_share_hint": "Les membres voient le magasin, le prix et la date de vos achats d’articles du catalogue, ainsi que votre nom comme auteur des articles que vous avez ajoutés. Les totaux des tickets et les autres achats restent cachés."
+    "branch_any": "Non précisé"
   },
   "scanner": {
     "title": "Scanner un code-barres",
@@ -932,7 +925,6 @@
     "err_fix_fields": "Corrigez les champs signalés",
     "err_empty": "Renseignez au moins une valeur",
     "saved": "Mesure enregistrée",
-    "hidden": "Cette personne n'a pas partagé ses mesures avec vos groupes.",
     "empty": "Aucune mesure pour l'instant.",
     "group_empty": "Aucune mesure pour l'instant",
     "delta_since": "{} depuis le {}",
@@ -1786,5 +1778,22 @@
     "channel": "Rappels",
     "tz_hint": "Fuseau horaire des rappels et des dates limites : {}",
     "settings_tooltip": "Réglages des notifications"
+  },
+  "people": {
+    "me": "Moi",
+    "prev": "Personne précédente",
+    "next": "Personne suivante",
+    "view_only": "Lecture seule",
+    "view_only_hint": "Lecture seule : vous pouvez modifier vos données et celles de vos enfants si vous êtes propriétaire ou admin du groupe.",
+    "child": "enfant"
+  },
+  "energy": {
+    "title": "Bilan calorique",
+    "empty": "Pas encore de données pour ce jour.",
+    "hint": "Les repas font monter la ligne, les calories se dépensent régulièrement au niveau d'entretien, les entraînements brûlent en plus. Touchez un nom pour masquer sa ligne.",
+    "eaten": "mangé {}",
+    "burned": "dépensé {}",
+    "workouts": "entraînements {}",
+    "no_norm": "pas de besoin — dépense non comptée"
   }
 }

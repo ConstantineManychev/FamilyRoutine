@@ -428,20 +428,24 @@ async fn plan_sessions_and_previous_results(a_db: PgPool)
     let (_, sessions) = send(&app, &alice, Method::GET, "/api/training/sessions", None).await;
     assert_eq!(sessions.as_array().unwrap().len(), 1);
 
-    let timeline = app
-        .call(
+    let finished = started + Duration::minutes(60);
+    let mut days = vec![started.date_naive(), finished.date_naive()];
+    days.dedup();
+    let mut burned = 0;
+    for day in days
+    {
+        let (status, energy) = send(
+            &app,
+            &alice,
             Method::GET,
-            &format!("/api/user/energy-timeline?target_date={}", started.date_naive()),
-            Some(&alice.token),
+            &format!("/api/energy/day?date={day}&tz=UTC"),
             None,
         )
         .await;
-    assert!(timeline
-        .body
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|node| node["event_type"] == "workout" && (node["val"].as_f64().unwrap() + kcal).abs() < 0.11));
+        assert_eq!(status, StatusCode::OK, "{energy}");
+        burned += energy["people"][0]["burned_workouts"].as_i64().unwrap();
+    }
+    assert!((burned as f64 - kcal).abs() <= 1.0, "{burned} vs {kcal}");
 
     let free = send(&app, &alice, Method::POST, "/api/training/sessions", Some(json!({}))).await;
     assert_eq!(free.0, StatusCode::CREATED);

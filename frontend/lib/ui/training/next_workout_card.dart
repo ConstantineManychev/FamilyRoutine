@@ -14,11 +14,20 @@ import 'training_format.dart';
 import 'training_revision.dart';
 import '../common/app_theme.dart';
 
+String trainingPath({String? aPersonId}) =>
+    aPersonId == null ? '/app/training' : Uri(path: '/app/training', queryParameters: {'person': aPersonId}).toString();
+
+String newProgramPath({String? aPersonId}) => aPersonId == null
+    ? '/app/training/programs/new'
+    : Uri(path: '/app/training/programs/new', queryParameters: {'person': aPersonId}).toString();
+
 class NextWorkoutCard extends ConsumerStatefulWidget
 {
   final Widget? menu;
+  final String? personId;
+  final bool isBare;
 
-  const NextWorkoutCard({super.key, this.menu});
+  const NextWorkoutCard({super.key, this.menu, this.personId, this.isBare = false});
 
   @override
   ConsumerState<NextWorkoutCard> createState() => _NextWorkoutCardState();
@@ -41,7 +50,7 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
   {
     try
     {
-      final plan = await ref.read(apiProv).getTrainingPlan(aDays: 7);
+      final plan = await ref.read(apiProv).getTrainingPlan(aDays: 7, aPersonId: widget.personId);
       if (mounted)
       {
         setState(()
@@ -71,7 +80,7 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
     setState(() => _isBusy = true);
     try
     {
-      final session = await ref.read(apiProv).startSession(aDayId);
+      final session = await ref.read(apiProv).startSession(aDayId, aPersonId: widget.personId);
       if (mounted)
       {
         notifyTrainingChanged(ref);
@@ -99,6 +108,10 @@ class _NextWorkoutCardState extends ConsumerState<NextWorkoutCard>
   {
     aContext.locale;
     ref.listen<int>(trainingRevisionProv, (_, __) => _load());
+    if (widget.isBare)
+    {
+      return _buildBody(aContext);
+    }
 
     return DashCard(
       title: Text('dashboard.widget_next_workout'.tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

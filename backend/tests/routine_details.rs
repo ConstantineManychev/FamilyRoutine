@@ -202,15 +202,16 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
 
     let (_, bob_meal) = details(&app, &bob, &meal).await;
     assert_eq!(bob_meal["is_mine"], false);
-    assert_eq!(bob_meal["is_details_hidden"], true);
-    assert_eq!(bob_meal["meals"], Value::Null);
+    assert_eq!(bob_meal["can_edit"], false);
+    assert_eq!(bob_meal["is_details_hidden"], false);
+    assert_eq!(bob_meal["meals"]["entries"].as_array().unwrap().len(), 2);
     let (_, bob_work) = details(&app, &bob, &work).await;
     assert_eq!(bob_work["is_details_hidden"], true);
     assert_eq!(bob_work["mark"]["status"], "school");
     assert_eq!(details(&app, &eve, &meal).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
         edit(&app, &bob, &meal, json!({ "status": "work" })).await.0,
-        StatusCode::NOT_FOUND
+        StatusCode::FORBIDDEN
     );
     assert_eq!(
         send(
@@ -222,26 +223,8 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
         )
         .await
         .0,
-        StatusCode::BAD_REQUEST
+        StatusCode::FORBIDDEN
     );
-
-    let (status, _) = send(
-        &app,
-        &alice,
-        Method::PUT,
-        &format!("/api/people/{}/sharing/{home}", alice.id),
-        Some(json!({
-            "is_body_shared": true, "is_composition_shared": true, "is_measures_shared": true,
-            "is_meals_shared": true
-        })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    let (_, profile) = send(&app, &alice, Method::GET, &format!("/api/people/{}", alice.id), None).await;
-    assert_eq!(profile["sharing"][0]["is_meals_shared"], true);
-    let (_, shared_meal) = details(&app, &bob, &meal).await;
-    assert_eq!(shared_meal["is_details_hidden"], false);
-    assert_eq!(shared_meal["meals"]["entries"].as_array().unwrap().len(), 2);
 
     let (status, _) = edit(&app, &alice, &meal, json!({ "status": "leisure" })).await;
     assert_eq!(status, StatusCode::OK);
@@ -261,17 +244,6 @@ async fn blocks_can_be_retyped_rescheduled_and_opened(a_db: PgPool)
         .filter(|entry| !entry["status_mark_id"].is_null())
         .count();
     assert_eq!(still_linked, 0);
-
-    let (status, _) = send(
-        &app,
-        &alice,
-        Method::PUT,
-        &format!("/api/families/{home}/routine-sharing"),
-        Some(json!({ "is_shared": false })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    assert_eq!(details(&app, &bob, &meal).await.0, StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -322,20 +294,4 @@ async fn workout_blocks_show_the_session_to_allowed_members(a_db: PgPool)
     let (_, member) = details(&app, &bob, gym_id).await;
     assert_eq!(member["workout"]["id"], session["id"]);
     assert_eq!(member["owner_name"].as_str().map(|name| name.is_empty()), Some(false));
-
-    let (status, _) = send(
-        &app,
-        &alice,
-        Method::PUT,
-        &format!("/api/people/{}/sharing/{home}", alice.id),
-        Some(json!({
-            "is_body_shared": true, "is_composition_shared": true, "is_measures_shared": true,
-            "is_training_shared": false
-        })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    let (_, hidden) = details(&app, &bob, gym_id).await;
-    assert_eq!(hidden["is_details_hidden"], true);
-    assert_eq!(hidden["workout"], Value::Null);
 }

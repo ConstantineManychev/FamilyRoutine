@@ -77,7 +77,9 @@ List<double> macroPercents(Macros aMacros)
 
 class GoalScreen extends ConsumerStatefulWidget
 {
-  const GoalScreen({super.key});
+  final String? personId;
+
+  const GoalScreen({super.key, this.personId});
 
   @override
   ConsumerState<GoalScreen> createState() => _GoalScreenState();
@@ -123,7 +125,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen>
   {
     try
     {
-      final goal = await ref.read(apiProv).getNutritionGoal();
+      final goal = await ref.read(apiProv).getNutritionGoal(aPersonId: widget.personId);
       if (!mounted)
       {
         return;
@@ -204,7 +206,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen>
     final previewId = ++_previewId;
     try
     {
-      final preview = await ref.read(apiProv).previewNutritionGoal(_draft);
+      final preview = await ref.read(apiProv).previewNutritionGoal(_draft, aPersonId: widget.personId);
       if (mounted && previewId == _previewId)
       {
         setState(() => _preview = preview);
@@ -267,7 +269,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen>
     setState(() => _isBusy = true);
     try
     {
-      await ref.read(apiProv).saveNutritionGoal(_draft);
+      await ref.read(apiProv).saveNutritionGoal(_draft, aPersonId: widget.personId);
       if (!mounted)
       {
         return;
@@ -330,7 +332,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen>
       );
     }
 
-    return SubPage(title: 'goal.title'.tr(), child: body);
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final person = people.where((aPerson) => aPerson.id == widget.personId).firstOrNull;
+    return SubPage(title: person == null ? 'goal.title'.tr() : '${'goal.title'.tr()} · ${person.fullName}', child: body);
   }
 
   Widget _childIntro(BuildContext aContext)

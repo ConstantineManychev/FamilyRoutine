@@ -255,16 +255,6 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
     }
   }
 
-  Future<void> _setRoutineSharing(bool aIsShared) async
-  {
-    await _runAction(() => ref.read(apiProv).setRoutineSharing(widget.famId!, aIsShared));
-  }
-
-  Future<void> _setPriceSharing(bool aIsShared) async
-  {
-    await _runAction(() => ref.read(apiProv).setPriceSharing(widget.famId!, aIsShared));
-  }
-
   Future<void> _setWalletShare(AccountDto aWallet, bool aIsShared) async
   {
     await _runAction(() async
@@ -365,31 +355,15 @@ class _FamDetailScreenState extends ConsumerState<FamDetailScreen>
         ],
         if (_isEdit) ...[
           const SizedBox(height: 16),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: context.palette.border),
-            ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(AppIcons.calendarClock),
-                  title: Text('routine.share_title'.tr()),
-                  subtitle: Text('routine.share_hint'.tr()),
-                  value: _famData?.isRoutineShared ?? true,
-                  onChanged: _isSaving ? null : _setRoutineSharing,
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  secondary: const Icon(AppIcons.tag),
-                  title: Text('catalog.prices_share_title'.tr()),
-                  subtitle: Text('catalog.prices_share_hint'.tr()),
-                  value: _famData?.isPricesShared ?? false,
-                  onChanged: _isSaving ? null : _setPriceSharing,
-                ),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(AppIcons.users, size: 18, color: context.palette.inkSecondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('family.open_sharing_hint'.tr(), style: TextStyle(color: context.palette.inkSecondary)),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           _buildWallets(),

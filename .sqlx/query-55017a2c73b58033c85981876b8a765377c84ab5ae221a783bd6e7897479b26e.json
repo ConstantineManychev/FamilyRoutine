@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            e.id, e.title, e.note, e.category AS \"category: RoutineStatus\", e.timing AS \"timing: PlanTiming\",\n            e.start_date, e.start_time, e.window_min, e.duration_min, e.tz, e.repeat AS \"repeat: PlanRepeat\",\n            e.repeat_every, e.weekday_mask, e.until_date, e.program_id, p.name AS \"program_name?\", e.day_id,\n            d.name AS \"day_name?\"\n        FROM plan_events e\n        LEFT JOIN training_programs p ON p.id = e.program_id\n        LEFT JOIN program_days d ON d.id = e.day_id\n        WHERE e.user_id = $1 AND ($2::uuid IS NULL OR e.id = $2)\n        ORDER BY e.start_time, e.title\n        ",
+  "query": "\n        SELECT\n            e.id, e.user_id AS owner_id, e.title, e.note, e.category AS \"category: RoutineStatus\", e.timing AS \"timing: PlanTiming\",\n            e.start_date, e.start_time, e.window_min, e.duration_min, e.tz, e.repeat AS \"repeat: PlanRepeat\",\n            e.repeat_every, e.weekday_mask, e.until_date, e.program_id, p.name AS \"program_name?\", e.day_id,\n            d.name AS \"day_name?\"\n        FROM plan_events e\n        LEFT JOIN training_programs p ON p.id = e.program_id\n        LEFT JOIN program_days d ON d.id = e.day_id\n        WHERE e.user_id = $1 AND ($2::uuid IS NULL OR e.id = $2)\n        ORDER BY e.start_time, e.title\n        ",
   "describe": {
     "columns": [
       {
@@ -10,16 +10,21 @@
       },
       {
         "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
         "name": "title",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "note",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "category: RoutineStatus",
         "type_info": {
           "Custom": {
@@ -41,7 +46,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "timing: PlanTiming",
         "type_info": {
           "Custom": {
@@ -56,32 +61,32 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "start_date",
         "type_info": "Date"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "start_time",
         "type_info": "Time"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "window_min",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "duration_min",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "tz",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "repeat: PlanRepeat",
         "type_info": {
           "Custom": {
@@ -98,37 +103,37 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "repeat_every",
         "type_info": "Int4"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "weekday_mask",
         "type_info": "Int4"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "until_date",
         "type_info": "Date"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "program_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "program_name?",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "day_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "day_name?",
         "type_info": "Varchar"
       }
@@ -140,6 +145,7 @@
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       true,
@@ -160,5 +166,5 @@
       false
     ]
   },
-  "hash": "f721bcf6b4034ae291cc88524ee20f6558365b83e12f85c3be9060ebd1c61ce2"
+  "hash": "55017a2c73b58033c85981876b8a765377c84ab5ae221a783bd6e7897479b26e"
 }

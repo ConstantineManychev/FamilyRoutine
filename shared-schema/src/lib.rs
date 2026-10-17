@@ -1,5 +1,6 @@
 mod ai;
 mod catalog;
+mod energy;
 mod finance;
 mod notify;
 mod nutrition;
@@ -14,6 +15,7 @@ mod work;
 pub use ai::*;
 pub use catalog::*;
 use chrono::{DateTime, NaiveDate, Utc};
+pub use energy::*;
 pub use finance::*;
 pub use notify::*;
 pub use nutrition::*;
@@ -164,8 +166,6 @@ pub struct FamDetailDto
     pub name: String,
     pub my_role: MemberRole,
     pub is_owner: bool,
-    pub is_routine_shared: bool,
-    pub is_prices_shared: bool,
     pub members: Vec<FamMemberDto>,
 }
 
@@ -418,28 +418,4 @@ pub struct SaveExRequest
     #[serde(default)]
     pub bw_pct: f64,
     pub musc_grps: Vec<ExMuscGrpDto>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EnergyEventType
-{
-    BmrBase,
-    Meal,
-    Workout,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct EnergyNodeDto
-{
-    pub ts: DateTime<Utc>,
-    pub event_type: EnergyEventType,
-    pub val: f64,
-    pub cum_val: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EnergyGraphQuery
-{
-    pub target_date: NaiveDate,
 }

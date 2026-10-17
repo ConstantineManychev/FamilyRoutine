@@ -52,10 +52,18 @@ class _FakeApi extends ApiSvc
   Future<MarkDetails> getMarkDetails(String aId) async => MarkDetails.fromJson(details);
 
   @override
-  Future<StatusMarkDto?> getCurrentMark() async => current;
+  Future<StatusMarkDto?> getCurrentMark({String? aPersonId}) async => current;
 
   @override
-  Future<StatusMarkDto> createMark(RoutineStatus aStatus, {String? aNote, DateTime? aStartTs, DateTime? aEndTs}) async
+  Future<StatusMarkDto> createMark(
+    RoutineStatus aStatus,
+    {
+      String? aNote,
+      DateTime? aStartTs,
+      DateTime? aEndTs,
+      String? aPersonId,
+    }
+  ) async
   {
     created.add(aStatus);
     createdStarts.add(aStartTs);

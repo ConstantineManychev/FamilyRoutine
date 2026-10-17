@@ -69,6 +69,7 @@ class ClockTime
 class PlanEvent
 {
   final String id;
+  final String? ownerId;
   final String title;
   final String? note;
   final RoutineStatus? category;
@@ -89,6 +90,7 @@ class PlanEvent
 
   const PlanEvent({
     required this.id,
+    this.ownerId,
     required this.title,
     this.note,
     this.category,
@@ -110,6 +112,7 @@ class PlanEvent
 
   factory PlanEvent.fromJson(Map<String, dynamic> aJson) => PlanEvent(
         id: aJson['id'] as String,
+        ownerId: aJson['owner_id'] as String?,
         title: aJson['title'] as String,
         note: aJson['note'] as String?,
         category: aJson['category'] == null ? null : RoutineStatus.fromJson(aJson['category']),

@@ -4,6 +4,7 @@ pub mod balance_handlers;
 pub mod bank_handlers;
 pub mod catalog_handlers;
 pub mod dashboard_handlers;
+pub mod energy_handlers;
 pub mod ex_handlers;
 pub mod extract;
 pub mod fam_handlers;

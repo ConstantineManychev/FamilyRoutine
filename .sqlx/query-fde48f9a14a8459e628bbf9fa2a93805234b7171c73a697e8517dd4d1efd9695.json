@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT u.id, ns.tz AS \"tz?\", ns.lang AS \"lang?\", COALESCE(ns.is_plan, TRUE) AS \"is_plan!\",\n               COALESCE(ns.plan_lead_min, $2) AS \"plan_lead_min!\", COALESCE(ns.is_workout, TRUE) AS \"is_workout!\",\n               COALESCE(ns.workout_lead_min, $3) AS \"workout_lead_min!\",\n               COALESCE(ns.is_expiring, TRUE) AS \"is_expiring!\", COALESCE(ns.is_expired, TRUE) AS \"is_expired!\"\n        FROM users u\n        LEFT JOIN notify_settings ns ON ns.user_id = u.id\n        WHERE u.id = ANY($1)\n        ORDER BY u.id\n        ",
+  "query": "\n        SELECT u.id, ns.tz AS \"tz?\", ns.lang AS \"lang?\", COALESCE(ns.is_plan, TRUE) AS \"is_plan!\",\n               COALESCE(ns.plan_lead_min, $2) AS \"plan_lead_min!\", COALESCE(ns.is_workout, TRUE) AS \"is_workout!\",\n               COALESCE(ns.workout_lead_min, $3) AS \"workout_lead_min!\",\n               COALESCE(ns.is_expiring, TRUE) AS \"is_expiring!\", COALESCE(ns.is_expired, TRUE) AS \"is_expired!\"\n        FROM users u\n        LEFT JOIN notify_settings ns ON ns.user_id = u.id\n        WHERE u.id = ANY($1) AND NOT u.is_managed\n        ORDER BY u.id\n        ",
   "describe": {
     "columns": [
       {
@@ -68,5 +68,5 @@
       null
     ]
   },
-  "hash": "0a773e7ac5c2d1460b92d91f3de0a4c06ebb1bf9408803e7c097e35bb8d4a18a"
+  "hash": "fde48f9a14a8459e628bbf9fa2a93805234b7171c73a697e8517dd4d1efd9695"
 }

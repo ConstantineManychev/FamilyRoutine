@@ -206,7 +206,7 @@ pub async fn load_prefs(a_conn: &mut PgConnection, a_user_ids: &[Uuid]) -> Resul
                COALESCE(ns.is_expiring, TRUE) AS "is_expiring!", COALESCE(ns.is_expired, TRUE) AS "is_expired!"
         FROM users u
         LEFT JOIN notify_settings ns ON ns.user_id = u.id
-        WHERE u.id = ANY($1)
+        WHERE u.id = ANY($1) AND NOT u.is_managed
         ORDER BY u.id
         "#,
         a_user_ids,
@@ -275,7 +275,8 @@ pub async fn replan(a_conn: &mut PgConnection, a_user_id: Uuid) -> Result<(), Ap
 {
     sqlx::query!(
         r#"
-        INSERT INTO plan_remind_due (user_id, due_ts) VALUES ($1, NOW())
+        INSERT INTO plan_remind_due (user_id, due_ts)
+        SELECT id, NOW() FROM users WHERE id = $1 AND NOT is_managed
         ON CONFLICT (user_id) DO UPDATE SET due_ts = LEAST(plan_remind_due.due_ts, EXCLUDED.due_ts)
         "#,
         a_user_id

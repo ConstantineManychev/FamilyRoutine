@@ -24,8 +24,9 @@ class AddFoodScreen extends ConsumerStatefulWidget
 {
   final DateTime date;
   final String? markId;
+  final String? personId;
 
-  const AddFoodScreen({super.key, required this.date, this.markId});
+  const AddFoodScreen({super.key, required this.date, this.markId, this.personId});
 
   @override
   ConsumerState<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -59,7 +60,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   {
     try
     {
-      final day = await ref.read(apiProv).getNutritionDay(widget.date);
+      final day = await ref.read(apiProv).getNutritionDay(widget.date, aPersonId: widget.personId);
       if (mounted)
       {
         setState(()
@@ -99,7 +100,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   {
     try
     {
-      final recent = await ref.read(apiProv).getRecentFoods();
+      final recent = await ref.read(apiProv).getRecentFoods(aPersonId: widget.personId);
       if (mounted)
       {
         setState(() => _recent = recent);
@@ -148,8 +149,13 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
         return;
       }
       final api = ref.read(apiProv);
-      final markId = await ensureMealBlock(api, target);
-      await api.addMealEntry({'date': dateWire(widget.date), 'status_mark_id': markId, ...aPayload});
+      final markId = await ensureMealBlock(api, target, aPersonId: widget.personId);
+      await api.addMealEntry({
+        'date': dateWire(widget.date),
+        'status_mark_id': markId,
+        if (widget.personId != null) 'person_id': widget.personId,
+        ...aPayload,
+      });
       if (!mounted)
       {
         return;
@@ -463,11 +469,14 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     aContext.locale;
     final meals = _meals;
     final target = _target;
+    final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
+    final person = people.where((aPerson) => aPerson.id == widget.personId).firstOrNull;
+    final title = 'nutrition.add_title'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(widget.date)]);
 
     return DefaultTabController(
       length: 3,
       child: SubPage(
-        title: 'nutrition.add_title'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(widget.date)]),
+        title: person == null ? title : '$title · ${person.fullName}',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

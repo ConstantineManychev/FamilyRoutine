@@ -51,6 +51,8 @@ class TimelineMemberDto
   final String fName;
   final String lName;
   final bool isMe;
+  final bool isManaged;
+  final bool canEdit;
   final List<StatusMarkDto> marks;
 
   const TimelineMemberDto({
@@ -58,8 +60,10 @@ class TimelineMemberDto
     required this.fName,
     required this.lName,
     required this.isMe,
+    this.isManaged = false,
+    bool? canEdit,
     required this.marks,
-  });
+  }) : canEdit = canEdit ?? isMe;
 
   String get fullName => '$fName $lName'.trim();
 
@@ -80,6 +84,8 @@ class TimelineMemberDto
         fName: aJson['first_name'] as String? ?? '',
         lName: aJson['last_name'] as String? ?? '',
         isMe: aJson['is_me'] as bool? ?? false,
+        isManaged: aJson['is_managed'] as bool? ?? false,
+        canEdit: aJson['can_edit'] as bool?,
         marks: (aJson['marks'] as List? ?? const [])
             .map((aItem) => StatusMarkDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),

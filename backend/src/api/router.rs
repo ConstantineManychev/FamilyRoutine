@@ -11,10 +11,10 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::api::{
-    ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
-    fam_handlers, geo_handlers, item_handlers, notify_handlers, nutrition_handlers, place_handlers, planner_handlers,
-    product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
-    stock_handlers, study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
+    ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, energy_handlers,
+    ex_handlers, fam_handlers, geo_handlers, item_handlers, notify_handlers, nutrition_handlers, place_handlers,
+    planner_handlers, product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers,
+    stats_handlers, stock_handlers, study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
     well_known_handlers, work_handlers,
 };
 use crate::domain::errors::ApiError;
@@ -36,6 +36,7 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/auth/logout-all", post(auth_handlers::logout_all))
         .route("/user/me", get(user_handlers::get_me))
         .route("/user/password", post(profile_handlers::change_password))
+        .route("/people", get(profile_handlers::list_people))
         .route(
             "/people/:id",
             get(profile_handlers::get_person).put(profile_handlers::update_person),
@@ -51,7 +52,6 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(profile_handlers::delete_entry),
         )
         .route("/people/:id/metrics/:metric", get(profile_handlers::metric_history))
-        .route("/people/:id/sharing/:family_id", put(profile_handlers::set_sharing))
         .route("/people/:id/training", get(training_handlers::person_training))
         .route(
             "/people/:id/training/sessions/:session_id",
@@ -166,7 +166,7 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(training_handlers::delete_session),
         )
         .route("/training/sessions/:id/finish", post(training_handlers::finish_session))
-        .route("/user/energy-timeline", get(user_handlers::get_energy_timeline))
+        .route("/energy/day", get(energy_handlers::energy_day))
         .route("/dicts", get(user_handlers::get_avail_dicts))
         .route("/features", get(recognize_handlers::features))
         .route(
@@ -268,11 +268,6 @@ pub fn build_router(a_state: AppState) -> Router
             "/families/:id/invites/:invite_id",
             axum::routing::delete(fam_handlers::revoke_family_invite),
         )
-        .route(
-            "/families/:id/routine-sharing",
-            put(routine_handlers::set_routine_sharing),
-        )
-        .route("/families/:id/price-sharing", put(fam_handlers::set_price_sharing))
         .route("/invites/accept", post(fam_handlers::accept_invite))
         .route("/routine/marks", post(routine_handlers::create_mark))
         .route(

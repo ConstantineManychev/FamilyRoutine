@@ -126,18 +126,6 @@ pub struct MetricValueDto
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ProfileSharingDto
-{
-    pub family_id: Uuid,
-    pub family_name: String,
-    pub is_body_shared: bool,
-    pub is_composition_shared: bool,
-    pub is_measures_shared: bool,
-    pub is_training_shared: bool,
-    pub is_meals_shared: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct ProfileDto
 {
     pub id: Uuid,
@@ -151,11 +139,18 @@ pub struct ProfileDto
     pub is_self: bool,
     pub is_managed: bool,
     pub can_edit: bool,
-    pub visible_groups: Vec<MetricGroup>,
-    pub is_training_visible: bool,
-    pub is_meals_visible: bool,
     pub latest: Vec<MetricValueDto>,
-    pub sharing: Vec<ProfileSharingDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PersonRefDto
+{
+    pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub is_me: bool,
+    pub is_managed: bool,
+    pub can_edit: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -218,18 +213,6 @@ pub struct CreateChildRequest
     pub last_name: String,
     pub birth_date: NaiveDate,
     pub sex: Sex,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ProfileSharingRequest
-{
-    pub is_body_shared: bool,
-    pub is_composition_shared: bool,
-    pub is_measures_shared: bool,
-    #[serde(default)]
-    pub is_training_shared: Option<bool>,
-    #[serde(default)]
-    pub is_meals_shared: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

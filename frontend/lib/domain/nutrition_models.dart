@@ -461,6 +461,8 @@ List<NormGap> _gaps(Object? aJson) => (aJson as List? ?? const []).map(NormGap.p
 
 class NutritionDay
 {
+  final String? personId;
+  final bool canEdit;
   final DateTime date;
   final Macros total;
   final List<DayMeal> meals;
@@ -471,6 +473,8 @@ class NutritionDay
   final double workoutKcal;
 
   const NutritionDay({
+    this.personId,
+    this.canEdit = true,
     required this.date,
     this.total = Macros.zero,
     this.meals = const [],
@@ -482,6 +486,8 @@ class NutritionDay
   });
 
   factory NutritionDay.fromJson(Map<String, dynamic> aJson) => NutritionDay(
+        personId: aJson['person_id'] as String?,
+        canEdit: aJson['can_edit'] as bool? ?? true,
         date: parseDateWire(aJson['date']),
         total: Macros.fromJson(aJson['total']),
         meals: (aJson['meals'] as List? ?? const [])

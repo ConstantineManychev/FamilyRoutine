@@ -70,10 +70,10 @@ class _FakeApi extends ApiSvc
   _FakeApi({this.isChild = false}) : super(Dio(), TokenStore(const FlutterSecureStorage()));
 
   @override
-  Future<NutritionGoal> getNutritionGoal() async => _goal(aIsChild: isChild);
+  Future<NutritionGoal> getNutritionGoal({String? aPersonId}) async => _goal(aIsChild: isChild);
 
   @override
-  Future<NutritionGoal> previewNutritionGoal(GoalDraft aDraft) async
+  Future<NutritionGoal> previewNutritionGoal(GoalDraft aDraft, {String? aPersonId}) async
   {
     final json = aDraft.toJson();
     previews.add(json);
@@ -91,7 +91,7 @@ class _FakeApi extends ApiSvc
   }
 
   @override
-  Future<NutritionGoal> saveNutritionGoal(GoalDraft aDraft) async
+  Future<NutritionGoal> saveNutritionGoal(GoalDraft aDraft, {String? aPersonId}) async
   {
     saved.add(aDraft.toJson());
     return _goal(aMode: aDraft.mode.name);
