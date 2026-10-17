@@ -591,6 +591,44 @@ class ApiSvc
     return CopyResult.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<WorkDay> getWorkDay(DateTime aDate) async
+  {
+    final res = await _dio.get('/api/work/day', queryParameters: {'date': dateWire(aDate)});
+    return WorkDay.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TaskDetails> getTask(String aId) async
+  {
+    final res = await _dio.get('/api/work/tasks/$aId');
+    return TaskDetails.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TaskDetails> createTask(TaskDraft aDraft) async
+  {
+    final res = await _dio.post('/api/work/tasks', data: aDraft.toJson());
+    return TaskDetails.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TaskDetails> updateTask(String aId, TaskDraft aDraft) async
+  {
+    final res = await _dio.put('/api/work/tasks/$aId', data: aDraft.toJson());
+    return TaskDetails.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<TaskDetails> logTask(String aId, TaskAction aAction, DateTime aDate, {String? aReport, String? aMarkId}) async
+  {
+    final report = aReport?.trim();
+    final res = await _dio.post('/api/work/tasks/$aId/log', data: {
+      'action': aAction.name,
+      'date': dateWire(aDate),
+      if (report != null && report.isNotEmpty) 'report': report,
+      if (aMarkId != null) 'status_mark_id': aMarkId,
+    });
+    return TaskDetails.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> archiveTask(String aId) => _dio.delete('/api/work/tasks/$aId');
+
   Future<NutritionGoal> getNutritionGoal() async
   {
     final res = await _dio.get('/api/nutrition/goal');
@@ -763,7 +801,10 @@ class ApiSvc
 
   Future<MarkDetails> getMarkDetails(String aId) async
   {
-    final res = await _dio.get('/api/routine/marks/$aId');
+    final res = await _dio.get(
+      '/api/routine/marks/$aId',
+      queryParameters: {'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes},
+    );
     return MarkDetails.fromJson(res.data as Map<String, dynamic>);
   }
 

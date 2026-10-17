@@ -12,6 +12,7 @@ import '../common/feedback.dart';
 import '../nutrition/nutrition_diary_screen.dart' show addFoodPath;
 import '../nutrition/nutrition_format.dart';
 import '../training/training_format.dart' show describeSets;
+import '../work/work_block_panel.dart';
 import 'routine_style.dart';
 
 const int _maxNoteLen = 200;
@@ -500,6 +501,9 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     {
       RoutineStatus.gym => _Panel(child: _buildWorkout(aContext, aDetails)),
       RoutineStatus.meal => _Panel(child: _buildMeals(aContext, aDetails)),
+      RoutineStatus.work when aDetails.work != null => _Panel(
+          child: WorkBlockPanel(markId: aDetails.mark.id, work: aDetails.work!, onOpenAll: (aPath) => _leaveTo(aPath)),
+        ),
       RoutineStatus.work => _Panel(child: _PanelNote(icon: AppIcons.listChecks, text: 'routine.work_placeholder'.tr())),
       RoutineStatus.school => _Panel(child: _PanelNote(icon: AppIcons.bookOpen, text: 'routine.school_placeholder'.tr())),
       _ => const SizedBox.shrink(),

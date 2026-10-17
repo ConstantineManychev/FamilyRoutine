@@ -71,6 +71,11 @@ const Map<String, List<String>> dynamicKeys = {
   ],
   'places': ['err_name_req', 'err_country_req', 'err_city_req'],
   'goal': ['mode_lose', 'mode_maintain', 'mode_gain'],
+  'work': [
+    'kind_day', 'kind_general', 'kind_day_hint', 'kind_general_hint', 'add_kind_day', 'add_kind_general',
+    'field_title', 'field_note', 'field_kind', 'field_date', 'event_created', 'event_edited', 'event_reopened',
+    'event_deleted',
+  ],
   'cats': [
     'level_1', 'level_2', 'level_3', 'per_100_g', 'per_100_ml', 'per_100_short_g', 'per_100_short_ml',
     'items_count.one', 'items_count.other',

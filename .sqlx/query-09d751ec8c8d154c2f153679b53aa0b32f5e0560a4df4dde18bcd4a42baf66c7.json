@@ -1,0 +1,96 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, kind AS \"kind: TaskEventKind\", field AS \"field: TaskField\", old_value, new_value, report,\n               event_on, event_ts, status_mark_id\n        FROM work_task_events\n        WHERE task_id = $1\n        ORDER BY seq\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind: TaskEventKind",
+        "type_info": {
+          "Custom": {
+            "name": "task_event_t",
+            "kind": {
+              "Enum": [
+                "created",
+                "edited",
+                "progress",
+                "done",
+                "reopened",
+                "deleted"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "field: TaskField",
+        "type_info": {
+          "Custom": {
+            "name": "task_field_t",
+            "kind": {
+              "Enum": [
+                "title",
+                "note",
+                "kind",
+                "date"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "old_value",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "new_value",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "report",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "event_on",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "event_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "status_mark_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "09d751ec8c8d154c2f153679b53aa0b32f5e0560a4df4dde18bcd4a42baf66c7"
+}

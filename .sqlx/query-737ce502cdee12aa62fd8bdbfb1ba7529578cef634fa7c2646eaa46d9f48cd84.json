@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT e.task_id, t.title AS task_title, e.kind AS \"kind: TaskEventKind\", e.report, e.event_ts\n        FROM work_task_events e\n        JOIN work_tasks t ON t.id = e.task_id\n        WHERE t.user_id = $1 AND e.status_mark_id = $2\n        ORDER BY e.seq\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "task_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: TaskEventKind",
+        "type_info": {
+          "Custom": {
+            "name": "task_event_t",
+            "kind": {
+              "Enum": [
+                "created",
+                "edited",
+                "progress",
+                "done",
+                "reopened",
+                "deleted"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "report",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "event_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "737ce502cdee12aa62fd8bdbfb1ba7529578cef634fa7c2646eaa46d9f48cd84"
+}

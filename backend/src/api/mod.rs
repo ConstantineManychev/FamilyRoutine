@@ -24,3 +24,4 @@ pub mod tx_handlers;
 pub mod user_handlers;
 pub mod wallet_handlers;
 pub mod well_known_handlers;
+pub mod work_handlers;

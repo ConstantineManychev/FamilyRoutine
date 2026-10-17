@@ -43,6 +43,7 @@ import '../ui/wallets/bank_callback_screen.dart';
 import '../ui/wallets/banks_screen.dart';
 import '../ui/wallets/wallet_detail_screen.dart';
 import '../ui/wallets/wallets_screen.dart';
+import '../ui/work/work_screen.dart';
 import 'route_guard.dart';
 
 GoRoute _sub(String aPath, Widget Function(GoRouterState aState) aBuild, {List<RouteBase> aRoutes = const []})
@@ -155,6 +156,7 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               ),
               _own('nutrition', (aState) => NutritionDiaryScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
               _own('nutrition/goal', (_) => const GoalScreen()),
+              _own('work', (aState) => WorkScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
               _own(
                 'nutrition/add',
                 (aState) => AddFoodScreen(

@@ -14,6 +14,7 @@ import '../nutrition/nutrition_today_block.dart';
 import '../routine/family_timeline_card.dart';
 import '../training/next_workout_card.dart';
 import '../training/training_revision.dart';
+import '../work/work_today_block.dart';
 
 const int _recentProgramCount = 5;
 const double _blockGap = 16;
@@ -43,6 +44,8 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
       padding: tabPadding(aContext),
       children: [
         const TodayPlanBlock(),
+        const SizedBox(height: _blockGap),
+        const WorkTodayBlock(),
         for (final fam in fams) ...[
           const SizedBox(height: _blockGap),
           FamilyTimelineCard(key: ValueKey('timeline:${fam.id}'), familyId: fam.id, title: fam.name),

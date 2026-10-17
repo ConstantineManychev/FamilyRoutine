@@ -5,8 +5,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use shared_schema::{
-    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkMealsDto, RoutineStatus, SharingRequest,
-    StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery, UpdateMarkRequest,
+    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkDetailsQuery, MarkMealsDto, RoutineStatus,
+    SharingRequest, StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery, UpdateMarkRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::nutrition_handlers::{load_norm, mark_entries, require_meal_mark};
 use crate::api::training_handlers::load_session;
+use crate::api::work_handlers::mark_work;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::clean_optional_text;
 use crate::security::authz::require_member;
@@ -27,6 +28,7 @@ const MAX_FUTURE_HOURS: i64 = 24;
 const MAX_TIMELINE_DAYS: i64 = 8;
 const MAX_RECENT_MARKS: i64 = 2000;
 const MAX_LINKED_ENTRIES: usize = 100;
+const MAX_TZ_OFFSET_MIN: i32 = 840;
 
 struct MarkRow
 {
@@ -272,10 +274,17 @@ pub async fn mark_details(
     State(a_state): State<AppState>,
     a_user: AuthUser,
     ApiPath(a_id): ApiPath<Uuid>,
+    ApiQuery(a_query): ApiQuery<MarkDetailsQuery>,
 ) -> Result<Json<MarkDetailsDto>, ApiError>
 {
+    if a_query.tz_offset_min.abs() > MAX_TZ_OFFSET_MIN
+    {
+        return Err(ApiError::Validation("tz_offset_min"));
+    }
     let mut conn = a_state.db.acquire().await?;
-    build_details(&mut conn, a_user.user_id, a_id).await.map(Json)
+    build_details(&mut conn, a_user.user_id, a_id, a_query.tz_offset_min)
+        .await
+        .map(Json)
 }
 
 pub async fn link_mark_meals(
@@ -327,12 +336,17 @@ pub async fn link_mark_meals(
     .execute(&mut *tx)
     .await?;
 
-    let details = build_details(&mut tx, a_user.user_id, a_id).await?;
+    let details = build_details(&mut tx, a_user.user_id, a_id, 0).await?;
     tx.commit().await?;
     Ok(Json(details))
 }
 
-async fn build_details(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<MarkDetailsDto, ApiError>
+async fn build_details(
+    a_conn: &mut PgConnection,
+    a_viewer_id: Uuid,
+    a_id: Uuid,
+    a_tz_offset_min: i32,
+) -> Result<MarkDetailsDto, ApiError>
 {
     let row = sqlx::query_as!(
         OwnedMarkRow,
@@ -381,6 +395,7 @@ async fn build_details(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid)
     let mut is_details_hidden = false;
     let mut workout = None;
     let mut meals = None;
+    let mut work = None;
     match row.status
     {
         RoutineStatus::Gym if can_see_training =>
@@ -417,6 +432,11 @@ async fn build_details(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid)
             });
         }
         RoutineStatus::Gym | RoutineStatus::Meal => is_details_hidden = true,
+        RoutineStatus::Work if is_mine =>
+        {
+            let local_day = (row.start_ts + Duration::minutes(i64::from(a_tz_offset_min))).date_naive();
+            work = Some(mark_work(a_conn, row.user_id, row.id, local_day).await?);
+        }
         RoutineStatus::Work | RoutineStatus::School => is_details_hidden = !is_mine,
         _ =>
         {}
@@ -436,6 +456,7 @@ async fn build_details(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid)
         is_details_hidden,
         workout,
         meals,
+        work,
     })
 }
 

@@ -14,7 +14,7 @@ use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
     fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers,
     product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
-    training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers,
+    training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers, work_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -85,6 +85,15 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/nutrition/goal/preview", post(nutrition_handlers::preview_goal))
         .route("/people/:id/nutrition/norm", get(nutrition_handlers::person_norm))
+        .route("/work/day", get(work_handlers::work_day))
+        .route("/work/tasks", post(work_handlers::create_task))
+        .route(
+            "/work/tasks/:id",
+            get(work_handlers::get_task)
+                .put(work_handlers::update_task)
+                .delete(work_handlers::archive_task),
+        )
+        .route("/work/tasks/:id/log", post(work_handlers::log_task))
         .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),

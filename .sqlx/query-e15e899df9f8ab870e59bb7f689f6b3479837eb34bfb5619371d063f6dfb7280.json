@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE work_tasks SET deleted_ts = NOW(), updated_ts = NOW() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e15e899df9f8ab870e59bb7f689f6b3479837eb34bfb5619371d063f6dfb7280"
+}

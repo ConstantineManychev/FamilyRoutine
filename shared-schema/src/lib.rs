@@ -6,6 +6,7 @@ mod planner;
 mod profile;
 mod routine;
 mod training;
+mod work;
 
 pub use ai::*;
 pub use catalog::*;
@@ -19,6 +20,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 pub use training::*;
 use uuid::Uuid;
+pub use work::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "mem_role_t", rename_all = "snake_case")]
