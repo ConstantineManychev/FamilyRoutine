@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE study_topics\n        SET parent_id = $3, title = $4, description = $5, unit = $6, target = $7, done = $8, updated_ts = NOW()\n        WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "study_unit_t",
+            "kind": {
+              "Enum": [
+                "percent",
+                "pages",
+                "tasks",
+                "lessons",
+                "chapters",
+                "hours"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8bc38b912f3d748f9554bf66bee78690583adad7a4af528a75d63e6006ac1f2f"
+}

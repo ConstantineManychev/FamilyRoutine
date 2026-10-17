@@ -47,6 +47,7 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       OFF_ENABLED: ${OFF_ENABLED:-true}
       PRODUCT_CAT_MAX_DEPTH: ${PRODUCT_CAT_MAX_DEPTH:-3}
+      STUDY_MAX_DEPTH: ${STUDY_MAX_DEPTH:-5}
       ANDROID_PACKAGE_NAME: ${ANDROID_PACKAGE_NAME:-com.familyroutine.family_routine}
       ANDROID_CERT_SHA256: ${ANDROID_CERT_SHA256:-}
     secrets:

@@ -25,6 +25,8 @@ const DEFAULT_ANTHROPIC_MODEL: &str = "claude-opus-5-5";
 const DEFAULT_OFF_API: &str = "https://world.openfoodfacts.org";
 const DEFAULT_CAT_MAX_DEPTH: u64 = 3;
 const MAX_CAT_MAX_DEPTH: u64 = 10;
+const DEFAULT_STUDY_MAX_DEPTH: u64 = 5;
+const MAX_STUDY_MAX_DEPTH: u64 = 10;
 pub const DEFAULT_ANDROID_PACKAGE: &str = "com.familyroutine.family_routine";
 const SHA256_BYTES: usize = 32;
 const MAX_PACKAGE_LEN: usize = 255;
@@ -352,6 +354,7 @@ pub struct AppConfig
     pub receipt_ai: ReceiptAiConfig,
     pub catalog: CatalogConfig,
     pub android_links: Option<AndroidLinks>,
+    pub study_max_depth: usize,
 }
 
 impl AppConfig
@@ -377,6 +380,13 @@ impl AppConfig
 
         let data_key = decode_data_key(&required("DATA_ENC_KEY")?)?;
         let password_pepper = decode_pepper(&required("PASSWORD_PEPPER")?)?;
+        let study_max_depth = usize::try_from(parse_u64(
+            "STUDY_MAX_DEPTH",
+            DEFAULT_STUDY_MAX_DEPTH,
+            1,
+            MAX_STUDY_MAX_DEPTH,
+        )?)
+        .map_err(|_| "STUDY_MAX_DEPTH is out of range".to_string())?;
 
         Ok(Self {
             database_url,
@@ -391,6 +401,7 @@ impl AppConfig
             receipt_ai: ReceiptAiConfig::from_env()?,
             catalog: CatalogConfig::from_env()?,
             android_links: AndroidLinks::from_env()?,
+            study_max_depth,
         })
     }
 }

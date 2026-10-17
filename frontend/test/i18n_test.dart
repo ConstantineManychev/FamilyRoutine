@@ -15,6 +15,8 @@ const Map<String, List<String>> dynamicKeys = {
     'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
     'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE', 'SESSION_ACTIVE', 'SESSION_FINISHED', 'TOO_MANY_PROGRAMS',
     'TOO_MANY_DISHES', 'TOO_MANY_ENTRIES', 'CAT_EXISTS', 'CAT_IN_USE', 'CAT_HAS_CHILDREN', 'TOO_MANY_CATS', 'MARK_OVERLAP',
+    'TASK_DONE', 'TASK_OPEN', 'TASK_ARCHIVED', 'TOO_MANY_TASKS', 'TOO_MANY_EVENTS', 'TOPIC_TOO_DEEP', 'TOPIC_CYCLE',
+    'TOPIC_HAS_CHILDREN', 'TOO_MANY_TOPICS', 'TOO_MANY_NOTES',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'metrics': [
@@ -84,6 +86,11 @@ const Map<String, List<String>> dynamicKeys = {
     'gap_weight', 'gap_height', 'gap_sex', 'gap_activity',
     'activity_sedentary', 'activity_light', 'activity_moderate', 'activity_active', 'activity_very_active',
     'copied.one', 'copied.other', 'missing_count.one', 'missing_count.other',
+  ],
+  'study': [
+    'unit_percent', 'unit_pages', 'unit_tasks', 'unit_lessons', 'unit_chapters', 'unit_hours',
+    'unit_short_percent', 'unit_short_pages', 'unit_short_tasks', 'unit_short_lessons', 'unit_short_chapters',
+    'unit_short_hours', 'subtopics_count.one', 'subtopics_count.other', 'notes_count.one', 'notes_count.other',
   ],
 };
 

@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{MacrosDto, MarkWorkDto, MealEntryDto, SessionDto};
+use crate::{MacrosDto, MarkStudyDto, MarkWorkDto, MealEntryDto, SessionDto};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "curr_status_t", rename_all = "snake_case")]
@@ -75,6 +75,7 @@ pub struct MarkDetailsDto
     pub workout: Option<SessionDto>,
     pub meals: Option<MarkMealsDto>,
     pub work: Option<MarkWorkDto>,
+    pub study: Option<MarkStudyDto>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

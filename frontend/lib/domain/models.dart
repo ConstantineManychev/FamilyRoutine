@@ -8,6 +8,7 @@ export 'planner_models.dart';
 export 'profile_models.dart';
 export 'routine_details_models.dart';
 export 'routine_models.dart';
+export 'study_models.dart';
 export 'training_models.dart';
 export 'work_models.dart';
 

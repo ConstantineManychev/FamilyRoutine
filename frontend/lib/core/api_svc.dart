@@ -591,6 +591,52 @@ class ApiSvc
     return CopyResult.fromJson(res.data as Map<String, dynamic>);
   }
 
+  Future<StudyTree> getStudyTree() async
+  {
+    final res = await _dio.get('/api/study/topics');
+    return StudyTree.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StudyTopic> createTopic(TopicDraft aDraft) async
+  {
+    final res = await _dio.post('/api/study/topics', data: aDraft.toJson());
+    return StudyTopic.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StudyTopic> updateTopic(String aId, TopicDraft aDraft) async
+  {
+    final res = await _dio.put('/api/study/topics/$aId', data: aDraft.toJson());
+    return StudyTopic.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteTopic(String aId) => _dio.delete('/api/study/topics/$aId');
+
+  Future<List<StudyNote>> getStudyNotes(String aTopicId, {bool aIsBranch = false}) async
+  {
+    final res = await _dio.get('/api/study/topics/$aTopicId/notes', queryParameters: {'is_branch': aIsBranch});
+    return _list(res.data, StudyNote.fromJson);
+  }
+
+  Future<StudyNote> createStudyNote(String aTopicId, String aBody, DateTime aNoteTs) async
+  {
+    final res = await _dio.post(
+      '/api/study/topics/$aTopicId/notes',
+      data: {'body': aBody.trim(), 'note_ts': aNoteTs.toUtc().toIso8601String()},
+    );
+    return StudyNote.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StudyNote> updateStudyNote(String aId, String aBody, DateTime aNoteTs) async
+  {
+    final res = await _dio.put(
+      '/api/study/notes/$aId',
+      data: {'body': aBody.trim(), 'note_ts': aNoteTs.toUtc().toIso8601String()},
+    );
+    return StudyNote.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteStudyNote(String aId) => _dio.delete('/api/study/notes/$aId');
+
   Future<WorkDay> getWorkDay(DateTime aDate) async
   {
     final res = await _dio.get('/api/work/day', queryParameters: {'date': dateWire(aDate)});

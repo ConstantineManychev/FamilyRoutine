@@ -57,6 +57,8 @@ pub fn catalog_config(a_admins: &[&str], a_off_url: Option<&str>) -> CatalogConf
     }
 }
 
+pub const DEFAULT_STUDY_DEPTH: usize = 5;
+
 pub struct TestApp
 {
     pub router: Router,
@@ -91,6 +93,19 @@ impl TestApp
             ai_config("http://127.0.0.1:9", None),
             catalog_config(&[], None),
             None,
+            DEFAULT_STUDY_DEPTH,
+        )
+    }
+
+    pub fn with_study_depth(a_db: PgPool, a_depth: usize) -> Self
+    {
+        Self::build(
+            a_db,
+            bank_config("http://127.0.0.1:9"),
+            ai_config("http://127.0.0.1:9", None),
+            catalog_config(&[], None),
+            None,
+            a_depth,
         )
     }
 
@@ -102,12 +117,20 @@ impl TestApp
             ai_config("http://127.0.0.1:9", None),
             catalog_config(&[], None),
             a_links,
+            DEFAULT_STUDY_DEPTH,
         )
     }
 
     pub fn with_catalog(a_db: PgPool, a_catalog: CatalogConfig, a_receipt_ai: ReceiptAiConfig) -> Self
     {
-        Self::build(a_db, bank_config("http://127.0.0.1:9"), a_receipt_ai, a_catalog, None)
+        Self::build(
+            a_db,
+            bank_config("http://127.0.0.1:9"),
+            a_receipt_ai,
+            a_catalog,
+            None,
+            DEFAULT_STUDY_DEPTH,
+        )
     }
 
     pub fn with_receipt_ai(a_db: PgPool, a_api_url: &str, a_daily_limit: i32) -> Self
@@ -130,6 +153,7 @@ impl TestApp
             a_receipt_ai,
             catalog_config(&[], None),
             None,
+            DEFAULT_STUDY_DEPTH,
         )
     }
 
@@ -139,6 +163,7 @@ impl TestApp
         a_receipt_ai: ReceiptAiConfig,
         a_catalog: CatalogConfig,
         a_android_links: Option<AndroidLinks>,
+        a_study_depth: usize,
     ) -> Self
     {
         let cfg = AppConfig {
@@ -154,6 +179,7 @@ impl TestApp
             receipt_ai: a_receipt_ai,
             catalog: a_catalog,
             android_links: a_android_links,
+            study_max_depth: a_study_depth,
         };
 
         let state = AppState::new(a_db, cfg).unwrap();

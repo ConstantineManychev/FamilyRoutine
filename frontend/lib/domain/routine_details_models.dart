@@ -1,5 +1,6 @@
 import 'nutrition_models.dart';
 import 'routine_models.dart';
+import 'study_models.dart';
 import 'training_models.dart';
 import 'work_models.dart';
 
@@ -30,6 +31,7 @@ class MarkDetails
   final WorkoutSession? workout;
   final MarkMeals? meals;
   final MarkWork? work;
+  final MarkStudy? study;
 
   const MarkDetails({
     required this.mark,
@@ -40,6 +42,7 @@ class MarkDetails
     this.workout,
     this.meals,
     this.work,
+    this.study,
   });
 
   factory MarkDetails.fromJson(Map<String, dynamic> aJson) => MarkDetails(
@@ -51,5 +54,6 @@ class MarkDetails
         workout: aJson['workout'] is Map<String, dynamic> ? WorkoutSession.fromJson(aJson['workout'] as Map<String, dynamic>) : null,
         meals: aJson['meals'] is Map<String, dynamic> ? MarkMeals.fromJson(aJson['meals'] as Map<String, dynamic>) : null,
         work: aJson['work'] is Map<String, dynamic> ? MarkWork.fromJson(aJson['work'] as Map<String, dynamic>) : null,
+        study: aJson['study'] is Map<String, dynamic> ? MarkStudy.fromJson(aJson['study'] as Map<String, dynamic>) : null,
       );
 }

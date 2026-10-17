@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO study_topics (user_id, parent_id, title, description, unit, target, done)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "study_unit_t",
+            "kind": {
+              "Enum": [
+                "percent",
+                "pages",
+                "tasks",
+                "lessons",
+                "chapters",
+                "hours"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "083b5687cb5a72186ec800c6189d46c9aaa49550f3435c7fb4d966527303f778"
+}

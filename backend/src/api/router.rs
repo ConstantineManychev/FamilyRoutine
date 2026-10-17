@@ -14,7 +14,7 @@ use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
     fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers,
     product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
-    training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers, work_handlers,
+    study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers, work_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -94,6 +94,22 @@ pub fn build_router(a_state: AppState) -> Router
                 .delete(work_handlers::archive_task),
         )
         .route("/work/tasks/:id/log", post(work_handlers::log_task))
+        .route(
+            "/study/topics",
+            get(study_handlers::list_topics).post(study_handlers::create_topic),
+        )
+        .route(
+            "/study/topics/:id",
+            put(study_handlers::update_topic).delete(study_handlers::delete_topic),
+        )
+        .route(
+            "/study/topics/:id/notes",
+            get(study_handlers::list_notes).post(study_handlers::create_note),
+        )
+        .route(
+            "/study/notes/:id",
+            put(study_handlers::update_note).delete(study_handlers::delete_note),
+        )
         .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),

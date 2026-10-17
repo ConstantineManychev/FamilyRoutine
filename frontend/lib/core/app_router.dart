@@ -38,6 +38,8 @@ import '../ui/training/exercise_progress_screen.dart';
 import '../ui/training/person_session_screen.dart';
 import '../ui/training/program_editor_screen.dart';
 import '../ui/training/training_screen.dart';
+import '../ui/study/study_screen.dart';
+import '../ui/study/topic_screen.dart';
 import '../ui/training/workout_session_screen.dart';
 import '../ui/wallets/bank_callback_screen.dart';
 import '../ui/wallets/banks_screen.dart';
@@ -157,6 +159,8 @@ final Provider<GoRouter> routerProv = Provider<GoRouter>((aRef)
               _own('nutrition', (aState) => NutritionDiaryScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
               _own('nutrition/goal', (_) => const GoalScreen()),
               _own('work', (aState) => WorkScreen(initialDate: DateTime.tryParse(aState.uri.queryParameters['date'] ?? ''))),
+              _own('study', (_) => const StudyScreen()),
+              _own('study/:id', (aState) => TopicScreen(key: ValueKey(_param(aState, 'id')), topicId: _param(aState, 'id')!)),
               _own(
                 'nutrition/add',
                 (aState) => AddFoodScreen(

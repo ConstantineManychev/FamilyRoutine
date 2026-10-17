@@ -5,6 +5,7 @@ mod nutrition;
 mod planner;
 mod profile;
 mod routine;
+mod study;
 mod training;
 mod work;
 
@@ -18,6 +19,7 @@ pub use profile::*;
 pub use routine::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+pub use study::*;
 pub use training::*;
 use uuid::Uuid;
 pub use work::*;

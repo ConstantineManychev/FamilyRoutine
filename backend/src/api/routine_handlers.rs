@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::nutrition_handlers::{load_norm, mark_entries, require_meal_mark};
+use crate::api::study_handlers::mark_study;
 use crate::api::training_handlers::load_session;
 use crate::api::work_handlers::mark_work;
 use crate::domain::errors::ApiError;
@@ -396,6 +397,7 @@ async fn build_details(
     let mut workout = None;
     let mut meals = None;
     let mut work = None;
+    let mut study = None;
     match row.status
     {
         RoutineStatus::Gym if can_see_training =>
@@ -437,6 +439,10 @@ async fn build_details(
             let local_day = (row.start_ts + Duration::minutes(i64::from(a_tz_offset_min))).date_naive();
             work = Some(mark_work(a_conn, row.user_id, row.id, local_day).await?);
         }
+        RoutineStatus::School if is_mine =>
+        {
+            study = Some(mark_study(a_conn, row.user_id, row.start_ts, row.end_ts).await?);
+        }
         RoutineStatus::Work | RoutineStatus::School => is_details_hidden = !is_mine,
         _ =>
         {}
@@ -457,6 +463,7 @@ async fn build_details(
         workout,
         meals,
         work,
+        study,
     })
 }
 

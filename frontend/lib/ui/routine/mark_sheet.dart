@@ -12,6 +12,7 @@ import '../common/feedback.dart';
 import '../nutrition/nutrition_diary_screen.dart' show addFoodPath;
 import '../nutrition/nutrition_format.dart';
 import '../training/training_format.dart' show describeSets;
+import '../study/study_block_panel.dart';
 import '../work/work_block_panel.dart';
 import 'routine_style.dart';
 
@@ -505,7 +506,15 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
           child: WorkBlockPanel(markId: aDetails.mark.id, work: aDetails.work!, onOpenAll: (aPath) => _leaveTo(aPath)),
         ),
       RoutineStatus.work => _Panel(child: _PanelNote(icon: AppIcons.listChecks, text: 'routine.work_placeholder'.tr())),
-      RoutineStatus.school => _Panel(child: _PanelNote(icon: AppIcons.bookOpen, text: 'routine.school_placeholder'.tr())),
+      RoutineStatus.school when aDetails.study != null => _Panel(
+          child: StudyBlockPanel(
+            markId: aDetails.mark.id,
+            startTs: aDetails.mark.startTs,
+            endTs: aDetails.mark.endTs,
+            study: aDetails.study!,
+            onOpenAll: (aPath) => _leaveTo(aPath),
+          ),
+        ),
       _ => const SizedBox.shrink(),
     };
   }
