@@ -106,6 +106,8 @@ pub enum StatsBucket
 {
     Hour,
     Day,
+    Week,
+    Month,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -197,6 +199,8 @@ pub struct TxDto
     pub is_merchant_linked: bool,
     pub account_owner_name: Option<String>,
     pub balance_doc_id: Option<Uuid>,
+    pub converted_amount: Option<Decimal>,
+    pub converted_curr_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -204,6 +208,7 @@ pub struct TxPageDto
 {
     pub items: Vec<TxDto>,
     pub next_cursor: Option<String>,
+    pub missing_rates: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -229,6 +234,8 @@ pub struct TxQuery
     pub is_uncategorized: Option<bool>,
     #[serde(default)]
     pub owner_id: Option<Uuid>,
+    #[serde(default)]
+    pub convert_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -367,6 +374,13 @@ pub struct SaveReceiptRequest
     pub new_place: Option<NewPlaceRequest>,
     #[serde(default)]
     pub discount: Decimal,
+    #[serde(default = "is_stocked_default")]
+    pub is_stocked: bool,
+}
+
+fn is_stocked_default() -> bool
+{
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -446,6 +460,8 @@ pub struct ReceiptDto
     pub cash_amount: Decimal,
     pub is_editable: bool,
     pub owner_name: Option<String>,
+    pub is_stocked: bool,
+    pub stocked_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

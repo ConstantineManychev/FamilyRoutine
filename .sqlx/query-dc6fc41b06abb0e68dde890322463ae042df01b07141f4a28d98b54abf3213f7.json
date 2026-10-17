@@ -1,0 +1,120 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT b.id, l.id AS lot_id, b.dish_id, b.family_id, b.title, b.cooked_ts, b.raw_g, b.cooked_g,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left_g!\",\n               b.kcal_100, b.prot_100, b.fat_100, b.carb_100, b.missing_count, l.cost, c.code AS \"curr_code?\", b.note\n        FROM cook_batches b\n        JOIN stock_lots l ON l.batch_id = b.id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE (b.owner_id = $1 OR b.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $1))\n          AND ($2::uuid IS NULL OR b.id = $2)\n          AND ($3::uuid IS NULL OR b.dish_id = $3)\n        ORDER BY b.cooked_ts, b.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "lot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "dish_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "cooked_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "raw_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "cooked_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "left_g!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "kcal_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "prot_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "fat_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "carb_100",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "missing_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 15,
+        "name": "curr_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 16,
+        "name": "note",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "dc6fc41b06abb0e68dde890322463ae042df01b07141f4a28d98b54abf3213f7"
+}

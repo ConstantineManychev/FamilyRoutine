@@ -12,6 +12,7 @@ import '../common/page_frames.dart';
 import '../planner/planner_screen.dart';
 import '../nutrition/nutrition_today_block.dart';
 import '../routine/family_timeline_card.dart';
+import '../stock/stock_today_block.dart';
 import '../study/study_today_block.dart';
 import '../training/next_workout_card.dart';
 import '../training/training_revision.dart';
@@ -55,6 +56,8 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
         ],
         const SizedBox(height: _blockGap),
         const NutritionTodayBlock(),
+        const SizedBox(height: _blockGap),
+        const StockTodayBlock(),
         const SizedBox(height: _blockGap),
         const NextWorkoutCard(),
         const SizedBox(height: _blockGap),

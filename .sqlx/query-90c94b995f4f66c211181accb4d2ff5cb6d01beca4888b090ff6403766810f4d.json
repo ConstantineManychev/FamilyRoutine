@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO stock_lots (\n                owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, receipt_id,\n                receipt_pos, added_by, acquired_ts\n            )\n            VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'receipt', $9, $10, $11, $12)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Uuid",
+        "Int2",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "90c94b995f4f66c211181accb4d2ff5cb6d01beca4888b090ff6403766810f4d"
+}

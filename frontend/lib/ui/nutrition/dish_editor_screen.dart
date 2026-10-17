@@ -9,6 +9,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../stock/stock_actions.dart';
 import 'amount_sheet.dart';
 import 'food_picker.dart';
 import 'meal_target.dart';
@@ -321,13 +322,14 @@ class _DishEditorScreenState extends ConsumerState<DishEditorScreen>
       }
       return;
     }
+    final batches = await dishBatches(api, dish.id);
     if (!mounted)
     {
       return;
     }
     final result = await showAmountSheet(
       context,
-      aTarget: AmountTarget.dish(dish),
+      aTarget: AmountTarget.dish(dish, aBatches: batches),
       aMealChoice: MealChoice(date: today, meals: meals, initial: defaultMealTarget(today, meals)),
       aPortions: dish.portionG != null ? 1 : null,
     );
@@ -495,6 +497,13 @@ class _DishEditorScreenState extends ConsumerState<DishEditorScreen>
     final title = _isNew ? 'nutrition.new_dish'.tr() : (_dish?.name ?? 'nutrition.dish'.tr());
     final dish = _dish;
     final actions = <Widget>[
+      if (dish != null)
+        IconButton(
+          key: const ValueKey('dish.cook'),
+          tooltip: 'stock.cook'.tr(),
+          onPressed: () => cookFlow(context, ref, null, aDishId: dish.id),
+          icon: const Icon(AppIcons.cookingPot),
+        ),
       if (dish != null)
         IconButton(tooltip: 'nutrition.add_to_diary'.tr(), onPressed: _addToDiary, icon: const Icon(AppIcons.plusCircle)),
       if (dish != null && dish.isEditable)

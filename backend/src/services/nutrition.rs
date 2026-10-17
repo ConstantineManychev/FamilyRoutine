@@ -31,6 +31,7 @@ const KCAL_PER_G_PROTEIN: f64 = 4.0;
 const KCAL_PER_G_FAT: f64 = 9.0;
 const KCAL_PER_G_CARB: f64 = 4.0;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Ingredient
 {
     pub per_100: Option<MacrosDto>,

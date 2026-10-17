@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.id, l.measure AS \"measure: StockMeasure\", l.qty, l.cost, i.piece_g,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left!\"\n        FROM stock_lots l\n        JOIN items i ON i.id = l.item_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND l.kind = 'item' AND l.item_id = $3\n        ORDER BY l.acquired_ts, l.created_ts, l.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "488141fd0e98e018d9795c40f80b0172da5a802b9b6000bffbb466d99f1afa19"
+}

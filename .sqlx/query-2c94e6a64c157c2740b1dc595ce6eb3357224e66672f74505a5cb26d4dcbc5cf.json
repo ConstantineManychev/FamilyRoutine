@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE stock_lots\n                    SET qty = $2, cost = $3, curr_id = $4, title = $5, acquired_ts = $6\n                    WHERE id = $1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Varchar",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2c94e6a64c157c2740b1dc595ce6eb3357224e66672f74505a5cb26d4dcbc5cf"
+}

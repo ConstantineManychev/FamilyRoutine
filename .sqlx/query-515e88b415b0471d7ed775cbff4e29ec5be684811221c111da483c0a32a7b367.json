@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM cook_batches b\n            WHERE b.id = $1\n              AND (b.owner_id = $2 OR b.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))\n        ) AS \"exists!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "515e88b415b0471d7ed775cbff4e29ec5be684811221c111da483c0a32a7b367"
+}

@@ -1,0 +1,87 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT name, type AS \"kind: ItemKind\", unit AS \"unit: ItemUnit\", net_qty,\n               net_measure AS \"net_measure: NetMeasure\", piece_g\n        FROM items WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "net_qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "net_measure: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "070b0e15dac1068d3c7ce16a3df4447e6603af955357b9a2a401c1848c346f46"
+}

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, owner_id, family_id, qty, cost FROM stock_lots WHERE batch_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "cost",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "9d5f0274501664291cfc8b42f77cdced1382a4b28d3d6c9d0f630e68565f46a3"
+}

@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.id, l.receipt_pos AS \"receipt_pos!\", l.item_id, l.measure AS \"measure: StockMeasure\", l.owner_id,\n               l.family_id, EXISTS (SELECT 1 FROM stock_moves m WHERE m.lot_id = l.id) AS \"is_touched!\"\n        FROM stock_lots l\n        WHERE l.receipt_id = $1 AND l.receipt_pos IS NOT NULL\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "receipt_pos!",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_touched!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "4f43143a806698b884437cf75e54aa9f495f3311e049b70d228031851da80c07"
+}

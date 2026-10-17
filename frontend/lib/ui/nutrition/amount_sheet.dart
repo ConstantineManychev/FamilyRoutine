@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/api_svc.dart';
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
@@ -15,6 +16,18 @@ const List<double> _portionPresets = [0.5, 1, 1.5, 2];
 
 enum AmountUnit { grams, portions }
 
+Future<List<CookBatch>> dishBatches(ApiSvc aApi, String aDishId) async
+{
+  try
+  {
+    return await aApi.getCookBatches(aDishId);
+  }
+  catch (_)
+  {
+    return const [];
+  }
+}
+
 class AmountTarget
 {
   final String title;
@@ -22,8 +35,16 @@ class AmountTarget
   final double? portionG;
   final bool isDish;
   final bool isMl;
+  final List<CookBatch> batches;
 
-  const AmountTarget({required this.title, required this.per100, this.portionG, this.isDish = false, this.isMl = false});
+  const AmountTarget({
+    required this.title,
+    required this.per100,
+    this.portionG,
+    this.isDish = false,
+    this.isMl = false,
+    this.batches = const [],
+  });
 
   factory AmountTarget.item(DictItemDto aItem) => AmountTarget(
         title: aItem.name,
@@ -32,7 +53,8 @@ class AmountTarget
         isMl: aItem.unit == ItemUnit.liter,
       );
 
-  factory AmountTarget.dish(Dish aDish) => AmountTarget(title: aDish.name, per100: aDish.per100, portionG: aDish.portionG, isDish: true);
+  factory AmountTarget.dish(Dish aDish, {List<CookBatch> aBatches = const []}) =>
+      AmountTarget(title: aDish.name, per100: aDish.per100, portionG: aDish.portionG, isDish: true, batches: aBatches);
 
   factory AmountTarget.entry(MealEntry aEntry) => AmountTarget(
         title: entryTitle(aEntry),
@@ -48,12 +70,14 @@ class AmountResult
   final MealTarget? target;
   final double? grams;
   final double? portions;
+  final String? batchId;
   final bool isDelete;
 
-  const AmountResult({this.target, this.grams, this.portions, this.isDelete = false});
+  const AmountResult({this.target, this.grams, this.portions, this.batchId, this.isDelete = false});
 
   Map<String, dynamic> toJson() => {
         if (portions != null) 'portions': amountText(portions) else 'grams': amountText(grams),
+        if (batchId != null) 'batch_id': batchId,
       };
 }
 
@@ -101,6 +125,7 @@ class AmountSheet extends StatefulWidget
 class _AmountSheetState extends State<AmountSheet>
 {
   late MealTarget? _meal = widget.mealChoice?.initial;
+  late String? _batchId = widget.target.batches.firstOrNull?.id;
   late AmountUnit _unit = widget.portions != null && widget.target.portionG != null ? AmountUnit.portions : AmountUnit.grams;
   late final TextEditingController _ctrl = TextEditingController(text: amountText(_initialValue()));
 
@@ -168,7 +193,50 @@ class _AmountSheetState extends State<AmountSheet>
       target: _meal,
       grams: _unit == AmountUnit.grams ? value : null,
       portions: _unit == AmountUnit.portions ? value : null,
+      batchId: _batchId,
     ));
+  }
+
+  Macros get _per100 => widget.target.batches.where((aBatch) => aBatch.id == _batchId).firstOrNull?.per100 ?? widget.target.per100;
+
+  Widget _batchPicker(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final locale = aContext.locale.toLanguageTag();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('stock.batch_choice'.tr(), style: TextStyle(fontWeight: FontWeight.w600, color: palette.inkSecondary)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            for (final batch in widget.target.batches)
+              ChoiceChip(
+                key: ValueKey('amount.batch.${batch.id}'),
+                showCheckmark: false,
+                avatar: const Icon(AppIcons.cookingPot, size: 16),
+                label: Text('stock.batch_chip'.tr(args: [
+                  DateFormat.MMMd(locale).format(batch.cookedTs),
+                  formatGrams(aContext, batch.leftG),
+                  formatAmount(aContext, batch.per100.kcal, aDigits: 0),
+                ])),
+                selected: _batchId == batch.id,
+                onSelected: (_) => setState(() => _batchId = batch.id),
+              ),
+            ChoiceChip(
+              key: const ValueKey('amount.batch.recipe'),
+              showCheckmark: false,
+              label: Text('stock.batch_recipe'.tr()),
+              selected: _batchId == null,
+              onSelected: (_) => setState(() => _batchId = null),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
   }
 
   String _portionUnitLabel() => widget.target.isDish ? 'nutrition.unit_portions'.tr() : 'nutrition.unit_pieces'.tr();
@@ -181,7 +249,8 @@ class _AmountSheetState extends State<AmountSheet>
     final target = widget.target;
     final portionG = target.portionG;
     final grams = _grams;
-    final preview = grams == null ? null : target.per100.forGrams(grams);
+    final per100 = _per100;
+    final preview = grams == null ? null : per100.forGrams(grams);
     final presets = _unit == AmountUnit.portions ? _portionPresets : _gramPresets;
     final choice = widget.mealChoice;
     final meal = _meal;
@@ -203,7 +272,7 @@ class _AmountSheetState extends State<AmountSheet>
                   children: [
                     Text(target.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text(per100Line(aContext, target.per100, aIsMl: target.isMl), style: TextStyle(color: palette.inkSecondary)),
+                    Text(per100Line(aContext, per100, aIsMl: target.isMl), style: TextStyle(color: palette.inkSecondary)),
                     if (portionG != null) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -212,6 +281,7 @@ class _AmountSheetState extends State<AmountSheet>
                       ),
                     ],
                     const SizedBox(height: 16),
+                    if (target.batches.isNotEmpty) _batchPicker(aContext),
                     if (portionG != null) ...[
                       SegmentedButton<AmountUnit>(
                         segments: [

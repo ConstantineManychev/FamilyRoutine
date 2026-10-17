@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.family_id AS \"family_id!\"\n        FROM stock_settings s\n        JOIN family_mems fm ON fm.family_id = s.family_id AND fm.user_id = s.user_id\n        WHERE s.user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "family_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "963fb50159cbea8aade8f261c18ad5586cae77903d3c5a4ff985a5c5950e0cbe"
+}

@@ -13,6 +13,7 @@ use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::item_handlers::{require_visible_items, resolve_new_item, MAX_ITEM_NAME_LEN};
 use crate::api::place_handlers::{learn_merchant_places, place_from_receipt, require_visible_place};
 use crate::api::recognize_handlers::alias_key;
+use crate::api::stock_handlers::{release_receipt_stock, sync_receipt_stock};
 use crate::api::tx_handlers::load_txs;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::require_account_editor;
@@ -41,6 +42,8 @@ struct ReceiptHead
     discount: Decimal,
     is_editable: bool,
     owner_name: Option<String>,
+    is_stocked: bool,
+    stocked_count: i64,
 }
 
 enum ItemRef
@@ -161,6 +164,7 @@ pub async fn delete_receipt(
     )
     .execute(&mut *tx)
     .await?;
+    release_receipt_stock(&mut tx, a_id).await?;
 
     sqlx::query!("DELETE FROM receipts WHERE id = $1", a_id)
         .execute(&mut *tx)
@@ -283,7 +287,7 @@ async fn save_receipt(
                 r#"
                 UPDATE receipts
                 SET receipt_ts = $2, merchant_id = $3, merchant_name = $4, place_id = $5, curr_id = $6,
-                    cash_account_id = $7, note = $8, place_addr_id = $9, discount = $10
+                    cash_account_id = $7, note = $8, place_addr_id = $9, discount = $10, is_stocked = $11
                 WHERE id = $1
                 "#,
                 id,
@@ -295,7 +299,8 @@ async fn save_receipt(
                 a_req.cash_account_id,
                 note,
                 place_addr_id,
-                discount
+                discount,
+                a_req.is_stocked
             )
             .execute(&mut *tx)
             .await?;
@@ -305,9 +310,9 @@ async fn save_receipt(
             r#"
             INSERT INTO receipts (
                 owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note, place_addr_id,
-                discount
+                discount, is_stocked
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
             "#,
             a_user_id,
@@ -319,7 +324,8 @@ async fn save_receipt(
             a_req.cash_account_id,
             note,
             place_addr_id,
-            discount
+            discount,
+            a_req.is_stocked
         )
         .fetch_one(&mut *tx)
         .await?,
@@ -382,6 +388,16 @@ async fn save_receipt(
             .await?;
         }
     }
+
+    let paid_share = if items_total > Decimal::ZERO
+    {
+        (items_total - discount) / items_total
+    }
+    else
+    {
+        Decimal::ONE
+    };
+    sync_receipt_stock(&mut tx, receipt_id, a_user_id, a_req.is_stocked, paid_share).await?;
 
     let paid_total = link_transactions(&mut tx, receipt_id, a_user_id, a_req.curr_id, &tx_ids).await?;
     learn_merchant_places(&mut tx, a_user_id, receipt_id, place_id, place_addr_id).await?;
@@ -628,7 +644,10 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
             r.note,
             r.discount,
             (r.owner_id = $2) AS "is_editable!",
-            CASE WHEN r.owner_id <> $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name
+            CASE WHEN r.owner_id <> $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,
+            r.is_stocked,
+            CASE WHEN r.owner_id = $2 THEN (SELECT COUNT(*) FROM stock_lots l WHERE l.receipt_id = r.id) ELSE 0 END
+                AS "stocked_count!"
         FROM receipts r
         JOIN users owner ON owner.id = r.owner_id
         JOIN currencies c ON c.id = r.curr_id
@@ -704,6 +723,8 @@ async fn load_receipt(a_conn: &mut PgConnection, a_id: Uuid, a_user_id: Uuid) ->
         rest_amount: money((paid_total - payable).max(Decimal::ZERO)),
         cash_amount: money((payable - paid_total).max(Decimal::ZERO)),
         is_editable: head.is_editable,
+        is_stocked: head.is_stocked,
+        stocked_count: head.stocked_count,
         owner_name: head.owner_name,
     })
 }

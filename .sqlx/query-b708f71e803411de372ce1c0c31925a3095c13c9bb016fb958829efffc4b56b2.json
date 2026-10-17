@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE stock_lots SET receipt_pos = NULL WHERE receipt_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b708f71e803411de372ce1c0c31925a3095c13c9bb016fb958829efffc4b56b2"
+}

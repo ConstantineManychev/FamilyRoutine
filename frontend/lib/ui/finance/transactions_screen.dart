@@ -11,6 +11,7 @@ import '../common/feedback.dart';
 import '../common/money.dart';
 import '../common/page_frames.dart';
 import 'finance_dialogs.dart';
+import 'finance_settings.dart';
 import 'wallet_scope.dart';
 import '../common/app_theme.dart';
 
@@ -60,6 +61,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   late DateTime? _to = widget.initialTo;
   Object? _loadError;
   bool _isLoading = false;
+  String? _convertTo;
+  List<String> _missingRates = const [];
 
   static const String _uncategorizedValue = 'none';
 
@@ -67,7 +70,31 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
   void initState()
   {
     super.initState();
-    _reload();
+    _init();
+  }
+
+  Future<void> _init() async
+  {
+    _convertTo = await loadConvertTo();
+    if (mounted)
+    {
+      await _reload();
+    }
+  }
+
+  void _openSettings(List<AccountDto> aWallets)
+  {
+    showConvertSheet(
+      context,
+      aConvertTo: _convertTo,
+      aWallets: aWallets,
+      aOnChanged: (aCode)
+      {
+        setState(() => _convertTo = aCode);
+        storeConvertTo(aCode);
+        _reload();
+      },
+    );
   }
 
   @override
@@ -98,6 +125,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             aIsUncategorized: _isUncategorized,
             aFrom: _from,
             aTo: _to,
+            aConvertTo: _convertTo,
           );
 
       if (!mounted)
@@ -109,6 +137,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       {
         _items = aIsReset ? page.items : [..._items, ...page.items];
         _cursor = page.nextCursor;
+        _missingRates = page.missingRates;
       });
     }
     catch (aError)
@@ -162,6 +191,12 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
           tooltip: 'finance.to_cash'.tr(),
           icon: const Icon(AppIcons.arrowLeftRight),
           onPressed: () => _openDialog(const TransferDialog()),
+        ),
+        IconButton(
+          key: const ValueKey('transactions.settings'),
+          tooltip: 'finance.list_settings'.tr(),
+          icon: Icon(AppIcons.settings, color: _convertTo == null ? null : aContext.colors.primary),
+          onPressed: () => _openSettings(wallets),
         ),
       ],
       child: Column(
@@ -224,6 +259,19 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
                     },
                   ),
                 ),
+                if (_convertTo != null)
+                  InputChip(
+                    key: const ValueKey('transactions.convert_chip'),
+                    avatar: const Icon(AppIcons.arrowLeftRight, size: 16),
+                    label: Text('finance.convert_short'.tr(args: [_convertTo!])),
+                    onPressed: () => _openSettings(wallets),
+                    onDeleted: ()
+                    {
+                      setState(() => _convertTo = null);
+                      storeConvertTo(null);
+                      _reload();
+                    },
+                  ),
                 if (_from != null || _to != null)
                   InputChip(
                     avatar: const Icon(AppIcons.calendar, size: 16),
@@ -241,6 +289,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
               ],
             ),
           ),
+          if (_missingRates.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(padding.left, 8, padding.right, 0),
+              child: Text(
+                'finance.missing_rates'.tr(args: [_missingRates.join(', ')]),
+                style: TextStyle(fontSize: 12, color: aContext.palette.warning),
+              ),
+            ),
           const SizedBox(height: 8),
           Expanded(child: _buildList(aContext)),
         ],
@@ -358,10 +414,27 @@ class TxTile extends StatelessWidget
       ),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: trailing ??
-          Text(
-            formatMoney(aContext, tx.amount, tx.currCode, aIsSigned: true),
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: amountColor),
-          ),
+          (tx.isConverted
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatMoney(aContext, tx.convertedAmount!, tx.convertedCurrCode!, aIsSigned: true),
+                      key: ValueKey('tx.converted.${tx.id}'),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: amountColor),
+                    ),
+                    Text(
+                      formatMoney(aContext, tx.amount, tx.currCode, aIsSigned: true),
+                      style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted),
+                    ),
+                  ],
+                )
+              : Text(
+                  formatMoney(aContext, tx.amount, tx.currCode, aIsSigned: true),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: amountColor),
+                )),
     );
 
     if (isFlat)

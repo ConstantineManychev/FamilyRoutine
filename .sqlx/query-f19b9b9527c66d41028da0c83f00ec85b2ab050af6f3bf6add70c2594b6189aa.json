@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT NULL::uuid AS family_id, NULL::text AS family_name, 0 AS \"rank!\",\n               (SELECT COUNT(*) FROM stock_lots l WHERE l.owner_id = $1\n                  AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)) AS \"lot_count!\"\n        UNION ALL\n        SELECT f.id, f.name, 1,\n               (SELECT COUNT(*) FROM stock_lots l WHERE l.family_id = f.id\n                  AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0))\n        FROM families f\n        JOIN family_mems fm ON fm.family_id = f.id AND fm.user_id = $1\n        ORDER BY 3, 2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "family_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "rank!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "lot_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f19b9b9527c66d41028da0c83f00ec85b2ab050af6f3bf6add70c2594b6189aa"
+}

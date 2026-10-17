@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, kcal, prot, fat, carb FROM items WHERE id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "carb",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5cf80ddc17d9d0dbb29581f1b0ec48455f39c34616471dbf15ad037e8353e5b6"
+}

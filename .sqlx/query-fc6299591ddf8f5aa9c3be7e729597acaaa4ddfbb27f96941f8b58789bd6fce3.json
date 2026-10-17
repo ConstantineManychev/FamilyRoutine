@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)\n        RETURNING id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
+  "query": "\n        UPDATE meal_entries\n        SET eaten_on = $2, status_mark_id = $3, title = $4, grams = $5, portions = $6, kcal = $7, prot = $8,\n            fat = $9, carb = $10\n        WHERE id = $1\n        RETURNING id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, batch_id, stock_short, created_ts\n        ",
   "describe": {
     "columns": [
       {
@@ -111,6 +111,16 @@
       },
       {
         "ordinal": 19,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
+        "name": "stock_short",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 21,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -119,34 +129,14 @@
       "Left": [
         "Uuid",
         "Date",
-        {
-          "Custom": {
-            "name": "meal_source_t",
-            "kind": {
-              "Enum": [
-                "item",
-                "dish",
-                "quick"
-              ]
-            }
-          }
-        },
-        "Uuid",
         "Uuid",
         "Varchar",
         "Numeric",
         "Numeric",
         "Numeric",
-        "Bool",
         "Numeric",
         "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Uuid"
+        "Numeric"
       ]
     },
     "nullable": [
@@ -169,8 +159,10 @@
       false,
       false,
       true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "e8130c1e7c6959cd720d1f0ecee909e0a39d62b7703e96899def0817757e0586"
+  "hash": "fc6299591ddf8f5aa9c3be7e729597acaaa4ddfbb27f96941f8b58789bd6fce3"
 }

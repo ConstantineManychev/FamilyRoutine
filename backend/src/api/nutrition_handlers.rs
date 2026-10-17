@@ -16,6 +16,9 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
+use crate::api::stock_handlers::{
+    consume_batch, consume_item, entry_store, load_batch, require_visible_batch, Consumer,
+};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text, contains_pattern};
 use crate::security::profile_access::profile_access;
@@ -26,13 +29,13 @@ use crate::services::nutrition::{
 use crate::state::AppState;
 
 const MAX_DISHES_PER_USER: i64 = 300;
-const MAX_INGREDIENTS: usize = 50;
+pub const MAX_INGREDIENTS: usize = 50;
 const MAX_DISH_NAME_LEN: usize = 100;
 const MAX_NOTE_LEN: usize = 500;
 const MAX_TITLE_LEN: usize = 200;
-const MAX_INGREDIENT_G: i64 = 20_000;
-const MAX_COOKED_G: i64 = 100_000;
-const COOKED_RATIO_LIMIT: i64 = 10;
+pub const MAX_INGREDIENT_G: i64 = 20_000;
+pub const MAX_COOKED_G: i64 = 100_000;
+pub const COOKED_RATIO_LIMIT: i64 = 10;
 const MAX_SERVING_G: i64 = 10_000;
 const MAX_SERVINGS: i32 = 100;
 const MAX_ENTRY_G: i64 = 10_000;
@@ -111,6 +114,8 @@ struct EntryRow
     fat: Decimal,
     carb: Decimal,
     status_mark_id: Option<Uuid>,
+    batch_id: Option<Uuid>,
+    stock_short: Option<Decimal>,
     created_ts: DateTime<Utc>,
 }
 
@@ -119,6 +124,7 @@ struct Snapshot
     source: MealSource,
     item_id: Option<Uuid>,
     dish_id: Option<Uuid>,
+    batch_id: Option<Uuid>,
     title: Option<String>,
     grams: Option<Decimal>,
     portions: Option<Decimal>,
@@ -164,12 +170,14 @@ impl From<EntryRow> for MealEntryDto
                 carb: a_row.carb.normalize(),
             },
             status_mark_id: a_row.status_mark_id,
+            batch_id: a_row.batch_id,
+            stock_short: a_row.stock_short.map(|value| value.normalize()),
             created_ts: a_row.created_ts,
         }
     }
 }
 
-fn item_per_100(
+pub fn item_per_100(
     a_kcal: Option<Decimal>,
     a_prot: Option<Decimal>,
     a_fat: Option<Decimal>,
@@ -184,7 +192,7 @@ fn item_per_100(
     })
 }
 
-fn bounded(a_value: Decimal, a_max: i64, a_field: &'static str) -> Result<Decimal, ApiError>
+pub fn bounded(a_value: Decimal, a_max: i64, a_field: &'static str) -> Result<Decimal, ApiError>
 {
     let value = amount(a_value);
     if value <= Decimal::ZERO || value > Decimal::from(a_max)
@@ -346,7 +354,7 @@ async fn query_dishes(
         .collect())
 }
 
-async fn load_dish(a_conn: &mut PgConnection, a_user_id: Uuid, a_id: Uuid) -> Result<DishDto, ApiError>
+pub async fn load_dish(a_conn: &mut PgConnection, a_user_id: Uuid, a_id: Uuid) -> Result<DishDto, ApiError>
 {
     query_dishes(a_conn, a_user_id, Some(a_id), None)
         .await?
@@ -414,7 +422,7 @@ fn clean_dish(a_req: SaveDishRequest) -> Result<CleanDish, ApiError>
     })
 }
 
-async fn require_food_items(a_conn: &mut PgConnection, a_item_ids: &[Uuid]) -> Result<(), ApiError>
+pub async fn require_food_items(a_conn: &mut PgConnection, a_item_ids: &[Uuid]) -> Result<(), ApiError>
 {
     let distinct: Vec<Uuid> = a_item_ids
         .iter()
@@ -626,6 +634,7 @@ fn quick_snapshot(a_quick: &QuickEntryRequest) -> Result<Snapshot, ApiError>
         source: MealSource::Quick,
         item_id: None,
         dish_id: None,
+        batch_id: None,
         title: clean_optional_text(a_quick.title.as_deref(), MAX_TITLE_LEN, "quick.title")?,
         grams: None,
         portions: None,
@@ -662,6 +671,7 @@ async fn item_snapshot(
         source: MealSource::Item,
         item_id: Some(a_item_id),
         dish_id: None,
+        batch_id: None,
         title: Some(item.name),
         grams: Some(grams),
         portions,
@@ -676,6 +686,7 @@ async fn dish_snapshot(
     a_conn: &mut PgConnection,
     a_user_id: Uuid,
     a_dish_id: Uuid,
+    a_batch_id: Option<Uuid>,
     a_grams: Option<Decimal>,
     a_portions: Option<Decimal>,
 ) -> Result<Snapshot, ApiError>
@@ -686,19 +697,78 @@ async fn dish_snapshot(
         other => other?,
     };
     let (grams, portions) = resolve_amount(a_grams, a_portions, dish.portion_g)?;
+    let (title, per_100) = match a_batch_id
+    {
+        Some(batch_id) =>
+        {
+            require_visible_batch(a_conn, batch_id, a_user_id).await?;
+            let batch = load_batch(a_conn, a_user_id, batch_id).await?;
+            if batch.dish_id != Some(a_dish_id)
+            {
+                return Err(ApiError::Validation("batch_id"));
+            }
+            (batch.title, batch.per_100)
+        }
+        None => (dish.name, dish.per_100),
+    };
 
     Ok(Snapshot {
         source: MealSource::Dish,
         item_id: None,
         dish_id: Some(a_dish_id),
-        title: Some(dish.name),
+        batch_id: a_batch_id,
+        title: Some(title),
         grams: Some(grams),
         portions,
         portion_g: portions.and(dish.portion_g),
         is_ml: false,
-        per_100: Some(dish.per_100),
-        total: for_grams(dish.per_100, grams),
+        per_100: Some(per_100),
+        total: for_grams(per_100, grams),
     })
+}
+
+async fn take_from_stock(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_entry_id: Uuid,
+    a_item_id: Option<Uuid>,
+    a_batch_id: Option<Uuid>,
+    a_grams: Option<Decimal>,
+) -> Result<Option<Decimal>, ApiError>
+{
+    let Some(grams) = a_grams
+    else
+    {
+        return Ok(None);
+    };
+    let short = match (a_item_id, a_batch_id)
+    {
+        (Some(item_id), None) =>
+        {
+            let store = entry_store(a_conn, a_entry_id, a_user_id).await?;
+            sqlx::query!("DELETE FROM stock_moves WHERE meal_entry_id = $1", a_entry_id)
+                .execute(&mut *a_conn)
+                .await?;
+            consume_item(a_conn, store, item_id, grams, Consumer::Entry(a_entry_id), a_user_id).await?
+        }
+        (None, Some(batch_id)) =>
+        {
+            sqlx::query!("DELETE FROM stock_moves WHERE meal_entry_id = $1", a_entry_id)
+                .execute(&mut *a_conn)
+                .await?;
+            consume_batch(a_conn, batch_id, grams, a_entry_id, a_user_id).await?
+        }
+        _ => return Ok(None),
+    };
+    let short = short.min(grams);
+    sqlx::query!(
+        "UPDATE meal_entries SET stock_short = $2 WHERE id = $1",
+        a_entry_id,
+        short
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    Ok(Some(short))
 }
 
 async fn require_day_capacity(
@@ -766,7 +836,7 @@ pub async fn mark_entries(
         r#"
         SELECT id, eaten_on, source AS "source: MealSource", item_id, dish_id, title,
                grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-               status_mark_id, created_ts
+               status_mark_id, batch_id, stock_short, created_ts
         FROM meal_entries
         WHERE user_id = $1 AND status_mark_id = $2
         ORDER BY created_ts, id
@@ -789,12 +859,26 @@ pub async fn create_entry(
     let mut tx = a_state.db.begin().await?;
     let snapshot = match (a_req.item_id, a_req.dish_id, a_req.quick.as_ref())
     {
-        (Some(item_id), None, None) => item_snapshot(&mut tx, item_id, a_req.grams, a_req.portions).await?,
+        (Some(item_id), None, None) if a_req.batch_id.is_none() =>
+        {
+            item_snapshot(&mut tx, item_id, a_req.grams, a_req.portions).await?
+        }
         (None, Some(dish_id), None) =>
         {
-            dish_snapshot(&mut tx, a_user.user_id, dish_id, a_req.grams, a_req.portions).await?
+            dish_snapshot(
+                &mut tx,
+                a_user.user_id,
+                dish_id,
+                a_req.batch_id,
+                a_req.grams,
+                a_req.portions,
+            )
+            .await?
         }
-        (None, None, Some(quick)) if a_req.grams.is_none() && a_req.portions.is_none() => quick_snapshot(quick)?,
+        (None, None, Some(quick)) if a_req.grams.is_none() && a_req.portions.is_none() && a_req.batch_id.is_none() =>
+        {
+            quick_snapshot(quick)?
+        }
         _ => return Err(ApiError::Validation("source")),
     };
     let mark_start = meal_mark_start(&mut tx, a_user.user_id, a_req.status_mark_id).await?;
@@ -807,12 +891,12 @@ pub async fn create_entry(
         r#"
         INSERT INTO meal_entries (
             user_id, eaten_on, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id
+            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, batch_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         RETURNING id, eaten_on, source AS "source: MealSource", item_id, dish_id, title,
                   grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-                  status_mark_id, created_ts
+                  status_mark_id, batch_id, stock_short, created_ts
         "#,
         a_user.user_id,
         date,
@@ -832,13 +916,28 @@ pub async fn create_entry(
         snapshot.total.prot,
         snapshot.total.fat,
         snapshot.total.carb,
-        a_req.status_mark_id
+        a_req.status_mark_id,
+        snapshot.batch_id
     )
     .fetch_one(&mut *tx)
     .await?;
+    let mut entry = MealEntryDto::from(row);
+    if entry.source != MealSource::Dish || entry.batch_id.is_some()
+    {
+        entry.stock_short = take_from_stock(
+            &mut tx,
+            a_user.user_id,
+            entry.id,
+            entry.item_id,
+            entry.batch_id,
+            entry.grams,
+        )
+        .await?
+        .map(|value| value.normalize());
+    }
 
     tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(row.into())))
+    Ok((StatusCode::CREATED, Json(entry)))
 }
 
 pub async fn update_entry(
@@ -855,7 +954,7 @@ pub async fn update_entry(
         r#"
         SELECT id, eaten_on, source AS "source: MealSource", item_id, dish_id, title,
                grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-               status_mark_id, created_ts
+               status_mark_id, batch_id, stock_short, created_ts
         FROM meal_entries
         WHERE id = $1 AND user_id = $2
         FOR UPDATE
@@ -906,7 +1005,7 @@ pub async fn update_entry(
         WHERE id = $1
         RETURNING id, eaten_on, source AS "source: MealSource", item_id, dish_id, title,
                   grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-                  status_mark_id, created_ts
+                  status_mark_id, batch_id, stock_short, created_ts
         "#,
         a_id,
         date,
@@ -921,9 +1020,23 @@ pub async fn update_entry(
     )
     .fetch_one(&mut *tx)
     .await?;
+    let mut entry = MealEntryDto::from(row);
+    if current.stock_short.is_some() && grams != current.grams
+    {
+        entry.stock_short = take_from_stock(
+            &mut tx,
+            a_user.user_id,
+            entry.id,
+            entry.item_id,
+            entry.batch_id,
+            entry.grams,
+        )
+        .await?
+        .map(|value| value.normalize());
+    }
 
     tx.commit().await?;
-    Ok(Json(row.into()))
+    Ok(Json(entry))
 }
 
 pub async fn delete_entry(
@@ -967,7 +1080,7 @@ pub async fn nutrition_day(
         r#"
         SELECT id, eaten_on, source AS "source: MealSource", item_id, dish_id, title,
                grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,
-               status_mark_id, created_ts
+               status_mark_id, batch_id, stock_short, created_ts
         FROM meal_entries
         WHERE user_id = $1 AND eaten_on = $2
         ORDER BY created_ts, id
@@ -1453,25 +1566,41 @@ pub async fn copy_meals(
         r#"
         INSERT INTO meal_entries (
             user_id, eaten_on, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, created_ts
+            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, batch_id, created_ts
         )
         SELECT user_id, $3, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, $4,
+               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, $4, batch_id,
                NOW() + (ROW_NUMBER() OVER (ORDER BY created_ts, id)) * INTERVAL '1 microsecond'
         FROM meal_entries
         WHERE user_id = $1 AND status_mark_id = $2
+        RETURNING id, source AS "source: MealSource", item_id, batch_id, grams
         "#,
         a_user.user_id,
         source.id,
         date,
         a_req.status_mark_id
     )
-    .execute(&mut *tx)
+    .fetch_all(&mut *tx)
     .await?;
+    for entry in &copied
+    {
+        if entry.source != MealSource::Dish || entry.batch_id.is_some()
+        {
+            take_from_stock(
+                &mut tx,
+                a_user.user_id,
+                entry.id,
+                entry.item_id,
+                entry.batch_id,
+                entry.grams,
+            )
+            .await?;
+        }
+    }
 
     tx.commit().await?;
     Ok(Json(CopyMealsDto {
-        copied: usize::try_from(copied.rows_affected()).unwrap_or_default(),
+        copied: copied.len(),
         source_start_ts: Some(source.start_ts),
     }))
 }

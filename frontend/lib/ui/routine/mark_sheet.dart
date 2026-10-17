@@ -385,20 +385,26 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                   const SizedBox(height: 20),
                   Text('routine.edit_mark'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
+                  DropdownButtonFormField<RoutineStatus>(
+                    key: ValueKey('mark.type.${mark.id}.${mark.status.name}'),
+                    initialValue: _status,
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: 'routine.event_kind'.tr(), border: const OutlineInputBorder(), isDense: true),
+                    items: [
                       for (final status in RoutineStatus.values)
-                        ChoiceChip(
+                        DropdownMenuItem(
                           key: ValueKey('mark.type.${status.name}'),
-                          showCheckmark: false,
-                          avatar: Icon(status.icon, size: 16, color: status.colorOf(aContext)),
-                          label: Text(status.label),
-                          selected: status == _status,
-                          onSelected: _isBusy ? null : (_) => setState(() => _status = status),
+                          value: status,
+                          child: Row(
+                            children: [
+                              Icon(status.icon, size: 18, color: status.colorOf(aContext)),
+                              const SizedBox(width: 10),
+                              Flexible(child: Text(status.label, overflow: TextOverflow.ellipsis)),
+                            ],
+                          ),
                         ),
                     ],
+                    onChanged: _isBusy ? null : (aStatus) => setState(() => _status = aStatus ?? _status),
                   ),
                   if (mark.status == RoutineStatus.meal && _status != RoutineStatus.meal && linkedCount > 0)
                     Padding(

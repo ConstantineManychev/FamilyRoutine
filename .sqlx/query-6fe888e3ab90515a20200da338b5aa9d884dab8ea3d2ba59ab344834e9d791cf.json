@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO stock_moves (lot_id, kind, qty, cost, meal_entry_id, batch_id, user_id)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "stock_move_t",
+            "kind": {
+              "Enum": [
+                "eaten",
+                "cooked",
+                "waste"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6fe888e3ab90515a20200da338b5aa9d884dab8ea3d2ba59ab344834e9d791cf"
+}

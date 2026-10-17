@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO receipts (\n                owner_id, receipt_ts, merchant_id, merchant_name, place_id, curr_id, cash_account_id, note, place_addr_id,\n                discount, is_stocked\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Numeric",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "db89dace5be4b76f875807a343dd1477bf1bd1ca96f2372a7188d6590bd1b4f8"
+}

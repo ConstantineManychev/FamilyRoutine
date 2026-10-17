@@ -254,7 +254,7 @@ async fn append_event(a_conn: &mut PgConnection, a_task_id: Uuid, a_event: NewEv
     .await?;
     if count >= MAX_EVENTS_PER_TASK
     {
-        return Err(ApiError::Conflict("TOO_MANY_EVENTS"));
+        return Err(ApiError::Conflict("TASK_LOG_FULL"));
     }
     sqlx::query!(
         r#"

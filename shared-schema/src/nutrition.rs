@@ -149,6 +149,8 @@ pub struct MealEntryDto
     pub per_100: Option<MacrosDto>,
     pub total: MacrosDto,
     pub status_mark_id: Option<Uuid>,
+    pub batch_id: Option<Uuid>,
+    pub stock_short: Option<Decimal>,
     pub created_ts: DateTime<Utc>,
 }
 
@@ -276,6 +278,8 @@ pub struct NewMealEntryRequest
     pub grams: Option<Decimal>,
     #[serde(default)]
     pub portions: Option<Decimal>,
+    #[serde(default)]
+    pub batch_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT curr_id, receipt_ts FROM receipts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "curr_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "receipt_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6ac2119a780dbe95044809de4e6b202ed4c1df376c1e36a93b02246d2b31b1f4"
+}

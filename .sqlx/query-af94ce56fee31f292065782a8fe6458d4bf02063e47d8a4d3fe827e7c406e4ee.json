@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) AS \"count!\"\n        FROM stock_lots\n        WHERE owner_id IS NOT DISTINCT FROM $1 AND family_id IS NOT DISTINCT FROM $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "af94ce56fee31f292065782a8fe6458d4bf02063e47d8a4d3fe827e7c406e4ee"
+}

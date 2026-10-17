@@ -1,0 +1,111 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT ri.pos, ri.item_id, ri.qty, ri.amount, i.name, i.type AS \"kind: ItemKind\", i.unit AS \"unit: ItemUnit\",\n               i.net_qty, i.net_measure AS \"net_measure: NetMeasure\", i.piece_g\n        FROM receipt_items ri\n        JOIN items i ON i.id = ri.item_id\n        WHERE ri.receipt_id = $1\n        ORDER BY ri.pos\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pos",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 1,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "amount",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "net_qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "net_measure: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "de3c86b57162a903272ee9352413e69342042c3a8d996bc0b10a6b0106a0be57"
+}

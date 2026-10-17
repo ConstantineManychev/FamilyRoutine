@@ -3,21 +3,22 @@ use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     AccountType, CreateTransferRequest, CreateTxRequest, MerchantDto, MerchantQuery, TransferDto, TxCategory, TxDto,
     TxPageDto, TxQuery, TxSource, TxType, UpdateTxRequest,
 };
-use sqlx::{PgConnection, PgExecutor};
+use sqlx::{PgConnection, PgExecutor, PgPool};
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
+use crate::api::stats_handlers::converter;
 use crate::banking::matching;
 use crate::domain::errors::ApiError;
 use crate::domain::finance_access::{require_account_editor, AccountAccess};
 use crate::domain::validation::{
-    check_nonzero_money, check_positive_money, clean_optional_text, contains_pattern, escape_like, MAX_NOTE_LEN,
+    check_nonzero_money, check_positive_money, clean_optional_text, contains_pattern, escape_like, money, MAX_NOTE_LEN,
     MAX_QUERY_LEN,
 };
 use crate::state::AppState;
@@ -86,7 +87,9 @@ pub async fn list_transactions(
                   AND can_see_scoped(lp.owner_id, lp.family_id, $1)
             ) AS "is_merchant_linked!",
             CASE WHEN a.user_id IS DISTINCT FROM $1 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name,
-            t.balance_doc_id
+            t.balance_doc_id,
+            NULL::numeric AS "converted_amount?",
+            NULL::text AS "converted_curr_code?"
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $1
         JOIN accounts a ON a.id = t.account_id
@@ -161,7 +164,57 @@ pub async fn list_transactions(
         None
     };
 
-    Ok(Json(TxPageDto { items, next_cursor }))
+    let missing_rates = convert_items(&a_state.db, &mut items, a_query.convert_to.as_deref()).await?;
+
+    Ok(Json(TxPageDto {
+        items,
+        next_cursor,
+        missing_rates,
+    }))
+}
+
+async fn convert_items(
+    a_db: &PgPool,
+    a_items: &mut [TxDto],
+    a_convert_to: Option<&str>,
+) -> Result<Vec<String>, ApiError>
+{
+    let mut converter = converter(a_db, a_convert_to).await?;
+    let Some((target_id, target_code)) = converter.target.as_ref().map(|target| (target.id, target.code.clone()))
+    else
+    {
+        return Ok(Vec::new());
+    };
+    let codes: Vec<String> = a_items.iter().map(|item| item.curr_code.clone()).collect();
+    let days: Vec<NaiveDate> = a_items.iter().map(|item| item.tx_ts.date_naive()).collect();
+    let rates = sqlx::query!(
+        r#"
+        SELECT r.ord AS "ord!", uah_rate(c.id, r.day) AS src_rate, uah_rate($3, r.day) AS dst_rate
+        FROM UNNEST($1::text[], $2::date[]) WITH ORDINALITY AS r(code, day, ord)
+        JOIN currencies c ON c.code = r.code
+        "#,
+        &codes,
+        &days,
+        target_id
+    )
+    .fetch_all(a_db)
+    .await?;
+    for rate in rates
+    {
+        let Some(item) = usize::try_from(rate.ord - 1)
+            .ok()
+            .and_then(|index| a_items.get_mut(index))
+        else
+        {
+            continue;
+        };
+        if let Some(amount) = converter.convert(item.amount, &item.curr_code, rate.src_rate, rate.dst_rate)
+        {
+            item.converted_amount = Some(money(amount));
+            item.converted_curr_code = Some(target_code.clone());
+        }
+    }
+    Ok(converter.missing.into_iter().collect())
 }
 
 pub async fn create_transaction(
@@ -587,7 +640,9 @@ where
                   AND can_see_scoped(lp.owner_id, lp.family_id, $2)
             ) AS "is_merchant_linked!",
             CASE WHEN a.user_id IS DISTINCT FROM $2 THEN owner.first_name || ' ' || owner.last_name END AS account_owner_name,
-            t.balance_doc_id
+            t.balance_doc_id,
+            NULL::numeric AS "converted_amount?",
+            NULL::text AS "converted_curr_code?"
         FROM transactions t
         JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2
         JOIN accounts a ON a.id = t.account_id

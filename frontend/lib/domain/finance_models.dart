@@ -451,7 +451,29 @@ class ManualPriceDto
       );
 }
 
-enum StatsBucket { hour, day }
+enum StatsBucket
+{
+  hour,
+  day,
+  week,
+  month;
+
+  DateTime endOf(DateTime aStart)
+  {
+    final start = aStart.toLocal();
+    return switch (this)
+    {
+      StatsBucket.hour => start.add(const Duration(hours: 1)),
+      StatsBucket.day => DateTime(start.year, start.month, start.day + 1),
+      StatsBucket.week => DateTime(start.year, start.month, start.day + 7),
+      StatsBucket.month => DateTime(start.year, start.month + 1),
+    };
+  }
+}
+
+enum ChartGrouping { day, week, month }
+
+enum ChartKind { bars, balance }
 
 class BankConnDto
 {
@@ -540,6 +562,8 @@ class TxDto
   final bool isMerchantLinked;
   final String? accountOwnerName;
   final String? balanceDocId;
+  final double? convertedAmount;
+  final String? convertedCurrCode;
 
   const TxDto({
     required this.id,
@@ -575,9 +599,12 @@ class TxDto
     this.isMerchantLinked = false,
     this.accountOwnerName,
     this.balanceDocId,
+    this.convertedAmount,
+    this.convertedCurrCode,
   });
 
   bool get isTransfer => transferId != null;
+  bool get isConverted => convertedAmount != null && convertedCurrCode != null && convertedCurrCode != currCode;
   bool get isManual => source == 'manual';
   bool get isReceiptCash => source == 'receipt_cash';
   bool get isOutflow => amount < 0;
@@ -620,6 +647,8 @@ class TxDto
         isMerchantLinked: aJson['is_merchant_linked'] as bool? ?? false,
         accountOwnerName: aJson['account_owner_name'] as String?,
         balanceDocId: aJson['balance_doc_id'] as String?,
+        convertedAmount: parseDecimalOrNull(aJson['converted_amount']),
+        convertedCurrCode: aJson['converted_curr_code'] as String?,
       );
 }
 
@@ -627,14 +656,16 @@ class TxPage
 {
   final List<TxDto> items;
   final String? nextCursor;
+  final List<String> missingRates;
 
-  const TxPage({required this.items, this.nextCursor});
+  const TxPage({required this.items, this.nextCursor, this.missingRates = const []});
 
   factory TxPage.fromJson(Map<String, dynamic> aJson) => TxPage(
         items: (aJson['items'] as List? ?? const [])
             .map((aItem) => TxDto.fromJson(aItem as Map<String, dynamic>))
             .toList(),
         nextCursor: aJson['next_cursor'] as String?,
+        missingRates: (aJson['missing_rates'] as List? ?? const []).cast<String>(),
       );
 }
 
@@ -877,6 +908,8 @@ class ReceiptDto
   final double cashAmount;
   final bool isEditable;
   final String? ownerName;
+  final bool isStocked;
+  final int stockedCount;
 
   const ReceiptDto({
     required this.id,
@@ -900,6 +933,8 @@ class ReceiptDto
     required this.cashAmount,
     this.isEditable = true,
     this.ownerName,
+    this.isStocked = true,
+    this.stockedCount = 0,
   });
 
   factory ReceiptDto.fromJson(Map<String, dynamic> aJson) => ReceiptDto(
@@ -928,6 +963,8 @@ class ReceiptDto
         cashAmount: parseDecimal(aJson['cash_amount']),
         isEditable: aJson['is_editable'] as bool? ?? true,
         ownerName: aJson['owner_name'] as String?,
+        isStocked: aJson['is_stocked'] as bool? ?? true,
+        stockedCount: (aJson['stocked_count'] as num?)?.toInt() ?? 0,
       );
 }
 

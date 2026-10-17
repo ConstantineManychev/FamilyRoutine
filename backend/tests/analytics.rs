@@ -347,6 +347,31 @@ async fn rates_convert_all_currencies_into_one(a_db: PgPool)
         vec![("EUR".to_string(), "1000.00".to_string(), "50.00".to_string())]
     );
 
+    let page = app
+        .call(
+            Method::GET,
+            "/api/transactions?limit=10&convert_to=EUR",
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(page.body["missing_rates"], json!([]));
+    let items = page.body["items"].as_array().unwrap();
+    let silpo = items.iter().find(|item| item["description"] == "Сільпо").unwrap();
+    assert_eq!(silpo["amount"], "-910.00");
+    assert_eq!(silpo["curr_code"], "UAH");
+    assert_eq!(silpo["converted_amount"], "-20.00");
+    assert_eq!(silpo["converted_curr_code"], "EUR");
+    assert!(items.iter().all(|item| item["converted_curr_code"] == "EUR"));
+    let plain = app
+        .call(Method::GET, "/api/transactions?limit=10", Some(&alice.token), None)
+        .await;
+    assert!(plain.body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["converted_amount"].is_null()));
+
     let in_uah = stats(&app, &alice, "categories", "&convert_to=UAH").await;
     let series = &in_uah["series"][0];
     assert_eq!(series["curr_code"], "UAH");
@@ -370,6 +395,103 @@ async fn rates_convert_all_currencies_into_one(a_db: PgPool)
         )
         .await;
     assert_eq!(unknown.body["field"], "convert_to");
+}
+
+async fn insert_at(a_db: &PgPool, a_account: Uuid, a_amount: &str, a_ts: &str)
+{
+    sqlx::query(
+        r#"
+        INSERT INTO transactions (user_id, account_id, curr_id, amount, tx_type, tx_ts, ext_id, source, rule_key)
+        SELECT a.user_id, a.id, a.curr_id, $2,
+               CASE WHEN $2 > 0 THEN 'income'::tx_type_t ELSE 'expense'::tx_type_t END,
+               $3::timestamptz, gen_random_uuid()::text, 'bank', ''
+        FROM accounts a WHERE a.id = $1
+        "#,
+    )
+    .bind(a_account)
+    .bind(Decimal::from_str(a_amount).unwrap())
+    .bind(a_ts)
+    .execute(a_db)
+    .await
+    .unwrap();
+}
+
+fn points(a_body: &Value) -> Vec<(String, String, String)>
+{
+    a_body["series"][0]["points"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|point| {
+            (
+                point["ts"].as_str().unwrap()[..10].to_string(),
+                point["income"].as_str().unwrap().to_string(),
+                point["expense"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect()
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn cashflow_groups_by_calendar_weeks_and_months(a_db: PgPool)
+{
+    let app = TestApp::new(a_db.clone());
+    let alice = app.user("alice@example.com").await;
+    let card = wallet(&app, &alice, "Card", "UAH", "card").await;
+    insert_at(&a_db, card, "-100.00", "2026-01-05T10:00:00Z").await;
+    insert_at(&a_db, card, "-50.00", "2026-01-11T22:00:00Z").await;
+    insert_at(&a_db, card, "300.00", "2026-01-12T08:00:00Z").await;
+    insert_at(&a_db, card, "-20.00", "2026-02-03T12:00:00Z").await;
+    let range = "from=2026-01-01T00:00:00Z&to=2026-03-01T00:00:00Z";
+
+    let weekly = app
+        .call(
+            Method::GET,
+            &format!("/api/stats/cashflow?bucket=week&{range}"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(weekly.status, StatusCode::OK, "{}", weekly.body);
+    let weeks = points(&weekly.body);
+    assert_eq!(weeks[0].0, "2025-12-29");
+    assert_eq!(
+        weeks[1],
+        ("2026-01-05".to_string(), "0.00".to_string(), "150.00".to_string())
+    );
+    assert_eq!(
+        weeks[2],
+        ("2026-01-12".to_string(), "300.00".to_string(), "0.00".to_string())
+    );
+    assert_eq!(weeks.len(), 9);
+
+    let monthly = app
+        .call(
+            Method::GET,
+            &format!("/api/stats/cashflow?bucket=month&{range}"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    assert_eq!(
+        points(&monthly.body),
+        vec![
+            ("2026-01-01".to_string(), "300.00".to_string(), "150.00".to_string()),
+            ("2026-02-01".to_string(), "0.00".to_string(), "20.00".to_string()),
+        ]
+    );
+
+    let shifted = app
+        .call(
+            Method::GET,
+            &format!("/api/stats/cashflow?bucket=week&{range}&tz_offset_min=180"),
+            Some(&alice.token),
+            None,
+        )
+        .await;
+    let shifted_weeks = points(&shifted.body);
+    assert_eq!(shifted_weeks[2].1, "300.00");
+    assert_eq!(shifted_weeks[2].2, "50.00");
 }
 
 #[sqlx::test(migrations = "./migrations")]

@@ -245,7 +245,11 @@ void main()
     final save = find.byKey(const ValueKey('mark.save'));
     expect(aTester.widget<ElevatedButton>(save).onPressed, isNull);
 
-    await aTester.tap(find.byKey(const ValueKey('mark.type.leisure')));
+    final kind = find.byType(DropdownButtonFormField<RoutineStatus>);
+    expect(find.descendant(of: kind, matching: find.text('Event type')), findsOneWidget);
+    await aTester.tap(kind);
+    await aTester.pumpAndSettle();
+    await aTester.tap(find.byKey(const ValueKey('mark.type.leisure')).last);
     await aTester.pumpAndSettle();
     expect(find.text('Diary entries stay in the food diary but are unlinked from this block.'), findsOneWidget);
     expect(aTester.widget<ElevatedButton>(save).onPressed, isNotNull);
@@ -288,7 +292,7 @@ void main()
     expect(find.byKey(const ValueKey('mark.open_workout')), findsOneWidget);
     expect(find.byKey(const ValueKey('mark.save')), findsNothing);
     expect(find.byKey(const ValueKey('mark.delete')), findsNothing);
-    expect(find.byKey(const ValueKey('mark.type.work')), findsNothing);
+    expect(find.byType(DropdownButtonFormField<RoutineStatus>), findsNothing);
   });
 
   testWidgets('hidden member details explain why nothing is shown', (aTester) async

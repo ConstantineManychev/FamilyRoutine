@@ -185,6 +185,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   Object? _loadError;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isStocked = true;
 
   bool get _isEdit => widget.receiptId != null;
 
@@ -291,6 +292,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     _cashAccountId = aReceipt.cashAccountId;
     _isCashChosen = true;
     _noteCtrl.text = aReceipt.note ?? '';
+    _isStocked = aReceipt.isStocked;
     _discountCtrl.text = _discountText(aReceipt.discount);
     _txs = [...aReceipt.txs];
     for (final row in _rows)
@@ -412,6 +414,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'items': items,
         'tx_ids': _txs.map((aTx) => aTx.id).toList(),
         'discount': moneyWire(discount),
+        'is_stocked': _isStocked,
         if (_pendingPlace() != null) 'new_place': {..._pendingPlace()!.toJson(), 'family_id': familyId},
       });
 
@@ -741,6 +744,20 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           maxLines: 2,
           inputFormatters: [LengthLimitingTextInputFormatter(500)],
           decoration: InputDecoration(labelText: 'finance.note'.tr(), border: const OutlineInputBorder()),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          key: const ValueKey('receipt.stocked'),
+          contentPadding: EdgeInsets.zero,
+          value: _isStocked,
+          onChanged: (aValue) => setState(() => _isStocked = aValue),
+          title: Text('stock.receipt_switch'.tr()),
+          subtitle: Text(
+            _saved != null && _saved!.isStocked && _saved!.stockedCount > 0
+                ? 'stock.receipt_stocked'.plural(_saved!.stockedCount)
+                : 'stock.receipt_switch_hint'.tr(),
+            style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted),
+          ),
         ),
         if (_saved != null) const SizedBox(height: 24),
       ],

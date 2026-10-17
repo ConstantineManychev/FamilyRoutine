@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../routine/routine_style.dart';
+import '../stock/stock_format.dart';
 
 final StateProvider<int> nutritionRevisionProv = StateProvider<int>((aRef) => 0);
 
@@ -12,6 +13,7 @@ void notifyNutritionChanged(WidgetRef aRef)
 {
   aRef.read(nutritionRevisionProv.notifier).state++;
   aRef.read(routineRevisionProv.notifier).state++;
+  aRef.read(stockRevisionProv.notifier).state++;
 }
 
 String mealLabel(MealKind aKind) => switch (aKind)
@@ -117,6 +119,16 @@ String entryAmount(BuildContext aContext, MealEntry aEntry)
   final count = formatAmount(aContext, portions, aDigits: 2);
   final unit = aEntry.source == MealSource.dish ? 'nutrition.portions_value' : 'nutrition.pieces_value';
   return '${unit.tr(args: [count])} · $weight';
+}
+
+String? entryStockNote(BuildContext aContext, MealEntry aEntry)
+{
+  final short = aEntry.stockShort;
+  if (short != null && short > 0)
+  {
+    return 'stock.entry_short'.tr(args: [formatGrams(aContext, short, aIsMl: aEntry.isMl)]);
+  }
+  return aEntry.batchId == null ? null : 'stock.entry_batch'.tr();
 }
 
 String normGapText(List<NormGap> aGaps)

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO stock_moves (lot_id, kind, qty, cost, reason, note, user_id)\n        VALUES ($1, 'waste', $2, $3, $4, $5, $6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "waste_reason_t",
+            "kind": {
+              "Enum": [
+                "spoiled",
+                "leftovers",
+                "other"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8013a3911e0e48cba7e5992adc3dbbf81fea21cd6ca7b7aaaf213e4c49f50fd4"
+}

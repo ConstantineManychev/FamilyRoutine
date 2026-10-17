@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use axum::extract::State;
 use axum::Json;
-use chrono::{DateTime, Duration, DurationRound, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, Datelike, Duration, DurationRound, Months, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     CashflowDto, CashflowPointDto, CashflowQuery, CashflowSeriesDto, CategoryAmountDto, CategoryQuery,
     CategorySeriesDto, CategoryStatsDto, FlowMode, StatsBucket, TxCategory,
 };
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiQuery, AuthUser};
@@ -19,16 +20,16 @@ const MAX_TZ_OFFSET_MIN: i32 = 14 * 60;
 const MAX_HOUR_RANGE_DAYS: i64 = 31;
 const MAX_DAY_RANGE_DAYS: i64 = 3 * 366;
 
-struct Target
+pub struct Target
 {
-    id: Uuid,
-    code: String,
+    pub id: Uuid,
+    pub code: String,
 }
 
-struct Converter
+pub struct Converter
 {
-    target: Option<Target>,
-    missing: BTreeSet<String>,
+    pub target: Option<Target>,
+    pub missing: BTreeSet<String>,
 }
 
 impl Converter
@@ -40,7 +41,7 @@ impl Converter
             .map_or_else(|| a_curr_code.to_string(), |target| target.code.clone())
     }
 
-    fn convert(
+    pub fn convert(
         &mut self,
         a_amount: Decimal,
         a_curr_code: &str,
@@ -71,6 +72,37 @@ impl Converter
     }
 }
 
+fn bucket_start(a_ts: NaiveDateTime, a_bucket: StatsBucket) -> Result<NaiveDateTime, ApiError>
+{
+    let date = a_ts.date();
+    let start = match a_bucket
+    {
+        StatsBucket::Hour =>
+        {
+            return a_ts
+                .duration_trunc(Duration::hours(1))
+                .map_err(|_| ApiError::Validation("range"))
+        }
+        StatsBucket::Day => date,
+        StatsBucket::Week => date - Duration::days(i64::from(date.weekday().num_days_from_monday())),
+        StatsBucket::Month => date.with_day(1).ok_or(ApiError::Validation("range"))?,
+    };
+    Ok(start.and_time(NaiveTime::MIN))
+}
+
+fn next_bucket(a_ts: NaiveDateTime, a_bucket: StatsBucket) -> Result<NaiveDateTime, ApiError>
+{
+    match a_bucket
+    {
+        StatsBucket::Hour => Ok(a_ts + Duration::hours(1)),
+        StatsBucket::Day => Ok(a_ts + Duration::days(1)),
+        StatsBucket::Week => Ok(a_ts + Duration::days(7)),
+        StatsBucket::Month => a_ts
+            .checked_add_months(Months::new(1))
+            .ok_or(ApiError::Validation("range")),
+    }
+}
+
 pub async fn cashflow(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -79,14 +111,14 @@ pub async fn cashflow(
 {
     check_tz(a_query.tz_offset_min)?;
 
-    let (step, unit, max_range) = match a_query.bucket
+    let (unit, max_range) = match a_query.bucket
     {
-        StatsBucket::Hour => (Duration::hours(1), "hour", Duration::days(MAX_HOUR_RANGE_DAYS)),
-        StatsBucket::Day => (Duration::days(1), "day", Duration::days(MAX_DAY_RANGE_DAYS)),
+        StatsBucket::Hour => ("hour", Duration::days(MAX_HOUR_RANGE_DAYS)),
+        StatsBucket::Day | StatsBucket::Week | StatsBucket::Month => ("day", Duration::days(MAX_DAY_RANGE_DAYS)),
     };
     check_range(a_query.from, a_query.to, max_range)?;
 
-    let mut converter = converter(&a_state, a_query.convert_to.as_deref()).await?;
+    let mut converter = converter(&a_state.db, a_query.convert_to.as_deref()).await?;
     let target_id = converter.target.as_ref().map(|target| target.id);
     let offset = Duration::minutes(i64::from(a_query.tz_offset_min));
 
@@ -144,7 +176,7 @@ pub async fn cashflow(
         let slot = by_currency
             .entry(converter.output_code(&row.curr_code))
             .or_default()
-            .entry(row.bucket)
+            .entry(bucket_start(row.bucket, a_query.bucket)?)
             .or_default();
         slot.0 += income;
         slot.1 += expense;
@@ -157,9 +189,7 @@ pub async fn cashflow(
 
     let local_from = (a_query.from + offset).naive_utc();
     let local_to = (a_query.to + offset).naive_utc();
-    let first_bucket = local_from
-        .duration_trunc(step)
-        .map_err(|_| ApiError::Validation("range"))?;
+    let first_bucket = bucket_start(local_from, a_query.bucket)?;
 
     let series = by_currency
         .into_iter()
@@ -175,17 +205,17 @@ pub async fn cashflow(
                     income: money(income),
                     expense: money(expense),
                 });
-                cursor += step;
+                cursor = next_bucket(cursor, a_query.bucket)?;
             }
 
-            CashflowSeriesDto {
+            Ok(CashflowSeriesDto {
                 income_total: money(points.iter().map(|point| point.income).sum()),
                 expense_total: money(points.iter().map(|point| point.expense).sum()),
                 curr_code,
                 points,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiError>>()?;
 
     Ok(Json(CashflowDto {
         bucket: a_query.bucket,
@@ -203,7 +233,7 @@ pub async fn categories(
     check_tz(a_query.tz_offset_min)?;
     check_range(a_query.from, a_query.to, Duration::days(MAX_DAY_RANGE_DAYS))?;
 
-    let mut converter = converter(&a_state, a_query.convert_to.as_deref()).await?;
+    let mut converter = converter(&a_state.db, a_query.convert_to.as_deref()).await?;
     let target_id = converter.target.as_ref().map(|target| target.id);
 
     let rows = sqlx::query!(
@@ -308,7 +338,7 @@ pub async fn categories(
     }))
 }
 
-async fn converter(a_state: &AppState, a_convert_to: Option<&str>) -> Result<Converter, ApiError>
+pub async fn converter(a_db: &PgPool, a_convert_to: Option<&str>) -> Result<Converter, ApiError>
 {
     let target = match a_convert_to.map(str::trim).filter(|code| !code.is_empty())
     {
@@ -316,7 +346,7 @@ async fn converter(a_state: &AppState, a_convert_to: Option<&str>) -> Result<Con
         {
             let code = code.to_ascii_uppercase();
             let id = sqlx::query_scalar!("SELECT id FROM currencies WHERE code = $1", code)
-                .fetch_optional(&a_state.db)
+                .fetch_optional(a_db)
                 .await?
                 .ok_or(ApiError::Validation("convert_to"))?;
             Some(Target { id, code })

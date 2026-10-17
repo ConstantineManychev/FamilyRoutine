@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
@@ -16,6 +15,7 @@ import '../finance/cashflow_chart.dart';
 import '../finance/category_view.dart';
 import '../finance/finance_dialogs.dart';
 import '../finance/finance_filter.dart';
+import '../finance/finance_settings.dart';
 import '../finance/transactions_screen.dart';
 import '../wallets/bank_conns_section.dart';
 import '../wallets/wallets_screen.dart';
@@ -24,8 +24,6 @@ const int _blockLimit = 5;
 const double _blockGap = 16;
 const double _filterBarHeight = 56;
 const String _modePref = 'finance.mode';
-const String _convertPref = 'finance.convert_to';
-const String _isConvertPref = 'finance.is_convert';
 
 class FinanceTab extends ConsumerStatefulWidget
 {
@@ -38,6 +36,8 @@ class FinanceTab extends ConsumerStatefulWidget
 class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAliveClientMixin
 {
   FinanceFilter _filter = const FinanceFilter();
+  ChartKind _chartKind = ChartKind.bars;
+  List<String> _txMissingRates = const [];
   CashflowData? _cashflow;
   CategoryStats? _categories;
   List<TxDto>? _txs;
@@ -55,39 +55,35 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
     _restore();
   }
 
-  Future<SharedPreferences?> _prefs() async
-  {
-    try
-    {
-      return await SharedPreferences.getInstance();
-    }
-    on Exception
-    {
-      return null;
-    }
-  }
-
   Future<void> _restore() async
   {
-    final prefs = await _prefs();
-    if (prefs != null)
-    {
-      final mode = prefs.getString(_modePref) == FlowMode.turnover.name ? FlowMode.turnover : FlowMode.net;
-      final isConverting = prefs.getBool(_isConvertPref) ?? false;
-      final code = prefs.getString(_convertPref) ?? defaultConvertCode;
-      _filter = _filter.copyWith(mode: mode, convertTo: () => isConverting ? code : null);
-    }
+    final prefs = await financePrefs();
+    final convertTo = await loadConvertTo();
+    final chart = await loadChartSettings();
+    final mode = prefs?.getString(_modePref) == FlowMode.turnover.name ? FlowMode.turnover : FlowMode.net;
+    _filter = _filter.copyWith(mode: mode, convertTo: () => convertTo, grouping: chart.grouping);
+    _chartKind = chart.kind;
     await _load();
   }
 
   Future<void> _store() async
   {
-    final prefs = await _prefs();
+    final prefs = await financePrefs();
     await prefs?.setString(_modePref, _filter.mode.name);
-    await prefs?.setBool(_isConvertPref, _filter.convertTo != null);
-    if (_filter.convertTo != null)
+    await storeConvertTo(_filter.convertTo);
+    await storeChartSettings(ChartSettings(grouping: _filter.grouping, kind: _chartKind));
+  }
+
+  Future<void> _syncConvert() async
+  {
+    final convertTo = await loadConvertTo();
+    if (mounted && convertTo != _filter.convertTo)
     {
-      await prefs?.setString(_convertPref, _filter.convertTo!);
+      setState(()
+      {
+        _filter = _filter.copyWith(convertTo: () => convertTo);
+        _filterVersion++;
+      });
     }
   }
 
@@ -134,6 +130,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
           aFrom: from,
           aTo: to,
           aLimit: _blockLimit,
+          aConvertTo: filter.convertTo,
         ),
       ]);
       if (!mounted || generation != _generation)
@@ -146,6 +143,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
         _cashflow = results[0] as CashflowData;
         _categories = results[1] as CategoryStats;
         _txs = (results[2] as TxPage).items;
+        _txMissingRates = (results[2] as TxPage).missingRates;
       });
     }
     catch (aError)
@@ -196,6 +194,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
       ref
         ..invalidate(walletsProv)
         ..invalidate(receiptsProv);
+      await _syncConvert();
       await _load(aIsReset: false);
     }
   }
@@ -211,6 +210,46 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
   }
 
   Future<void> _connectBank() => connectBank(context, ref);
+
+  void _openPeriod(DateTime aFrom, DateTime aTo)
+  {
+    _push('/app/transactions', aQuery: {
+      ..._filter.scope.query,
+      'from': aFrom.toUtc().toIso8601String(),
+      'to': aTo.toUtc().toIso8601String(),
+    });
+  }
+
+  void _openChartSettings()
+  {
+    showChartSettingsSheet(
+      context,
+      aSettings: ChartSettings(grouping: _filter.grouping, kind: _chartKind),
+      aOnChanged: (aSettings)
+      {
+        final isRegrouped = aSettings.grouping != _filter.grouping;
+        setState(() => _chartKind = aSettings.kind);
+        if (isRegrouped)
+        {
+          _setFilter(_filter.copyWith(grouping: aSettings.grouping));
+        }
+        else
+        {
+          _store();
+        }
+      },
+    );
+  }
+
+  void _openConvertSettings(List<AccountDto> aWallets)
+  {
+    showConvertSheet(
+      context,
+      aConvertTo: _filter.convertTo,
+      aWallets: aWallets,
+      aOnChanged: (aCode) => _setFilter(_filter.copyWith(convertTo: () => aCode)),
+    );
+  }
 
   void _openCategory(TxCategory? aCategory)
   {
@@ -257,7 +296,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
                 const SizedBox(height: _blockGap),
                 _buildReceipts(aContext),
                 const SizedBox(height: _blockGap),
-                _buildTransactions(aContext),
+                _buildTransactions(aContext, wallets),
                 const SizedBox(height: _blockGap),
                 _buildCashflow(aContext),
                 const SizedBox(height: _blockGap),
@@ -397,7 +436,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildTransactions(BuildContext aContext)
+  Widget _buildTransactions(BuildContext aContext, List<AccountDto> aWallets)
   {
     final txs = _txs;
 
@@ -406,6 +445,14 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
       onAdd: () => _openDialog(const CashEntryDialog(isIncome: true)),
       addTooltip: 'finance.cash_entry'.tr(),
       onExpand: () => _push('/app/transactions', aQuery: _filter.query),
+      actions: [
+        IconButton(
+          key: const ValueKey('finance.tx_settings'),
+          tooltip: 'finance.list_settings'.tr(),
+          icon: const Icon(AppIcons.settings, size: 20),
+          onPressed: () => _openConvertSettings(aWallets),
+        ),
+      ],
       child: _error != null
           ? ErrorRetry(error: _error!, onRetry: _load)
           : txs == null
@@ -414,6 +461,7 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
                   ? BlockEmpty('finance.no_transactions'.tr())
                   : Column(
                       children: [
+                        _missingRates(aContext, _txMissingRates),
                         for (final tx in txs) TxTile(tx: tx, isFlat: true, onTap: () => _openDialog(TxDetailDialog(tx: tx))),
                       ],
                     ),
@@ -493,13 +541,26 @@ class _FinanceTabState extends ConsumerState<FinanceTab> with AutomaticKeepAlive
                 key: ValueKey('cashflow:$code:${_filter.bucket.name}:$_filterVersion'),
                 series: data.series.firstWhere((aSeries) => aSeries.currCode == code),
                 bucket: _filter.bucket,
+                kind: _chartKind,
+                onOpenPeriod: _openPeriod,
               ),
             ),
         ],
       );
     }
 
-    return BlockCard(title: 'finance.cashflow'.tr(), child: content);
+    return BlockCard(
+      title: 'finance.cashflow'.tr(),
+      actions: [
+        IconButton(
+          key: const ValueKey('finance.chart_settings'),
+          tooltip: 'finance.chart_settings'.tr(),
+          icon: const Icon(AppIcons.settings, size: 20),
+          onPressed: _openChartSettings,
+        ),
+      ],
+      child: content,
+    );
   }
 
   Widget _buildCategories(BuildContext aContext)

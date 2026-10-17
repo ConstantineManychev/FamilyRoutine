@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.owner_id, l.family_id, l.source AS \"source: StockSource\", l.batch_id\n        FROM stock_lots l\n        WHERE l.id = $1\n          AND (l.owner_id = $2 OR l.family_id IN (SELECT family_id FROM family_mems WHERE user_id = $2))\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "source: StockSource",
+        "type_info": {
+          "Custom": {
+            "name": "stock_source_t",
+            "kind": {
+              "Enum": [
+                "receipt",
+                "manual",
+                "cooked"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "1268e1cb54f3fda8f4b52f943a41d5280cbc12a461e7da23511682d539a69dd5"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO stock_settings (user_id, family_id) VALUES ($1, $2)\n            ON CONFLICT (user_id) DO UPDATE SET family_id = EXCLUDED.family_id, updated_ts = NOW()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b4c128a87b83e7dbcab07629abb04cf8cc4b78b95f2e172d16cab63fafbda898"
+}

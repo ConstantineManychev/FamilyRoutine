@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND status_mark_id = $2\n        ORDER BY created_ts, id\n        ",
+  "query": "\n        SELECT id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, batch_id, stock_short, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND status_mark_id = $2\n        ORDER BY created_ts, id\n        ",
   "describe": {
     "columns": [
       {
@@ -111,6 +111,16 @@
       },
       {
         "ordinal": 19,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
+        "name": "stock_short",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 21,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -141,8 +151,10 @@
       false,
       false,
       true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "33a9ab3f920c3d93dc27e75c4f9ac60b45c36516c163347956567c1903d893a4"
+  "hash": "740628093cf0dab8248870aab2827719d5e5338cdb26b4f1e2f9c435c7680fb4"
 }

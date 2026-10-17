@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM stock_moves WHERE meal_entry_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "66ca62c56d1c6b799d3aaf6d976ab73c66a4d55a922d0ae91fddb51b60d25a07"
+}

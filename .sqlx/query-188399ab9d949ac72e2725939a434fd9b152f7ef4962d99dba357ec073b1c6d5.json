@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO stock_lots (\n            owner_id, family_id, kind, batch_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts\n        )\n        VALUES ($1, $2, 'dish', $3, $4, 'g', $5, $6, $7, 'cooked', $8, NOW())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "188399ab9d949ac72e2725939a434fd9b152f7ef4962d99dba357ec073b1c6d5"
+}

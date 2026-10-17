@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.curr_id AS \"curr_id!\", SUM(m.cost) AS \"cost!\"\n        FROM stock_moves m\n        JOIN stock_lots l ON l.id = m.lot_id\n        WHERE m.batch_id = $1 AND m.cost IS NOT NULL\n        GROUP BY l.curr_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "curr_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "cost!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "ae265d363f6986785b99d65055cb391fc6b98cddb639e703a1d6461e25e9cfe2"
+}

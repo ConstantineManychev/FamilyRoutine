@@ -15,8 +15,8 @@ const Map<String, List<String>> dynamicKeys = {
     'AI_QUOTA_EXCEEDED', 'AI_SERVER_UNAVAILABLE', 'AI_KEY_MISSING', 'AI_OWN_KEYS_DISABLED', 'AI_NO_MODELS',
     'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE', 'SESSION_ACTIVE', 'SESSION_FINISHED', 'TOO_MANY_PROGRAMS',
     'TOO_MANY_DISHES', 'TOO_MANY_ENTRIES', 'CAT_EXISTS', 'CAT_IN_USE', 'CAT_HAS_CHILDREN', 'TOO_MANY_CATS', 'MARK_OVERLAP',
-    'TASK_DONE', 'TASK_OPEN', 'TASK_ARCHIVED', 'TOO_MANY_TASKS', 'TOO_MANY_EVENTS', 'TOPIC_TOO_DEEP', 'TOPIC_CYCLE',
-    'TOPIC_HAS_CHILDREN', 'TOO_MANY_TOPICS', 'TOO_MANY_NOTES',
+    'TASK_DONE', 'TASK_OPEN', 'TASK_ARCHIVED', 'TOO_MANY_TASKS', 'TASK_LOG_FULL', 'TOPIC_TOO_DEEP', 'TOPIC_CYCLE',
+    'TOPIC_HAS_CHILDREN', 'TOO_MANY_TOPICS', 'TOO_MANY_NOTES', 'STOCK_LOT_USED', 'STOCK_FROM_RECEIPT', 'TOO_MANY_LOTS',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'metrics': [
@@ -36,7 +36,10 @@ const Map<String, List<String>> dynamicKeys = {
     'provider_monobank', 'provider_enable_banking', 'status_pending', 'status_active', 'status_error', 'status_expired',
     'error_UNAUTHORIZED', 'error_APP_INACTIVE', 'error_RATE_LIMITED', 'error_REJECTED', 'error_UNAVAILABLE', 'error_INTERNAL',
   ],
-  'finance': ['period_day', 'period_week', 'period_month', 'period_quarter'],
+  'finance': [
+    'period_day', 'period_week', 'period_month', 'period_quarter', 'grouping_day', 'grouping_week', 'grouping_month',
+    'chart_kind_bars', 'chart_kind_balance', 'chart_kind_bars_hint', 'chart_kind_balance_hint',
+  ],
   'finance.cat': [
     'groceries', 'restaurants', 'transport', 'fuel', 'shopping', 'health', 'utilities', 'entertainment', 'travel',
     'education', 'home', 'cash', 'transfer', 'fees', 'income', 'other', 'none',
@@ -91,6 +94,11 @@ const Map<String, List<String>> dynamicKeys = {
     'unit_percent', 'unit_pages', 'unit_tasks', 'unit_lessons', 'unit_chapters', 'unit_hours',
     'unit_short_percent', 'unit_short_pages', 'unit_short_tasks', 'unit_short_lessons', 'unit_short_chapters',
     'unit_short_hours', 'subtopics_count.one', 'subtopics_count.other', 'notes_count.one', 'notes_count.other',
+  ],
+  'stock': [
+    'measure_g', 'measure_ml', 'measure_pcs', 'source_receipt', 'source_manual', 'source_cooked', 'reason_spoiled',
+    'reason_leftovers', 'reason_other', 'move_eaten', 'move_cooked', 'move_waste', 'lots_count.one', 'lots_count.other',
+    'receipt_stocked.one', 'receipt_stocked.other',
   ],
 };
 

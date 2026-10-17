@@ -15,6 +15,7 @@ import 'amount_sheet.dart';
 import 'meal_target.dart';
 import 'nutrition_format.dart';
 import 'nutrition_summary.dart';
+import '../stock/stock_format.dart';
 
 const double _contentMaxWidth = 720;
 const int _maxFutureDays = 7;
@@ -353,6 +354,12 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
       actions: [
         IconButton(tooltip: 'goal.title'.tr(), onPressed: _openGoal, icon: const Icon(AppIcons.slidersHorizontal)),
         IconButton(tooltip: 'nutrition.dishes'.tr(), onPressed: () => aContext.push('/app/dishes'), icon: const Icon(AppIcons.cookingPot)),
+        IconButton(
+          key: const ValueKey('diary.stock'),
+          tooltip: 'stock.title'.tr(),
+          onPressed: () => aContext.push(stockPath),
+          icon: const Icon(AppIcons.package),
+        ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -461,6 +468,7 @@ class _MealSection extends StatelessWidget
                     [
                       if (entryAmount(aContext, entry).isNotEmpty) entryAmount(aContext, entry),
                       macrosLine(aContext, entry.total),
+                      if (entryStockNote(aContext, entry) != null) entryStockNote(aContext, entry)!,
                     ].join(' · '),
                   ),
                   trailing: Text(formatKcal(aContext, entry.total.kcal), style: const TextStyle(fontWeight: FontWeight.w600)),

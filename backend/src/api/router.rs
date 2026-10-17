@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::extract::DefaultBodyLimit;
 use axum::http::header::{ACCEPT, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE};
 use axum::http::{HeaderName, HeaderValue, Method};
-use axum::routing::{get, patch, post, put};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -14,7 +14,8 @@ use crate::api::{
     ai_handlers, auth_handlers, balance_handlers, bank_handlers, catalog_handlers, dashboard_handlers, ex_handlers,
     fam_handlers, geo_handlers, item_handlers, nutrition_handlers, place_handlers, planner_handlers,
     product_cat_handlers, profile_handlers, receipt_handlers, recognize_handlers, routine_handlers, stats_handlers,
-    study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers, well_known_handlers, work_handlers,
+    stock_handlers, study_handlers, training_handlers, tx_handlers, user_handlers, wallet_handlers,
+    well_known_handlers, work_handlers,
 };
 use crate::domain::errors::ApiError;
 use crate::security::session::CSRF_HEADER;
@@ -110,6 +111,17 @@ pub fn build_router(a_state: AppState) -> Router
             "/study/notes/:id",
             put(study_handlers::update_note).delete(study_handlers::delete_note),
         )
+        .route(
+            "/stock/settings",
+            get(stock_handlers::get_settings).put(stock_handlers::save_settings),
+        )
+        .route("/stock", get(stock_handlers::list_stock))
+        .route("/stock/lots", post(stock_handlers::create_lot))
+        .route("/stock/lots/:id", delete(stock_handlers::delete_lot))
+        .route("/stock/lots/:id/waste", post(stock_handlers::waste_lot))
+        .route("/stock/cook", post(stock_handlers::cook))
+        .route("/stock/batches", get(stock_handlers::list_batches))
+        .route("/stock/moves", get(stock_handlers::list_moves))
         .route(
             "/training/programs",
             get(training_handlers::list_programs).post(training_handlers::create_program),

@@ -363,9 +363,11 @@ class ApiSvc
     TxCategory? aCategory,
     bool aIsUncategorized = false,
     String? aOwnerId,
+    String? aConvertTo,
   }) async
   {
     final res = await _dio.get('/api/transactions', queryParameters: {
+      if (aConvertTo != null) 'convert_to': aConvertTo,
       if (aOwnerId != null) 'owner_id': aOwnerId,
       if (aCategory != null) 'category': aCategory.name,
       if (aIsUncategorized) 'is_uncategorized': true,
@@ -636,6 +638,96 @@ class ApiSvc
   }
 
   Future<void> deleteStudyNote(String aId) => _dio.delete('/api/study/notes/$aId');
+
+  Future<StockSettings> getStockSettings() async
+  {
+    final res = await _dio.get('/api/stock/settings');
+    return StockSettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StockSettings> saveStockSettings(String? aFamilyId) async
+  {
+    final res = await _dio.put('/api/stock/settings', data: {'family_id': aFamilyId});
+    return StockSettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StockData> getStock({StockStoreRef? aStore}) async
+  {
+    final res = await _dio.get('/api/stock', queryParameters: aStore?.query);
+    return StockData.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StockLot> createStockLot({
+    required StockStoreRef aStore,
+    required String aItemId,
+    required double aQty,
+    required StockMeasure aUnit,
+    double? aCost,
+    String? aCurrId,
+    DateTime? aAcquiredOn,
+  }) async
+  {
+    final res = await _dio.post('/api/stock/lots', data: {
+      ...aStore.query,
+      'item_id': aItemId,
+      'qty': aQty.toString(),
+      'unit': aUnit.name,
+      if (aCost != null && aCurrId != null) 'cost': aCost.toStringAsFixed(2),
+      if (aCost != null && aCurrId != null) 'curr_id': aCurrId,
+      if (aAcquiredOn != null) 'acquired_on': dateWire(aAcquiredOn),
+    });
+    return StockLot.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteStockLot(String aId) => _dio.delete('/api/stock/lots/$aId');
+
+  Future<StockLot> wasteStockLot(String aId, double aQty, WasteReason aReason, String? aNote) async
+  {
+    final res = await _dio.post('/api/stock/lots/$aId/waste', data: {
+      'qty': aQty.toString(),
+      'reason': aReason.name,
+      if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+    });
+    return StockLot.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<CookBatch> cookDish({
+    required StockStoreRef aStore,
+    required String aDishId,
+    required double aCookedG,
+    required List<CookIngredient> aIngredients,
+    String? aNote,
+  }) async
+  {
+    final res = await _dio.post('/api/stock/cook', data: {
+      ...aStore.query,
+      'dish_id': aDishId,
+      'cooked_g': aCookedG.toString(),
+      'ingredients': [
+        for (final ingredient in aIngredients) {'item_id': ingredient.itemId, 'grams': ingredient.grams.toString()},
+      ],
+      if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+    });
+    return CookBatch.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<CookBatch>> getCookBatches(String aDishId) async
+  {
+    final res = await _dio.get('/api/stock/batches', queryParameters: {'dish_id': aDishId});
+    return _list(res.data, CookBatch.fromJson);
+  }
+
+  Future<StockMoves> getStockMoves({StockStoreRef? aStore, StockMoveKind? aKind, DateTime? aFrom, DateTime? aTo, int aLimit = 100}) async
+  {
+    final res = await _dio.get('/api/stock/moves', queryParameters: {
+      ...?aStore?.query,
+      if (aKind != null) 'kind': aKind.name,
+      if (aFrom != null) 'from': aFrom.toUtc().toIso8601String(),
+      if (aTo != null) 'to': aTo.toUtc().toIso8601String(),
+      'limit': aLimit,
+    });
+    return StockMoves.fromJson(res.data as Map<String, dynamic>);
+  }
 
   Future<WorkDay> getWorkDay(DateTime aDate) async
   {

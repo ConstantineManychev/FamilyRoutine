@@ -440,6 +440,20 @@ pub async fn merge_item(
     )
     .execute(&mut *tx)
     .await?;
+    sqlx::query!(
+        "UPDATE stock_lots SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE cook_batch_items SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
 
     let removed = sqlx::query!(
         r#"

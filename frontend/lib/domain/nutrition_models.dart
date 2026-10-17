@@ -287,6 +287,8 @@ class MealEntry
   final Macros? per100;
   final Macros total;
   final String? statusMarkId;
+  final String? batchId;
+  final double? stockShort;
 
   const MealEntry({
     required this.id,
@@ -302,6 +304,8 @@ class MealEntry
     this.per100,
     required this.total,
     this.statusMarkId,
+    this.batchId,
+    this.stockShort,
   });
 
   factory MealEntry.fromJson(Map<String, dynamic> aJson) => MealEntry(
@@ -318,6 +322,8 @@ class MealEntry
         per100: Macros.fromJsonOrNull(aJson['per_100']),
         total: Macros.fromJson(aJson['total']),
         statusMarkId: aJson['status_mark_id'] as String?,
+        batchId: aJson['batch_id'] as String?,
+        stockShort: parseDecimalOrNull(aJson['stock_short']),
       );
 }
 

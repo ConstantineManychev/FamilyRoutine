@@ -221,9 +221,14 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
 
   Future<void> _pickDish(Dish aDish, {double? aGrams, double? aPortions}) async
   {
+    final batches = await dishBatches(ref.read(apiProv), aDish.id);
+    if (!mounted)
+    {
+      return;
+    }
     final result = await showAmountSheet(
       context,
-      aTarget: AmountTarget.dish(aDish),
+      aTarget: AmountTarget.dish(aDish, aBatches: batches),
       aGrams: aGrams,
       aPortions: aPortions ?? (aGrams == null && aDish.portionG != null ? 1 : null),
     );

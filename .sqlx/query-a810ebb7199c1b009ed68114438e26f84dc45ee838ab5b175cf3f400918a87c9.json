@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM stock_lots l\n        WHERE l.receipt_id = $1 AND NOT EXISTS (SELECT 1 FROM stock_moves m WHERE m.lot_id = l.id)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a810ebb7199c1b009ed68114438e26f84dc45ee838ab5b175cf3f400918a87c9"
+}

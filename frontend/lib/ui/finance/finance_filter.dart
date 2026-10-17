@@ -20,6 +20,7 @@ class FinanceFilter
   final FlowMode mode;
   final String? convertTo;
   final String? currCode;
+  final ChartGrouping grouping;
 
   const FinanceFilter({
     this.scope = const WalletScope(null),
@@ -28,6 +29,7 @@ class FinanceFilter
     this.mode = FlowMode.net,
     this.convertTo,
     this.currCode,
+    this.grouping = ChartGrouping.day,
   });
 
   (DateTime, DateTime) get range
@@ -52,7 +54,12 @@ class FinanceFilter
   StatsBucket get bucket
   {
     final (from, to) = range;
-    return to.difference(from) <= _hourlyLimit ? StatsBucket.hour : StatsBucket.day;
+    return switch (grouping)
+    {
+      ChartGrouping.week => StatsBucket.week,
+      ChartGrouping.month => StatsBucket.month,
+      ChartGrouping.day => to.difference(from) <= _hourlyLimit ? StatsBucket.hour : StatsBucket.day,
+    };
   }
 
   Map<String, String> get query
@@ -86,6 +93,7 @@ class FinanceFilter
     FlowMode? mode,
     String? Function()? convertTo,
     String? Function()? currCode,
+    ChartGrouping? grouping,
   })
   {
     return FinanceFilter(
@@ -95,8 +103,16 @@ class FinanceFilter
       mode: mode ?? this.mode,
       convertTo: convertTo == null ? this.convertTo : convertTo(),
       currCode: currCode == null ? this.currCode : currCode(),
+      grouping: grouping ?? this.grouping,
     );
   }
+}
+
+List<String> convertCurrencies(List<AccountDto> aWallets)
+{
+  final codes = <String>{defaultConvertCode, 'UAH', 'USD', ...aWallets.map((aWallet) => aWallet.currCode)}
+    ..removeWhere((aCode) => aCode.isEmpty);
+  return codes.toList()..sort();
 }
 
 String scopeLabel(FinanceFilter aFilter, List<AccountDto> aWallets, String? aMyUserId)
@@ -176,12 +192,7 @@ class _FilterSheetState extends State<_FilterSheet>
     }
   }
 
-  List<String> get _currencies
-  {
-    final codes = <String>{defaultConvertCode, 'UAH', 'USD', ...widget.wallets.map((aWallet) => aWallet.currCode)}
-      ..removeWhere((aCode) => aCode.isEmpty);
-    return codes.toList()..sort();
-  }
+  List<String> get _currencies => convertCurrencies(widget.wallets);
 
   Widget _title(BuildContext aContext, String aText) => Padding(
         padding: const EdgeInsets.only(top: 16, bottom: 8),

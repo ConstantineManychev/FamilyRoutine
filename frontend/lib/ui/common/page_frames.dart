@@ -225,6 +225,7 @@ class BlockCard extends StatelessWidget
   final VoidCallback? onExpand;
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final List<Widget> actions;
 
   const BlockCard({
     super.key,
@@ -234,6 +235,7 @@ class BlockCard extends StatelessWidget
     this.addTooltip,
     this.onExpand,
     this.padding = const EdgeInsets.fromLTRB(4, 4, 4, 8),
+    this.actions = const [],
   });
 
   @override
@@ -264,6 +266,7 @@ class BlockCard extends StatelessWidget
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: aContext.palette.inkPrimary),
                   ),
                 ),
+                ...actions,
                 if (onExpand != null)
                   IconButton(
                     tooltip: 'common.show_all'.tr(),

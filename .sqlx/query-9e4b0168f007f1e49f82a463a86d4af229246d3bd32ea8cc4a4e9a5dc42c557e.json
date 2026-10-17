@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT $2 - COALESCE(SUM(qty), 0) AS \"left!\" FROM stock_moves WHERE lot_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9e4b0168f007f1e49f82a463a86d4af229246d3bd32ea8cc4a4e9a5dc42c557e"
+}

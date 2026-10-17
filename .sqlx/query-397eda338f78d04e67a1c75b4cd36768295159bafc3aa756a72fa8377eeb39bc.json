@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE meal_entries\n        SET eaten_on = $2, status_mark_id = $3, title = $4, grams = $5, portions = $6, kcal = $7, prot = $8,\n            fat = $9, carb = $10\n        WHERE id = $1\n        RETURNING id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n                  grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n                  status_mark_id, created_ts\n        ",
+  "query": "\n        SELECT id, eaten_on, source AS \"source: MealSource\", item_id, dish_id, title,\n               grams, portions, portion_g, is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb,\n               status_mark_id, batch_id, stock_short, created_ts\n        FROM meal_entries\n        WHERE user_id = $1 AND eaten_on = $2\n        ORDER BY created_ts, id\n        ",
   "describe": {
     "columns": [
       {
@@ -111,6 +111,16 @@
       },
       {
         "ordinal": 19,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 20,
+        "name": "stock_short",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 21,
         "name": "created_ts",
         "type_info": "Timestamptz"
       }
@@ -118,15 +128,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Date",
-        "Uuid",
-        "Varchar",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric",
-        "Numeric"
+        "Date"
       ]
     },
     "nullable": [
@@ -149,8 +151,10 @@
       false,
       false,
       true,
+      true,
+      true,
       false
     ]
   },
-  "hash": "f664ba8c708d5f40166fae055c66a44b2b9b2989bdea4a0be623f6dace8307ee"
+  "hash": "397eda338f78d04e67a1c75b4cd36768295159bafc3aa756a72fa8377eeb39bc"
 }
