@@ -26,6 +26,7 @@ pub fn read_request(
     a_target: &AiTarget,
     a_image: &ReceiptImage,
     a_task: &VisionTask,
+    a_prompt: &str,
 ) -> RequestBuilder
 {
     a_http
@@ -35,7 +36,7 @@ pub fn read_request(
             a_target.model
         ))
         .header(KEY_HEADER, &a_target.api_key)
-        .json(&request_body(a_image, a_task))
+        .json(&request_body(a_image, a_task, a_prompt))
 }
 
 pub fn models_request(a_http: &reqwest::Client, a_base: &str, a_api_key: &str) -> RequestBuilder
@@ -140,7 +141,7 @@ fn is_stable_tier(a_model: &str, a_tier: &str) -> bool
         .is_some_and(is_version)
 }
 
-fn request_body(a_image: &ReceiptImage, a_task: &VisionTask) -> Value
+fn request_body(a_image: &ReceiptImage, a_task: &VisionTask, a_prompt: &str) -> Value
 {
     json!({
         "systemInstruction": { "parts": [{ "text": a_task.system }] },
@@ -148,7 +149,7 @@ fn request_body(a_image: &ReceiptImage, a_task: &VisionTask) -> Value
             "role": "user",
             "parts": [
                 { "inlineData": { "mimeType": a_image.media_type, "data": a_image.data_base64 } },
-                { "text": a_task.prompt }
+                { "text": a_prompt }
             ]
         }],
         "generationConfig": {

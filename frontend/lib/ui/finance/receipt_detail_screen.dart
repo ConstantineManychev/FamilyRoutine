@@ -16,6 +16,7 @@ import '../common/money.dart';
 import '../dicts/item_form.dart';
 import '../dicts/scope_widgets.dart';
 import 'finance_dialogs.dart';
+import 'receipt_merge.dart';
 import 'receipt_view.dart';
 import 'transactions_screen.dart';
 import '../common/app_theme.dart';
@@ -65,8 +66,11 @@ class _ItemRow
   ItemUnit unit = ItemUnit.piece;
   NewItemDraft? newItem;
   String? sourceText;
+  String? barcode;
   LineMatch? match;
   bool isPricePrefilled = false;
+  bool isMissing = false;
+  ({double qty, double amount})? before;
 
   _ItemRow();
 
@@ -77,6 +81,7 @@ class _ItemRow
     kind = aLine.kind;
     unit = aLine.unit;
     sourceText = aLine.text;
+    barcode = aLine.barcode;
     match = aLine.match;
     if (aLine.itemId == null)
     {
@@ -123,6 +128,7 @@ class _ItemRow
     itemId = aItem.id;
     newItem = null;
     match = null;
+    barcode = aItem.barcode;
     itemName = aItem.name;
     kind = aItem.kind;
     unit = aItem.unit;
@@ -130,6 +136,42 @@ class _ItemRow
     {
       nameCtrl.text = aItem.name;
     }
+  }
+
+  String get entryName => isPicked ? itemName : newItem?.name ?? nameCtrl.text.trim();
+
+  Map<String, dynamic> enteredJson() => {
+        'name': entryName,
+        'unit': unit.wire,
+        if ((barcode ?? newItem?.barcode) case final code?) 'barcode': code,
+        if (itemId case final id?) 'item_id': id,
+      };
+
+  void takeReceipt(ReceiptLineSum aSum, RecognizedLine aFirst)
+  {
+    final oldQty = qty;
+    final oldAmount = parseAmountInput(amountCtrl.text) ?? 0;
+    if (!isPicked && !isNew)
+    {
+      itemId = aFirst.itemId;
+      itemName = aFirst.itemName ?? aFirst.name;
+      kind = aFirst.kind;
+      unit = aFirst.unit;
+      match = aFirst.match;
+      barcode = aFirst.barcode;
+      newItem = aFirst.itemId == null
+          ? NewItemDraft(name: aFirst.name, kind: aFirst.kind, unit: aFirst.unit, barcode: aFirst.barcode)
+          : null;
+      nameCtrl.text = itemName;
+    }
+    sourceText = aSum.text;
+    isMissing = false;
+    isPricePrefilled = false;
+    qtyCtrl.text = _trimZeros(aSum.qty);
+    priceCtrl.text = aSum.unitPrice == null ? '' : aSum.unitPrice!.toStringAsFixed(2);
+    amountCtrl.text = aSum.amount.toStringAsFixed(2);
+    final isChanged = (oldAmount - aSum.amount).abs() > 0.004 || (oldQty - aSum.qty).abs() > 0.0005;
+    before = oldAmount > 0 && isChanged ? (qty: oldQty, amount: oldAmount) : null;
   }
 
   void onNameEdited(String aText)
@@ -858,22 +900,37 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       return;
     }
 
+    final entered = _rows.where((aRow) => !aRow.isBlank && aRow.entryName.isNotEmpty).toList();
     final draft = await runWithProgress(
       context,
       'receipt.recognizing'.tr(),
-      () => ref.read(apiProv).recognizeReceipt(photo.base64, photo.mediaType),
+      () => ref.read(apiProv).recognizeReceipt(
+            photo.base64,
+            photo.mediaType,
+            aEntered: [for (final row in entered) row.enteredJson()],
+          ),
     );
     if (draft != null && mounted)
     {
-      _applyDraft(draft);
+      _applyDraft(draft, entered);
     }
   }
 
-  void _applyDraft(RecognizedReceipt aDraft)
+  String _recognitionSummary(RecognizedReceipt aDraft, ReceiptMergePlan aPlan)
+  {
+    final newCount = aPlan.added.where((aLine) => aLine.itemId == null).length;
+    return [
+      'receipt.recognized'.tr(args: ['${aDraft.lines.length}', '$newCount']),
+      if (aPlan.linkedLines > 0) 'receipt.recognized_linked'.tr(args: ['${aPlan.linkedLines}']),
+      if (aDraft.lines.isNotEmpty && aPlan.missing.isNotEmpty) 'receipt.recognized_missing'.tr(args: ['${aPlan.missing.length}']),
+    ].join(' ');
+  }
+
+  void _applyDraft(RecognizedReceipt aDraft, List<_ItemRow> aEntered)
   {
     final currCode = aDraft.currCode ?? _currCode;
-    final newCount = aDraft.lines.where((aLine) => aLine.itemId == null).length;
-    final summary = 'receipt.recognized'.tr(args: ['${aDraft.lines.length}', '$newCount']);
+    final plan = ReceiptMergePlan.of(aEntered.length, aDraft.lines);
+    final summary = _recognitionSummary(aDraft, plan);
     final mismatch = aDraft.isTotalMismatch
         ? 'receipt.total_mismatch'.tr(args: [
             formatMoney(context, aDraft.payable, currCode),
@@ -915,7 +972,19 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         _rows.remove(row);
         row.dispose();
       }
-      _rows.addAll(aDraft.lines.map(_ItemRow.recognized));
+      for (final MapEntry(key: index, value: lines) in plan.linked.entries)
+      {
+        final row = aEntered[index];
+        if (_rows.contains(row))
+        {
+          row.takeReceipt(ReceiptLineSum.of(lines), lines.first);
+        }
+      }
+      for (final index in plan.missing)
+      {
+        aEntered[index].isMissing = aDraft.lines.isNotEmpty;
+      }
+      _rows.addAll(plan.added.map(_ItemRow.recognized));
       if (_rows.isEmpty)
       {
         _rows.add(_ItemRow());
@@ -1197,7 +1266,11 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       controller: aRow.qtyCtrl,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: amountFormatters,
-      onChanged: (_) => setState(aRow.recalc),
+      onChanged: (_) => setState(()
+      {
+        aRow.before = null;
+        aRow.recalc();
+      }),
       decoration: decoration('finance.qty'.tr()).copyWith(
         hintText: '1',
         suffixText: aRow.isPicked ? itemUnitShort(aRow.unit) : null,
@@ -1211,6 +1284,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       onChanged: (_) => setState(()
       {
         aRow.isPricePrefilled = false;
+        aRow.before = null;
         aRow.recalc();
       }),
       decoration: decoration('finance.price'.tr()).copyWith(
@@ -1226,7 +1300,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       controller: aRow.amountCtrl,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: amountFormatters,
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) => setState(() => aRow.before = null),
       decoration: decoration('finance.amount'.tr()),
     );
     final remove = IconButton(
@@ -1239,6 +1313,8 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
       }),
     );
 
+    final note = _rowNote(aRow);
+
     return Padding(
       key: aRow.key,
       padding: const EdgeInsets.only(bottom: 8),
@@ -1247,16 +1323,22 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         {
           if (aConstraints.maxWidth >= _wideRowWidth)
           {
-            return Row(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(flex: 5, child: picker),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: qty),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: price),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: amount),
-                remove,
+                Row(
+                  children: [
+                    Expanded(flex: 5, child: picker),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: qty),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: price),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: amount),
+                    remove,
+                  ],
+                ),
+                if (note != null) note,
               ],
             );
           }
@@ -1281,11 +1363,46 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
                       ],
                     ),
                   ),
+                  if (note != null) note,
                 ],
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget? _rowNote(_ItemRow aRow)
+  {
+    final palette = context.palette;
+    final before = aRow.before;
+    final (IconData, Color, String)? note = aRow.isMissing
+        ? (AppIcons.alertCircle, palette.warning, 'receipt.missing_in_receipt'.tr())
+        : before != null
+            ? (
+                AppIcons.refreshCw,
+                palette.inkMuted,
+                'receipt.updated_from_receipt'.tr(args: [
+                  '${_ItemRow._trimZeros(before.qty)} ${itemUnitShort(aRow.unit)}',
+                  formatMoney(context, before.amount, _currCode),
+                ]),
+              )
+            : null;
+    if (note == null)
+    {
+      return null;
+    }
+    final (icon, color, text) = note;
+    return Padding(
+      key: ValueKey(aRow.isMissing ? 'receipt.row_missing' : 'receipt.row_updated'),
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: color))),
+        ],
       ),
     );
   }

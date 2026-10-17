@@ -5,8 +5,8 @@ use base64::Engine;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
-    FeaturesDto, ItemKind, ItemUnit, LineMatch, NewPlaceRequest, RecognizeReceiptRequest, RecognizedLineDto,
-    RecognizedReceiptDto,
+    EnteredLineDto, FeaturesDto, ItemKind, ItemUnit, LineMatch, NewPlaceRequest, RecognizeReceiptRequest,
+    RecognizedLineDto, RecognizedReceiptDto,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -15,7 +15,7 @@ use crate::api::ai_handlers::{charge_scan, read_error, record_usage, refund_scan
 use crate::api::extract::{ApiJson, AuthUser};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{check_money, check_qty, clean_barcode, money};
-use crate::receipt_ai::{RawDiscount, RawLine, RawReceipt, ReadError, ReceiptImage};
+use crate::receipt_ai::{EnteredItem, RawDiscount, RawLine, RawReceipt, ReadError, ReceiptImage};
 use crate::state::AppState;
 
 const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
@@ -44,6 +44,14 @@ struct CleanLine
     unit_price: Option<Decimal>,
     amount: Decimal,
     barcode: Option<String>,
+    entered_ref: Option<usize>,
+}
+
+struct EnteredLine
+{
+    name_key: String,
+    barcode: Option<String>,
+    item_id: Option<Uuid>,
 }
 
 struct MatchedItem
@@ -98,6 +106,7 @@ pub async fn recognize_receipt(
 ) -> Result<Json<RecognizedReceiptDto>, ApiError>
 {
     let image = check_image(&a_req.media_type, &a_req.image, MAX_IMAGE_BYTES)?;
+    let (entered_items, entered_lines) = check_entered(&a_req.entered)?;
 
     let mut conn = a_state.db.acquire().await?;
     let resolved = resolve_ai(&a_state, &mut conn, a_user.user_id)
@@ -106,7 +115,7 @@ pub async fn recognize_receipt(
     drop(conn);
     charge_scan(&a_state, a_user.user_id, &resolved).await?;
 
-    let outcome = match a_state.receipt_ai.read(&resolved.target, &image).await
+    let outcome = match a_state.receipt_ai.read(&resolved.target, &image, &entered_items).await
     {
         Ok(outcome) => outcome,
         Err(err) =>
@@ -126,9 +135,15 @@ pub async fn recognize_receipt(
     }
 
     let mut conn = a_state.db.acquire().await?;
-    build_draft(&mut conn, a_user.user_id, outcome.receipt, a_req.tz_offset_min)
-        .await
-        .map(Json)
+    build_draft(
+        &mut conn,
+        a_user.user_id,
+        outcome.receipt,
+        a_req.tz_offset_min,
+        &entered_lines,
+    )
+    .await
+    .map(Json)
 }
 
 pub fn alias_key(a_text: &str) -> Option<String>
@@ -174,11 +189,81 @@ pub fn check_image(a_media_type: &str, a_data: &str, a_max_bytes: usize) -> Resu
     })
 }
 
+fn check_entered(a_entered: &[EnteredLineDto]) -> Result<(Vec<EnteredItem>, Vec<EnteredLine>), ApiError>
+{
+    if a_entered.len() > MAX_LINES
+    {
+        return Err(ApiError::Validation("entered"));
+    }
+
+    let mut items = Vec::with_capacity(a_entered.len());
+    let mut lines = Vec::with_capacity(a_entered.len());
+    for (index, entered) in a_entered.iter().enumerate()
+    {
+        let name = clean_text(&entered.name);
+        if name.is_empty()
+        {
+            return Err(ApiError::Validation("entered"));
+        }
+        let barcode = clean_barcode(entered.barcode.as_deref()).ok().flatten();
+        lines.push(EnteredLine {
+            name_key: name.to_lowercase(),
+            barcode: barcode.clone(),
+            item_id: entered.item_id,
+        });
+        items.push(EnteredItem {
+            index,
+            name,
+            barcode,
+            unit: entered.unit,
+        });
+    }
+    Ok((items, lines))
+}
+
+fn link_entered(
+    a_entered: &[EnteredLine],
+    a_used: &mut [bool],
+    a_line: &CleanLine,
+    a_item: Option<&MatchedItem>,
+) -> Option<usize>
+{
+    let keys = [
+        Some(a_line.name.to_lowercase()),
+        Some(a_line.text.to_lowercase()),
+        a_item.map(|item| item.name.to_lowercase()),
+    ];
+    let is_same = |entered: &EnteredLine| {
+        (entered.item_id.is_some() && entered.item_id == a_item.map(|item| item.id))
+            || (entered.barcode.is_some() && entered.barcode == a_line.barcode)
+            || keys.iter().flatten().any(|key| *key == entered.name_key)
+    };
+    let same: Vec<usize> = a_entered
+        .iter()
+        .enumerate()
+        .filter(|(_, entered)| is_same(entered))
+        .map(|(index, _)| index)
+        .collect();
+
+    let linked = same
+        .iter()
+        .copied()
+        .find(|index| !a_used[*index])
+        .or_else(|| same.first().copied())
+        .or(a_line.entered_ref.filter(|index| *index < a_entered.len()));
+    if let Some(index) = linked
+    {
+        a_used[index] = true;
+    }
+    linked
+}
+
 async fn build_draft(
     a_conn: &mut PgConnection,
     a_user_id: Uuid,
     a_raw: RawReceipt,
     a_tz_offset_min: i32,
+    a_entered: &[EnteredLine],
 ) -> Result<RecognizedReceiptDto, ApiError>
 {
     let store_name = clean_part(a_raw.store_name.as_deref());
@@ -198,9 +283,11 @@ async fn build_draft(
     let (folded, leftover_cents) = fold_line_discounts(a_raw.lines);
     let lines: Vec<CleanLine> = folded.into_iter().filter_map(clean_line).take(MAX_LINES).collect();
     let mut recognized = Vec::with_capacity(lines.len());
+    let mut used = vec![false; a_entered.len()];
     for line in lines
     {
         let found = match_item(a_conn, a_user_id, &line).await?;
+        let entered_ref = link_entered(a_entered, &mut used, &line, found.as_ref().map(|(item, _)| item));
         let (item_id, item_name, match_kind) = match found
         {
             Some((item, kind)) => (Some(item.id), Some(item.name), kind),
@@ -218,6 +305,7 @@ async fn build_draft(
             item_id,
             item_name,
             match_kind,
+            entered_ref,
         });
     }
 
@@ -389,6 +477,10 @@ fn clean_line(a_raw: RawLine) -> Option<CleanLine>
         unit_price: a_raw.unit_price.and_then(to_money),
         amount,
         barcode: clean_barcode(a_raw.barcode.as_deref()).ok().flatten(),
+        entered_ref: a_raw
+            .entered_ref
+            .filter(|index| index.fract() == 0.0 && (0.0..=MAX_LINES as f64).contains(index))
+            .map(|index| index as usize),
     })
 }
 
@@ -626,6 +718,7 @@ mod tests
             unit_price: Some(a_amount),
             amount: a_amount,
             barcode: None,
+            entered_ref: None,
         }
     }
 
@@ -676,6 +769,7 @@ mod tests
             unit_price: Some(89.9),
             amount: 46.071,
             barcode: Some("4820024700016".into()),
+            entered_ref: Some(2.5),
         })
         .unwrap();
         assert_eq!(line.text, "МОЛОКО ГАЛИЧ 2.5%");
@@ -684,6 +778,7 @@ mod tests
         assert_eq!(line.amount.to_string(), "46.07");
         assert_eq!(line.unit, ItemUnit::Kilogram);
         assert_eq!(line.kind, ItemKind::Food);
+        assert_eq!(line.entered_ref, None);
 
         assert!(clean_line(RawLine {
             text: "Знижка".into(),
@@ -694,8 +789,112 @@ mod tests
             unit_price: None,
             amount: -5.0,
             barcode: None,
+            entered_ref: None,
         })
         .is_none());
+    }
+
+    fn entered(a_name: &str, a_barcode: Option<&str>, a_item_id: Option<Uuid>) -> EnteredLine
+    {
+        EnteredLine {
+            name_key: a_name.to_lowercase(),
+            barcode: a_barcode.map(str::to_string),
+            item_id: a_item_id,
+        }
+    }
+
+    fn receipt_line(a_text: &str, a_name: &str, a_barcode: Option<&str>, a_entered_ref: Option<usize>) -> CleanLine
+    {
+        CleanLine {
+            text: a_text.into(),
+            name: a_name.into(),
+            kind: ItemKind::Food,
+            unit: ItemUnit::Piece,
+            qty: Decimal::ONE,
+            unit_price: None,
+            amount: Decimal::ONE,
+            barcode: a_barcode.map(str::to_string),
+            entered_ref: a_entered_ref,
+        }
+    }
+
+    #[test]
+    fn receipt_lines_link_to_entered_rows()
+    {
+        let milk = Uuid::new_v4();
+        let rows = [
+            entered("Молоко Простоквашино 2,5% 930 мл", None, Some(milk)),
+            entered("Кава Lavazza", Some("4820024700016"), None),
+            entered("Хліб", None, None),
+            entered("Кава Lavazza", Some("4820024700016"), None),
+        ];
+        let mut used = vec![false; rows.len()];
+        let matched_milk = MatchedItem {
+            id: milk,
+            name: "Молоко Простоквашино 2,5% 930 мл".into(),
+            unit: ItemUnit::Piece,
+        };
+
+        let by_item = link_entered(
+            &rows,
+            &mut used,
+            &receipt_line("МОЛ ПРОСТ", "Молоко", None, Some(2)),
+            Some(&matched_milk),
+        );
+        let by_barcode = link_entered(
+            &rows,
+            &mut used,
+            &receipt_line("КАВА", "Кава", Some("4820024700016"), None),
+            None,
+        );
+        let second_coffee = link_entered(
+            &rows,
+            &mut used,
+            &receipt_line("КАВА", "Кава", Some("4820024700016"), None),
+            None,
+        );
+        let third_coffee = link_entered(
+            &rows,
+            &mut used,
+            &receipt_line("КАВА LAVAZZA", "Кава Lavazza", None, None),
+            None,
+        );
+        let by_model = link_entered(
+            &rows,
+            &mut used,
+            &receipt_line("ХЛІБ БАТОН", "Батон", None, Some(2)),
+            None,
+        );
+        let out_of_range = link_entered(&rows, &mut used, &receipt_line("ПАКЕТ", "Пакет", None, Some(9)), None);
+
+        assert_eq!(
+            [by_item, by_barcode, second_coffee, third_coffee, by_model, out_of_range],
+            [Some(0), Some(1), Some(3), Some(1), Some(2), None]
+        );
+    }
+
+    #[test]
+    fn entered_rows_are_cleaned_and_bounded()
+    {
+        let row = |a_name: &str, a_barcode: Option<&str>| EnteredLineDto {
+            name: a_name.into(),
+            barcode: a_barcode.map(str::to_string),
+            unit: ItemUnit::Piece,
+            item_id: None,
+        };
+
+        let (items, lines) =
+            check_entered(&[row("  Кава\tLavazza ", Some("4820024700016")), row("Хліб", Some("123"))]).unwrap();
+        assert_eq!(items[0].name, "Кава Lavazza");
+        assert_eq!(items[1].index, 1);
+        assert_eq!(items[1].barcode, None);
+        assert_eq!(lines[0].name_key, "кава lavazza");
+        assert!(matches!(
+            check_entered(&[row(" \n ", None)]),
+            Err(ApiError::Validation("entered"))
+        ));
+        let too_many = vec![row("Хліб", None); MAX_LINES + 1];
+        assert!(matches!(check_entered(&too_many), Err(ApiError::Validation("entered"))));
     }
 
     #[test]

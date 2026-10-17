@@ -30,12 +30,13 @@ pub fn read_request(
     a_target: &AiTarget,
     a_image: &ReceiptImage,
     a_task: &VisionTask,
+    a_prompt: &str,
 ) -> RequestBuilder
 {
     a_http
         .post(format!("{}/v1/responses", a_base.trim_end_matches('/')))
         .bearer_auth(&a_target.api_key)
-        .json(&request_body(&a_target.model, a_image, a_task))
+        .json(&request_body(&a_target.model, a_image, a_task, a_prompt))
 }
 
 pub fn models_request(a_http: &reqwest::Client, a_base: &str, a_api_key: &str) -> RequestBuilder
@@ -132,7 +133,7 @@ fn is_suitable(a_model: &str) -> bool
         && !has_date_suffix(a_model)
 }
 
-fn request_body(a_model: &str, a_image: &ReceiptImage, a_task: &VisionTask) -> Value
+fn request_body(a_model: &str, a_image: &ReceiptImage, a_task: &VisionTask, a_prompt: &str) -> Value
 {
     json!({
         "model": a_model,
@@ -145,7 +146,7 @@ fn request_body(a_model: &str, a_image: &ReceiptImage, a_task: &VisionTask) -> V
                     "image_url": format!("data:{};base64,{}", a_image.media_type, a_image.data_base64),
                     "detail": IMAGE_DETAIL
                 },
-                { "type": "input_text", "text": a_task.prompt }
+                { "type": "input_text", "text": a_prompt }
             ]
         }],
         "text": { "format": { "type": "json_schema", "name": a_task.name, "strict": true, "schema": (a_task.schema)() } },
@@ -167,7 +168,7 @@ mod tests
             media_type: "image/png",
             data_base64: "AAAA".into(),
         };
-        let body = request_body("gpt-5.5", &image, &LABEL_TASK);
+        let body = request_body("gpt-5.5", &image, &LABEL_TASK, LABEL_TASK.prompt);
 
         assert_eq!(body["store"], false);
         assert_eq!(body["text"]["format"]["strict"], true);

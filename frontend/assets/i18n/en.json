@@ -843,7 +843,11 @@
     "new_branch": "A branch will be added: {}",
     "new_item_hint": "New item — it will be added to the catalog when you save",
     "similar_hint": "Looks like “{}” — check that this is the right item",
-    "err_image_type": "JPEG, PNG and WebP photos are supported."
+    "err_image_type": "JPEG, PNG and WebP photos are supported.",
+    "recognized_linked": "Matched to items already entered: {}.",
+    "recognized_missing": "Not found on the receipt: {} — marked below.",
+    "missing_in_receipt": "Not on the recognized receipt — check or remove it",
+    "updated_from_receipt": "Updated from the receipt, was: {} for {}"
   },
   "settings": {
     "title": "Settings",

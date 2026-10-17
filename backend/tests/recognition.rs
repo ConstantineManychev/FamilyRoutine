@@ -484,3 +484,136 @@ async fn vouchers_and_deals_reduce_what_was_paid(a_db: PgPool)
     assert_eq!(too_much.status, StatusCode::BAD_REQUEST);
     assert_eq!(too_much.body["field"], "discount");
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn entered_rows_are_linked_to_receipt_lines_and_teach_aliases(a_db: PgPool)
+{
+    let (ai_url, mock) = spawn_anthropic().await;
+    let app = TestApp::with_receipt_ai(a_db, &ai_url, 2);
+    let alice = app.user("alice@example.com").await;
+    let uah = app.currency_by_code(&alice.token, "UAH").await;
+    let milk = post(
+        &app,
+        &alice,
+        "/api/dicts/items",
+        json!({ "name": "Молоко Простоквашино 2,5% 930 мл", "kind": "food", "unit": "piece" }),
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let coffee = post(
+        &app,
+        &alice,
+        "/api/dicts/items",
+        json!({ "name": "Кава Lavazza", "kind": "food", "unit": "piece", "barcode": COFFEE_BARCODE }),
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let scan = |a_entered: Value| json!({ "image": photo(), "media_type": "image/jpeg", "tz_offset_min": 180, "entered": a_entered });
+    let blank = app
+        .call(
+            Method::POST,
+            "/api/receipts/recognize",
+            Some(&alice.token),
+            Some(scan(json!([{ "name": " \n ", "unit": "piece" }]))),
+        )
+        .await;
+    assert_eq!(blank.status, StatusCode::BAD_REQUEST);
+    assert_eq!(blank.body["field"], "entered");
+    assert!(mock.requests.lock().unwrap().is_empty());
+
+    let mut milk_line = line(
+        "МОЛ ПРОСТ 2.5% 0.93Л",
+        "Молоко Простоквашино 2,5%",
+        "piece",
+        2.0,
+        85.8,
+        None,
+    );
+    milk_line["entered_ref"] = json!(0);
+    let mut bag = line("ПАКЕТ", "Пакет", "piece", 1.0, 2.5, None);
+    bag["entered_ref"] = json!(7);
+    mock.reply_with(receipt(
+        "АТБ",
+        "Хрещатик",
+        "5",
+        vec![
+            milk_line,
+            line("КАВА ЛАВАЦА", "Кава Лавацца", "piece", 1.0, 195.3, Some(COFFEE_BARCODE)),
+            line("КАВА ЛАВАЦА", "Кава Лавацца", "piece", 1.0, 195.3, Some(COFFEE_BARCODE)),
+            bag,
+        ],
+    ));
+    let reply = app
+        .call(
+            Method::POST,
+            "/api/receipts/recognize",
+            Some(&alice.token),
+            Some(scan(json!([
+                { "name": "Молоко Простоквашино 2,5% 930 мл", "unit": "piece", "item_id": milk },
+                { "name": "Кава Lavazza", "barcode": COFFEE_BARCODE, "unit": "piece", "item_id": coffee },
+                { "name": "Хліб Київхліб", "unit": "piece" }
+            ]))),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let refs: Vec<Value> = reply.body["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line["entered_ref"].clone())
+        .collect();
+    assert_eq!(refs, vec![json!(0), json!(1), json!(1), Value::Null]);
+
+    let request = mock.requests.lock().unwrap().last().cloned().unwrap();
+    let prompt = request["messages"][0]["content"][1]["text"].as_str().unwrap();
+    assert!(prompt.contains("Entered items:"));
+    assert!(prompt.contains(r#"{"ref":2,"name":"Хліб Київхліб","unit":"piece"}"#));
+    assert!(prompt.contains(&format!(r#""barcode":"{COFFEE_BARCODE}""#)));
+    let required = &request["output_config"]["format"]["schema"]["properties"]["lines"]["items"]["required"];
+    assert!(required.as_array().unwrap().contains(&json!("entered_ref")));
+
+    post(
+        &app,
+        &alice,
+        "/api/receipts",
+        json!({
+            "receipt_ts": reply.body["receipt_ts"], "curr_id": uah,
+            "items": [{ "item_id": milk, "source_text": "МОЛ ПРОСТ 2.5% 0.93Л", "qty": "2", "amount": "85.80" }]
+        }),
+    )
+    .await;
+
+    let (status, again) = recognize(
+        &app,
+        &alice,
+        &mock,
+        receipt(
+            "АТБ",
+            "Хрещатик",
+            "5",
+            vec![line(
+                "МОЛ ПРОСТ 2.5% 0.93Л",
+                "Молоко Простоквашино",
+                "piece",
+                1.0,
+                42.9,
+                None,
+            )],
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{again}");
+    assert_eq!(again["lines"][0]["match_kind"], "alias");
+    assert_eq!(again["lines"][0]["item_id"], milk.as_str());
+    assert_eq!(again["lines"][0]["entered_ref"], Value::Null);
+    let prompt = mock.requests.lock().unwrap().last().cloned().unwrap()["messages"][0]["content"][1]["text"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(!prompt.contains("Entered items:"));
+}

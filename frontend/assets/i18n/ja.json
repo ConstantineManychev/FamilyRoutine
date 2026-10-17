@@ -843,7 +843,11 @@
     "new_branch": "店舗を追加します：{}",
     "new_item_hint": "新しい品目です。保存時にカタログへ追加されます",
     "similar_hint": "「{}」に似ています。正しい品目か確認してください",
-    "err_image_type": "JPEG、PNG、WebP の写真に対応しています。"
+    "err_image_type": "JPEG、PNG、WebP の写真に対応しています。",
+    "recognized_linked": "入力済みの品目と照合：{}件。",
+    "recognized_missing": "レシートに見つからない品目：{}件（下に表示）。",
+    "missing_in_receipt": "認識したレシートにありません — 確認するか削除してください",
+    "updated_from_receipt": "レシートで更新、変更前：{}・{}"
   },
   "settings": {
     "title": "設定",

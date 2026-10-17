@@ -843,7 +843,11 @@
     "new_branch": "Un magasin sera ajouté : {}",
     "new_item_hint": "Nouvel article — il sera ajouté au catalogue à l’enregistrement",
     "similar_hint": "Ressemble à « {} » — vérifiez qu’il s’agit du bon article",
-    "err_image_type": "Les photos JPEG, PNG et WebP sont prises en charge."
+    "err_image_type": "Les photos JPEG, PNG et WebP sont prises en charge.",
+    "recognized_linked": "Associés aux articles déjà saisis : {}.",
+    "recognized_missing": "Absents du ticket : {} — signalés ci-dessous.",
+    "missing_in_receipt": "Absent du ticket reconnu — vérifiez ou supprimez",
+    "updated_from_receipt": "Mis à jour d’après le ticket, avant : {} pour {}"
   },
   "settings": {
     "title": "Paramètres",

@@ -390,6 +390,19 @@ pub struct RecognizeReceiptRequest
     pub media_type: String,
     #[serde(default)]
     pub tz_offset_min: i32,
+    #[serde(default)]
+    pub entered: Vec<EnteredLineDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EnteredLineDto
+{
+    pub name: String,
+    #[serde(default)]
+    pub barcode: Option<String>,
+    pub unit: ItemUnit,
+    #[serde(default)]
+    pub item_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -417,6 +430,7 @@ pub struct RecognizedLineDto
     pub item_id: Option<Uuid>,
     pub item_name: Option<String>,
     pub match_kind: LineMatch,
+    pub entered_ref: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]

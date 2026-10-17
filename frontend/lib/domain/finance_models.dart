@@ -803,6 +803,7 @@ class RecognizedLine
   final String? itemId;
   final String? itemName;
   final LineMatch match;
+  final int? enteredRef;
 
   const RecognizedLine({
     required this.text,
@@ -816,6 +817,7 @@ class RecognizedLine
     this.itemId,
     this.itemName,
     required this.match,
+    this.enteredRef,
   });
 
   factory RecognizedLine.fromJson(Map<String, dynamic> aJson) => RecognizedLine(
@@ -830,6 +832,7 @@ class RecognizedLine
         itemId: aJson['item_id'] as String?,
         itemName: aJson['item_name'] as String?,
         match: LineMatch.parse(aJson['match_kind']),
+        enteredRef: (aJson['entered_ref'] as num?)?.toInt(),
       );
 }
 

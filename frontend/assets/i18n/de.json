@@ -843,7 +843,11 @@
     "new_branch": "Eine Filiale wird hinzugefügt: {}",
     "new_item_hint": "Neuer Artikel – wird beim Speichern in den Katalog aufgenommen",
     "similar_hint": "Ähnlich wie „{}“ – prüfen Sie, ob der Artikel stimmt",
-    "err_image_type": "Unterstützt werden JPEG-, PNG- und WebP-Fotos."
+    "err_image_type": "Unterstützt werden JPEG-, PNG- und WebP-Fotos.",
+    "recognized_linked": "Bereits eingegebenen Positionen zugeordnet: {}.",
+    "recognized_missing": "Nicht auf dem Beleg gefunden: {} — unten markiert.",
+    "missing_in_receipt": "Nicht auf dem erkannten Beleg — prüfen oder entfernen",
+    "updated_from_receipt": "Vom Beleg übernommen, vorher: {} für {}"
   },
   "settings": {
     "title": "Einstellungen",

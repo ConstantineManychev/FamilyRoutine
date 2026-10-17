@@ -843,7 +843,11 @@
     "new_branch": "将添加门店：{}",
     "new_item_hint": "新条目——保存时将加入目录",
     "similar_hint": "与“{}”相似——请确认是否为同一条目",
-    "err_image_type": "支持 JPEG、PNG 和 WebP 照片。"
+    "err_image_type": "支持 JPEG、PNG 和 WebP 照片。",
+    "recognized_linked": "已与已录入的项目匹配：{} 项。",
+    "recognized_missing": "小票中未找到：{} 项——已在下方标出。",
+    "missing_in_receipt": "识别的小票中没有此项——请检查或删除",
+    "updated_from_receipt": "已按小票更新，原为：{}，{}"
   },
   "settings": {
     "title": "设置",

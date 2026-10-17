@@ -1366,7 +1366,11 @@ class ApiSvc
 
   Future<void> deleteAiKey(AiProvider aProvider) => _dio.delete('/api/settings/ai/keys/${aProvider.toJson()}');
 
-  Future<RecognizedReceipt> recognizeReceipt(String aImageBase64, String aMediaType) async
+  Future<RecognizedReceipt> recognizeReceipt(
+    String aImageBase64,
+    String aMediaType, {
+    List<Map<String, dynamic>> aEntered = const [],
+  }) async
   {
     final res = await _dio.post(
       '/api/receipts/recognize',
@@ -1374,6 +1378,7 @@ class ApiSvc
         'image': aImageBase64,
         'media_type': aMediaType,
         'tz_offset_min': DateTime.now().timeZoneOffset.inMinutes,
+        if (aEntered.isNotEmpty) 'entered': aEntered,
       },
       options: Options(receiveTimeout: const Duration(seconds: 150), sendTimeout: const Duration(seconds: 60)),
     );
