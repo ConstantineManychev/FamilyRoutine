@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            l.id,\n            l.kind AS \"kind: StockKind\",\n            l.item_id,\n            b.dish_id AS \"dish_id?\",\n            l.batch_id,\n            l.title,\n            l.measure AS \"measure: StockMeasure\",\n            l.qty,\n            l.qty - COALESCE(mv.used, 0) AS \"left_qty!\",\n            l.cost,\n            c.code AS \"curr_code?\",\n            l.source AS \"source: StockSource\",\n            l.receipt_id,\n            l.acquired_ts,\n            (mv.used IS NOT NULL) AS \"is_touched!\",\n            i.piece_g AS \"piece_g?\",\n            i.kcal AS \"item_kcal?\",\n            i.prot AS \"item_prot?\",\n            i.fat AS \"item_fat?\",\n            i.carb AS \"item_carb?\",\n            b.kcal_100 AS \"batch_kcal?\",\n            b.prot_100 AS \"batch_prot?\",\n            b.fat_100 AS \"batch_fat?\",\n            b.carb_100 AS \"batch_carb?\",\n            l.expires_on\n        FROM stock_lots l\n        LEFT JOIN (SELECT lot_id, SUM(qty) AS used FROM stock_moves GROUP BY lot_id) mv ON mv.lot_id = l.id\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND ($3::uuid IS NULL OR l.id = $3)\n          AND ($4 OR l.qty > COALESCE(mv.used, 0))\n        ORDER BY l.kind, LOWER(l.title), l.expires_on NULLS LAST, l.acquired_ts, l.id\n        ",
+  "query": "\n        SELECT\n            l.id,\n            l.kind AS \"kind: StockKind\",\n            l.item_id,\n            b.dish_id AS \"dish_id?\",\n            l.batch_id,\n            l.title,\n            l.measure AS \"measure: StockMeasure\",\n            l.qty,\n            l.qty - COALESCE(mv.used, 0) AS \"left_qty!\",\n            l.cost,\n            c.code AS \"curr_code?\",\n            l.source AS \"source: StockSource\",\n            l.receipt_id,\n            l.acquired_ts,\n            (mv.used IS NOT NULL) AS \"is_touched!\",\n            i.piece_g AS \"piece_g?\",\n            l.pack_size,\n            i.type AS \"item_kind?: ItemKind\",\n            i.unit AS \"item_unit?: ItemUnit\",\n            i.net_qty AS \"net_qty?\",\n            i.net_measure AS \"net_measure?: NetMeasure\",\n            i.kcal AS \"item_kcal?\",\n            i.prot AS \"item_prot?\",\n            i.fat AS \"item_fat?\",\n            i.carb AS \"item_carb?\",\n            b.kcal_100 AS \"batch_kcal?\",\n            b.prot_100 AS \"batch_prot?\",\n            b.fat_100 AS \"batch_fat?\",\n            b.carb_100 AS \"batch_carb?\",\n            l.expires_on\n        FROM stock_lots l\n        LEFT JOIN (SELECT lot_id, SUM(qty) AS used FROM stock_moves GROUP BY lot_id) mv ON mv.lot_id = l.id\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        LEFT JOIN currencies c ON c.id = l.curr_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND ($3::uuid IS NULL OR l.id = $3)\n          AND ($4 OR l.qty > COALESCE(mv.used, 0))\n        ORDER BY l.kind, LOWER(l.title), l.expires_on NULLS LAST, l.acquired_ts, l.id\n        ",
   "describe": {
     "columns": [
       {
@@ -117,46 +117,106 @@
       },
       {
         "ordinal": 16,
-        "name": "item_kcal?",
+        "name": "pack_size",
         "type_info": "Numeric"
       },
       {
         "ordinal": 17,
-        "name": "item_prot?",
-        "type_info": "Numeric"
+        "name": "item_kind?: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 18,
-        "name": "item_fat?",
-        "type_info": "Numeric"
+        "name": "item_unit?: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 19,
-        "name": "item_carb?",
+        "name": "net_qty?",
         "type_info": "Numeric"
       },
       {
         "ordinal": 20,
-        "name": "batch_kcal?",
-        "type_info": "Numeric"
+        "name": "net_measure?: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 21,
-        "name": "batch_prot?",
+        "name": "item_kcal?",
         "type_info": "Numeric"
       },
       {
         "ordinal": 22,
-        "name": "batch_fat?",
+        "name": "item_prot?",
         "type_info": "Numeric"
       },
       {
         "ordinal": 23,
-        "name": "batch_carb?",
+        "name": "item_fat?",
         "type_info": "Numeric"
       },
       {
         "ordinal": 24,
+        "name": "item_carb?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 25,
+        "name": "batch_kcal?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 26,
+        "name": "batch_prot?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 27,
+        "name": "batch_fat?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 28,
+        "name": "batch_carb?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 29,
         "name": "expires_on",
         "type_info": "Date"
       }
@@ -187,6 +247,11 @@
       null,
       true,
       true,
+      false,
+      false,
+      true,
+      true,
+      true,
       true,
       true,
       true,
@@ -197,5 +262,5 @@
       true
     ]
   },
-  "hash": "d7c7396e1c4a4126992e4bf006f389a7f39591f2f053e0a2c600c175204b8e88"
+  "hash": "8d21aac35498ab711b75cac80e013aa1f7f310a63b9468113cb5e6955ba5a4ff"
 }

@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE stock_lots\n                    SET measure = $2, qty = LEAST(GREATEST(ROUND(qty * $3, 1), 0.1), 1000000), pack_size = $3\n                    WHERE id = $1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        },
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "984ee3b63dc60845ef7fca50e698f8252d38f920f45116e359f5cacb138a4416"
+}

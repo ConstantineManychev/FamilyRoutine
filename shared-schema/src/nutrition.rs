@@ -151,6 +151,7 @@ pub struct MealEntryDto
     pub status_mark_id: Option<Uuid>,
     pub batch_id: Option<Uuid>,
     pub stock_short: Option<Decimal>,
+    pub is_pack_needed: bool,
     pub created_ts: DateTime<Utc>,
 }
 

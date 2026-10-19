@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO energy_marks (user_id, ts, kcal, set_by) VALUES ($1, $2, $3, $4)\n        ON CONFLICT (user_id, ts) DO UPDATE SET kcal = EXCLUDED.kcal, set_by = EXCLUDED.set_by, created_ts = NOW()\n        RETURNING id, ts, kcal::float8 AS \"kcal!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "kcal!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Numeric",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "edaba121d8d8eead235c4252efde9505cb6e423f6b941d1bf977478803444941"
+}

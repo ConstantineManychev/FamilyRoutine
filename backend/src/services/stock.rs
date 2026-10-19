@@ -28,6 +28,14 @@ pub struct LotLeft
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Intake
+{
+    pub measure: StockMeasure,
+    pub amount: Decimal,
+    pub pack: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Take
 {
     pub lot_id: Uuid,
@@ -59,7 +67,7 @@ fn in_range(a_value: Decimal) -> Option<Decimal>
 
 pub fn is_stockable(a_kind: ItemKind) -> bool
 {
-    matches!(a_kind, ItemKind::Food | ItemKind::Product)
+    a_kind == ItemKind::Food
 }
 
 pub fn measure_of(a_shape: &ItemShape) -> Option<StockMeasure>
@@ -82,7 +90,7 @@ pub fn measure_of(a_shape: &ItemShape) -> Option<StockMeasure>
     }
 }
 
-fn piece_amount(a_shape: &ItemShape, a_measure: StockMeasure) -> Option<Decimal>
+pub fn piece_amount(a_shape: &ItemShape, a_measure: StockMeasure) -> Option<Decimal>
 {
     match (a_measure, a_shape.net_qty, a_shape.net_measure)
     {
@@ -93,7 +101,16 @@ fn piece_amount(a_shape: &ItemShape, a_measure: StockMeasure) -> Option<Decimal>
     }
 }
 
-pub fn intake_qty(a_shape: &ItemShape, a_receipt_qty: Decimal) -> Option<(StockMeasure, Decimal)>
+fn pack_of(a_shape: &ItemShape, a_measure: StockMeasure) -> Option<Decimal>
+{
+    if a_shape.unit != ItemUnit::Piece || a_measure == StockMeasure::Pcs
+    {
+        return None;
+    }
+    piece_amount(a_shape, a_measure).filter(|value| *value > Decimal::ZERO)
+}
+
+pub fn intake_qty(a_shape: &ItemShape, a_receipt_qty: Decimal) -> Option<Intake>
 {
     let measure = measure_of(a_shape)?;
     let amount = match a_shape.unit
@@ -101,25 +118,68 @@ pub fn intake_qty(a_shape: &ItemShape, a_receipt_qty: Decimal) -> Option<(StockM
         ItemUnit::Kilogram | ItemUnit::Liter => a_receipt_qty * Decimal::from(THOUSAND),
         _ => a_receipt_qty * piece_amount(a_shape, measure)?,
     };
-    Some((measure, in_range(amount)?))
+    Some(Intake {
+        measure,
+        amount: in_range(amount)?,
+        pack: pack_of(a_shape, measure),
+    })
 }
 
-pub fn manual_qty(a_shape: &ItemShape, a_qty: Decimal, a_unit: StockMeasure) -> Option<(StockMeasure, Decimal)>
+pub fn manual_qty(a_shape: &ItemShape, a_qty: Decimal, a_unit: StockMeasure) -> Option<Intake>
 {
     let measure = measure_of(a_shape)?;
-    let amount = if a_unit == measure
+    let (amount, pack) = if a_unit == measure
     {
-        a_qty
+        (a_qty, None)
     }
     else if a_unit == StockMeasure::Pcs
     {
-        a_qty * piece_amount(a_shape, measure)?
+        (a_qty * piece_amount(a_shape, measure)?, pack_of(a_shape, measure))
     }
     else
     {
         return None;
     };
-    Some((measure, in_range(amount)?))
+    Some(Intake {
+        measure,
+        amount: in_range(amount)?,
+        pack,
+    })
+}
+
+pub fn display_pack(a_shape: &ItemShape, a_measure: StockMeasure, a_lot_pack: Option<Decimal>) -> Option<Decimal>
+{
+    a_lot_pack.or_else(|| pack_of(a_shape, a_measure))
+}
+
+pub fn write_off_amount(
+    a_measure: StockMeasure,
+    a_unit: Option<StockMeasure>,
+    a_qty: Decimal,
+    a_pack: Option<Decimal>,
+) -> Option<Decimal>
+{
+    let amount = match a_unit
+    {
+        None => a_qty,
+        Some(unit) if unit == a_measure => a_qty,
+        Some(StockMeasure::Pcs) if a_measure != StockMeasure::Pcs =>
+        {
+            a_qty * a_pack.filter(|pack| *pack > Decimal::ZERO)?
+        }
+        Some(_) => return None,
+    };
+    let amount = qty(amount);
+    (amount > Decimal::ZERO).then_some(amount)
+}
+
+pub fn rescaled_qty(a_qty: Decimal, a_from: Decimal, a_to: Decimal) -> Decimal
+{
+    if a_from <= Decimal::ZERO
+    {
+        return a_qty;
+    }
+    qty(a_qty * a_to / a_from).clamp(Decimal::new(1, QTY_SCALE), Decimal::from(MAX_LOT_QTY))
 }
 
 pub fn grams_per_unit(a_measure: StockMeasure, a_piece_g: Option<Decimal>) -> Option<Decimal>
@@ -218,16 +278,42 @@ mod tests
     fn receipt_quantity_becomes_mass_from_the_item_card()
     {
         let milk = shape(ItemUnit::Piece, Some(("930", NetMeasure::Ml)), None);
-        assert_eq!(intake_qty(&milk, dec("2")), Some((StockMeasure::Ml, dec("1860"))));
+        assert_eq!(
+            intake_qty(&milk, dec("2")),
+            Some(Intake {
+                measure: StockMeasure::Ml,
+                amount: dec("1860"),
+                pack: Some(dec("930")),
+            })
+        );
         let apples = shape(ItemUnit::Kilogram, None, None);
-        assert_eq!(intake_qty(&apples, dec("1.255")), Some((StockMeasure::G, dec("1255"))));
+        assert_eq!(
+            intake_qty(&apples, dec("1.255")),
+            Some(Intake {
+                measure: StockMeasure::G,
+                amount: dec("1255"),
+                pack: None,
+            })
+        );
         let eggs = shape(ItemUnit::Piece, None, Some("60"));
-        assert_eq!(intake_qty(&eggs, dec("10")), Some((StockMeasure::G, dec("600"))));
+        assert_eq!(
+            intake_qty(&eggs, dec("10")).map(|intake| intake.amount),
+            Some(dec("600"))
+        );
+        let cheese = shape(ItemUnit::Piece, None, None);
+        assert_eq!(
+            intake_qty(&cheese, dec("1")),
+            Some(Intake {
+                measure: StockMeasure::Pcs,
+                amount: dec("1"),
+                pack: None,
+            })
+        );
         let candle = ItemShape {
             kind: ItemKind::Product,
             ..shape(ItemUnit::Piece, None, None)
         };
-        assert_eq!(intake_qty(&candle, dec("3")), Some((StockMeasure::Pcs, dec("3"))));
+        assert_eq!(intake_qty(&candle, dec("3")), None);
         let haircut = ItemShape {
             kind: ItemKind::Service,
             ..shape(ItemUnit::Piece, None, None)
@@ -242,11 +328,19 @@ mod tests
         let yogurt = shape(ItemUnit::Piece, Some(("150", NetMeasure::G)), None);
         assert_eq!(
             manual_qty(&yogurt, dec("4"), StockMeasure::Pcs),
-            Some((StockMeasure::G, dec("600")))
+            Some(Intake {
+                measure: StockMeasure::G,
+                amount: dec("600"),
+                pack: Some(dec("150")),
+            })
         );
         assert_eq!(
             manual_qty(&yogurt, dec("320"), StockMeasure::G),
-            Some((StockMeasure::G, dec("320")))
+            Some(Intake {
+                measure: StockMeasure::G,
+                amount: dec("320"),
+                pack: None,
+            })
         );
         assert_eq!(manual_qty(&yogurt, dec("320"), StockMeasure::Ml), None);
         let flour = shape(ItemUnit::Kilogram, None, None);
@@ -300,6 +394,53 @@ mod tests
         let (partial, rest) = plan_takes(&[lot(3, "10", "10", Some("60"), None)], dec("150"));
         assert_eq!(partial[0].qty, dec("2.5"));
         assert_eq!(rest, Decimal::ZERO);
+    }
+
+    #[test]
+    fn write_off_converts_pieces_through_the_pack()
+    {
+        assert_eq!(
+            write_off_amount(StockMeasure::G, Some(StockMeasure::Pcs), dec("0.5"), Some(dec("290"))),
+            Some(dec("145"))
+        );
+        assert_eq!(
+            write_off_amount(StockMeasure::G, Some(StockMeasure::G), dec("250"), None),
+            Some(dec("250"))
+        );
+        assert_eq!(
+            write_off_amount(StockMeasure::G, None, dec("40"), None),
+            Some(dec("40"))
+        );
+        assert_eq!(
+            write_off_amount(StockMeasure::G, Some(StockMeasure::Pcs), dec("1"), None),
+            None
+        );
+        assert_eq!(
+            write_off_amount(StockMeasure::Pcs, Some(StockMeasure::G), dec("250"), Some(dec("290"))),
+            None
+        );
+        assert_eq!(
+            write_off_amount(StockMeasure::Ml, Some(StockMeasure::G), dec("250"), None),
+            None
+        );
+        assert_eq!(write_off_amount(StockMeasure::G, None, dec("0"), None), None);
+    }
+
+    #[test]
+    fn pack_changes_rescale_the_lot()
+    {
+        assert_eq!(rescaled_qty(dec("580"), dec("290"), dec("300")), dec("600"));
+        assert_eq!(rescaled_qty(dec("290"), dec("290"), dec("250")), dec("250"));
+        assert_eq!(rescaled_qty(dec("100"), dec("0"), dec("250")), dec("100"));
+        let packed = shape(ItemUnit::Piece, Some(("290", NetMeasure::G)), None);
+        assert_eq!(display_pack(&packed, StockMeasure::G, None), Some(dec("290")));
+        assert_eq!(
+            display_pack(&packed, StockMeasure::G, Some(dec("300"))),
+            Some(dec("300"))
+        );
+        assert_eq!(display_pack(&packed, StockMeasure::Ml, None), None);
+        let flour = shape(ItemUnit::Kilogram, None, None);
+        assert_eq!(display_pack(&flour, StockMeasure::G, None), None);
     }
 
     #[test]

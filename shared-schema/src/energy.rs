@@ -8,6 +8,25 @@ pub struct EnergyDayQuery
 {
     pub date: NaiveDate,
     pub tz: String,
+    #[serde(default)]
+    pub days: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetEnergyMarkRequest
+{
+    #[serde(default)]
+    pub person_id: Option<Uuid>,
+    pub ts: DateTime<Utc>,
+    pub kcal: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EnergyMarkDto
+{
+    pub id: Uuid,
+    pub ts: DateTime<Utc>,
+    pub kcal: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -30,14 +49,17 @@ pub struct EnergyPersonDto
     pub eaten: i64,
     pub burned_base: i64,
     pub burned_workouts: i64,
+    pub start_kcal: i64,
     pub balance: i64,
     pub points: Vec<EnergyPointDto>,
+    pub marks: Vec<EnergyMarkDto>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EnergyDayDto
 {
     pub date: NaiveDate,
+    pub days: i64,
     pub day_start: DateTime<Utc>,
     pub day_end: DateTime<Utc>,
     pub people: Vec<EnergyPersonDto>,

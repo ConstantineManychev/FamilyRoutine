@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            r.merchant_id,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            r.place_id,\n            p.name AS \"place_name?\",\n            r.place_addr_id,\n            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,\n            r.curr_id,\n            c.code AS curr_code,\n            r.cash_account_id,\n            r.note,\n            r.discount,\n            (r.owner_id = $2) AS \"is_editable!\",\n            CASE WHEN r.owner_id <> $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,\n            r.is_stocked,\n            CASE WHEN r.owner_id = $2 THEN (SELECT COUNT(*) FROM stock_lots l WHERE l.receipt_id = r.id) ELSE 0 END\n                AS \"stocked_count!\"\n        FROM receipts r\n        JOIN users owner ON owner.id = r.owner_id\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        WHERE r.id = $1 AND (r.owner_id = $2 OR EXISTS (\n            SELECT 1 FROM transactions t\n            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2\n            WHERE t.receipt_id = r.id\n        ))\n        ",
+  "query": "\n        SELECT\n            r.id,\n            r.receipt_ts,\n            r.merchant_id,\n            COALESCE(r.merchant_name, m.name) AS merchant_name,\n            r.place_id,\n            p.name AS \"place_name?\",\n            r.place_addr_id,\n            CASE WHEN pa.id IS NOT NULL THEN addr_label(ci.name, st.name, pa.house_num, pa.zip) END AS branch,\n            r.curr_id,\n            c.code AS curr_code,\n            r.cash_account_id,\n            r.note,\n            r.discount,\n            (r.owner_id = $2) AS \"is_editable!\",\n            CASE WHEN r.owner_id <> $2 THEN owner.first_name || ' ' || owner.last_name END AS owner_name,\n            r.is_stocked,\n            r.stock_family_id,\n            sf.name AS \"stock_family_name?\",\n            CASE WHEN r.owner_id = $2 THEN (SELECT COUNT(*) FROM stock_lots l WHERE l.receipt_id = r.id) ELSE 0 END\n                AS \"stocked_count!\"\n        FROM receipts r\n        JOIN users owner ON owner.id = r.owner_id\n        JOIN currencies c ON c.id = r.curr_id\n        LEFT JOIN merchants m ON m.id = r.merchant_id\n        LEFT JOIN places p ON p.id = r.place_id\n        LEFT JOIN place_addrs pa ON pa.id = r.place_addr_id\n        LEFT JOIN streets st ON st.id = pa.street_id\n        LEFT JOIN cities ci ON ci.id = pa.city_id\n        LEFT JOIN families sf ON sf.id = r.stock_family_id\n        WHERE r.id = $1 AND (r.owner_id = $2 OR EXISTS (\n            SELECT 1 FROM transactions t\n            JOIN account_viewers v ON v.account_id = t.account_id AND v.viewer_id = $2\n            WHERE t.receipt_id = r.id\n        ))\n        ",
   "describe": {
     "columns": [
       {
@@ -85,6 +85,16 @@
       },
       {
         "ordinal": 16,
+        "name": "stock_family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 17,
+        "name": "stock_family_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 18,
         "name": "stocked_count!",
         "type_info": "Int8"
       }
@@ -112,8 +122,10 @@
       null,
       null,
       false,
+      true,
+      false,
       null
     ]
   },
-  "hash": "81ebd48da9c4d4b0d6965d71827f978c58e8fe3e6c7a6acfe95369243918084b"
+  "hash": "2f0ed931cc0bf7e2e4b04bac5f33e6d49e3c763ef29b841d288222e1863fd70b"
 }

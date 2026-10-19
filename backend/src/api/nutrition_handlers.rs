@@ -172,6 +172,7 @@ impl From<EntryRow> for MealEntryDto
             status_mark_id: a_row.status_mark_id,
             batch_id: a_row.batch_id,
             stock_short: a_row.stock_short.map(|value| value.normalize()),
+            is_pack_needed: false,
             created_ts: a_row.created_ts,
         }
     }
@@ -744,14 +745,14 @@ async fn take_from_stock(
     a_item_id: Option<Uuid>,
     a_batch_id: Option<Uuid>,
     a_grams: Option<Decimal>,
-) -> Result<Option<Decimal>, ApiError>
+) -> Result<Option<(Decimal, bool)>, ApiError>
 {
     let Some(grams) = a_grams
     else
     {
         return Ok(None);
     };
-    let short = match (a_item_id, a_batch_id)
+    let (short, is_pack_needed) = match (a_item_id, a_batch_id)
     {
         (Some(item_id), None) =>
         {
@@ -759,14 +760,18 @@ async fn take_from_stock(
             sqlx::query!("DELETE FROM stock_moves WHERE meal_entry_id = $1", a_entry_id)
                 .execute(&mut *a_conn)
                 .await?;
-            consume_item(a_conn, store, item_id, grams, Consumer::Entry(a_entry_id), a_user_id).await?
+            let consumed = consume_item(a_conn, store, item_id, grams, Consumer::Entry(a_entry_id), a_user_id).await?;
+            (consumed.short, consumed.is_pack_needed)
         }
         (None, Some(batch_id)) =>
         {
             sqlx::query!("DELETE FROM stock_moves WHERE meal_entry_id = $1", a_entry_id)
                 .execute(&mut *a_conn)
                 .await?;
-            consume_batch(a_conn, batch_id, grams, a_entry_id, a_user_id).await?
+            (
+                consume_batch(a_conn, batch_id, grams, a_entry_id, a_user_id).await?,
+                false,
+            )
         }
         _ => return Ok(None),
     };
@@ -778,7 +783,7 @@ async fn take_from_stock(
     )
     .execute(&mut *a_conn)
     .await?;
-    Ok(Some(short))
+    Ok(Some((short, is_pack_needed)))
 }
 
 async fn require_day_capacity(
@@ -944,7 +949,10 @@ pub async fn create_entry(
             entry.grams,
         )
         .await?
-        .map(|value| value.normalize());
+        .map(|(short, is_pack_needed)| {
+            entry.is_pack_needed = is_pack_needed;
+            short.normalize()
+        });
     }
 
     tx.commit().await?;
@@ -1044,7 +1052,10 @@ pub async fn update_entry(
             entry.grams,
         )
         .await?
-        .map(|value| value.normalize());
+        .map(|(short, is_pack_needed)| {
+            entry.is_pack_needed = is_pack_needed;
+            short.normalize()
+        });
     }
 
     tx.commit().await?;

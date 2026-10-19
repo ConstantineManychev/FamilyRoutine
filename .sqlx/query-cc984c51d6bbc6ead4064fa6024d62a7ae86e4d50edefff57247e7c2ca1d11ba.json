@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE stock_moves SET qty = GREATEST(ROUND(qty * $2, 1), 0.1) WHERE lot_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc984c51d6bbc6ead4064fa6024d62a7ae86e4d50edefff57247e7c2ca1d11ba"
+}

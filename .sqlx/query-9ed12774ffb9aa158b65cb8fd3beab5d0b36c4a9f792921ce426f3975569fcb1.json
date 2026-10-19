@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT me.user_id, COALESCE(m.start_ts, me.created_ts) AS \"ts!\", me.kcal::float8 AS \"kcal!\"\n        FROM meal_entries me\n        LEFT JOIN status_marks m ON m.id = me.status_mark_id\n        WHERE me.user_id = ANY($1) AND me.eaten_on = $2\n        ",
+  "query": "\n        SELECT me.user_id, COALESCE(m.start_ts, me.created_ts) AS \"ts!\", me.kcal::float8 AS \"kcal!\"\n        FROM meal_entries me\n        LEFT JOIN status_marks m ON m.id = me.status_mark_id\n        WHERE me.user_id = ANY($1)\n          AND COALESCE(m.start_ts, me.created_ts) >= $2 AND COALESCE(m.start_ts, me.created_ts) < $3\n        ",
   "describe": {
     "columns": [
       {
@@ -22,7 +22,8 @@
     "parameters": {
       "Left": [
         "UuidArray",
-        "Date"
+        "Timestamptz",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -31,5 +32,5 @@
       null
     ]
   },
-  "hash": "32dcbaed12aecc2449ce572fa4d5978d00d64da6f84a94fad49eb4ba8259abd0"
+  "hash": "9ed12774ffb9aa158b65cb8fd3beab5d0b36c4a9f792921ce426f3975569fcb1"
 }

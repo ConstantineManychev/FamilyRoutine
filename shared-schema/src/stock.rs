@@ -42,6 +42,7 @@ pub enum StockMoveKind
     Eaten,
     Cooked,
     Waste,
+    Used,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -107,6 +108,7 @@ pub struct StockLotDto
     pub acquired_ts: DateTime<Utc>,
     pub is_touched: bool,
     pub piece_g: Option<Decimal>,
+    pub pack_size: Option<Decimal>,
     pub per_100: Option<MacrosDto>,
     pub expires_on: Option<NaiveDate>,
     pub is_expired: bool,
@@ -152,9 +154,36 @@ pub struct SetLotExpiryRequest
 pub struct WasteRequest
 {
     pub qty: Decimal,
-    pub reason: WasteReason,
+    #[serde(default)]
+    pub unit: Option<StockMeasure>,
+    #[serde(default)]
+    pub reason: Option<WasteReason>,
     #[serde(default)]
     pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WriteOffRequest
+{
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
+    #[serde(default)]
+    pub is_personal: bool,
+    pub item_id: Uuid,
+    pub qty: Decimal,
+    #[serde(default)]
+    pub unit: Option<StockMeasure>,
+    #[serde(default)]
+    pub reason: Option<WasteReason>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct StockStoreChoice
+{
+    #[serde(default)]
+    pub family_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

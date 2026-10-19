@@ -106,12 +106,25 @@ async fn marks_split_the_day_without_overlaps(a_db: PgPool)
         .await;
     assert_eq!(too_old.status, StatusCode::BAD_REQUEST);
 
+    let month = app
+        .call(
+            Method::GET,
+            &format!(
+                "/api/routine/timeline?from={}&to={}",
+                iso(now - Duration::days(30)),
+                iso(now)
+            ),
+            Some(&anna.token),
+            None,
+        )
+        .await;
+    assert_eq!(month.status, StatusCode::OK, "{}", month.body);
     let too_wide = app
         .call(
             Method::GET,
             &format!(
                 "/api/routine/timeline?from={}&to={}",
-                iso(now - Duration::days(10)),
+                iso(now - Duration::days(40)),
                 iso(now)
             ),
             Some(&anna.token),

@@ -376,6 +376,8 @@ pub struct SaveReceiptRequest
     pub discount: Decimal,
     #[serde(default = "is_stocked_default")]
     pub is_stocked: bool,
+    #[serde(default)]
+    pub stock_store: Option<crate::StockStoreChoice>,
 }
 
 fn is_stocked_default() -> bool
@@ -475,6 +477,8 @@ pub struct ReceiptDto
     pub is_editable: bool,
     pub owner_name: Option<String>,
     pub is_stocked: bool,
+    pub stock_family_id: Option<Uuid>,
+    pub stock_family_name: Option<String>,
     pub stocked_count: i64,
 }
 

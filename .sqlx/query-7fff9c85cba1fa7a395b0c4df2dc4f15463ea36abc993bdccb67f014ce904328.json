@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT e.id, e.user_id, e.grams AS \"grams!\"\n        FROM meal_entries e\n        WHERE e.item_id = $1 AND e.batch_id IS NULL AND e.stock_short > 0 AND e.grams IS NOT NULL\n          AND e.created_ts >= $2\n        ORDER BY e.created_ts, e.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "grams!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7fff9c85cba1fa7a395b0c4df2dc4f15463ea36abc993bdccb67f014ce904328"
+}

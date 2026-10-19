@@ -13,7 +13,8 @@
               "Enum": [
                 "eaten",
                 "cooked",
-                "waste"
+                "waste",
+                "used"
               ]
             }
           }

@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, owner_id, family_id, measure AS \"measure: StockMeasure\", qty, pack_size, created_ts\n        FROM stock_lots\n        WHERE kind = 'item' AND item_id = $1 AND (measure = 'pcs' OR pack_size IS NOT NULL)\n        ORDER BY created_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "family_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "pack_size",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "7486e9afb4f23a043f7b25a240080c9630979492597db92ca8ee4d02debab5e1"
+}

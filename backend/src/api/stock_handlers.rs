@@ -10,7 +10,7 @@ use shared_schema::{
     BatchQuery, CookBatchDto, CookBatchItemDto, CookRequest, ItemKind, ItemUnit, MacrosDto, MoneyTotalDto, NetMeasure,
     NewStockLotRequest, SaveStockSettingsRequest, SetLotExpiryRequest, StockDto, StockKind, StockLotDto, StockMeasure,
     StockMoveDto, StockMoveKind, StockMovesDto, StockMovesQuery, StockQuery, StockSettingsDto, StockSource,
-    StockStoreDto, WasteReason, WasteRequest,
+    StockStoreDto, WasteReason, WasteRequest, WriteOffRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -26,7 +26,8 @@ use crate::security::authz::require_member;
 use crate::services::nutrition::{dish_math, Ingredient};
 use crate::services::planner::{local_date, parse_zone};
 use crate::services::stock::{
-    cost_share, grams_per_unit, intake_qty, manual_qty, plan_takes, qty, ItemShape, LotLeft, COST_SCALE,
+    cost_share, display_pack, grams_per_unit, intake_qty, manual_qty, measure_of, piece_amount, plan_takes, qty,
+    rescaled_qty, write_off_amount, Intake, ItemShape, LotLeft, Take, COST_SCALE,
 };
 use crate::state::AppState;
 
@@ -46,7 +47,7 @@ pub struct Store
 
 impl Store
 {
-    fn personal(a_user_id: Uuid) -> Self
+    pub fn personal(a_user_id: Uuid) -> Self
     {
         Self {
             owner_id: Some(a_user_id),
@@ -54,7 +55,7 @@ impl Store
         }
     }
 
-    fn group(a_family_id: Uuid) -> Self
+    pub fn group(a_family_id: Uuid) -> Self
     {
         Self {
             owner_id: None,
@@ -83,6 +84,13 @@ pub enum Consumer
     Batch(Uuid),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Consumed
+{
+    pub short: Decimal,
+    pub is_pack_needed: bool,
+}
+
 struct LotRow
 {
     id: Uuid,
@@ -101,6 +109,11 @@ struct LotRow
     acquired_ts: DateTime<Utc>,
     is_touched: bool,
     piece_g: Option<Decimal>,
+    pack_size: Option<Decimal>,
+    item_kind: Option<ItemKind>,
+    item_unit: Option<ItemUnit>,
+    net_qty: Option<Decimal>,
+    net_measure: Option<NetMeasure>,
     item_kcal: Option<Decimal>,
     item_prot: Option<Decimal>,
     item_fat: Option<Decimal>,
@@ -122,6 +135,21 @@ impl LotRow
             StockKind::Dish => item_per_100(self.batch_kcal, self.batch_prot, self.batch_fat, self.batch_carb),
         };
         let left_qty = self.left_qty.max(Decimal::ZERO);
+        let pack_size = match (self.item_kind, self.item_unit)
+        {
+            (Some(kind), Some(unit)) => display_pack(
+                &ItemShape {
+                    kind,
+                    unit,
+                    net_qty: self.net_qty,
+                    net_measure: self.net_measure,
+                    piece_g: self.piece_g,
+                },
+                self.measure,
+                self.pack_size,
+            ),
+            _ => None,
+        };
         StockLotDto {
             id: self.id,
             kind: self.kind,
@@ -140,6 +168,7 @@ impl LotRow
             acquired_ts: self.acquired_ts,
             is_touched: self.is_touched,
             piece_g: self.piece_g.map(|value| value.normalize()),
+            pack_size: pack_size.map(|value| value.normalize()),
             per_100,
             is_expired: self.expires_on.is_some_and(|expires_on| expires_on < a_today),
             expires_on: self.expires_on,
@@ -260,7 +289,7 @@ async fn store_name(a_conn: &mut PgConnection, a_store: Store) -> Result<Option<
 
 async fn insert_moves(
     a_conn: &mut PgConnection,
-    a_takes: &[crate::services::stock::Take],
+    a_takes: &[Take],
     a_consumer: Consumer,
     a_user_id: Uuid,
 ) -> Result<(), ApiError>
@@ -298,7 +327,7 @@ pub async fn consume_item(
     a_grams: Decimal,
     a_consumer: Consumer,
     a_user_id: Uuid,
-) -> Result<Decimal, ApiError>
+) -> Result<Consumed, ApiError>
 {
     lock_store(a_conn, a_store).await?;
     let today = store_today(a_conn, a_store).await?;
@@ -332,7 +361,13 @@ pub async fn consume_item(
         .collect();
     let (takes, short) = plan_takes(&lots, a_grams);
     insert_moves(a_conn, &takes, a_consumer, a_user_id).await?;
-    Ok(short)
+    let has_unmeasured = lots
+        .iter()
+        .any(|lot| lot.grams_per_unit.is_none() && lot.left > Decimal::ZERO);
+    Ok(Consumed {
+        short,
+        is_pack_needed: short > Decimal::ZERO && has_unmeasured,
+    })
 }
 
 pub async fn consume_batch(
@@ -423,7 +458,7 @@ pub async fn sync_receipt_stock(
     a_conn: &mut PgConnection,
     a_receipt_id: Uuid,
     a_owner_id: Uuid,
-    a_is_stocked: bool,
+    a_target: Option<Store>,
     a_paid_share: Decimal,
 ) -> Result<(), ApiError>
 {
@@ -456,8 +491,8 @@ pub async fn sync_receipt_stock(
     .fetch_all(&mut *a_conn)
     .await?;
 
-    let mut wanted: BTreeMap<i16, (Uuid, String, StockMeasure, Decimal, Decimal)> = BTreeMap::new();
-    if a_is_stocked
+    let mut wanted: BTreeMap<i16, (Uuid, String, Intake, Decimal)> = BTreeMap::new();
+    if a_target.is_some()
     {
         for item in items
         {
@@ -468,43 +503,47 @@ pub async fn sync_receipt_stock(
                 net_measure: item.net_measure,
                 piece_g: item.piece_g,
             };
-            if let Some((measure, amount)) = intake_qty(&shape, item.qty)
+            if let Some(intake) = intake_qty(&shape, item.qty)
             {
                 let cost = (item.amount * a_paid_share).round_dp(COST_SCALE);
-                wanted.insert(item.pos, (item.item_id, item.name, measure, amount, cost));
+                wanted.insert(item.pos, (item.item_id, item.name, intake, cost));
             }
         }
     }
 
-    let store = match lots.first()
+    let previous = lots.first().map(|lot| Store::of(lot.owner_id, lot.family_id));
+    if let Some(store) = previous
     {
-        Some(lot) => Store::of(lot.owner_id, lot.family_id),
-        None if wanted.is_empty() => return Ok(()),
-        None => active_store(a_conn, a_owner_id).await?,
-    };
-    lock_store(a_conn, store).await?;
+        lock_store(a_conn, store).await?;
+    }
+    if let Some(store) = a_target.filter(|store| Some(*store) != previous)
+    {
+        lock_store(a_conn, store).await?;
+    }
 
     for lot in &lots
     {
-        let is_same = wanted
-            .get(&lot.receipt_pos)
-            .is_some_and(|(item_id, _, measure, _, _)| Some(*item_id) == lot.item_id && *measure == lot.measure);
+        let is_same = a_target == Some(Store::of(lot.owner_id, lot.family_id))
+            && wanted
+                .get(&lot.receipt_pos)
+                .is_some_and(|(item_id, _, intake, _)| Some(*item_id) == lot.item_id && intake.measure == lot.measure);
         if is_same
         {
-            if let Some((_, title, _, amount, cost)) = wanted.remove(&lot.receipt_pos)
+            if let Some((_, title, intake, cost)) = wanted.remove(&lot.receipt_pos)
             {
                 sqlx::query!(
                     r#"
                     UPDATE stock_lots
-                    SET qty = $2, cost = $3, curr_id = $4, title = $5, acquired_ts = $6
+                    SET qty = $2, cost = $3, curr_id = $4, title = $5, acquired_ts = $6, pack_size = $7
                     WHERE id = $1
                     "#,
                     lot.id,
-                    amount,
+                    intake.amount,
                     cost,
                     head.curr_id,
                     title,
-                    head.receipt_ts
+                    head.receipt_ts,
+                    intake.pack
                 )
                 .execute(&mut *a_conn)
                 .await?;
@@ -524,34 +563,68 @@ pub async fn sync_receipt_stock(
         }
     }
 
+    let Some(store) = a_target
+    else
+    {
+        return Ok(());
+    };
     require_room(a_conn, store, i64::try_from(wanted.len()).unwrap_or(i64::MAX)).await?;
-    for (pos, (item_id, title, measure, amount, cost)) in wanted
+    for (pos, (item_id, title, intake, cost)) in wanted
     {
         sqlx::query!(
             r#"
             INSERT INTO stock_lots (
                 owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, receipt_id,
-                receipt_pos, added_by, acquired_ts
+                receipt_pos, added_by, acquired_ts, pack_size
             )
-            VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'receipt', $9, $10, $11, $12)
+            VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'receipt', $9, $10, $11, $12, $13)
             "#,
             store.owner_id,
             store.family_id,
             item_id,
             title,
-            measure as StockMeasure,
-            amount,
+            intake.measure as StockMeasure,
+            intake.amount,
             cost,
             head.curr_id,
             a_receipt_id,
             pos,
             a_owner_id,
-            head.receipt_ts
+            head.receipt_ts,
+            intake.pack
         )
         .execute(&mut *a_conn)
         .await?;
     }
     Ok(())
+}
+
+pub async fn receipt_store(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_is_stocked: bool,
+    a_choice: Option<shared_schema::StockStoreChoice>,
+) -> Result<Option<Store>, ApiError>
+{
+    if !a_is_stocked
+    {
+        return Ok(None);
+    }
+    match a_choice
+    {
+        None => active_store(a_conn, a_user_id).await.map(Some),
+        Some(choice) => match choice.family_id
+        {
+            Some(family_id) =>
+            {
+                require_member(&mut *a_conn, family_id, a_user_id)
+                    .await
+                    .map_err(|_| ApiError::Validation("stock_store"))?;
+                Ok(Some(Store::group(family_id)))
+            }
+            None => Ok(Some(Store::personal(a_user_id))),
+        },
+    }
 }
 
 pub async fn release_receipt_stock(a_conn: &mut PgConnection, a_receipt_id: Uuid) -> Result<(), ApiError>
@@ -601,6 +674,11 @@ async fn query_lots(
             l.acquired_ts,
             (mv.used IS NOT NULL) AS "is_touched!",
             i.piece_g AS "piece_g?",
+            l.pack_size,
+            i.type AS "item_kind?: ItemKind",
+            i.unit AS "item_unit?: ItemUnit",
+            i.net_qty AS "net_qty?",
+            i.net_measure AS "net_measure?: NetMeasure",
             i.kcal AS "item_kcal?",
             i.prot AS "item_prot?",
             i.fat AS "item_fat?",
@@ -806,7 +884,11 @@ pub async fn create_lot(
         net_measure: item.net_measure,
         piece_g: item.piece_g,
     };
-    let (measure, amount) = manual_qty(&shape, a_req.qty, a_req.unit).ok_or(ApiError::Validation("qty"))?;
+    if measure_of(&shape).is_none()
+    {
+        return Err(ApiError::Validation("item_id"));
+    }
+    let intake = manual_qty(&shape, a_req.qty, a_req.unit).ok_or(ApiError::Validation("qty"))?;
     if let Some(curr_id) = a_req.curr_id
     {
         let is_known = sqlx::query_scalar!(
@@ -828,22 +910,23 @@ pub async fn create_lot(
         r#"
         INSERT INTO stock_lots (
             owner_id, family_id, kind, item_id, title, measure, qty, cost, curr_id, source, added_by, acquired_ts,
-            expires_on
+            expires_on, pack_size
         )
-        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10, $11)
+        VALUES ($1, $2, 'item', $3, $4, $5, $6, $7, $8, 'manual', $9, $10, $11, $12)
         RETURNING id
         "#,
         store.owner_id,
         store.family_id,
         a_req.item_id,
         item.name,
-        measure as StockMeasure,
-        amount,
+        intake.measure as StockMeasure,
+        intake.amount,
         cost,
         a_req.curr_id,
         a_user.user_id,
         acquired_ts,
-        a_req.expires_on
+        a_req.expires_on,
+        intake.pack
     )
     .fetch_one(&mut *tx)
     .await?;
@@ -920,6 +1003,137 @@ pub async fn set_lot_expiry(
     Ok(Json(updated))
 }
 
+struct WriteOffLot
+{
+    id: Uuid,
+    measure: StockMeasure,
+    qty: Decimal,
+    left: Decimal,
+    cost: Option<Decimal>,
+    pack: Option<Decimal>,
+}
+
+async fn write_off_lots(
+    a_conn: &mut PgConnection,
+    a_store: Store,
+    a_item_id: Option<Uuid>,
+    a_lot_id: Option<Uuid>,
+) -> Result<Vec<WriteOffLot>, ApiError>
+{
+    let rows = sqlx::query!(
+        r#"
+        SELECT l.id, l.measure AS "measure: StockMeasure", l.qty, l.cost, l.pack_size,
+               i.type AS "item_kind?: ItemKind", i.unit AS "item_unit?: ItemUnit", i.net_qty AS "net_qty?",
+               i.net_measure AS "net_measure?: NetMeasure", i.piece_g AS "piece_g?",
+               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS "left!"
+        FROM stock_lots l
+        LEFT JOIN items i ON i.id = l.item_id
+        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2
+          AND ($3::uuid IS NULL OR (l.kind = 'item' AND l.item_id = $3))
+          AND ($4::uuid IS NULL OR l.id = $4)
+        ORDER BY l.expires_on NULLS LAST, l.acquired_ts, l.created_ts, l.id
+        "#,
+        a_store.owner_id,
+        a_store.family_id,
+        a_item_id,
+        a_lot_id
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter(|row| row.left > Decimal::ZERO)
+        .map(|row| {
+            let pack = match (row.item_kind, row.item_unit)
+            {
+                (Some(kind), Some(unit)) => display_pack(
+                    &ItemShape {
+                        kind,
+                        unit,
+                        net_qty: row.net_qty,
+                        net_measure: row.net_measure,
+                        piece_g: row.piece_g,
+                    },
+                    row.measure,
+                    row.pack_size,
+                ),
+                _ => None,
+            };
+            WriteOffLot {
+                id: row.id,
+                measure: row.measure,
+                qty: row.qty,
+                left: row.left,
+                cost: row.cost,
+                pack,
+            }
+        })
+        .collect())
+}
+
+async fn write_off(
+    a_conn: &mut PgConnection,
+    a_lots: &[WriteOffLot],
+    a_qty: Decimal,
+    a_unit: Option<StockMeasure>,
+    a_reason: Option<WasteReason>,
+    a_note: Option<&str>,
+    a_user_id: Uuid,
+) -> Result<(), ApiError>
+{
+    let Some(first) = a_lots.first()
+    else
+    {
+        return Err(ApiError::Validation("qty"));
+    };
+    let measure = first.measure;
+    let amount = write_off_amount(measure, a_unit, a_qty, first.pack).ok_or(ApiError::Validation("unit"))?;
+    let same: Vec<&WriteOffLot> = a_lots.iter().filter(|lot| lot.measure == measure).collect();
+    let available: Decimal = same.iter().map(|lot| lot.left).sum();
+    if amount > available + Decimal::new(1, 1)
+    {
+        return Err(ApiError::Validation("qty"));
+    }
+    let lefts: Vec<LotLeft> = same
+        .iter()
+        .map(|lot| LotLeft {
+            id: lot.id,
+            qty: lot.qty,
+            left: lot.left,
+            grams_per_unit: Some(Decimal::ONE),
+            cost: lot.cost,
+        })
+        .collect();
+    let (takes, _) = plan_takes(&lefts, amount.min(available));
+    let kind = if a_reason.is_some()
+    {
+        StockMoveKind::Waste
+    }
+    else
+    {
+        StockMoveKind::Used
+    };
+    for take in takes
+    {
+        sqlx::query!(
+            r#"
+            INSERT INTO stock_moves (lot_id, kind, qty, cost, reason, note, user_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+            take.lot_id,
+            kind as StockMoveKind,
+            take.qty,
+            take.cost,
+            a_reason as Option<WasteReason>,
+            a_note,
+            a_user_id
+        )
+        .execute(&mut *a_conn)
+        .await?;
+    }
+    Ok(())
+}
+
 pub async fn waste_lot(
     State(a_state): State<AppState>,
     a_user: AuthUser,
@@ -928,36 +1142,215 @@ pub async fn waste_lot(
 ) -> Result<Json<StockLotDto>, ApiError>
 {
     let note = clean_optional_text(a_req.note.as_deref(), MAX_NOTE_LEN, "note")?;
-    let amount = qty(a_req.qty);
-    if amount <= Decimal::ZERO
-    {
-        return Err(ApiError::Validation("qty"));
-    }
     let mut tx = a_state.db.begin().await?;
     let lot = visible_lot(&mut tx, a_id, a_user.user_id).await?;
     lock_store(&mut tx, lot.store).await?;
-    let current = load_lot(&mut tx, lot.store, a_id).await?;
-    if amount > current.left_qty
-    {
-        return Err(ApiError::Validation("qty"));
-    }
-    sqlx::query!(
-        r#"
-        INSERT INTO stock_moves (lot_id, kind, qty, cost, reason, note, user_id)
-        VALUES ($1, 'waste', $2, $3, $4, $5, $6)
-        "#,
-        a_id,
-        amount,
-        cost_share(current.cost, current.qty, amount),
-        a_req.reason as WasteReason,
-        note,
-        a_user.user_id
+    let lots = write_off_lots(&mut tx, lot.store, None, Some(a_id)).await?;
+    write_off(
+        &mut tx,
+        &lots,
+        a_req.qty,
+        a_req.unit,
+        a_req.reason,
+        note.as_deref(),
+        a_user.user_id,
     )
-    .execute(&mut *tx)
     .await?;
     let updated = load_lot(&mut tx, lot.store, a_id).await?;
     tx.commit().await?;
     Ok(Json(updated))
+}
+
+pub async fn write_off_item(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiJson(a_req): ApiJson<WriteOffRequest>,
+) -> Result<StatusCode, ApiError>
+{
+    let note = clean_optional_text(a_req.note.as_deref(), MAX_NOTE_LEN, "note")?;
+    let mut tx = a_state.db.begin().await?;
+    let store = chosen_store(&mut tx, a_user.user_id, a_req.family_id, a_req.is_personal).await?;
+    lock_store(&mut tx, store).await?;
+    let lots = write_off_lots(&mut tx, store, Some(a_req.item_id), None).await?;
+    write_off(
+        &mut tx,
+        &lots,
+        a_req.qty,
+        a_req.unit,
+        a_req.reason,
+        note.as_deref(),
+        a_user.user_id,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+struct ScaledLot
+{
+    id: Uuid,
+    owner_id: Option<Uuid>,
+    family_id: Option<Uuid>,
+    measure: StockMeasure,
+    qty: Decimal,
+    pack_size: Option<Decimal>,
+    created_ts: DateTime<Utc>,
+}
+
+pub async fn rescale_item_stock(a_conn: &mut PgConnection, a_item_id: Uuid) -> Result<(), ApiError>
+{
+    let Some(item) = sqlx::query!(
+        r#"
+        SELECT type AS "kind: ItemKind", unit AS "unit: ItemUnit", net_qty, net_measure AS "net_measure: NetMeasure",
+               piece_g
+        FROM items WHERE id = $1
+        "#,
+        a_item_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?
+    else
+    {
+        return Ok(());
+    };
+    let shape = ItemShape {
+        kind: item.kind,
+        unit: item.unit,
+        net_qty: item.net_qty,
+        net_measure: item.net_measure,
+        piece_g: item.piece_g,
+    };
+    let Some(target) = measure_of(&shape).filter(|measure| *measure != StockMeasure::Pcs)
+    else
+    {
+        return Ok(());
+    };
+    if shape.unit != ItemUnit::Piece
+    {
+        return Ok(());
+    }
+    let Some(pack) = piece_amount(&shape, target).filter(|pack| *pack > Decimal::ZERO)
+    else
+    {
+        return Ok(());
+    };
+    let lots = sqlx::query_as!(
+        ScaledLot,
+        r#"
+        SELECT id, owner_id, family_id, measure AS "measure: StockMeasure", qty, pack_size, created_ts
+        FROM stock_lots
+        WHERE kind = 'item' AND item_id = $1 AND (measure = 'pcs' OR pack_size IS NOT NULL)
+        ORDER BY created_ts
+        "#,
+        a_item_id
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    let mut converted: Vec<(Store, DateTime<Utc>)> = Vec::new();
+    for lot in lots
+    {
+        let store = Store::of(lot.owner_id, lot.family_id);
+        match (lot.measure, lot.pack_size)
+        {
+            (StockMeasure::Pcs, _) =>
+            {
+                lock_store(a_conn, store).await?;
+                sqlx::query!(
+                    r#"
+                    UPDATE stock_lots
+                    SET measure = $2, qty = LEAST(GREATEST(ROUND(qty * $3, 1), 0.1), 1000000), pack_size = $3
+                    WHERE id = $1
+                    "#,
+                    lot.id,
+                    target as StockMeasure,
+                    pack
+                )
+                .execute(&mut *a_conn)
+                .await?;
+                sqlx::query!(
+                    "UPDATE stock_moves SET qty = GREATEST(ROUND(qty * $2, 1), 0.1) WHERE lot_id = $1",
+                    lot.id,
+                    pack
+                )
+                .execute(&mut *a_conn)
+                .await?;
+                match converted.iter_mut().find(|(known, _)| *known == store)
+                {
+                    Some((_, since)) => *since = (*since).min(lot.created_ts),
+                    None => converted.push((store, lot.created_ts)),
+                }
+            }
+            (_, Some(old)) if old != pack || lot.measure != target =>
+            {
+                lock_store(a_conn, store).await?;
+                sqlx::query!(
+                    "UPDATE stock_lots SET measure = $2, qty = $3, pack_size = $4 WHERE id = $1",
+                    lot.id,
+                    target as StockMeasure,
+                    rescaled_qty(lot.qty, old, pack),
+                    pack
+                )
+                .execute(&mut *a_conn)
+                .await?;
+            }
+            _ =>
+            {}
+        }
+    }
+    for (store, since) in converted
+    {
+        resync_short_entries(a_conn, store, a_item_id, since).await?;
+    }
+    Ok(())
+}
+
+async fn resync_short_entries(
+    a_conn: &mut PgConnection,
+    a_store: Store,
+    a_item_id: Uuid,
+    a_since: DateTime<Utc>,
+) -> Result<(), ApiError>
+{
+    let entries = sqlx::query!(
+        r#"
+        SELECT e.id, e.user_id, e.grams AS "grams!"
+        FROM meal_entries e
+        WHERE e.item_id = $1 AND e.batch_id IS NULL AND e.stock_short > 0 AND e.grams IS NOT NULL
+          AND e.created_ts >= $2
+        ORDER BY e.created_ts, e.id
+        "#,
+        a_item_id,
+        a_since
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    for entry in entries
+    {
+        if entry_store(a_conn, entry.id, entry.user_id).await? != a_store
+        {
+            continue;
+        }
+        sqlx::query!("DELETE FROM stock_moves WHERE meal_entry_id = $1", entry.id)
+            .execute(&mut *a_conn)
+            .await?;
+        let consumed = consume_item(
+            a_conn,
+            a_store,
+            a_item_id,
+            entry.grams,
+            Consumer::Entry(entry.id),
+            entry.user_id,
+        )
+        .await?;
+        sqlx::query!(
+            "UPDATE meal_entries SET stock_short = $2 WHERE id = $1",
+            entry.id,
+            consumed.short.min(entry.grams)
+        )
+        .execute(&mut *a_conn)
+        .await?;
+    }
+    Ok(())
 }
 
 async fn load_batches(
@@ -1166,7 +1559,8 @@ pub async fn cook(
             Consumer::Batch(batch_id),
             a_user.user_id,
         )
-        .await?;
+        .await?
+        .short;
         sqlx::query!(
             r#"
             INSERT INTO cook_batch_items (batch_id, position, item_id, item_name, grams, short_g)

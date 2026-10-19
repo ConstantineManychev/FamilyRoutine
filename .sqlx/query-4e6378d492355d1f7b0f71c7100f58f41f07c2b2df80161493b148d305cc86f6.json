@@ -1,0 +1,131 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l.id, l.measure AS \"measure: StockMeasure\", l.qty, l.cost, l.pack_size,\n               i.type AS \"item_kind?: ItemKind\", i.unit AS \"item_unit?: ItemUnit\", i.net_qty AS \"net_qty?\",\n               i.net_measure AS \"net_measure?: NetMeasure\", i.piece_g AS \"piece_g?\",\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left!\"\n        FROM stock_lots l\n        LEFT JOIN items i ON i.id = l.item_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND ($3::uuid IS NULL OR (l.kind = 'item' AND l.item_id = $3))\n          AND ($4::uuid IS NULL OR l.id = $4)\n        ORDER BY l.expires_on NULLS LAST, l.acquired_ts, l.created_ts, l.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "pack_size",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "item_kind?: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "item_unit?: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "net_qty?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "net_measure?: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "piece_g?",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "4e6378d492355d1f7b0f71c7100f58f41f07c2b2df80161493b148d305cc86f6"
+}

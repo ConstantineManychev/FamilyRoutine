@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::place_handlers::require_visible_place;
+use crate::api::stock_handlers::rescale_item_stock;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{
     check_money, check_qty, clean_barcode, clean_optional_text, clean_text, contains_pattern, money,
@@ -294,6 +295,7 @@ pub async fn update_item(
     )
     .execute(&mut *tx)
     .await?;
+    rescale_item_stock(&mut tx, a_id).await?;
 
     let item = load_item(&a_state, &mut tx, &viewer, a_id).await?;
     tx.commit().await?;
@@ -372,6 +374,7 @@ pub async fn fill_item(
     )
     .execute(&mut *tx)
     .await?;
+    rescale_item_stock(&mut tx, a_id).await?;
 
     let item = load_item(&a_state, &mut tx, &viewer, a_id).await?;
     tx.commit().await?;
@@ -496,6 +499,8 @@ pub async fn merge_item(
         .execute(&mut *tx)
         .await?;
     }
+
+    rescale_item_stock(&mut tx, a_req.target_id).await?;
 
     let item = load_item(&a_state, &mut tx, &viewer, a_req.target_id).await?;
     tx.commit().await?;

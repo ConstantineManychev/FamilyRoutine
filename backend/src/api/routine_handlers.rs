@@ -26,7 +26,7 @@ use crate::state::AppState;
 const MAX_NOTE_LEN: usize = 200;
 const MAX_PAST_DAYS: i64 = 31;
 const MAX_FUTURE_HOURS: i64 = 24;
-const MAX_TIMELINE_DAYS: i64 = 8;
+const MAX_TIMELINE_DAYS: i64 = 32;
 const MAX_RECENT_MARKS: i64 = 2000;
 const MAX_LINKED_ENTRIES: usize = 100;
 const MAX_TZ_OFFSET_MIN: i32 = 840;

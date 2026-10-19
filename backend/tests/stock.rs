@@ -131,7 +131,7 @@ async fn receipts_fill_the_store_and_the_diary_takes_oldest_lots_first(a_db: PgP
     });
     let first = receipt(&app, &alice, None, first_body.clone()).await;
     assert_eq!(first["is_stocked"], true);
-    assert_eq!(first["stocked_count"], 3);
+    assert_eq!(first["stocked_count"], 2);
     let second_body = json!({
         "receipt_ts": ts(Utc::now() - Duration::days(1)), "curr_id": uah,
         "items": [{ "item_id": buckwheat, "qty": "0.5", "amount": "40" }]
@@ -149,12 +149,10 @@ async fn receipts_fill_the_store_and_the_diary_takes_oldest_lots_first(a_db: PgP
     assert_eq!(milk_lot["cost"], "72.00");
     assert_eq!(milk_lot["curr_code"], "UAH");
     assert_eq!(milk_lot["source"], "receipt");
-    let candle_lot = lots.iter().find(|lot| lot["title"] == "Свеча").unwrap();
-    assert_eq!(
-        (candle_lot["measure"].as_str(), candle_lot["qty"].as_str()),
-        (Some("pcs"), Some("3"))
-    );
-    assert!(lots.iter().all(|lot| lot["title"] != "Стрижка"));
+    assert_eq!(milk_lot["pack_size"], "930");
+    assert!(lots
+        .iter()
+        .all(|lot| lot["title"] != "Свеча" && lot["title"] != "Стрижка"));
     assert_eq!(left_of(&store, "Гречка"), vec!["1000", "500"]);
 
     let mark = meal_block(&app, &alice).await;
@@ -595,4 +593,220 @@ async fn group_store_is_shared_with_members_only(a_db: PgPool)
     assert_eq!(after["stores"].as_array().unwrap().len(), 1);
     let (status, _) = send(&app, &bob, Method::GET, &format!("/api/stock?family_id={fam}"), None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn receipts_pick_a_store_and_packs_follow_the_item_mass(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let bob = app.user("bob@example.com").await;
+    let fam = app.family(&alice, "Дом").await;
+    app.join(&alice, &bob, &fam, "standard").await;
+    let uah = app.currency_by_code(&alice.token, "UAH").await;
+    let curd = item(
+        &app,
+        &alice,
+        json!({ "name": "Творог", "kind": "food", "unit": "piece",
+                "nutrition": { "kcal": "120", "prot": "16", "fat": "5", "carb": "3" } }),
+    )
+    .await;
+    let lines = json!([{ "item_id": curd, "qty": "1", "amount": "70" }]);
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        "/api/stock/settings",
+        Some(json!({ "family_id": fam })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let to_default = receipt(
+        &app,
+        &alice,
+        None,
+        json!({ "receipt_ts": ts(Utc::now() - Duration::days(2)), "curr_id": uah, "items": lines }),
+    )
+    .await;
+    assert_eq!(to_default["stock_family_id"], fam.as_str());
+    assert_eq!(to_default["stock_family_name"], "Дом");
+    assert_eq!(
+        left_of(&stock(&app, &bob, &format!("?family_id={fam}")).await, "Творог"),
+        vec!["1"]
+    );
+
+    let to_nowhere = receipt(
+        &app,
+        &alice,
+        None,
+        json!({ "receipt_ts": ts(Utc::now() - Duration::days(2)), "curr_id": uah, "items": lines,
+                "is_stocked": false }),
+    )
+    .await;
+    assert_eq!(to_nowhere["is_stocked"], false);
+    assert_eq!(to_nowhere["stocked_count"], 0);
+
+    let personal_body = json!({ "receipt_ts": ts(Utc::now() - Duration::days(1)), "curr_id": uah, "items": lines,
+                                "stock_store": { "family_id": null } });
+    let personal = receipt(&app, &alice, None, personal_body.clone()).await;
+    assert!(personal["stock_family_id"].is_null());
+    assert_eq!(personal["is_stocked"], true);
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        "/api/stock/settings",
+        Some(json!({ "family_id": null })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let mine = stock(&app, &alice, "").await;
+    let lot = mine["lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lot| lot["title"] == "Творог")
+        .unwrap()
+        .clone();
+    assert_eq!((lot["measure"].as_str(), lot["qty"].as_str()), (Some("pcs"), Some("1")));
+    assert!(lot["pack_size"].is_null());
+
+    let (status, foreign) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/receipts",
+        Some(json!({ "receipt_ts": ts(Utc::now()), "curr_id": uah, "items": lines,
+                     "stock_store": { "family_id": uuid::Uuid::new_v4() } })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{foreign}");
+
+    let mark = meal_block(&app, &alice).await;
+    let eaten = eat(&app, &alice, &mark, json!({ "item_id": curd, "grams": "250" })).await;
+    assert_eq!(eaten["stock_short"], "250");
+    assert_eq!(eaten["is_pack_needed"], true);
+    assert_eq!(left_of(&stock(&app, &alice, "").await, "Творог"), vec!["1"]);
+
+    let (status, filled) = send(
+        &app,
+        &alice,
+        Method::PATCH,
+        &format!("/api/dicts/items/{curd}/fill"),
+        Some(json!({ "net_qty": "290", "net_measure": "g" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{filled}");
+    let mine = stock(&app, &alice, "").await;
+    let lot = mine["lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lot| lot["title"] == "Творог")
+        .unwrap()
+        .clone();
+    assert_eq!((lot["measure"].as_str(), lot["qty"].as_str()), (Some("g"), Some("290")));
+    assert_eq!(lot["pack_size"], "290");
+    assert_eq!(lot["left_qty"], "40");
+    let group = stock(&app, &bob, &format!("?family_id={fam}")).await;
+    let group_lot = group["lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lot| lot["title"] == "Творог")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (group_lot["qty"].as_str(), group_lot["left_qty"].as_str()),
+        (Some("290"), Some("290"))
+    );
+
+    let (status, edited) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &format!("/api/dicts/items/{curd}"),
+        Some(
+            json!({ "name": "Творог", "kind": "food", "unit": "piece", "net_qty": "300", "net_measure": "g",
+                     "nutrition": { "kcal": "120", "prot": "16", "fat": "5", "carb": "3" } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{edited}");
+    assert_eq!(left_of(&stock(&app, &alice, "").await, "Творог"), vec!["50"]);
+    assert_eq!(
+        left_of(&stock(&app, &bob, &format!("?family_id={fam}")).await, "Творог"),
+        vec!["300"]
+    );
+
+    let (status, wrong) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/stock/write-off",
+        Some(json!({ "family_id": fam, "item_id": curd, "qty": "250", "unit": "ml" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{wrong}");
+    let (status, _) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/stock/write-off",
+        Some(json!({ "family_id": fam, "item_id": curd, "qty": "0.5", "unit": "pcs", "note": "в сырники" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        left_of(&stock(&app, &bob, &format!("?family_id={fam}")).await, "Творог"),
+        vec!["150"]
+    );
+    let (status, too_much) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/stock/write-off",
+        Some(json!({ "family_id": fam, "item_id": curd, "qty": "151", "unit": "g", "reason": "spoiled" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{too_much}");
+    let (status, _) = send(
+        &app,
+        &bob,
+        Method::POST,
+        "/api/stock/write-off",
+        Some(json!({ "family_id": fam, "item_id": curd, "qty": "150", "unit": "g", "reason": "spoiled" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(left_of(&stock(&app, &bob, &format!("?family_id={fam}")).await, "Творог").is_empty());
+    let (status, moves) = send(
+        &app,
+        &bob,
+        Method::GET,
+        &format!("/api/stock/moves?family_id={fam}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{moves}");
+    let kinds: Vec<&str> = moves["moves"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|move_| move_["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, vec!["waste", "used"]);
+    assert_eq!(moves["waste_g"], "150");
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/stock/write-off",
+        Some(json!({ "is_personal": true, "item_id": curd, "qty": "50", "unit": "g" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(left_of(&stock(&app, &alice, "").await, "Творог").is_empty());
 }

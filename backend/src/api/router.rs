@@ -122,6 +122,7 @@ pub fn build_router(a_state: AppState) -> Router
             delete(stock_handlers::delete_lot).patch(stock_handlers::set_lot_expiry),
         )
         .route("/stock/lots/:id/waste", post(stock_handlers::waste_lot))
+        .route("/stock/write-off", post(stock_handlers::write_off_item))
         .route("/stock/cook", post(stock_handlers::cook))
         .route("/stock/batches", get(stock_handlers::list_batches))
         .route("/stock/moves", get(stock_handlers::list_moves))
@@ -167,6 +168,8 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route("/training/sessions/:id/finish", post(training_handlers::finish_session))
         .route("/energy/day", get(energy_handlers::energy_day))
+        .route("/energy/marks", post(energy_handlers::set_mark))
+        .route("/energy/marks/:id", delete(energy_handlers::delete_mark))
         .route("/dicts", get(user_handlers::get_avail_dicts))
         .route("/features", get(recognize_handlers::features))
         .route(
