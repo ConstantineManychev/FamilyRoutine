@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
+import '../stock/stock_format.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
@@ -134,6 +135,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen>
           ? await api.fillItem(item.id, _draft.fillPayload(item))
           : await api.saveItem(widget.itemId, _draft.payload());
       ref.invalidate(itemsProv);
+      notifyStockChanged(ref);
       if (!mounted)
       {
         return;

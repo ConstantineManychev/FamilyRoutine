@@ -289,6 +289,7 @@ class MealEntry
   final String? statusMarkId;
   final String? batchId;
   final double? stockShort;
+  final bool isPackNeeded;
 
   const MealEntry({
     required this.id,
@@ -306,6 +307,7 @@ class MealEntry
     this.statusMarkId,
     this.batchId,
     this.stockShort,
+    this.isPackNeeded = false,
   });
 
   factory MealEntry.fromJson(Map<String, dynamic> aJson) => MealEntry(
@@ -324,6 +326,7 @@ class MealEntry
         statusMarkId: aJson['status_mark_id'] as String?,
         batchId: aJson['batch_id'] as String?,
         stockShort: parseDecimalOrNull(aJson['stock_short']),
+        isPackNeeded: aJson['is_pack_needed'] as bool? ?? false,
       );
 }
 

@@ -83,7 +83,8 @@
     "STOCK_LOT_USED": "这一批已被食用、烹饪或核销：无法删除，只能核销剩余部分",
     "STOCK_FROM_RECEIPT": "这一批来自小票：请在小票中关闭“将商品入库”或进行核销",
     "TOO_MANY_LOTS": "该仓库批次过多",
-    "PUSH_UNAVAILABLE": "服务器未配置推送通知"
+    "PUSH_UNAVAILABLE": "服务器未配置推送通知",
+    "TOO_MANY_MARKS": "热量校正过多：请删除旧的校正。"
   },
   "sidebar": {
     "routine": "日常",
@@ -796,7 +797,12 @@
     "norm_share": "每日标准的 {}%（{} 千卡）",
     "delete_meal_hint": "饮食记录会保留在日记的“未归入用餐”中。",
     "status_of": "状态：{}",
-    "set_status_for": "为{}设置状态"
+    "set_status_for": "为{}设置状态",
+    "new_block": "新时段：{}",
+    "block_created": "已添加时段“{}”",
+    "block_too_old": "时段最早只能设在 31 天前。",
+    "block_too_far": "时段必须在一天内结束。",
+    "tap_to_create": "点击自己或孩子那一行的空白处即可添加时段。"
   },
   "catalog": {
     "scope": "保存位置",
@@ -849,7 +855,10 @@
     "theme_light": "浅色",
     "theme_dark": "深色",
     "theme_violet": "紫色",
-    "language": "语言"
+    "language": "语言",
+    "stock_title": "库存",
+    "stock_default": "默认库存",
+    "stock_hint": "收据商品默认进入的库存，以及饮食日记扣除吃掉的量的库存。每张收据都可选择其他库存。"
   },
   "ai": {
     "title": "小票识别",
@@ -1630,11 +1639,11 @@
     "store": "仓库",
     "store_personal": "个人库存",
     "store_group": "群组“{}”的库存",
-    "active": "当前",
-    "make_active": "设为当前",
-    "active_set": "当前仓库：{}",
-    "active_hint": "小票中的购买会进入这里，饮食日记从这里扣除吃掉的部分。",
-    "inactive_hint": "此仓库不是当前仓库：小票和日记使用其他仓库。",
+    "active": "默认",
+    "make_active": "设为默认库存",
+    "active_set": "默认库存：{}",
+    "active_hint": "默认库存：收据中的商品默认建议加到这里，饮食日记从这里扣除吃掉的量。也可在设置中更改。",
+    "inactive_hint": "这不是默认库存：收据和日记默认使用其他库存。",
     "add": "添加",
     "add_to_stock": "入库",
     "added": "“{}”已入库",
@@ -1663,9 +1672,8 @@
     "source_receipt": "来自小票",
     "source_manual": "手动",
     "source_cooked": "已烹饪",
-    "waste": "作为浪费核销",
     "waste_title": "核销：{}",
-    "waste_qty": "丢弃数量",
+    "waste_qty": "出库数量",
     "err_waste_qty": "须大于零且不超过剩余量",
     "reason": "原因",
     "reason_spoiled": "变质",
@@ -1683,7 +1691,7 @@
     "cost_optional": "花费（可选）",
     "currency": "币种",
     "acquired_on": "购买于：{}",
-    "not_stockable": "该商品无法入库（服务或无质量单位）。",
+    "not_stockable": "只有食品（类型“食品”）可以入库。",
     "pick_dish": "要做哪道菜？",
     "no_dishes": "请先创建带食谱的菜",
     "cook_title": "烹饪菜品",
@@ -1703,8 +1711,6 @@
     "batch_recipe": "按食谱",
     "entry_short": "库存不足：{}",
     "entry_batch": "来自成品",
-    "receipt_switch": "将商品入库",
-    "receipt_switch_hint": "小票中的商品进入当前仓库：数量 × 净含量。",
     "receipt_stocked": {
       "zero": "已入库：{} 项",
       "one": "已入库：{} 项",
@@ -1739,7 +1745,27 @@
     "expiry_title": "保质期：{}",
     "expiry_hint": "先到期的批次优先使用。到期后剩余部分将自动核销。",
     "expiry_past_hint": "该日期已过——剩余部分将按过期核销。",
-    "reason_expired": "已过期"
+    "reason_expired": "已过期",
+    "pack_unknown": "未填写包装重量",
+    "writeoff_title": "出库：{}",
+    "writeoff_action": "出库",
+    "writeoff_lot": "从此批次出库",
+    "writeoff_in_grams": "按克出库",
+    "reason_used": "已使用",
+    "move_used": "已出库",
+    "written_off": "已出库：{}",
+    "pack_title": "包装重量：{}",
+    "pack_hint": "一个包装（一件）的重量。库存将换算为克，并可按克出库。",
+    "pack_qty": "单个包装重量",
+    "pack_skip": "以后再说",
+    "pack_saved": "已保存包装重量，库存已重新计算",
+    "pack_missing": "未填写包装重量：库存按件计算，按克吃掉的量不会从中扣除。",
+    "pack_set": "填写包装重量",
+    "pack_needed_hint": "该商品在库存中按件存放且没有包装重量，因此 {} 未被扣除。填写单个包装重量后，库存会重新计算并扣除吃掉的量。",
+    "lots_title": "批次",
+    "receipt_target": "入库商品",
+    "receipt_target_hint": "收据中的食品会进入所选库存。默认使用设置中的库存。",
+    "receipt_target_none": "不添加"
   },
   "notify": {
     "title": "通知",
@@ -1790,10 +1816,37 @@
   "energy": {
     "title": "热量平衡",
     "empty": "这一天还没有数据。",
-    "hint": "进食会抬高曲线，全天按维持热量均匀消耗，训练会额外消耗。点击名字可隐藏对应曲线。",
+    "hint": "热量平衡会累积，午夜不会清零。进食会抬高曲线，按维持热量均匀消耗，训练会额外消耗。点击图表可设置该时刻的准确数值；点击名字可隐藏对应曲线。",
     "eaten": "摄入 {}",
     "burned": "消耗 {}",
     "workouts": "训练 {}",
-    "no_norm": "无标准 — 未计算消耗"
+    "no_norm": "无标准 — 未计算消耗",
+    "period": {
+      "zero": "{} 天内",
+      "one": "{} 天内",
+      "two": "{} 天内",
+      "few": "{} 天内",
+      "many": "{} 天内",
+      "other": "{} 天内"
+    },
+    "correct_title": "此时刻的热量",
+    "correct_kcal": "热量平衡",
+    "kcal_unit": "千卡",
+    "correct_hint": "从这一刻起，图表将从输入的数值继续。负数表示热量缺口。",
+    "mark_delete": "删除校正",
+    "mark_saved": "数值已保存",
+    "mark_deleted": "校正已删除"
+  },
+  "range": {
+    "prev": "向前",
+    "next": "向后",
+    "days": {
+      "zero": "{} 天",
+      "one": "{} 天",
+      "two": "{} 天",
+      "few": "{} 天",
+      "many": "{} 天",
+      "other": "{} 天"
+    }
   }
 }

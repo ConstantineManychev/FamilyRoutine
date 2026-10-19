@@ -9,6 +9,7 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/ai_photo.dart';
 import '../common/app_icons.dart';
+import '../stock/stock_format.dart';
 import '../common/barcode_scanner.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
@@ -227,9 +228,15 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
   Object? _loadError;
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _isStocked = true;
+  String? _stockKey;
+
+  static const String _stockNone = 'none';
+  static const String _stockPersonal = 'personal';
 
   bool get _isEdit => widget.receiptId != null;
+
+  String _currentStockKey(StockSettings? aSettings) =>
+      _stockKey ?? aSettings?.active.ref.familyId ?? _stockPersonal;
 
   String get _currCode => _currs.where((aCurr) => aCurr.id == _currId).firstOrNull?.code ?? '';
 
@@ -334,7 +341,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
     _cashAccountId = aReceipt.cashAccountId;
     _isCashChosen = true;
     _noteCtrl.text = aReceipt.note ?? '';
-    _isStocked = aReceipt.isStocked;
+    _stockKey = aReceipt.isStocked ? aReceipt.stockFamilyId ?? _stockPersonal : _stockNone;
     _discountCtrl.text = _discountText(aReceipt.discount);
     _txs = [...aReceipt.txs];
     for (final row in _rows)
@@ -456,7 +463,7 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
         'items': items,
         'tx_ids': _txs.map((aTx) => aTx.id).toList(),
         'discount': moneyWire(discount),
-        'is_stocked': _isStocked,
+        ..._stockPayload(),
         if (_pendingPlace() != null) 'new_place': {..._pendingPlace()!.toJson(), 'family_id': familyId},
       });
 
@@ -788,21 +795,61 @@ class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen>
           decoration: InputDecoration(labelText: 'finance.note'.tr(), border: const OutlineInputBorder()),
         ),
         const SizedBox(height: 8),
-        SwitchListTile(
-          key: const ValueKey('receipt.stocked'),
-          contentPadding: EdgeInsets.zero,
-          value: _isStocked,
-          onChanged: (aValue) => setState(() => _isStocked = aValue),
-          title: Text('stock.receipt_switch'.tr()),
-          subtitle: Text(
-            _saved != null && _saved!.isStocked && _saved!.stockedCount > 0
-                ? 'stock.receipt_stocked'.plural(_saved!.stockedCount)
-                : 'stock.receipt_switch_hint'.tr(),
-            style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted),
-          ),
-        ),
+        const SizedBox(height: 8),
+        _buildStockTarget(aContext),
         if (_saved != null) const SizedBox(height: 24),
       ],
+    );
+  }
+
+  Map<String, dynamic> _stockPayload()
+  {
+    final key = _currentStockKey(ref.read(stockSettingsProv).valueOrNull);
+    if (key == _stockNone)
+    {
+      return {'is_stocked': false};
+    }
+    return {
+      'is_stocked': true,
+      'stock_store': {'family_id': key == _stockPersonal ? null : key},
+    };
+  }
+
+  Widget _buildStockTarget(BuildContext aContext)
+  {
+    final settings = ref.watch(stockSettingsProv).valueOrNull;
+    final key = _currentStockKey(settings);
+    final saved = _saved;
+    final groups = <String, String>{
+      for (final store in settings?.stores ?? const <StockStore>[])
+        if (!store.ref.isPersonal) store.ref.familyId!: store.ref.familyName ?? '',
+    };
+    if (!groups.containsKey(key) && key != _stockNone && key != _stockPersonal)
+    {
+      groups[key] = saved?.stockFamilyName ?? '';
+    }
+    final hint = saved != null && saved.isStocked && saved.stockedCount > 0
+        ? 'stock.receipt_stocked'.plural(saved.stockedCount)
+        : 'stock.receipt_target_hint'.tr();
+
+    return DropdownButtonFormField<String>(
+      key: ValueKey('receipt.stock_target.$key'),
+      initialValue: key,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'stock.receipt_target'.tr(),
+        helperText: hint,
+        helperMaxLines: 2,
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(AppIcons.package, size: 18),
+      ),
+      items: [
+        DropdownMenuItem(value: _stockNone, child: Text('stock.receipt_target_none'.tr())),
+        DropdownMenuItem(value: _stockPersonal, child: Text('stock.store_personal'.tr())),
+        for (final entry in groups.entries)
+          DropdownMenuItem(value: entry.key, child: Text('stock.store_group'.tr(args: [entry.value]), overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: (aValue) => setState(() => _stockKey = aValue),
     );
   }
 

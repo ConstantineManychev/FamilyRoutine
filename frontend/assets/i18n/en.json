@@ -83,7 +83,8 @@
     "STOCK_LOT_USED": "This lot has already been eaten, cooked or written off: it cannot be deleted, only its rest written off",
     "STOCK_FROM_RECEIPT": "This lot comes from a receipt: remove it in the receipt (the “Add products to stock” switch) or write it off",
     "TOO_MANY_LOTS": "Too many lots in this store",
-    "PUSH_UNAVAILABLE": "Push notifications are not configured on the server"
+    "PUSH_UNAVAILABLE": "Push notifications are not configured on the server",
+    "TOO_MANY_MARKS": "Too many balance corrections: delete old ones."
   },
   "sidebar": {
     "routine": "Routine",
@@ -796,7 +797,12 @@
     "norm_share": "{}% of the daily norm ({} kcal)",
     "delete_meal_hint": "Food entries stay in the diary under “Not in a meal”.",
     "status_of": "Status: {}",
-    "set_status_for": "Set status for {}"
+    "set_status_for": "Set status for {}",
+    "new_block": "New block: {}",
+    "block_created": "Block “{}” added",
+    "block_too_old": "A block can start at most 31 days ago.",
+    "block_too_far": "A block must end within a day from now.",
+    "tap_to_create": "Tap an empty spot in your row or a child’s row to add a block."
   },
   "catalog": {
     "scope": "Keep in",
@@ -849,7 +855,10 @@
     "theme_light": "Light",
     "theme_dark": "Dark",
     "theme_violet": "Violet",
-    "language": "Language"
+    "language": "Language",
+    "stock_title": "Stock",
+    "stock_default": "Default store",
+    "stock_hint": "Where receipt products go by default and where the food diary takes what you eat from. Each receipt can pick another store."
   },
   "ai": {
     "title": "Receipt recognition",
@@ -1630,11 +1639,11 @@
     "store": "Store",
     "store_personal": "Personal stock",
     "store_group": "Group stock “{}”",
-    "active": "Active",
-    "make_active": "Make active",
-    "active_set": "Active store: {}",
-    "active_hint": "Receipt purchases go here and the food diary takes what you eat from here.",
-    "inactive_hint": "This store is not active: receipts and the diary use another one.",
+    "active": "Default",
+    "make_active": "Make default store",
+    "active_set": "Default store: {}",
+    "active_hint": "Default store: receipts offer to add products here and the food diary takes what you eat from here. Also set in Settings.",
+    "inactive_hint": "This is not the default store: receipts and the diary use another one by default.",
     "add": "Add",
     "add_to_stock": "Add to stock",
     "added": "“{}” added to stock",
@@ -1663,9 +1672,8 @@
     "source_receipt": "from a receipt",
     "source_manual": "manual",
     "source_cooked": "cooked",
-    "waste": "Write off as waste",
     "waste_title": "Write off: {}",
-    "waste_qty": "How much to throw away",
+    "waste_qty": "How much to write off",
     "err_waste_qty": "Above zero and no more than what is left",
     "reason": "Reason",
     "reason_spoiled": "Spoiled",
@@ -1683,7 +1691,7 @@
     "cost_optional": "Cost (optional)",
     "currency": "Currency",
     "acquired_on": "Bought: {}",
-    "not_stockable": "This item cannot be stocked (a service or a unit without mass).",
+    "not_stockable": "Only food products (type “Food”) can be stocked.",
     "pick_dish": "Which dish are you cooking?",
     "no_dishes": "Create a dish with a recipe first",
     "cook_title": "Cook a dish",
@@ -1703,8 +1711,6 @@
     "batch_recipe": "By recipe",
     "entry_short": "not in stock: {}",
     "entry_batch": "from a batch",
-    "receipt_switch": "Add products to stock",
-    "receipt_switch_hint": "Products from the receipt go to the active store: quantity × net weight.",
     "receipt_stocked": {
       "zero": "In stock: {} items",
       "one": "In stock: {} item",
@@ -1739,7 +1745,27 @@
     "expiry_title": "Best before: {}",
     "expiry_hint": "Lots that expire first are used first. After the date the rest is written off automatically.",
     "expiry_past_hint": "This date has passed — the rest will be written off as expired.",
-    "reason_expired": "Expired"
+    "reason_expired": "Expired",
+    "pack_unknown": "pack mass unknown",
+    "writeoff_title": "Write off: {}",
+    "writeoff_action": "Write off",
+    "writeoff_lot": "Write off from this batch",
+    "writeoff_in_grams": "Write off in grams",
+    "reason_used": "Used",
+    "move_used": "Written off",
+    "written_off": "Written off: {}",
+    "pack_title": "Pack mass: {}",
+    "pack_hint": "How much one pack (piece) weighs. The stock is recalculated in grams and can be written off in grams.",
+    "pack_qty": "Mass of one pack",
+    "pack_skip": "Not now",
+    "pack_saved": "Pack mass saved, stock recalculated",
+    "pack_missing": "The pack mass is unknown: the stock is counted in pieces and food eaten in grams is not taken from it.",
+    "pack_set": "Set pack mass",
+    "pack_needed_hint": "This product is stocked in pieces without a pack mass, so {} were not taken from stock. Enter the mass of one pack: the stock is recalculated and what you ate is written off.",
+    "lots_title": "Batches",
+    "receipt_target": "Products to stock",
+    "receipt_target_hint": "Food products from the receipt go to the chosen store. The default comes from Settings.",
+    "receipt_target_none": "Do not add"
   },
   "notify": {
     "title": "Notifications",
@@ -1790,10 +1816,37 @@
   "energy": {
     "title": "Calorie balance",
     "empty": "No data for this day yet.",
-    "hint": "Food raises the line, calories burn evenly through the day at maintenance level, workouts burn extra. Tap a name to hide its line.",
+    "hint": "The balance accumulates and does not reset at midnight. Food raises the line, calories burn evenly at maintenance level, workouts burn extra. Tap the chart to set the exact value at that time; tap a name to hide its line.",
     "eaten": "eaten {}",
     "burned": "burned {}",
     "workouts": "workouts {}",
-    "no_norm": "no norm — burn not counted"
+    "no_norm": "no norm — burn not counted",
+    "period": {
+      "zero": "for {} days",
+      "one": "for {} day",
+      "two": "for {} days",
+      "few": "for {} days",
+      "many": "for {} days",
+      "other": "for {} days"
+    },
+    "correct_title": "Calories at this time",
+    "correct_kcal": "Calorie balance",
+    "kcal_unit": "kcal",
+    "correct_hint": "From this moment the chart continues from the value you enter. A negative number is a deficit.",
+    "mark_delete": "Delete correction",
+    "mark_saved": "Value saved",
+    "mark_deleted": "Correction deleted"
+  },
+  "range": {
+    "prev": "Back",
+    "next": "Forward",
+    "days": {
+      "zero": "{} days",
+      "one": "{} day",
+      "two": "{} days",
+      "few": "{} days",
+      "many": "{} days",
+      "other": "{} days"
+    }
   }
 }

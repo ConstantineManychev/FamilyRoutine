@@ -6,6 +6,9 @@ import '../../domain/models.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 
+const int maxMarkPastDays = 31;
+const int maxMarkFutureHours = 24;
+
 final StateProvider<int> routineRevisionProv = StateProvider<int>((aRef) => 0);
 
 extension RoutineStatusStyle on RoutineStatus

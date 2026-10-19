@@ -16,6 +16,7 @@ import 'amount_sheet.dart';
 import 'meal_target.dart';
 import 'nutrition_format.dart';
 import 'nutrition_summary.dart';
+import '../stock/stock_actions.dart';
 import '../stock/stock_format.dart';
 
 const double _contentMaxWidth = 720;
@@ -269,9 +270,32 @@ class _NutritionDiaryScreenState extends ConsumerState<NutritionDiaryScreen>
     {
       return;
     }
-    await _apply(() async => result.isDelete
-        ? api.deleteMealEntry(aEntry.id)
-        : api.updateMealEntry(aEntry.id, {...await _placement(result.target), ...result.toJson()}));
+    MealEntry? updated;
+    await _apply(() async
+    {
+      if (result.isDelete)
+      {
+        await api.deleteMealEntry(aEntry.id);
+        return;
+      }
+      updated = await api.updateMealEntry(aEntry.id, {...await _placement(result.target), ...result.toJson()});
+    });
+    final changed = updated;
+    final itemId = changed?.itemId;
+    if (changed != null && changed.isPackNeeded && itemId != null && mounted)
+    {
+      final isSet = await packMassFlow(
+        context,
+        ref,
+        itemId,
+        entryTitle(changed),
+        aReason: 'stock.pack_needed_hint'.tr(args: [formatGrams(context, changed.grams ?? 0, aIsMl: changed.isMl)]),
+      );
+      if (isSet)
+      {
+        await _load();
+      }
+    }
   }
 
   Widget _dateBar(BuildContext aContext)

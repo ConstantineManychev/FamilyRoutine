@@ -694,15 +694,33 @@ class ApiSvc
 
   Future<void> deleteStockLot(String aId) => _dio.delete('/api/stock/lots/$aId');
 
-  Future<StockLot> wasteStockLot(String aId, double aQty, WasteReason aReason, String? aNote) async
+  Future<StockLot> wasteStockLot(String aId, double aQty, WasteReason? aReason, String? aNote, {StockMeasure? aUnit}) async
   {
     final res = await _dio.post('/api/stock/lots/$aId/waste', data: {
       'qty': aQty.toString(),
-      'reason': aReason.name,
+      if (aUnit != null) 'unit': aUnit.name,
+      if (aReason != null) 'reason': aReason.name,
       if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
     });
     return StockLot.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<void> writeOffStockItem({
+    required StockStoreRef aStore,
+    required String aItemId,
+    required double aQty,
+    required StockMeasure aUnit,
+    WasteReason? aReason,
+    String? aNote,
+  }) =>
+      _dio.post('/api/stock/write-off', data: {
+        ...aStore.query,
+        'item_id': aItemId,
+        'qty': aQty.toString(),
+        'unit': aUnit.name,
+        if (aReason != null) 'reason': aReason.name,
+        if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
+      });
 
   Future<CookBatch> cookDish({
     required StockStoreRef aStore,
@@ -1136,11 +1154,27 @@ class ApiSvc
     return _list(res.data, PersonRef.fromJson);
   }
 
-  Future<EnergyDay> getEnergyDay(DateTime aDate) async
+  Future<EnergyDay> getEnergyDay(DateTime aDate, {int aDays = 1}) async
   {
-    final res = await _dio.get('/api/energy/day', queryParameters: {'date': dateWire(aDate), 'tz': deviceTimeZone()});
+    final res = await _dio.get('/api/energy/day', queryParameters: {
+      'date': dateWire(aDate),
+      'tz': deviceTimeZone(),
+      if (aDays != 1) 'days': aDays,
+    });
     return EnergyDay.fromJson(res.data as Map<String, dynamic>);
   }
+
+  Future<EnergyMark> setEnergyMark({String? aPersonId, required DateTime aTs, required double aKcal}) async
+  {
+    final res = await _dio.post('/api/energy/marks', data: {
+      if (aPersonId != null) 'person_id': aPersonId,
+      'ts': aTs.toUtc().toIso8601String(),
+      'kcal': aKcal.toStringAsFixed(0),
+    });
+    return EnergyMark.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteEnergyMark(String aId) => _dio.delete('/api/energy/marks/$aId');
 
   Future<PersonProfile> createChild(String aFamId, String aFirstName, String aLastName, DateTime aBirthDate, Sex aSex) async
   {

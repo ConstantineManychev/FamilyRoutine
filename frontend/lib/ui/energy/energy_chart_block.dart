@@ -3,15 +3,16 @@ import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
-import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import '../common/person_switcher.dart';
+import '../common/range_days.dart';
 import '../nutrition/nutrition_format.dart' show formatAmount, formatKcal, nutritionRevisionProv;
 import '../planner/planner_common.dart';
 import '../routine/routine_style.dart';
@@ -19,11 +20,17 @@ import '../training/training_revision.dart';
 
 const double _chartHeight = 220;
 const double _axisWidth = 48;
-const double _labelHeight = 20;
+const double _labelHeight = 32;
 const double _tooltipWidth = 200;
 const double _lineWidth = 2;
 const double _myLineWidth = 3;
 const double _minSpan = 500;
+const double _minDayWidth = 96;
+const double _minTickGap = 44;
+const double _markSize = 5;
+const int _markMatchMinutes = 30;
+const int _maxCorrection = 100000;
+const List<int> _hourSteps = [1, 2, 3, 6, 12, 24];
 const Duration _refreshInterval = Duration(minutes: 5);
 
 double? energyAt(List<EnergyPoint> aPoints, DateTime aMoment)
@@ -55,11 +62,28 @@ double? energyAt(List<EnergyPoint> aPoints, DateTime aMoment)
   return null;
 }
 
+double? energyNear(List<EnergyPoint> aPoints, DateTime aMoment)
+{
+  if (aPoints.isEmpty)
+  {
+    return null;
+  }
+  if (aMoment.isBefore(aPoints.first.ts))
+  {
+    return aPoints.first.kcal;
+  }
+  return energyAt(aPoints, aMoment.isAfter(aPoints.last.ts) ? aPoints.last.ts : aMoment);
+}
+
 String formatSignedKcal(BuildContext aContext, num aValue)
 {
   final text = formatKcal(aContext, aValue.abs().toDouble());
   return aValue > 0 ? '+$text' : (aValue < 0 ? '−$text' : text);
 }
+
+EnergyMark? markNear(EnergyPerson aPerson, DateTime aTs) => aPerson.marks
+    .where((aMark) => aMark.ts.difference(aTs).inMinutes.abs() <= _markMatchMinutes)
+    .firstOrNull;
 
 class EnergyChartBlock extends ConsumerStatefulWidget
 {
@@ -71,14 +95,15 @@ class EnergyChartBlock extends ConsumerStatefulWidget
 
 class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
 {
-  DateTime _date = dayOnly(DateTime.now());
+  DateTime _lastDay = dayOnly(DateTime.now());
+  int _days = 1;
   EnergyDay? _day;
   Object? _error;
   Timer? _timer;
   int _request = 0;
   final Set<String> _hidden = {};
 
-  bool get _isToday => _date == dayOnly(DateTime.now());
+  bool get _isCurrent => _lastDay == dayOnly(DateTime.now());
 
   @override
   void initState()
@@ -87,7 +112,7 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
     _load();
     _timer = Timer.periodic(_refreshInterval, (_)
     {
-      if (mounted && _isToday)
+      if (mounted && _isCurrent)
       {
         _load();
       }
@@ -106,7 +131,7 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
     final request = ++_request;
     try
     {
-      final day = await ref.read(apiProv).getEnergyDay(_date);
+      final day = await ref.read(apiProv).getEnergyDay(_lastDay, aDays: _days);
       if (mounted && request == _request)
       {
         setState(()
@@ -125,16 +150,12 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
     }
   }
 
-  void _shift(int aDays)
+  void _setRange(DateTime aLastDay, int aDays)
   {
-    final next = dayOnly(_date.add(Duration(days: aDays, hours: 12)));
-    if (next.isAfter(dayOnly(DateTime.now())))
-    {
-      return;
-    }
     setState(()
     {
-      _date = next;
+      _lastDay = dayOnly(aLastDay);
+      _days = aDays;
       _day = null;
       _error = null;
     });
@@ -150,6 +171,55 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
         _hidden.add(aPersonId);
       }
     });
+  }
+
+  Future<void> _correct(EnergyDay aDay, DateTime aTs, String? aNearestId) async
+  {
+    final editable = aDay.people.where((aPerson) => aPerson.canEdit).toList();
+    if (editable.isEmpty)
+    {
+      return;
+    }
+    final now = DateTime.now();
+    final ts = aTs.isAfter(now) ? now : aTs;
+    final initial = editable.where((aPerson) => aPerson.personId == aNearestId).firstOrNull ?? editable.first;
+    final choice = await showDialog<_Correction>(
+      context: context,
+      builder: (_) => _CorrectionDialog(people: editable, initial: initial, ts: ts),
+    );
+    if (choice == null || !mounted)
+    {
+      return;
+    }
+    final api = ref.read(apiProv);
+    try
+    {
+      final deleteId = choice.deleteMarkId;
+      if (deleteId != null)
+      {
+        await api.deleteEnergyMark(deleteId);
+      }
+      else
+      {
+        await api.setEnergyMark(
+          aPersonId: choice.person.isMe ? null : choice.person.personId,
+          aTs: ts,
+          aKcal: choice.kcal,
+        );
+      }
+      if (mounted)
+      {
+        showInfoSnack(context, deleteId != null ? 'energy.mark_deleted'.tr() : 'energy.mark_saved'.tr());
+        await _load();
+      }
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        showErrorSnack(context, aError);
+      }
+    }
   }
 
   @override
@@ -181,7 +251,12 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            EnergyChart(day: day, hidden: _hidden),
+            EnergyChart(
+              key: ValueKey('energy.chart.${day.dayStart.toIso8601String()}.${day.days}'),
+              day: day,
+              hidden: _hidden,
+              onPick: (aTs, aNearestId) => _correct(day, aTs, aNearestId),
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -190,6 +265,7 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
                 for (var index = 0; index < day.people.length; index++)
                   _LegendChip(
                     person: day.people[index],
+                    days: day.days,
                     color: personColor(aContext, index),
                     isHidden: _hidden.contains(day.people[index].personId),
                     onTap: () => _toggle(day.people[index].personId),
@@ -205,25 +281,147 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
 
     return BlockCard(
       title: 'energy.title'.tr(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: RangeDaysBar(
+              keyPrefix: 'energy.range',
+              lastDay: _lastDay,
+              days: _days,
+              onShift: (aDay) => _setRange(aDay, _days),
+              onDays: (aDays) => _setRange(_lastDay, aDays),
+            ),
+          ),
+          content,
+        ],
+      ),
+    );
+  }
+}
+
+class _Correction
+{
+  final EnergyPerson person;
+  final double kcal;
+  final String? deleteMarkId;
+
+  const _Correction(this.person, this.kcal, {this.deleteMarkId});
+}
+
+class _CorrectionDialog extends StatefulWidget
+{
+  final List<EnergyPerson> people;
+  final EnergyPerson initial;
+  final DateTime ts;
+
+  const _CorrectionDialog({required this.people, required this.initial, required this.ts});
+
+  @override
+  State<_CorrectionDialog> createState() => _CorrectionDialogState();
+}
+
+class _CorrectionDialogState extends State<_CorrectionDialog>
+{
+  late EnergyPerson _person = widget.initial;
+  late final _ctrl = TextEditingController(text: _valueText(widget.initial));
+
+  String _valueText(EnergyPerson aPerson) => (energyNear(aPerson.points, widget.ts) ?? 0).round().toString();
+
+  @override
+  void dispose()
+  {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  int? get _kcal
+  {
+    final text = _ctrl.text.trim().replaceAll('−', '-').replaceAll(' ', '');
+    final value = int.tryParse(text);
+    return value == null || value.abs() > _maxCorrection ? null : value;
+  }
+
+  void _select(EnergyPerson aPerson)
+  {
+    setState(()
+    {
+      _person = aPerson;
+      _ctrl.text = _valueText(aPerson);
+    });
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final locale = aContext.locale.toLanguageTag();
+    final kcal = _kcal;
+    final mark = markNear(_person, widget.ts);
+    final when = '${DateFormat.MMMEd(locale).format(widget.ts)}, ${formatClock(aContext, widget.ts)}';
+
+    return AlertDialog(
+      scrollable: true,
+      title: Text('energy.correct_title'.tr()),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(when, key: const ValueKey('energy.correct.when'), style: TextStyle(color: palette.inkSecondary)),
+            if (widget.people.length > 1) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final person in widget.people)
+                    ChoiceChip(
+                      key: ValueKey('energy.correct.person.${person.personId}'),
+                      showCheckmark: false,
+                      label: Text(person.isMe ? 'people.me'.tr() : person.fullName),
+                      selected: person.personId == _person.personId,
+                      onSelected: (_) => _select(person),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('energy.correct.kcal'),
+              controller: _ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(signed: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[-−0-9 ]')), LengthLimitingTextInputFormatter(8)],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'energy.correct_kcal'.tr(),
+                suffixText: 'energy.kcal_unit'.tr(),
+                helperText: 'energy.correct_hint'.tr(),
+                helperMaxLines: 3,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
       actions: [
-        IconButton(
-          tooltip: 'routine.prev_day'.tr(),
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(AppIcons.chevronLeft, size: 18),
-          onPressed: () => _shift(-1),
-        ),
-        Text(
-          _isToday ? 'routine.today'.tr() : DateFormat.MMMd(aContext.locale.toLanguageTag()).format(_date),
-          style: TextStyle(fontWeight: FontWeight.w600, color: aContext.palette.inkSecondary),
-        ),
-        IconButton(
-          tooltip: 'routine.next_day'.tr(),
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(AppIcons.chevronRight, size: 18),
-          onPressed: _isToday ? null : () => _shift(1),
+        if (mark != null)
+          TextButton(
+            key: const ValueKey('energy.correct.delete'),
+            style: TextButton.styleFrom(foregroundColor: palette.danger),
+            onPressed: () => Navigator.of(aContext).pop(_Correction(_person, 0, deleteMarkId: mark.id)),
+            child: Text('energy.mark_delete'.tr()),
+          ),
+        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
+        ElevatedButton(
+          key: const ValueKey('energy.correct.save'),
+          onPressed: kcal == null ? null : () => Navigator.of(aContext).pop(_Correction(_person, kcal.toDouble())),
+          child: Text('common.ok'.tr()),
         ),
       ],
-      child: content,
     );
   }
 }
@@ -231,11 +429,12 @@ class _EnergyChartBlockState extends ConsumerState<EnergyChartBlock>
 class _LegendChip extends StatelessWidget
 {
   final EnergyPerson person;
+  final int days;
   final Color color;
   final bool isHidden;
   final VoidCallback onTap;
 
-  const _LegendChip({required this.person, required this.color, required this.isHidden, required this.onTap});
+  const _LegendChip({required this.person, required this.days, required this.color, required this.isHidden, required this.onTap});
 
   @override
   Widget build(BuildContext aContext)
@@ -285,7 +484,10 @@ class _LegendChip extends StatelessWidget
                           ],
                         ),
                       ),
-                      Text(details, style: TextStyle(fontSize: 11, color: palette.inkSecondary)),
+                      Text(
+                        days > 1 ? '${'energy.period'.plural(days)}: $details' : details,
+                        style: TextStyle(fontSize: 11, color: palette.inkSecondary),
+                      ),
                     ],
                   ),
                 ),
@@ -302,8 +504,9 @@ class EnergyChart extends StatefulWidget
 {
   final EnergyDay day;
   final Set<String> hidden;
+  final void Function(DateTime aTs, String? aNearestId)? onPick;
 
-  const EnergyChart({super.key, required this.day, this.hidden = const {}});
+  const EnergyChart({super.key, required this.day, this.hidden = const {}, this.onPick});
 
   @override
   State<EnergyChart> createState() => _EnergyChartState();
@@ -311,17 +514,65 @@ class EnergyChart extends StatefulWidget
 
 class _EnergyChartState extends State<EnergyChart>
 {
+  final _scroll = ScrollController();
   DateTime? _cursor;
+  bool _isScrolledToEnd = false;
+
+  @override
+  void dispose()
+  {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   List<int> get _visible => [
         for (var index = 0; index < widget.day.people.length; index++)
           if (!widget.hidden.contains(widget.day.people[index].personId) && widget.day.people[index].points.isNotEmpty) index,
       ];
 
-  void _point(Offset aPosition, Size aSize)
+  void _hover(Offset aPosition, _EnergyLayout aLayout)
   {
-    final layout = _EnergyLayout(widget.day, _visible, aSize);
-    setState(() => _cursor = layout.tsOf(aPosition.dx));
+    setState(() => _cursor = aLayout.tsOf(aPosition.dx));
+  }
+
+  void _pick(Offset aPosition, _EnergyLayout aLayout)
+  {
+    final ts = aLayout.tsOf(aPosition.dx);
+    String? nearest;
+    var bestDistance = double.infinity;
+    for (final index in _visible)
+    {
+      final person = widget.day.people[index];
+      final value = energyNear(person.points, ts);
+      if (value == null)
+      {
+        continue;
+      }
+      final distance = (aLayout.yOf(value) - aPosition.dy).abs();
+      if (distance < bestDistance)
+      {
+        bestDistance = distance;
+        nearest = person.personId;
+      }
+    }
+    setState(() => _cursor = ts);
+    widget.onPick?.call(ts, nearest);
+  }
+
+  void _scrollToEnd()
+  {
+    if (_isScrolledToEnd)
+    {
+      return;
+    }
+    _isScrolledToEnd = true;
+    WidgetsBinding.instance.addPostFrameCallback((_)
+    {
+      if (mounted && _scroll.hasClients)
+      {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
   }
 
   @override
@@ -330,44 +581,74 @@ class _EnergyChartState extends State<EnergyChart>
     return LayoutBuilder(
       builder: (_, aConstraints)
       {
-        final size = Size(aConstraints.maxWidth, _chartHeight + _labelHeight);
+        final viewport = math.max(120.0, aConstraints.maxWidth - _axisWidth);
+        final width = rangeContentWidth(viewport, widget.day.days, _minDayWidth);
         final visible = _visible;
-        final layout = _EnergyLayout(widget.day, visible, size);
+        final layout = _EnergyLayout(widget.day, visible, Size(width, _chartHeight + _labelHeight));
         final colors = [for (var index = 0; index < widget.day.people.length; index++) personColor(aContext, index)];
         final cursor = _cursor;
+        if (width > viewport)
+        {
+          _scrollToEnd();
+        }
 
-        return MouseRegion(
-          onHover: (aEvent) => _point(aEvent.localPosition, size),
-          onExit: (_) => setState(() => _cursor = null),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (aDetails) => _point(aDetails.localPosition, size),
-            onLongPressMoveUpdate: (aDetails) => _point(aDetails.localPosition, size),
-            onLongPressEnd: (_) => setState(() => _cursor = null),
-            child: SizedBox(
-              width: size.width,
-              height: size.height,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      key: const ValueKey('energy.chart'),
-                      painter: _EnergyPainter(
-                        layout: layout,
-                        people: widget.day.people,
-                        visible: visible,
-                        colors: colors,
-                        palette: aContext.palette,
-                        cursor: cursor,
-                        valueLabel: (aValue) => formatAmount(aContext, aValue, aDigits: 0),
+        return SizedBox(
+          height: _chartHeight + _labelHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: _axisWidth,
+                height: _chartHeight + _labelHeight,
+                child: CustomPaint(
+                  painter: _AxisPainter(
+                    layout: layout,
+                    palette: aContext.palette,
+                    valueLabel: (aValue) => formatAmount(aContext, aValue, aDigits: 0),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  key: const ValueKey('energy.scroll'),
+                  controller: _scroll,
+                  scrollDirection: Axis.horizontal,
+                  child: MouseRegion(
+                    onHover: (aEvent) => _hover(aEvent.localPosition, layout),
+                    onExit: (_) => setState(() => _cursor = null),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (aDetails) => _pick(aDetails.localPosition, layout),
+                      child: SizedBox(
+                        width: width,
+                        height: _chartHeight + _labelHeight,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: CustomPaint(
+                                key: const ValueKey('energy.chart'),
+                                painter: _PlotPainter(
+                                  layout: layout,
+                                  people: widget.day.people,
+                                  visible: visible,
+                                  colors: colors,
+                                  palette: aContext.palette,
+                                  cursor: cursor,
+                                  hourLabel: (aTs) => formatClock(aContext, aTs),
+                                  dayLabel: (aTs) => DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aTs),
+                                ),
+                              ),
+                            ),
+                            if (cursor != null) _buildTooltip(aContext, layout, visible, colors, cursor),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  if (cursor != null) _buildTooltip(aContext, layout, visible, colors, cursor),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         );
       },
@@ -390,6 +671,7 @@ class _EnergyChartState extends State<EnergyChart>
     final left = (x + 12 + _tooltipWidth > width ? x - 12 - _tooltipWidth : x + 12)
         .clamp(0.0, math.max(0.0, width - _tooltipWidth))
         .toDouble();
+    final local = aCursor.toLocal();
 
     return Positioned(
       left: left,
@@ -406,7 +688,12 @@ class _EnergyChartState extends State<EnergyChart>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(formatClock(aContext, aCursor.toLocal()), style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary)),
+                Text(
+                  widget.day.days > 1
+                      ? '${DateFormat.MMMd(aContext.locale.toLanguageTag()).format(local)}, ${formatClock(aContext, local)}'
+                      : formatClock(aContext, local),
+                  style: TextStyle(fontSize: 12, color: aContext.palette.inkSecondary),
+                ),
                 const SizedBox(height: 6),
                 for (final (index, value) in rows)
                   Padding(
@@ -465,7 +752,7 @@ class _EnergyLayout
 
   const _EnergyLayout._(this.start, this.end, this.low, this.high, this.size);
 
-  double get plotLeft => _axisWidth;
+  double get plotLeft => 4;
 
   double get plotRight => size.width - 8;
 
@@ -485,9 +772,71 @@ class _EnergyLayout
     final share = ((aX - plotLeft) / math.max(1.0, plotRight - plotLeft)).clamp(0.0, 1.0);
     return start.add(Duration(seconds: (end.difference(start).inSeconds * share).round()));
   }
+
+  double get valueStep
+  {
+    final raw = (high - low) / 4;
+    final magnitude = math.pow(10, (math.log(math.max(raw, 1)) / math.ln10).floor()).toDouble();
+    for (final factor in [1.0, 2.0, 2.5, 5.0, 10.0])
+    {
+      if (factor * magnitude >= raw)
+      {
+        return factor * magnitude;
+      }
+    }
+    return 10 * magnitude;
+  }
+
+  Iterable<double> get valueTicks sync*
+  {
+    final step = valueStep;
+    for (var value = (low / step).ceil() * step; value <= high; value += step)
+    {
+      yield value;
+    }
+  }
+
+  int get hourStep
+  {
+    final hours = math.max(1, end.difference(start).inMinutes / 60);
+    final perHour = (plotRight - plotLeft) / hours;
+    return _hourSteps.firstWhere((aStep) => aStep * perHour >= _minTickGap, orElse: () => 24);
+  }
 }
 
-class _EnergyPainter extends CustomPainter
+void _paintText(Canvas aCanvas, String aText, Offset aAnchor, Color aColor, {bool aAlignRight = false, bool aIsCentered = false, bool aIsBold = false})
+{
+  final painter = TextPainter(
+    text: TextSpan(text: aText, style: TextStyle(fontSize: 10, color: aColor, fontWeight: aIsBold ? FontWeight.w700 : FontWeight.w400)),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  final dx = aAlignRight ? aAnchor.dx - painter.width : (aIsCentered ? aAnchor.dx - painter.width / 2 : aAnchor.dx);
+  painter.paint(aCanvas, Offset(dx, aAnchor.dy - painter.height / 2));
+}
+
+class _AxisPainter extends CustomPainter
+{
+  final _EnergyLayout layout;
+  final AppPalette palette;
+  final String Function(double) valueLabel;
+
+  _AxisPainter({required this.layout, required this.palette, required this.valueLabel});
+
+  @override
+  void paint(Canvas aCanvas, Size aSize)
+  {
+    for (final value in layout.valueTicks)
+    {
+      _paintText(aCanvas, valueLabel(value), Offset(aSize.width - 6, layout.yOf(value)), palette.inkMuted, aAlignRight: true);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AxisPainter aOld) =>
+      aOld.layout.low != layout.low || aOld.layout.high != layout.high || aOld.palette != palette;
+}
+
+class _PlotPainter extends CustomPainter
 {
   final _EnergyLayout layout;
   final List<EnergyPerson> people;
@@ -495,16 +844,18 @@ class _EnergyPainter extends CustomPainter
   final List<Color> colors;
   final AppPalette palette;
   final DateTime? cursor;
-  final String Function(double) valueLabel;
+  final String Function(DateTime) hourLabel;
+  final String Function(DateTime) dayLabel;
 
-  _EnergyPainter({
+  _PlotPainter({
     required this.layout,
     required this.people,
     required this.visible,
     required this.colors,
     required this.palette,
     required this.cursor,
-    required this.valueLabel,
+    required this.hourLabel,
+    required this.dayLabel,
   });
 
   @override
@@ -513,27 +864,38 @@ class _EnergyPainter extends CustomPainter
     final grid = Paint()
       ..color = palette.grid
       ..strokeWidth = 1;
-    final baseline = Paint()
+    final strong = Paint()
       ..color = palette.baseline
       ..strokeWidth = 1.5;
-    final step = _niceStep((layout.high - layout.low) / 4);
-    for (var value = (layout.low / step).ceil() * step; value <= layout.high; value += step)
+    for (final value in layout.valueTicks)
     {
       final y = layout.yOf(value);
-      aCanvas.drawLine(Offset(layout.plotLeft, y), Offset(layout.plotRight, y), value.abs() < 1e-6 ? baseline : grid);
-      _text(aCanvas, valueLabel(value), Offset(layout.plotLeft - 6, y), aAlignRight: true);
+      aCanvas.drawLine(Offset(layout.plotLeft, y), Offset(layout.plotRight, y), value.abs() < 1e-6 ? strong : grid);
     }
 
+    final step = layout.hourStep;
     final localStart = layout.start.toLocal();
-    final hours = (layout.end.difference(layout.start).inMinutes / 60).round();
-    final hourStep = aSize.width >= 640 ? 3 : 6;
-    for (var hour = 0; hour <= hours; hour += hourStep)
+    var tick = DateTime(localStart.year, localStart.month, localStart.day, localStart.hour);
+    final localEnd = layout.end.toLocal();
+    final isMultiDay = layout.end.difference(layout.start).inHours > 26;
+    while (!tick.isAfter(localEnd))
     {
-      final ts = layout.start.add(Duration(hours: hour));
-      final x = layout.xOf(ts);
-      aCanvas.drawLine(Offset(x, 0), Offset(x, layout.plotHeight), grid);
-      final label = '${((localStart.hour + hour) % 24).toString().padLeft(2, '0')}:00';
-      _text(aCanvas, label, Offset(x, layout.plotHeight + _labelHeight / 2), aIsCentered: true);
+      final isMidnight = tick.hour == 0;
+      if (tick.hour % step == 0 || isMidnight)
+      {
+        final x = layout.xOf(tick.toUtc());
+        aCanvas.drawLine(Offset(x, 0), Offset(x, layout.plotHeight), isMidnight && isMultiDay ? strong : grid);
+        final labelY = layout.plotHeight + 9;
+        if (isMidnight && isMultiDay)
+        {
+          _paintText(aCanvas, dayLabel(tick), Offset(x, labelY + 12), palette.inkSecondary, aIsCentered: true, aIsBold: true);
+        }
+        if (step < 24)
+        {
+          _paintText(aCanvas, hourLabel(tick), Offset(x, labelY), palette.inkMuted, aIsCentered: true);
+        }
+      }
+      tick = DateTime(tick.year, tick.month, tick.day, tick.hour + 1);
     }
 
     for (final index in visible.reversed)
@@ -544,6 +906,7 @@ class _EnergyPainter extends CustomPainter
       {
         continue;
       }
+      final color = colors[index];
       final path = Path()..moveTo(layout.xOf(points.first.ts), layout.yOf(points.first.kcal));
       for (final point in points.skip(1))
       {
@@ -552,14 +915,32 @@ class _EnergyPainter extends CustomPainter
       aCanvas.drawPath(
         path,
         Paint()
-          ..color = colors[index]
+          ..color = color
           ..style = PaintingStyle.stroke
           ..strokeWidth = person.isMe ? _myLineWidth : _lineWidth
           ..strokeJoin = StrokeJoin.round
           ..strokeCap = StrokeCap.round,
       );
       final last = points.last;
-      aCanvas.drawCircle(Offset(layout.xOf(last.ts), layout.yOf(last.kcal)), person.isMe ? 4 : 3, Paint()..color = colors[index]);
+      aCanvas.drawCircle(Offset(layout.xOf(last.ts), layout.yOf(last.kcal)), person.isMe ? 4 : 3, Paint()..color = color);
+      for (final mark in person.marks)
+      {
+        final center = Offset(layout.xOf(mark.ts), layout.yOf(mark.kcal));
+        final diamond = Path()
+          ..moveTo(center.dx, center.dy - _markSize)
+          ..lineTo(center.dx + _markSize, center.dy)
+          ..lineTo(center.dx, center.dy + _markSize)
+          ..lineTo(center.dx - _markSize, center.dy)
+          ..close();
+        aCanvas.drawPath(diamond, Paint()..color = palette.surface);
+        aCanvas.drawPath(
+          diamond,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
     }
 
     final shown = cursor;
@@ -584,36 +965,6 @@ class _EnergyPainter extends CustomPainter
     }
   }
 
-  double _niceStep(double aRaw)
-  {
-    final magnitude = math.pow(10, (math.log(math.max(aRaw, 1)) / math.ln10).floor()).toDouble();
-    for (final factor in [1.0, 2.0, 2.5, 5.0, 10.0])
-    {
-      if (factor * magnitude >= aRaw)
-      {
-        return factor * magnitude;
-      }
-    }
-    return 10 * magnitude;
-  }
-
-  void _text(Canvas aCanvas, String aText, Offset aAnchor, {bool aAlignRight = false, bool aIsCentered = false})
-  {
-    final painter = TextPainter(
-      text: TextSpan(text: aText, style: TextStyle(fontSize: 10, color: palette.inkMuted)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final dx = aAlignRight ? aAnchor.dx - painter.width : (aIsCentered ? aAnchor.dx - painter.width / 2 : aAnchor.dx);
-    painter.paint(aCanvas, Offset(dx, aAnchor.dy - painter.height / 2));
-  }
-
   @override
-  bool shouldRepaint(covariant _EnergyPainter aOld) =>
-      aOld.layout.size != layout.size ||
-      aOld.people != people ||
-      aOld.cursor != cursor ||
-      aOld.palette != palette ||
-      aOld.visible.length != visible.length ||
-      aOld.layout.low != layout.low ||
-      aOld.layout.high != layout.high;
+  bool shouldRepaint(covariant _PlotPainter aOld) => true;
 }

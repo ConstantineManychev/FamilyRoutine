@@ -37,7 +37,8 @@ enum StockMoveKind
 {
   eaten,
   cooked,
-  waste;
+  waste,
+  used;
 
   static StockMoveKind parse(Object? aValue) => _parseEnum(values, aValue, StockMoveKind.eaten);
 }
@@ -119,6 +120,7 @@ class StockLot
   final DateTime acquiredTs;
   final bool isTouched;
   final double? pieceG;
+  final double? packSize;
   final Macros? per100;
   final DateTime? expiresOn;
   final bool isExpired;
@@ -141,10 +143,19 @@ class StockLot
     required this.acquiredTs,
     this.isTouched = false,
     this.pieceG,
+    this.packSize,
     this.per100,
     this.expiresOn,
     this.isExpired = false,
   });
+
+  bool get isPackKnown => measure.isMass && (packSize ?? 0) > 0;
+
+  bool get isUnmeasured => kind == StockKind.item && measure == StockMeasure.pcs;
+
+  double? get leftPieces => isPackKnown ? leftQty / packSize! : null;
+
+  double? get qtyPieces => isPackKnown ? qty / packSize! : null;
 
   bool get isRemovable => !isTouched && source != StockSource.receipt;
 
@@ -181,6 +192,7 @@ class StockLot
         acquiredTs: parseTs(aJson['acquired_ts']),
         isTouched: aJson['is_touched'] as bool? ?? false,
         pieceG: parseDecimalOrNull(aJson['piece_g']),
+        packSize: parseDecimalOrNull(aJson['pack_size']),
         per100: Macros.fromJsonOrNull(aJson['per_100']),
         expiresOn: aJson['expires_on'] == null ? null : parseDateWire(aJson['expires_on']),
         isExpired: aJson['is_expired'] as bool? ?? false,
@@ -203,6 +215,22 @@ class StockGroup
   StockMeasure get measure => first.measure;
 
   double get leftQty => lots.where((aLot) => aLot.measure == measure).fold(0, (aSum, aLot) => aSum + aLot.leftQty);
+
+  String? get itemId => first.itemId;
+
+  double? get packSize => lots.where((aLot) => aLot.measure == measure && aLot.isPackKnown).firstOrNull?.packSize;
+
+  double? get leftPieces
+  {
+    final measured = lots.where((aLot) => aLot.measure == measure && aLot.isPackKnown).toList();
+    if (measured.isEmpty)
+    {
+      return null;
+    }
+    return measured.fold<double>(0, (aSum, aLot) => aSum + (aLot.leftPieces ?? 0));
+  }
+
+  bool get isUnmeasured => first.isUnmeasured;
 
   StockLot? get soonest
   {

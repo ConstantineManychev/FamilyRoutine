@@ -17,35 +17,108 @@ const List<int> _quickShelfDays = [1, 3, 7, 30];
 
 final RegExp _numberInput = RegExp(r'[0-9.,]');
 
-class WasteDraft
+class WriteOffSubject
+{
+  final String title;
+  final StockMeasure measure;
+  final double leftQty;
+  final double totalQty;
+  final double? packSize;
+  final double? cost;
+  final String? currCode;
+
+  const WriteOffSubject({
+    required this.title,
+    required this.measure,
+    required this.leftQty,
+    required this.totalQty,
+    this.packSize,
+    this.cost,
+    this.currCode,
+  });
+
+  factory WriteOffSubject.lot(StockLot aLot) => WriteOffSubject(
+        title: aLot.title,
+        measure: aLot.measure,
+        leftQty: aLot.leftQty,
+        totalQty: aLot.qty,
+        packSize: aLot.isPackKnown ? aLot.packSize : null,
+        cost: aLot.cost,
+        currCode: aLot.currCode,
+      );
+
+  factory WriteOffSubject.group(StockGroup aGroup) => WriteOffSubject(
+        title: aGroup.title,
+        measure: aGroup.measure,
+        leftQty: aGroup.leftQty,
+        totalQty: aGroup.leftQty,
+        packSize: aGroup.packSize,
+        cost: aGroup.lots.where((aLot) => aLot.measure == aGroup.measure).fold<double>(0, (aSum, aLot) => aSum + (aLot.leftCost ?? 0)),
+        currCode: aGroup.lots.map((aLot) => aLot.currCode).whereType<String>().toSet().length == 1 ? aGroup.first.currCode : null,
+      );
+
+  bool get isUnmeasured => measure == StockMeasure.pcs;
+
+  List<StockMeasure> get units => [measure, if (measure != StockMeasure.pcs && packSize != null) StockMeasure.pcs];
+
+  double? inMeasure(double aQty, StockMeasure aUnit)
+  {
+    if (aUnit == measure)
+    {
+      return aQty;
+    }
+    final pack = packSize;
+    return aUnit == StockMeasure.pcs && pack != null ? aQty * pack : null;
+  }
+}
+
+class WriteOffDraft
 {
   final double qty;
-  final WasteReason reason;
+  final StockMeasure unit;
+  final WasteReason? reason;
   final String? note;
+  final bool isPackRequested;
 
-  const WasteDraft({required this.qty, required this.reason, this.note});
+  const WriteOffDraft({required this.qty, required this.unit, this.reason, this.note}) : isPackRequested = false;
+
+  const WriteOffDraft.packRequested()
+      : qty = 0,
+        unit = StockMeasure.g,
+        reason = null,
+        note = null,
+        isPackRequested = true;
 }
 
-Future<WasteDraft?> showWasteDialog(BuildContext aContext, StockLot aLot)
+const List<WasteReason?> writeOffReasons = [null, WasteReason.spoiled, WasteReason.expired, WasteReason.leftovers, WasteReason.other];
+
+String writeOffReasonLabel(WasteReason? aReason) => aReason == null ? 'stock.reason_used'.tr() : reasonLabel(aReason);
+
+Future<WriteOffDraft?> showWriteOffDialog(BuildContext aContext, WriteOffSubject aSubject, {bool aCanAskPack = false})
 {
-  return showDialog<WasteDraft>(context: aContext, builder: (_) => WasteDialog(lot: aLot));
+  return showDialog<WriteOffDraft>(
+    context: aContext,
+    builder: (_) => WriteOffDialog(subject: aSubject, canAskPack: aCanAskPack),
+  );
 }
 
-class WasteDialog extends StatefulWidget
+class WriteOffDialog extends StatefulWidget
 {
-  final StockLot lot;
+  final WriteOffSubject subject;
+  final bool canAskPack;
 
-  const WasteDialog({super.key, required this.lot});
+  const WriteOffDialog({super.key, required this.subject, this.canAskPack = false});
 
   @override
-  State<WasteDialog> createState() => _WasteDialogState();
+  State<WriteOffDialog> createState() => _WriteOffDialogState();
 }
 
-class _WasteDialogState extends State<WasteDialog>
+class _WriteOffDialogState extends State<WriteOffDialog>
 {
-  late final _qtyCtrl = TextEditingController(text: amountText(widget.lot.leftQty));
+  late StockMeasure _unit = widget.subject.measure;
+  late final _qtyCtrl = TextEditingController(text: amountText(widget.subject.leftQty));
   final _noteCtrl = TextEditingController();
-  WasteReason _reason = WasteReason.spoiled;
+  WasteReason? _reason;
 
   @override
   void dispose()
@@ -55,33 +128,77 @@ class _WasteDialogState extends State<WasteDialog>
     super.dispose();
   }
 
-  double? get _qty
+  double? get _amount
   {
     final value = parseAmountText(_qtyCtrl.text);
-    return value == null || value <= 0 || value > widget.lot.leftQty ? null : value;
+    if (value == null || value <= 0)
+    {
+      return null;
+    }
+    final amount = widget.subject.inMeasure(value, _unit);
+    return amount == null || amount > widget.subject.leftQty + 0.1 ? null : amount;
+  }
+
+  void _selectUnit(StockMeasure aUnit)
+  {
+    final subject = widget.subject;
+    final current = parseAmountText(_qtyCtrl.text);
+    final pack = subject.packSize;
+    setState(()
+    {
+      if (current != null && pack != null && aUnit != _unit)
+      {
+        final converted = aUnit == StockMeasure.pcs ? current / pack : current * pack;
+        _qtyCtrl.text = amountText(double.parse(converted.toStringAsFixed(aUnit == StockMeasure.pcs ? 2 : 1)));
+      }
+      _unit = aUnit;
+    });
   }
 
   @override
   Widget build(BuildContext aContext)
   {
     final palette = aContext.palette;
-    final lot = widget.lot;
-    final qty = _qty;
-    final cost = lot.cost;
-    final currCode = lot.currCode;
-    final share = qty == null || cost == null || currCode == null || lot.qty <= 0 ? null : cost * qty / lot.qty;
+    final subject = widget.subject;
+    final amount = _amount;
+    final cost = subject.cost;
+    final currCode = subject.currCode;
+    final share = amount == null || cost == null || currCode == null || subject.totalQty <= 0 ? null : cost * amount / subject.totalQty;
+    final pieces = subject.packSize == null ? null : subject.leftQty / subject.packSize!;
 
     return AlertDialog(
       scrollable: true,
-      title: Text('stock.waste_title'.tr(args: [lot.title])),
+      title: Text('stock.writeoff_title'.tr(args: [subject.title])),
       content: SizedBox(
         width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final unit in subject.units)
+                  ChoiceChip(
+                    key: ValueKey('writeoff.unit.${unit.name}'),
+                    showCheckmark: false,
+                    label: Text(measureLabel(unit)),
+                    selected: _unit == unit,
+                    onSelected: (_) => _selectUnit(unit),
+                  ),
+                if (subject.isUnmeasured && widget.canAskPack)
+                  ActionChip(
+                    key: const ValueKey('writeoff.ask_pack'),
+                    avatar: const Icon(AppIcons.scale, size: 16),
+                    label: Text('stock.writeoff_in_grams'.tr()),
+                    onPressed: () => Navigator.of(aContext).pop(const WriteOffDraft.packRequested()),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
             TextField(
-              key: const ValueKey('waste.qty'),
+              key: const ValueKey('writeoff.qty'),
               controller: _qtyCtrl,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -89,9 +206,10 @@ class _WasteDialogState extends State<WasteDialog>
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'stock.waste_qty'.tr(),
-                suffixText: measureLabel(lot.measure),
-                helperText: 'stock.left_of'.tr(args: [formatStockQty(aContext, lot.leftQty, lot.measure)]),
-                errorText: _qtyCtrl.text.trim().isEmpty || qty != null ? null : 'stock.err_waste_qty'.tr(),
+                suffixText: measureLabel(_unit),
+                helperText: 'stock.left_of'.tr(args: [formatStockAmount(aContext, subject.leftQty, subject.measure, aPieces: pieces)]),
+                helperMaxLines: 2,
+                errorText: _qtyCtrl.text.trim().isEmpty || amount != null ? null : 'stock.err_waste_qty'.tr(),
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -102,11 +220,11 @@ class _WasteDialogState extends State<WasteDialog>
               spacing: 8,
               runSpacing: 6,
               children: [
-                for (final reason in WasteReason.values)
+                for (final reason in writeOffReasons)
                   ChoiceChip(
-                    key: ValueKey('waste.reason.${reason.name}'),
+                    key: ValueKey('writeoff.reason.${reason?.name ?? 'used'}'),
                     showCheckmark: false,
-                    label: Text(reasonLabel(reason)),
+                    label: Text(writeOffReasonLabel(reason)),
                     selected: _reason == reason,
                     onSelected: (_) => setState(() => _reason = reason),
                   ),
@@ -120,7 +238,7 @@ class _WasteDialogState extends State<WasteDialog>
               inputFormatters: [LengthLimitingTextInputFormatter(_maxNoteLen)],
               decoration: InputDecoration(labelText: 'stock.note'.tr(), border: const OutlineInputBorder()),
             ),
-            if (share != null && currCode != null)
+            if (share != null && currCode != null && _reason != null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
@@ -134,11 +252,117 @@ class _WasteDialogState extends State<WasteDialog>
       actions: [
         TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('common.cancel'.tr())),
         ElevatedButton(
-          key: const ValueKey('waste.save'),
-          onPressed: qty == null
+          key: const ValueKey('writeoff.save'),
+          onPressed: amount == null
               ? null
-              : () => Navigator.of(aContext).pop(WasteDraft(qty: qty, reason: _reason, note: _noteCtrl.text.trim())),
-          child: Text('stock.waste_action'.tr()),
+              : () => Navigator.of(aContext).pop(WriteOffDraft(
+                    qty: parseAmountText(_qtyCtrl.text)!,
+                    unit: _unit,
+                    reason: _reason,
+                    note: _noteCtrl.text.trim(),
+                  )),
+          child: Text('stock.writeoff_action'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+class PackMass
+{
+  final double qty;
+  final NetMeasure measure;
+
+  const PackMass(this.qty, this.measure);
+}
+
+Future<PackMass?> showPackMassDialog(BuildContext aContext, String aTitle, {String? aReason})
+{
+  return showDialog<PackMass>(context: aContext, builder: (_) => PackMassDialog(title: aTitle, reason: aReason));
+}
+
+class PackMassDialog extends StatefulWidget
+{
+  final String title;
+  final String? reason;
+
+  const PackMassDialog({super.key, required this.title, this.reason});
+
+  @override
+  State<PackMassDialog> createState() => _PackMassDialogState();
+}
+
+class _PackMassDialogState extends State<PackMassDialog>
+{
+  final _qtyCtrl = TextEditingController();
+  NetMeasure _measure = NetMeasure.g;
+
+  @override
+  void dispose()
+  {
+    _qtyCtrl.dispose();
+    super.dispose();
+  }
+
+  double? get _qty
+  {
+    final value = parseAmountText(_qtyCtrl.text);
+    return value == null || value <= 0 || value > _maxLotQty ? null : value;
+  }
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final qty = _qty;
+
+    return AlertDialog(
+      scrollable: true,
+      title: Text('stock.pack_title'.tr(args: [widget.title])),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(widget.reason ?? 'stock.pack_hint'.tr(), style: TextStyle(color: palette.inkSecondary)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final measure in NetMeasure.values)
+                  ChoiceChip(
+                    key: ValueKey('pack.measure.${measure.name}'),
+                    showCheckmark: false,
+                    label: Text(measureLabel(measure == NetMeasure.ml ? StockMeasure.ml : StockMeasure.g)),
+                    selected: _measure == measure,
+                    onSelected: (_) => setState(() => _measure = measure),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey('pack.qty'),
+              controller: _qtyCtrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(_numberInput), LengthLimitingTextInputFormatter(9)],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'stock.pack_qty'.tr(),
+                suffixText: measureLabel(_measure == NetMeasure.ml ? StockMeasure.ml : StockMeasure.g),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(aContext).pop(), child: Text('stock.pack_skip'.tr())),
+        ElevatedButton(
+          key: const ValueKey('pack.save'),
+          onPressed: qty == null ? null : () => Navigator.of(aContext).pop(PackMass(qty, _measure)),
+          child: Text('common.save'.tr()),
         ),
       ],
     );

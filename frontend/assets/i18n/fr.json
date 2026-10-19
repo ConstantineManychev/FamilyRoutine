@@ -83,7 +83,8 @@
     "STOCK_LOT_USED": "Ce lot a déjà été mangé, cuisiné ou jeté : impossible de le supprimer, seulement d’en jeter le reste",
     "STOCK_FROM_RECEIPT": "Ce lot vient d’un ticket : retirez-le dans le ticket (option « Mettre les produits en réserve ») ou jetez-le",
     "TOO_MANY_LOTS": "Trop de lots dans cette réserve",
-    "PUSH_UNAVAILABLE": "Les notifications push ne sont pas configurées sur le serveur"
+    "PUSH_UNAVAILABLE": "Les notifications push ne sont pas configurées sur le serveur",
+    "TOO_MANY_MARKS": "Trop de corrections du bilan : supprimez les anciennes."
   },
   "sidebar": {
     "routine": "Routine",
@@ -796,7 +797,12 @@
     "norm_share": "{} % des besoins du jour ({} kcal)",
     "delete_meal_hint": "Les entrées restent dans le journal, dans « Hors repas ».",
     "status_of": "Statut : {}",
-    "set_status_for": "Définir le statut de {}"
+    "set_status_for": "Définir le statut de {}",
+    "new_block": "Nouveau bloc : {}",
+    "block_created": "Bloc « {} » ajouté",
+    "block_too_old": "Un bloc peut commencer au plus 31 jours en arrière.",
+    "block_too_far": "Un bloc doit se terminer dans les 24 heures.",
+    "tap_to_create": "Touchez un espace libre de votre ligne ou de celle d’un enfant pour ajouter un bloc."
   },
   "catalog": {
     "scope": "Enregistrer dans",
@@ -849,7 +855,10 @@
     "theme_light": "Clair",
     "theme_dark": "Sombre",
     "theme_violet": "Violet",
-    "language": "Langue"
+    "language": "Langue",
+    "stock_title": "Stocks",
+    "stock_default": "Stock par défaut",
+    "stock_hint": "Où vont par défaut les produits des tickets et d’où le journal alimentaire retire ce que vous mangez. Chaque ticket peut choisir un autre stock."
   },
   "ai": {
     "title": "Reconnaissance des tickets",
@@ -1630,11 +1639,11 @@
     "store": "Réserve",
     "store_personal": "Réserve personnelle",
     "store_group": "Réserve du groupe « {} »",
-    "active": "Active",
-    "make_active": "Rendre active",
-    "active_set": "Réserve active : {}",
-    "active_hint": "Les achats des tickets arrivent ici et le journal alimentaire y prélève ce que vous mangez.",
-    "inactive_hint": "Cette réserve n’est pas active : les tickets et le journal en utilisent une autre.",
+    "active": "Par défaut",
+    "make_active": "Définir comme stock par défaut",
+    "active_set": "Stock par défaut : {}",
+    "active_hint": "Stock par défaut : les tickets proposent d’y ajouter les produits et le journal alimentaire y retire ce que vous mangez. Modifiable aussi dans les réglages.",
+    "inactive_hint": "Ce n’est pas le stock par défaut : tickets et journal en utilisent un autre par défaut.",
     "add": "Ajouter",
     "add_to_stock": "Mettre en réserve",
     "added": "« {} » ajouté à la réserve",
@@ -1663,9 +1672,8 @@
     "source_receipt": "d’un ticket",
     "source_manual": "manuel",
     "source_cooked": "préparé",
-    "waste": "Jeter",
     "waste_title": "Jeter : {}",
-    "waste_qty": "Quantité jetée",
+    "waste_qty": "Quantité à retirer",
     "err_waste_qty": "Supérieur à zéro et au plus le reste",
     "reason": "Raison",
     "reason_spoiled": "Abîmé",
@@ -1683,7 +1691,7 @@
     "cost_optional": "Coût (facultatif)",
     "currency": "Devise",
     "acquired_on": "Acheté : {}",
-    "not_stockable": "Cet article ne peut pas être stocké (service ou unité sans masse).",
+    "not_stockable": "Seuls les aliments (type « Aliment ») vont en stock.",
     "pick_dish": "Quel plat préparez-vous ?",
     "no_dishes": "Créez d’abord un plat avec une recette",
     "cook_title": "Cuisiner un plat",
@@ -1703,8 +1711,6 @@
     "batch_recipe": "Selon la recette",
     "entry_short": "pas en réserve : {}",
     "entry_batch": "d’un lot",
-    "receipt_switch": "Mettre les produits en réserve",
-    "receipt_switch_hint": "Les produits du ticket vont dans la réserve active : quantité × poids net.",
     "receipt_stocked": {
       "zero": "En réserve : {} article",
       "one": "En réserve : {} article",
@@ -1739,7 +1745,27 @@
     "expiry_title": "Date limite : {}",
     "expiry_hint": "Les lots qui expirent en premier sont utilisés en premier. Après la date, le reste est retiré automatiquement.",
     "expiry_past_hint": "Cette date est passée — le reste sera retiré comme périmé.",
-    "reason_expired": "Date dépassée"
+    "reason_expired": "Date dépassée",
+    "pack_unknown": "poids du paquet inconnu",
+    "writeoff_title": "Retirer : {}",
+    "writeoff_action": "Retirer",
+    "writeoff_lot": "Retirer de ce lot",
+    "writeoff_in_grams": "Retirer en grammes",
+    "reason_used": "Utilisé",
+    "move_used": "Retiré",
+    "written_off": "Retiré : {}",
+    "pack_title": "Poids du paquet : {}",
+    "pack_hint": "Combien pèse un paquet (une pièce). Le stock est recalculé en grammes et peut être retiré en grammes.",
+    "pack_qty": "Poids d’un paquet",
+    "pack_skip": "Plus tard",
+    "pack_saved": "Poids du paquet enregistré, stock recalculé",
+    "pack_missing": "Le poids du paquet est inconnu : le stock est compté en pièces et ce qui est mangé en grammes n’en est pas retiré.",
+    "pack_set": "Indiquer le poids du paquet",
+    "pack_needed_hint": "Ce produit est en stock en pièces sans poids de paquet, donc {} n’ont pas été retirés. Indiquez le poids d’un paquet : le stock sera recalculé et ce que vous avez mangé retiré.",
+    "lots_title": "Lots",
+    "receipt_target": "Produits en stock",
+    "receipt_target_hint": "Les aliments du ticket vont dans le stock choisi. Par défaut celui des réglages.",
+    "receipt_target_none": "Ne pas ajouter"
   },
   "notify": {
     "title": "Notifications",
@@ -1790,10 +1816,37 @@
   "energy": {
     "title": "Bilan calorique",
     "empty": "Pas encore de données pour ce jour.",
-    "hint": "Les repas font monter la ligne, les calories se dépensent régulièrement au niveau d'entretien, les entraînements brûlent en plus. Touchez un nom pour masquer sa ligne.",
+    "hint": "Le bilan se cumule et n’est pas remis à zéro à minuit. Les repas font monter la ligne, les calories se dépensent régulièrement au niveau d’entretien, les entraînements brûlent en plus. Touchez le graphique pour saisir la valeur exacte à ce moment ; touchez un nom pour masquer sa ligne.",
     "eaten": "mangé {}",
     "burned": "dépensé {}",
     "workouts": "entraînements {}",
-    "no_norm": "pas de besoin — dépense non comptée"
+    "no_norm": "pas de besoin — dépense non comptée",
+    "period": {
+      "zero": "sur {} jours",
+      "one": "sur {} jour",
+      "two": "sur {} jours",
+      "few": "sur {} jours",
+      "many": "sur {} jours",
+      "other": "sur {} jours"
+    },
+    "correct_title": "Calories à ce moment",
+    "correct_kcal": "Bilan calorique",
+    "kcal_unit": "kcal",
+    "correct_hint": "À partir de ce moment, le graphique repart de la valeur saisie. Un nombre négatif est un déficit.",
+    "mark_delete": "Supprimer la correction",
+    "mark_saved": "Valeur enregistrée",
+    "mark_deleted": "Correction supprimée"
+  },
+  "range": {
+    "prev": "Précédent",
+    "next": "Suivant",
+    "days": {
+      "zero": "{} jours",
+      "one": "{} jour",
+      "two": "{} jours",
+      "few": "{} jours",
+      "many": "{} jours",
+      "other": "{} jours"
+    }
   }
 }

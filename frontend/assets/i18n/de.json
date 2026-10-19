@@ -83,7 +83,8 @@
     "STOCK_LOT_USED": "Aus dieser Charge wurde schon gegessen, gekocht oder abgebucht: Sie kann nicht gelöscht, nur der Rest abgebucht werden",
     "STOCK_FROM_RECEIPT": "Diese Charge stammt aus einem Beleg: Entferne sie im Beleg (Schalter „Produkte einlagern“) oder buche sie ab",
     "TOO_MANY_LOTS": "Zu viele Chargen in diesem Lager",
-    "PUSH_UNAVAILABLE": "Push-Benachrichtigungen sind auf dem Server nicht eingerichtet"
+    "PUSH_UNAVAILABLE": "Push-Benachrichtigungen sind auf dem Server nicht eingerichtet",
+    "TOO_MANY_MARKS": "Zu viele Bilanzkorrekturen: Löschen Sie alte."
   },
   "sidebar": {
     "routine": "Routine",
@@ -796,7 +797,12 @@
     "norm_share": "{} % des Tagesbedarfs ({} kcal)",
     "delete_meal_hint": "Die Einträge bleiben im Tagebuch unter „Ohne Mahlzeit“.",
     "status_of": "Status: {}",
-    "set_status_for": "Status setzen für {}"
+    "set_status_for": "Status setzen für {}",
+    "new_block": "Neuer Block: {}",
+    "block_created": "Block „{}“ hinzugefügt",
+    "block_too_old": "Ein Block darf höchstens 31 Tage zurückliegen.",
+    "block_too_far": "Ein Block muss innerhalb eines Tages enden.",
+    "tap_to_create": "Tippen Sie auf eine freie Stelle in Ihrer Zeile oder der eines Kindes, um einen Block hinzuzufügen."
   },
   "catalog": {
     "scope": "Speichern in",
@@ -849,7 +855,10 @@
     "theme_light": "Hell",
     "theme_dark": "Dunkel",
     "theme_violet": "Violett",
-    "language": "Sprache"
+    "language": "Sprache",
+    "stock_title": "Vorräte",
+    "stock_default": "Standardlager",
+    "stock_hint": "Wohin Produkte aus Belegen standardmäßig kommen und woraus das Ernährungstagebuch Gegessenes abbucht. Jeder Beleg kann ein anderes Lager wählen."
   },
   "ai": {
     "title": "Belegerkennung",
@@ -1630,11 +1639,11 @@
     "store": "Lager",
     "store_personal": "Persönlicher Vorrat",
     "store_group": "Gruppenvorrat „{}“",
-    "active": "Aktiv",
-    "make_active": "Aktiv setzen",
-    "active_set": "Aktives Lager: {}",
-    "active_hint": "Hierher kommen Einkäufe aus Belegen, und das Ernährungstagebuch bucht Gegessenes von hier ab.",
-    "inactive_hint": "Dieses Lager ist nicht aktiv: Belege und Tagebuch nutzen ein anderes.",
+    "active": "Standard",
+    "make_active": "Als Standardlager festlegen",
+    "active_set": "Standardlager: {}",
+    "active_hint": "Standardlager: Belege schlagen vor, Produkte hierher zu buchen, und das Ernährungstagebuch bucht Gegessenes von hier ab. Auch in den Einstellungen änderbar.",
+    "inactive_hint": "Dies ist nicht das Standardlager: Belege und Tagebuch nutzen standardmäßig ein anderes.",
     "add": "Hinzufügen",
     "add_to_stock": "Einlagern",
     "added": "„{}“ eingelagert",
@@ -1663,9 +1672,8 @@
     "source_receipt": "aus Beleg",
     "source_manual": "manuell",
     "source_cooked": "gekocht",
-    "waste": "Als Abfall abbuchen",
     "waste_title": "Abbuchen: {}",
-    "waste_qty": "Wie viel wegwerfen",
+    "waste_qty": "Wie viel ausbuchen",
     "err_waste_qty": "Größer als null und höchstens der Rest",
     "reason": "Grund",
     "reason_spoiled": "Verdorben",
@@ -1683,7 +1691,7 @@
     "cost_optional": "Kosten (optional)",
     "currency": "Währung",
     "acquired_on": "Gekauft: {}",
-    "not_stockable": "Dieser Artikel kann nicht gelagert werden (Dienstleistung oder Einheit ohne Masse).",
+    "not_stockable": "Nur Lebensmittel (Typ „Lebensmittel“) kommen ins Lager.",
     "pick_dish": "Welches Gericht kochst du?",
     "no_dishes": "Lege zuerst ein Gericht mit Rezept an",
     "cook_title": "Gericht kochen",
@@ -1703,8 +1711,6 @@
     "batch_recipe": "Nach Rezept",
     "entry_short": "nicht auf Lager: {}",
     "entry_batch": "aus einer Charge",
-    "receipt_switch": "Produkte einlagern",
-    "receipt_switch_hint": "Produkte aus dem Beleg kommen ins aktive Lager: Menge × Nettogewicht.",
     "receipt_stocked": {
       "zero": "Im Lager: {} Positionen",
       "one": "Im Lager: {} Position",
@@ -1739,7 +1745,27 @@
     "expiry_title": "Haltbarkeit: {}",
     "expiry_hint": "Partien, die zuerst ablaufen, werden zuerst verbraucht. Nach dem Datum wird der Rest automatisch abgeschrieben.",
     "expiry_past_hint": "Das Datum ist bereits vorbei — der Rest wird als abgelaufen abgeschrieben.",
-    "reason_expired": "Abgelaufen"
+    "reason_expired": "Abgelaufen",
+    "pack_unknown": "Packungsgewicht unbekannt",
+    "writeoff_title": "Ausbuchen: {}",
+    "writeoff_action": "Ausbuchen",
+    "writeoff_lot": "Aus dieser Charge ausbuchen",
+    "writeoff_in_grams": "In Gramm ausbuchen",
+    "reason_used": "Verbraucht",
+    "move_used": "Ausgebucht",
+    "written_off": "Ausgebucht: {}",
+    "pack_title": "Packungsgewicht: {}",
+    "pack_hint": "Wie viel eine Packung (ein Stück) wiegt. Der Bestand wird in Gramm umgerechnet und kann in Gramm ausgebucht werden.",
+    "pack_qty": "Gewicht einer Packung",
+    "pack_skip": "Nicht jetzt",
+    "pack_saved": "Packungsgewicht gespeichert, Bestand neu berechnet",
+    "pack_missing": "Das Packungsgewicht fehlt: Der Bestand wird in Stück gezählt, in Gramm Gegessenes wird nicht abgebucht.",
+    "pack_set": "Packungsgewicht angeben",
+    "pack_needed_hint": "Dieses Produkt liegt in Stück ohne Packungsgewicht im Lager, daher wurden {} nicht abgebucht. Geben Sie das Gewicht einer Packung an: Der Bestand wird neu berechnet und das Gegessene abgebucht.",
+    "lots_title": "Chargen",
+    "receipt_target": "Produkte ins Lager",
+    "receipt_target_hint": "Lebensmittel aus dem Beleg kommen ins gewählte Lager. Standard aus den Einstellungen.",
+    "receipt_target_none": "Nicht hinzufügen"
   },
   "notify": {
     "title": "Benachrichtigungen",
@@ -1790,10 +1816,37 @@
   "energy": {
     "title": "Kalorienbilanz",
     "empty": "Für diesen Tag gibt es noch keine Daten.",
-    "hint": "Essen hebt die Linie, über den Tag werden Kalorien gleichmäßig nach Erhaltungsbedarf verbraucht, Trainings verbrennen zusätzlich. Tippen Sie auf einen Namen, um die Linie auszublenden.",
+    "hint": "Die Bilanz wird fortgeführt und um Mitternacht nicht zurückgesetzt. Essen hebt die Linie, Kalorien werden gleichmäßig nach Erhaltungsbedarf verbraucht, Trainings verbrennen zusätzlich. Tippen Sie auf das Diagramm, um den genauen Wert zu diesem Zeitpunkt anzugeben; tippen Sie auf einen Namen, um die Linie auszublenden.",
     "eaten": "gegessen {}",
     "burned": "verbraucht {}",
     "workouts": "Training {}",
-    "no_norm": "kein Bedarf — Verbrauch nicht berechnet"
+    "no_norm": "kein Bedarf — Verbrauch nicht berechnet",
+    "period": {
+      "zero": "für {} Tage",
+      "one": "für {} Tag",
+      "two": "für {} Tage",
+      "few": "für {} Tage",
+      "many": "für {} Tage",
+      "other": "für {} Tage"
+    },
+    "correct_title": "Kalorien zu diesem Zeitpunkt",
+    "correct_kcal": "Kalorienbilanz",
+    "kcal_unit": "kcal",
+    "correct_hint": "Ab diesem Moment geht das Diagramm vom eingegebenen Wert aus weiter. Eine negative Zahl ist ein Defizit.",
+    "mark_delete": "Korrektur löschen",
+    "mark_saved": "Wert gespeichert",
+    "mark_deleted": "Korrektur gelöscht"
+  },
+  "range": {
+    "prev": "Zurück",
+    "next": "Weiter",
+    "days": {
+      "zero": "{} Tage",
+      "one": "{} Tag",
+      "two": "{} Tage",
+      "few": "{} Tage",
+      "many": "{} Tage",
+      "other": "{} Tage"
+    }
   }
 }

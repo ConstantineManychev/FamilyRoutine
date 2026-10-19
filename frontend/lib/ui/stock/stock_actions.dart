@@ -77,14 +77,104 @@ Future<bool> addLotFlow(BuildContext aContext, WidgetRef aRef, StockStoreRef aSt
   return isDone;
 }
 
-Future<bool> wasteLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) async
+Future<bool> packMassFlow(BuildContext aContext, WidgetRef aRef, String aItemId, String aTitle, {String? aReason}) async
 {
-  final draft = await showWasteDialog(aContext, aLot);
-  if (draft == null || !aContext.mounted)
+  final pack = await showPackMassDialog(aContext, aTitle, aReason: aReason);
+  if (pack == null || !aContext.mounted)
   {
     return false;
   }
-  return _run(aContext, aRef, () => aRef.read(apiProv).wasteStockLot(aLot.id, draft.qty, draft.reason, draft.note));
+  try
+  {
+    await aRef.read(apiProv).fillItem(aItemId, {'net_qty': amountText(pack.qty), 'net_measure': pack.measure.name});
+    notifyNutritionChanged(aRef);
+    if (aContext.mounted)
+    {
+      showInfoSnack(aContext, 'stock.pack_saved'.tr());
+    }
+    return true;
+  }
+  catch (aError)
+  {
+    if (aContext.mounted)
+    {
+      showErrorSnack(aContext, aError);
+    }
+    return false;
+  }
+}
+
+Future<bool> wasteLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) async
+{
+  final draft = await showWriteOffDialog(aContext, WriteOffSubject.lot(aLot));
+  if (draft == null || draft.isPackRequested || !aContext.mounted)
+  {
+    return false;
+  }
+  final isDone = await _run(
+    aContext,
+    aRef,
+    () => aRef.read(apiProv).wasteStockLot(aLot.id, draft.qty, draft.reason, draft.note, aUnit: draft.unit),
+  );
+  if (isDone && aContext.mounted)
+  {
+    showInfoSnack(aContext, 'stock.written_off'.tr(args: [aLot.title]));
+  }
+  return isDone;
+}
+
+Future<StockGroup?> _reloadGroup(WidgetRef aRef, StockStoreRef aStore, String aItemId) async
+{
+  final data = await aRef.read(apiProv).getStock(aStore: aStore);
+  return data.groupsOf(StockKind.item).where((aGroup) => aGroup.itemId == aItemId).firstOrNull;
+}
+
+Future<bool> writeOffGroupFlow(BuildContext aContext, WidgetRef aRef, StockStoreRef aStore, StockGroup aGroup) async
+{
+  final itemId = aGroup.itemId;
+  if (itemId == null)
+  {
+    return wasteLotFlow(aContext, aRef, aGroup.first);
+  }
+  var group = aGroup;
+  var draft = await showWriteOffDialog(aContext, WriteOffSubject.group(group), aCanAskPack: true);
+  if (draft != null && draft.isPackRequested && aContext.mounted)
+  {
+    final isSet = await packMassFlow(aContext, aRef, itemId, group.title);
+    if (!isSet || !aContext.mounted)
+    {
+      return false;
+    }
+    final reloaded = await _reloadGroup(aRef, aStore, itemId);
+    if (reloaded == null || !aContext.mounted)
+    {
+      return false;
+    }
+    group = reloaded;
+    draft = await showWriteOffDialog(aContext, WriteOffSubject.group(group));
+  }
+  if (draft == null || draft.isPackRequested || !aContext.mounted)
+  {
+    return false;
+  }
+  final chosen = draft;
+  final isDone = await _run(
+    aContext,
+    aRef,
+    () => aRef.read(apiProv).writeOffStockItem(
+          aStore: aStore,
+          aItemId: itemId,
+          aQty: chosen.qty,
+          aUnit: chosen.unit,
+          aReason: chosen.reason,
+          aNote: chosen.note,
+        ),
+  );
+  if (isDone && aContext.mounted)
+  {
+    showInfoSnack(aContext, 'stock.written_off'.tr(args: [group.title]));
+  }
+  return isDone;
 }
 
 Future<bool> expiryLotFlow(BuildContext aContext, WidgetRef aRef, StockLot aLot) async

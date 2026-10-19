@@ -135,6 +135,35 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
   bool _isChanged(StatusMarkDto aMark) =>
       _status != aMark.status || _noteCtrl.text.trim() != (aMark.note ?? '') || _isTimeChanged(aMark);
 
+  Future<void> _pickDate() async
+  {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: dayOnly(_start),
+      firstDate: dayOnly(now.subtract(const Duration(days: maxMarkPastDays))),
+      lastDate: dayOnly(now.add(const Duration(days: 1))),
+    );
+    if (picked == null || !mounted)
+    {
+      return;
+    }
+    final shift = DateTime(picked.year, picked.month, picked.day).difference(dayOnly(_start)).inDays;
+    if (shift == 0)
+    {
+      return;
+    }
+    setState(()
+    {
+      _start = DateTime(_start.year, _start.month, _start.day + shift, _start.hour, _start.minute);
+      final end = _end;
+      if (end != null)
+      {
+        _end = DateTime(end.year, end.month, end.day + shift, end.hour, end.minute);
+      }
+    });
+  }
+
   Future<void> _pickStart() async
   {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_start));
@@ -472,6 +501,12 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        OutlinedButton.icon(
+          key: const ValueKey('mark.date'),
+          onPressed: _isBusy ? null : _pickDate,
+          icon: const Icon(AppIcons.calendar, size: 16),
+          label: Text(DateFormat.MMMEd(aContext.locale.toLanguageTag()).format(_start)),
+        ),
         OutlinedButton.icon(
           key: const ValueKey('mark.start'),
           onPressed: _isBusy ? null : _pickStart,

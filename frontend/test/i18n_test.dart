@@ -16,7 +16,7 @@ const Map<String, List<String>> dynamicKeys = {
     'AI_PROVIDER_UNAVAILABLE', 'WRONG_PASSWORD', 'CHILD_PROFILE', 'SESSION_ACTIVE', 'SESSION_FINISHED', 'TOO_MANY_PROGRAMS',
     'TOO_MANY_DISHES', 'TOO_MANY_ENTRIES', 'CAT_EXISTS', 'CAT_IN_USE', 'CAT_HAS_CHILDREN', 'TOO_MANY_CATS', 'MARK_OVERLAP',
     'TASK_DONE', 'TASK_OPEN', 'TASK_ARCHIVED', 'TOO_MANY_TASKS', 'TASK_LOG_FULL', 'TOPIC_TOO_DEEP', 'TOPIC_CYCLE',
-    'TOPIC_HAS_CHILDREN', 'TOO_MANY_TOPICS', 'TOO_MANY_NOTES', 'STOCK_LOT_USED', 'STOCK_FROM_RECEIPT', 'TOO_MANY_LOTS',
+    'TOPIC_HAS_CHILDREN', 'TOO_MANY_TOPICS', 'TOO_MANY_NOTES', 'STOCK_LOT_USED', 'STOCK_FROM_RECEIPT', 'TOO_MANY_LOTS', 'TOO_MANY_MARKS',
   ],
   'ai': ['hint_anthropic', 'hint_openai', 'hint_gemini'],
   'metrics': [
@@ -97,7 +97,7 @@ const Map<String, List<String>> dynamicKeys = {
   ],
   'stock': [
     'measure_g', 'measure_ml', 'measure_pcs', 'source_receipt', 'source_manual', 'source_cooked', 'reason_spoiled',
-    'reason_leftovers', 'reason_other', 'move_eaten', 'move_cooked', 'move_waste', 'lots_count.one', 'lots_count.other',
+    'reason_leftovers', 'reason_other', 'move_eaten', 'move_cooked', 'move_waste', 'move_used', 'lots_count.one', 'lots_count.other',
     'receipt_stocked.one', 'receipt_stocked.other',
   ],
 };

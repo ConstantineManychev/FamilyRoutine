@@ -12,6 +12,7 @@ import 'package:family_routine/ui/common/app_theme.dart';
 import 'package:family_routine/ui/common/person_switcher.dart';
 import 'package:family_routine/ui/energy/energy_chart_block.dart';
 import 'package:family_routine/ui/nutrition/nutrition_today_block.dart';
+import 'package:family_routine/ui/routine/family_timeline_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -40,6 +41,9 @@ Map<String, dynamic> _macros(String aKcal) => {'kcal': aKcal, 'prot': '0', 'fat'
 class _FakeApi extends ApiSvc
 {
   final List<String?> dayRequests = [];
+  final List<int> energyDays = [];
+  final List<(String?, DateTime, double)> energyMarks = [];
+  final List<(RoutineStatus, DateTime?, DateTime?, String?)> createdMarks = [];
 
   _FakeApi() : super(Dio(), TokenStore(const FlutterSecureStorage()));
 
@@ -68,8 +72,45 @@ class _FakeApi extends ApiSvc
   }
 
   @override
-  Future<EnergyDay> getEnergyDay(DateTime aDate) async
+  Future<EnergyMark> setEnergyMark({String? aPersonId, required DateTime aTs, required double aKcal}) async
   {
+    energyMarks.add((aPersonId, aTs, aKcal));
+    return EnergyMark(id: 'm1', ts: aTs, kcal: aKcal);
+  }
+
+  @override
+  Future<StatusMarkDto> createMark(
+    RoutineStatus aStatus,
+    {
+      String? aNote,
+      DateTime? aStartTs,
+      DateTime? aEndTs,
+      String? aPersonId,
+    }
+  ) async
+  {
+    createdMarks.add((aStatus, aStartTs, aEndTs, aPersonId));
+    return StatusMarkDto(id: 'new', status: aStatus, startTs: aStartTs ?? DateTime.now(), endTs: aEndTs);
+  }
+
+  @override
+  Future<TimelineDto> getTimeline({String? aFamilyId, required DateTime aFrom, required DateTime aTo}) async
+  {
+    return TimelineDto.fromJson({
+      'family_id': aFamilyId,
+      'family_name': 'Home',
+      'members': [
+        {'user_id': 'me', 'first_name': 'Anna', 'last_name': 'Test', 'is_me': true, 'can_edit': true, 'marks': const []},
+        {'user_id': 'kid', 'first_name': 'Kid', 'last_name': 'Test', 'is_me': false, 'is_managed': true, 'can_edit': true, 'marks': const []},
+        {'user_id': 'bob', 'first_name': 'Bob', 'last_name': 'Test', 'is_me': false, 'can_edit': false, 'marks': const []},
+      ],
+    });
+  }
+
+  @override
+  Future<EnergyDay> getEnergyDay(DateTime aDate, {int aDays = 1}) async
+  {
+    energyDays.add(aDays);
     final start = DateTime.utc(2026, 10, 16, 21);
     String at(int aHours) => start.add(Duration(hours: aHours)).toIso8601String();
     return EnergyDay.fromJson({
@@ -207,7 +248,8 @@ void main()
   {
     await EasyLocalization.ensureInitialized();
     await aTester.binding.setSurfaceSize(_narrowPhone);
-    await aTester.pumpWidget(_app(const EnergyChartBlock(), aApi: _FakeApi()));
+    final api = _FakeApi();
+    await aTester.pumpWidget(_app(const EnergyChartBlock(), aApi: api));
     await aTester.pumpAndSettle();
 
     expect(find.text('Calorie balance'), findsOneWidget);
@@ -226,7 +268,51 @@ void main()
 
     await aTester.tapAt(aTester.getCenter(find.byKey(const ValueKey('energy.chart'))));
     await aTester.pumpAndSettle();
-    expect(find.text('Me'), findsWidgets);
+    expect(find.text('Calories at this time'), findsOneWidget);
+    final field = aTester.widget<TextField>(find.byKey(const ValueKey('energy.correct.kcal')));
+    expect(int.parse(field.controller!.text), inInclusiveRange(-900, -700));
+    await aTester.enterText(find.byKey(const ValueKey('energy.correct.kcal')), '250');
+    await aTester.pump();
+    await aTester.tap(find.byKey(const ValueKey('energy.correct.save')));
+    await aTester.pumpAndSettle();
+    expect(api.energyMarks.single.$1, isNull);
+    expect(api.energyMarks.single.$3, 250);
+
+    await aTester.tap(find.byKey(const ValueKey('energy.range.days.7')));
+    await aTester.pumpAndSettle();
+    expect(api.energyDays.last, 7);
+    expect(find.byKey(const ValueKey('energy.scroll')), findsOneWidget);
+    expect(aTester.takeException(), isNull);
+    await aTester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('tapping an empty spot on a child row creates a block for the child', (aTester) async
+  {
+    await EasyLocalization.ensureInitialized();
+    await aTester.binding.setSurfaceSize(const Size(900, 900));
+    final api = _FakeApi();
+    await aTester.pumpWidget(_app(const FamilyTimelineCard(familyId: 'f1', title: 'Home'), aApi: api));
+    await aTester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('timeline.track.bob')), findsNothing);
+    final track = find.byKey(const ValueKey('timeline.track.kid'));
+    expect(track, findsOneWidget);
+    await aTester.tapAt(aTester.getTopLeft(track) + const Offset(20, 10));
+    await aTester.pumpAndSettle();
+    expect(find.text('New block: Kid Test'), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('block.status.school')));
+    await aTester.tap(find.byKey(const ValueKey('block.minutes.30')));
+    await aTester.pump();
+    await aTester.tap(find.byKey(const ValueKey('block.save')));
+    await aTester.pumpAndSettle();
+    final created = api.createdMarks.single;
+    expect(created.$1, RoutineStatus.school);
+    expect(created.$4, 'kid');
+    expect(created.$3!.difference(created.$2!), const Duration(minutes: 30));
+
+    await aTester.tap(find.byKey(const ValueKey('timeline.range.days.14')));
+    await aTester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('timeline.scroll')), findsOneWidget);
     expect(aTester.takeException(), isNull);
     await aTester.binding.setSurfaceSize(null);
   });

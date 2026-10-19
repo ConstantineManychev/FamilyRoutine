@@ -12,6 +12,7 @@ import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import '../common/snap_tab_view.dart';
 import 'amount_sheet.dart';
+import '../stock/stock_actions.dart';
 import 'food_picker.dart';
 import 'meal_target.dart';
 import 'nutrition_format.dart';
@@ -150,7 +151,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
       }
       final api = ref.read(apiProv);
       final markId = await ensureMealBlock(api, target, aPersonId: widget.personId);
-      await api.addMealEntry({
+      final entry = await api.addMealEntry({
         'date': dateWire(widget.date),
         'status_mark_id': markId,
         if (widget.personId != null) 'person_id': widget.personId,
@@ -162,6 +163,21 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
       }
       notifyNutritionChanged(ref);
       showInfoSnack(context, 'nutrition.added'.tr(args: [aTitle, mealLabel(target.kind)]));
+      final itemId = entry.itemId;
+      if (entry.isPackNeeded && itemId != null)
+      {
+        await packMassFlow(
+          context,
+          ref,
+          itemId,
+          aTitle,
+          aReason: 'stock.pack_needed_hint'.tr(args: [formatGrams(context, entry.grams ?? 0, aIsMl: entry.isMl)]),
+        );
+        if (!mounted)
+        {
+          return;
+        }
+      }
       await Future.wait([_loadMeals(aMarkId: markId), _loadRecent()]);
     }
     catch (aError)

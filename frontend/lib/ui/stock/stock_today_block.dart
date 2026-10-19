@@ -11,6 +11,7 @@ import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import 'stock_actions.dart';
 import 'stock_format.dart';
+import 'stock_item_sheet.dart';
 
 const int _shownGroups = 5;
 
@@ -73,12 +74,24 @@ class StockTodayBlock extends ConsumerWidget
             else
               for (final group in groups.take(_shownGroups))
                 ListTile(
+                  key: ValueKey('stock.block.${group.key}'),
                   dense: true,
-                  onTap: () => aContext.push(stockPath),
+                  onTap: () => group.kind == StockKind.dish
+                      ? wasteLotFlow(aContext, aRef, group.first)
+                      : openStockGroup(aContext, aRef, aData.store, group),
                   leading: Icon(group.kind == StockKind.dish ? AppIcons.cookingPot : AppIcons.shoppingBag, size: 18, color: palette.inkSecondary),
                   title: Text(group.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: _urgentExpiry(aContext, group),
-                  trailing: Text(formatStockQty(aContext, group.leftQty, group.measure), style: TextStyle(color: palette.inkSecondary)),
+                  trailing: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Text(
+                      formatGroupLeft(aContext, group),
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: group.isUnmeasured ? palette.warning : palette.inkSecondary),
+                    ),
+                  ),
                 ),
             if (groups.length > _shownGroups)
               Padding(

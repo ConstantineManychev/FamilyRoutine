@@ -13,6 +13,7 @@ import '../common/page_frames.dart';
 import '../nutrition/nutrition_format.dart';
 import 'stock_actions.dart';
 import 'stock_format.dart';
+import 'stock_item_sheet.dart';
 
 const double _contentMaxWidth = 760;
 
@@ -214,8 +215,8 @@ class _StockScreenState extends ConsumerState<StockScreen>
         _ => deleteLotFlow(context, ref, aLot),
       },
       itemBuilder: (_) => [
+        PopupMenuItem(value: 'waste', child: Text('stock.writeoff_action'.tr())),
         PopupMenuItem(value: 'expiry', child: Text('stock.expiry_action'.tr())),
-        PopupMenuItem(value: 'waste', child: Text('stock.waste'.tr())),
         if (aLot.isRemovable)
           PopupMenuItem(
             value: 'delete',
@@ -223,18 +224,6 @@ class _StockScreenState extends ConsumerState<StockScreen>
           ),
       ],
     );
-  }
-
-  String _lotLine(BuildContext aContext, StockLot aLot)
-  {
-    final cost = aLot.leftCost;
-    final currCode = aLot.currCode;
-    return [
-      DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aLot.acquiredTs),
-      sourceLabel(aLot.source),
-      'stock.left_of_total'.tr(args: [formatStockQty(aContext, aLot.leftQty, aLot.measure), formatStockQty(aContext, aLot.qty, aLot.measure)]),
-      if (cost != null && currCode != null) formatMoney(aContext, cost, currCode),
-    ].join(' · ');
   }
 
   Color _toneColor(BuildContext aContext, ExpiryTone aTone) => switch (aTone)
@@ -264,29 +253,16 @@ class _StockScreenState extends ConsumerState<StockScreen>
     );
   }
 
-  Widget _lotTile(BuildContext aContext, StockLot aLot)
-  {
-    return ListTile(
-      key: ValueKey('stock.lot.${aLot.id}'),
-      dense: true,
-      contentPadding: const EdgeInsets.only(left: 16, right: 4),
-      leading: Icon(sourceIcon(aLot.source), size: 18, color: aContext.palette.inkMuted),
-      title: Text(_lotLine(aContext, aLot), style: const TextStyle(fontSize: 13)),
-      subtitle: _expiryLine(aContext, aLot),
-      trailing: _lotMenu(aLot),
-    );
-  }
-
-  Widget _itemGroup(BuildContext aContext, StockGroup aGroup)
+  Widget _itemGroup(BuildContext aContext, StockStoreRef aStore, StockGroup aGroup)
   {
     final palette = aContext.palette;
-    final first = aGroup.first;
-    final per100 = first.per100;
+    final per100 = aGroup.first.per100;
     final nearest = aGroup.soonest;
     final nearestLine = nearest == null ? null : _expiryLine(aContext, nearest);
-    return ExpansionTile(
+    return ListTile(
       key: ValueKey('stock.group.${aGroup.key}'),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      onTap: () => openStockGroup(aContext, ref, aStore, aGroup),
       title: Text(aGroup.title, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,16 +270,21 @@ class _StockScreenState extends ConsumerState<StockScreen>
         children: [
           Text(
             [
-              formatStockQty(aContext, aGroup.leftQty, aGroup.measure),
-              'stock.lots_count'.plural(aGroup.lots.length),
+              formatGroupLeft(aContext, aGroup),
+              if (aGroup.lots.length > 1) 'stock.lots_count'.plural(aGroup.lots.length),
               if (per100 != null) per100Line(aContext, per100, aIsMl: aGroup.measure == StockMeasure.ml),
             ].join(' · '),
-            style: TextStyle(fontSize: 12, color: palette.inkMuted),
+            style: TextStyle(fontSize: 12, color: aGroup.isUnmeasured ? palette.warning : palette.inkMuted),
           ),
           if (nearestLine != null) nearestLine,
         ],
       ),
-      children: [for (final lot in aGroup.lots) _lotTile(aContext, lot)],
+      trailing: IconButton(
+        key: ValueKey('stock.writeoff.${aGroup.key}'),
+        tooltip: 'stock.writeoff_action'.tr(),
+        icon: const Icon(AppIcons.minus, size: 18),
+        onPressed: () => writeOffGroupFlow(aContext, ref, aStore, aGroup),
+      ),
     );
   }
 
@@ -316,6 +297,7 @@ class _StockScreenState extends ConsumerState<StockScreen>
     return ListTile(
       key: ValueKey('stock.batch.${aLot.id}'),
       contentPadding: const EdgeInsets.only(left: 12, right: 4),
+      onTap: () => wasteLotFlow(aContext, ref, aLot),
       leading: Icon(AppIcons.cookingPot, color: palette.inkSecondary),
       title: Text(aLot.title, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Column(
@@ -325,7 +307,7 @@ class _StockScreenState extends ConsumerState<StockScreen>
           Text(
             [
               'stock.cooked_on'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aLot.acquiredTs)]),
-              'stock.left_of_total'.tr(args: [formatStockQty(aContext, aLot.leftQty, aLot.measure), formatStockQty(aContext, aLot.qty, aLot.measure)]),
+              'stock.left_of_total'.tr(args: [formatLotLeft(aContext, aLot), formatStockQty(aContext, aLot.qty, aLot.measure)]),
               if (per100 != null) per100Line(aContext, per100),
               if (cost != null && currCode != null) formatMoney(aContext, cost, currCode),
             ].join(' · '),
@@ -403,7 +385,7 @@ class _StockScreenState extends ConsumerState<StockScreen>
                       aTitle: 'stock.products'.tr(),
                       aIcon: AppIcons.shoppingBag,
                       aEmpty: 'stock.products_empty'.tr(),
-                      aChildren: [for (final group in items) _itemGroup(aContext, group)],
+                      aChildren: [for (final group in items) _itemGroup(aContext, data.store, group)],
                     ),
                     const SizedBox(height: 20),
                     _section(

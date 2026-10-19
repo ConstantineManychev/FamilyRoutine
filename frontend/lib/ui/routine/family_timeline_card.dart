@@ -9,8 +9,10 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
+import '../common/range_days.dart';
 import 'dash_card.dart';
 import 'mark_sheet.dart';
+import 'new_block_dialog.dart';
 import 'routine_style.dart';
 import 'status_sheet.dart';
 import '../common/app_theme.dart';
@@ -21,6 +23,10 @@ const double _trackHeight = 24;
 const double _blockGap = 2;
 const double _blockRadius = 4;
 const double _axisHeight = 20;
+const double _multiAxisHeight = 34;
+const double _minDayWidth = 120;
+const double _minTickGap = 40;
+const List<int> _hourSteps = [1, 2, 3, 6, 12, 24];
 
 DateTime _dayStart(DateTime aTs) => DateTime(aTs.year, aTs.month, aTs.day);
 
@@ -38,14 +44,17 @@ class FamilyTimelineCard extends ConsumerStatefulWidget
 
 class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
 {
-  DateTime _day = _dayStart(DateTime.now());
+  DateTime _lastDay = _dayStart(DateTime.now());
+  int _days = 1;
   TimelineDto? _data;
   Object? _error;
   Timer? _timer;
   int _requestId = 0;
   bool _isFollowingToday = true;
 
-  bool get _isToday => _day == _dayStart(DateTime.now());
+  DateTime get _from => rangeFirstDay(_lastDay, _days);
+
+  DateTime get _to => DateTime(_lastDay.year, _lastDay.month, _lastDay.day + 1);
 
   @override
   void initState()
@@ -78,7 +87,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     {
       return;
     }
-    _day = _dayStart(DateTime.now());
+    _lastDay = _dayStart(DateTime.now());
     _load();
   }
 
@@ -87,11 +96,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     final requestId = ++_requestId;
     try
     {
-      final data = await ref.read(apiProv).getTimeline(
-            aFamilyId: widget.familyId,
-            aFrom: _day,
-            aTo: _day.add(const Duration(days: 1)),
-          );
+      final data = await ref.read(apiProv).getTimeline(aFamilyId: widget.familyId, aFrom: _from, aTo: _to);
       if (mounted && requestId == _requestId)
       {
         setState(()
@@ -110,40 +115,31 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     }
   }
 
-  void _shiftDay(int aDays)
+  void _setRange(DateTime aLastDay, int aDays)
   {
     setState(()
     {
-      _day = _dayStart(_day.add(Duration(days: aDays, hours: 12)));
-      _isFollowingToday = _isToday;
+      _lastDay = _dayStart(aLastDay);
+      _days = aDays;
+      _isFollowingToday = _lastDay == _dayStart(DateTime.now());
       _data = null;
     });
     _load();
   }
 
-  void _goToday()
+  Future<void> _create(TimelineMemberDto aMember, DateTime aTs) async
   {
-    setState(()
+    final isCreated = await openNewBlock(
+      context,
+      ref,
+      aStart: aTs,
+      aPersonId: aMember.isMe ? null : aMember.userId,
+      aPersonName: aMember.fullName,
+    );
+    if (isCreated)
     {
-      _day = _dayStart(DateTime.now());
-      _isFollowingToday = true;
-      _data = null;
-    });
-    _load();
-  }
-
-  String _dayLabel(BuildContext aContext)
-  {
-    final today = _dayStart(DateTime.now());
-    final diff = _day.difference(today).inHours.round() ~/ 24;
-    final date = DateFormat.MMMEd(aContext.locale.toLanguageTag()).format(_day);
-    return switch (diff)
-    {
-      0 => '${'routine.today'.tr()}, $date',
-      -1 => '${'routine.yesterday'.tr()}, $date',
-      1 => '${'routine.tomorrow'.tr()}, $date',
-      _ => date,
-    };
+      await _load();
+    }
   }
 
   @override
@@ -153,7 +149,6 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     ref.listen<int>(routineRevisionProv, (_, __) => _load());
     final data = _data;
     final title = widget.title ?? data?.familyName ?? 'routine.my_day'.tr();
-    final canGoForward = _day.isBefore(_dayStart(DateTime.now()).add(const Duration(days: 1)));
 
     return DashCard(
       title: Row(
@@ -164,28 +159,22 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
           Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
         ],
       ),
-      actions: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              tooltip: 'routine.prev_day'.tr(),
-              icon: const Icon(AppIcons.chevronLeft, size: 18),
-              onPressed: () => _shiftDay(-1),
-            ),
-            Text(_dayLabel(aContext), style: TextStyle(fontWeight: FontWeight.w600, color: context.palette.inkSecondary)),
-            IconButton(
-              tooltip: 'routine.next_day'.tr(),
-              icon: const Icon(AppIcons.chevronRight, size: 18),
-              onPressed: canGoForward ? () => _shiftDay(1) : null,
-            ),
-            if (!_isToday)
-              TextButton(onPressed: _goToday, child: Text('routine.today'.tr())),
-          ],
-        ),
-      ],
       menu: widget.menu,
-      child: _buildBody(aContext, data),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RangeDaysBar(
+            keyPrefix: 'timeline.range',
+            lastDay: _lastDay,
+            days: _days,
+            maxDay: _dayStart(DateTime.now()).add(const Duration(days: 1)),
+            onShift: (aDay) => _setRange(aDay, _days),
+            onDays: (aDays) => _setRange(_lastDay, aDays),
+          ),
+          const SizedBox(height: 8),
+          _buildBody(aContext, data),
+        ],
+      ),
     );
   }
 
@@ -208,9 +197,12 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _TimelineGrid(
-          day: _day,
+          key: ValueKey('grid.${_from.toIso8601String()}.$_days'),
+          from: _from,
+          to: _to,
           members: aData.members,
           onOpenMark: (aMark) => openMarkSheet(context, aMark.id),
+          onCreate: _create,
         ),
         const SizedBox(height: 12),
         if (!hasMarks)
@@ -224,6 +216,8 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
                 .map((aStatus) => _LegendItem(status: aStatus))
                 .toList(),
           ),
+        const SizedBox(height: 6),
+        Text('routine.tap_to_create'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkMuted)),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -234,13 +228,54 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
   }
 }
 
-class _TimelineGrid extends StatelessWidget
+class _TimelineGrid extends StatefulWidget
 {
-  final DateTime day;
+  final DateTime from;
+  final DateTime to;
   final List<TimelineMemberDto> members;
   final ValueChanged<StatusMarkDto> onOpenMark;
+  final void Function(TimelineMemberDto aMember, DateTime aTs) onCreate;
 
-  const _TimelineGrid({required this.day, required this.members, required this.onOpenMark});
+  const _TimelineGrid({
+    super.key,
+    required this.from,
+    required this.to,
+    required this.members,
+    required this.onOpenMark,
+    required this.onCreate,
+  });
+
+  @override
+  State<_TimelineGrid> createState() => _TimelineGridState();
+}
+
+class _TimelineGridState extends State<_TimelineGrid>
+{
+  final _scroll = ScrollController();
+  bool _isPositioned = false;
+
+  @override
+  void dispose()
+  {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToNow(double aX, double aViewport)
+  {
+    if (_isPositioned)
+    {
+      return;
+    }
+    _isPositioned = true;
+    WidgetsBinding.instance.addPostFrameCallback((_)
+    {
+      if (mounted && _scroll.hasClients)
+      {
+        _scroll.jumpTo((aX - aViewport * 0.75).clamp(0.0, _scroll.position.maxScrollExtent));
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext aContext)
@@ -250,21 +285,41 @@ class _TimelineGrid extends StatelessWidget
       {
         final width = aConstraints.maxWidth;
         final nameWidth = math.min(180.0, math.max(96.0, width * 0.24));
-        final trackWidth = math.max(120.0, width - nameWidth - 12);
-        final hourStep = trackWidth >= 720 ? 2 : (trackWidth >= 360 ? 3 : 6);
-        final dayEnd = day.add(const Duration(days: 1));
-        final dayLength = dayEnd.difference(day).inSeconds.toDouble();
+        final viewport = math.max(120.0, width - nameWidth - 12);
+        final days = math.max(1, (widget.to.difference(widget.from).inHours / 24).round());
+        final trackWidth = rangeContentWidth(viewport, days, _minDayWidth);
+        final from = widget.from;
+        final to = widget.to;
+        final total = to.difference(from).inSeconds.toDouble();
         final now = DateTime.now();
-        final isNowVisible = !now.isBefore(day) && now.isBefore(dayEnd);
+        final isNowVisible = !now.isBefore(from) && now.isBefore(to);
+        final isMultiDay = days > 1;
+        final axisHeight = isMultiDay ? _multiAxisHeight : _axisHeight;
+        final hours = math.max(1, to.difference(from).inMinutes / 60);
+        final hourStep = _hourSteps.firstWhere((aStep) => aStep * trackWidth / hours >= _minTickGap, orElse: () => 24);
 
         double xOf(DateTime aTs)
         {
-          final seconds = aTs.difference(day).inSeconds.clamp(0, dayLength.toInt());
-          return trackWidth * seconds / dayLength;
+          final seconds = aTs.difference(from).inSeconds.clamp(0, total.toInt());
+          return trackWidth * seconds / total;
         }
 
-        final hours = [for (var hour = 0; hour <= 24; hour += hourStep) hour];
-        final gridHeight = _axisHeight + members.length * _rowHeight;
+        DateTime tsOf(double aX) => from.add(Duration(seconds: (total * (aX / trackWidth).clamp(0.0, 1.0)).round()));
+
+        final ticks = <DateTime>[];
+        for (var tick = from; !tick.isAfter(to); tick = DateTime(tick.year, tick.month, tick.day, tick.hour + 1))
+        {
+          if (tick.hour % hourStep == 0)
+          {
+            ticks.add(tick);
+          }
+        }
+        if (trackWidth > viewport && isNowVisible)
+        {
+          _scrollToNow(xOf(now), viewport);
+        }
+        final gridHeight = axisHeight + widget.members.length * _rowHeight;
+        final locale = aContext.locale.toLanguageTag();
 
         return SizedBox(
           height: gridHeight,
@@ -276,8 +331,8 @@ class _TimelineGrid extends StatelessWidget
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: _axisHeight),
-                    for (final member in members)
+                    SizedBox(height: axisHeight),
+                    for (final member in widget.members)
                       SizedBox(
                         height: _rowHeight,
                         child: _MemberLabel(
@@ -297,54 +352,80 @@ class _TimelineGrid extends StatelessWidget
                 ),
               ),
               const SizedBox(width: 12),
-              SizedBox(
-                width: trackWidth,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    for (final hour in hours) ...[
-                      Positioned(
-                        left: trackWidth * hour / 24,
-                        top: _axisHeight,
-                        bottom: 0,
-                        child: Container(width: 1, color: aContext.palette.grid),
-                      ),
-                      Positioned(
-                        left: (trackWidth * hour / 24 - 20).clamp(-4.0, trackWidth - 36),
-                        width: 40,
-                        top: 0,
-                        child: Text(
-                          '${hour.toString().padLeft(2, '0')}:00',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: aContext.palette.inkMuted),
-                        ),
-                      ),
-                    ],
-                    for (var index = 0; index < members.length; index++)
-                      Positioned(
-                        left: 0,
-                        width: trackWidth,
-                        top: _axisHeight + index * _rowHeight + (_rowHeight - _trackHeight) / 2,
-                        height: _trackHeight,
-                        child: _MemberTrack(
-                          member: members[index],
-                          day: day,
-                          dayEnd: dayEnd,
-                          now: now,
-                          xOf: xOf,
-                          onOpenMark: onOpenMark,
-                        ),
-                      ),
-                    if (isNowVisible)
-                      Positioned(
-                        left: xOf(now) - 1,
-                        top: _axisHeight - 4,
-                        bottom: 0,
-                        child: IgnorePointer(
-                          child: Container(width: 2, color: aContext.palette.inkPrimary),
-                        ),
-                      ),
-                  ],
+              Expanded(
+                child: SingleChildScrollView(
+                  key: const ValueKey('timeline.scroll'),
+                  controller: _scroll,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: trackWidth,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        for (final tick in ticks) ...[
+                          Positioned(
+                            left: xOf(tick),
+                            top: axisHeight,
+                            bottom: 0,
+                            child: Container(
+                              width: tick.hour == 0 && isMultiDay ? 2 : 1,
+                              color: tick.hour == 0 && isMultiDay ? aContext.palette.baseline : aContext.palette.grid,
+                            ),
+                          ),
+                          if (hourStep < 24)
+                            Positioned(
+                              left: (xOf(tick) - 20).clamp(-4.0, trackWidth - 36),
+                              width: 40,
+                              top: isMultiDay ? 16 : 0,
+                              child: Text(
+                                '${tick.hour.toString().padLeft(2, '0')}:00',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11, color: aContext.palette.inkMuted),
+                              ),
+                            ),
+                          if (isMultiDay && tick.hour == 0)
+                            Positioned(
+                              left: (xOf(tick) + 4).clamp(0.0, trackWidth - 80),
+                              width: 80,
+                              top: 0,
+                              child: Text(
+                                DateFormat.MMMEd(locale).format(tick),
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: aContext.palette.inkSecondary),
+                              ),
+                            ),
+                        ],
+                        for (var index = 0; index < widget.members.length; index++)
+                          Positioned(
+                            left: 0,
+                            width: trackWidth,
+                            top: axisHeight + index * _rowHeight + (_rowHeight - _trackHeight) / 2,
+                            height: _trackHeight,
+                            child: _MemberTrack(
+                              member: widget.members[index],
+                              from: from,
+                              to: to,
+                              now: now,
+                              xOf: xOf,
+                              onOpenMark: widget.onOpenMark,
+                              onCreate: widget.members[index].canEdit
+                                  ? (aX) => widget.onCreate(widget.members[index], tsOf(aX))
+                                  : null,
+                            ),
+                          ),
+                        if (isNowVisible)
+                          Positioned(
+                            left: xOf(now) - 1,
+                            top: axisHeight - 4,
+                            bottom: 0,
+                            child: IgnorePointer(
+                              child: Container(width: 2, color: aContext.palette.inkPrimary),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -428,19 +509,21 @@ class _MemberLabel extends StatelessWidget
 class _MemberTrack extends StatelessWidget
 {
   final TimelineMemberDto member;
-  final DateTime day;
-  final DateTime dayEnd;
+  final DateTime from;
+  final DateTime to;
   final DateTime now;
   final double Function(DateTime) xOf;
   final ValueChanged<StatusMarkDto> onOpenMark;
+  final ValueChanged<double>? onCreate;
 
   const _MemberTrack({
     required this.member,
-    required this.day,
-    required this.dayEnd,
+    required this.from,
+    required this.to,
     required this.now,
     required this.xOf,
     required this.onOpenMark,
+    this.onCreate,
   });
 
   @override
@@ -449,9 +532,9 @@ class _MemberTrack extends StatelessWidget
     final blocks = <Widget>[];
     for (final mark in member.marks)
     {
-      final openEnd = now.isBefore(dayEnd) ? now : dayEnd;
+      final openEnd = now.isBefore(to) ? now : to;
       final end = mark.endTs ?? openEnd;
-      if (!end.isAfter(day) || !end.isAfter(mark.startTs))
+      if (!end.isAfter(from) || !end.isAfter(mark.startTs))
       {
         continue;
       }
@@ -472,13 +555,29 @@ class _MemberTrack extends StatelessWidget
         ),
       ));
     }
+    final create = onCreate;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: aContext.palette.surfaceMuted,
         borderRadius: BorderRadius.circular(_blockRadius),
       ),
-      child: Stack(children: blocks),
+      child: Stack(
+        children: [
+          if (create != null)
+            Positioned.fill(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.cell,
+                child: GestureDetector(
+                  key: ValueKey('timeline.track.${member.userId}'),
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (aDetails) => create(aDetails.localPosition.dx),
+                ),
+              ),
+            ),
+          ...blocks,
+        ],
+      ),
     );
   }
 }

@@ -912,6 +912,8 @@ class ReceiptDto
   final bool isEditable;
   final String? ownerName;
   final bool isStocked;
+  final String? stockFamilyId;
+  final String? stockFamilyName;
   final int stockedCount;
 
   const ReceiptDto({
@@ -937,6 +939,8 @@ class ReceiptDto
     this.isEditable = true,
     this.ownerName,
     this.isStocked = true,
+    this.stockFamilyId,
+    this.stockFamilyName,
     this.stockedCount = 0,
   });
 
@@ -967,6 +971,8 @@ class ReceiptDto
         isEditable: aJson['is_editable'] as bool? ?? true,
         ownerName: aJson['owner_name'] as String?,
         isStocked: aJson['is_stocked'] as bool? ?? true,
+        stockFamilyId: aJson['stock_family_id'] as String?,
+        stockFamilyName: aJson['stock_family_name'] as String?,
         stockedCount: (aJson['stocked_count'] as num?)?.toInt() ?? 0,
       );
 }

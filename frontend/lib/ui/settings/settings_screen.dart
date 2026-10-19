@@ -5,6 +5,7 @@ import '../common/feedback.dart';
 import '../notify/notify_settings_section.dart';
 import 'ai_settings_section.dart';
 import 'app_settings_section.dart';
+import 'stock_settings_section.dart';
 
 class SettingsScreen extends StatelessWidget
 {
@@ -19,6 +20,8 @@ class SettingsScreen extends StatelessWidget
       padding: screenPadding(aContext),
       children: const [
         AppSettingsSection(),
+        SizedBox(height: 24),
+        StockSettingsSection(),
         SizedBox(height: 24),
         NotifySettingsSection(),
         SizedBox(height: 24),

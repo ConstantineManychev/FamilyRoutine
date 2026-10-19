@@ -29,6 +29,25 @@ String storeLabel(StockStoreRef aStore) =>
 
 String measureLabel(StockMeasure aMeasure) => 'stock.measure_${aMeasure.name}'.tr();
 
+String formatPieces(BuildContext aContext, double aPieces) =>
+    '${NumberFormat('#,##0.#', aContext.locale.toLanguageTag()).format(aPieces)} ${measureLabel(StockMeasure.pcs)}';
+
+String formatStockAmount(BuildContext aContext, double aQty, StockMeasure aMeasure, {double? aPieces})
+{
+  final main = formatStockQty(aContext, aQty, aMeasure);
+  if (aMeasure == StockMeasure.pcs)
+  {
+    return '$main · ${'stock.pack_unknown'.tr()}';
+  }
+  return aPieces == null ? main : '$main (${formatPieces(aContext, aPieces)})';
+}
+
+String formatGroupLeft(BuildContext aContext, StockGroup aGroup) =>
+    formatStockAmount(aContext, aGroup.leftQty, aGroup.measure, aPieces: aGroup.kind == StockKind.item ? aGroup.leftPieces : null);
+
+String formatLotLeft(BuildContext aContext, StockLot aLot) =>
+    formatStockAmount(aContext, aLot.leftQty, aLot.measure, aPieces: aLot.leftPieces);
+
 String formatStockQty(BuildContext aContext, double aQty, StockMeasure aMeasure)
 {
   final locale = aContext.locale.toLanguageTag();
@@ -95,6 +114,7 @@ IconData moveIcon(StockMoveKind aKind) => switch (aKind)
   StockMoveKind.eaten => AppIcons.utensils,
   StockMoveKind.cooked => AppIcons.cookingPot,
   StockMoveKind.waste => AppIcons.trash,
+  StockMoveKind.used => AppIcons.checkCircle,
 };
 
 IconData sourceIcon(StockSource aSource) => switch (aSource)
@@ -106,7 +126,7 @@ IconData sourceIcon(StockSource aSource) => switch (aSource)
 
 StockMeasure? measureOfItem(DictItemDto aItem)
 {
-  if (aItem.kind == ItemKind.service)
+  if (aItem.kind != ItemKind.food)
   {
     return null;
   }

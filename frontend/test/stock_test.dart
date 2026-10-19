@@ -49,6 +49,7 @@ Map<String, dynamic> _lot(
     String? aKcal,
     String? aExpires,
     bool aIsExpired = false,
+    String? aPack,
   }
 ) => {
       'id': aId,
@@ -68,6 +69,7 @@ Map<String, dynamic> _lot(
       'acquired_ts': aAcquired,
       'is_touched': aIsTouched,
       'piece_g': null,
+      'pack_size': aPack,
       'per_100': aKcal == null ? null : _macros(aKcal),
       'expires_on': aExpires,
       'is_expired': aIsExpired,
@@ -86,7 +88,7 @@ Map<String, dynamic> _stockJson({String? aFamilyId}) => {
       'lots': [
         _lot('l1', 'Buckwheat', '1000', '1000', aItemId: 'i1', aCost: '54.00', aKcal: '343'),
         _lot('l2', 'Buckwheat', '500', '500', aItemId: 'i1', aAcquired: '2026-10-12T10:00:00Z', aIsTouched: true),
-        _lot('l3', 'Milk', '1860', '930', aItemId: 'i2', aMeasure: 'ml', aSource: 'manual', aExpires: _day(1)),
+        _lot('l3', 'Milk', '1860', '930', aItemId: 'i2', aMeasure: 'ml', aSource: 'manual', aExpires: _day(1), aPack: '930'),
         _lot('l4', 'Pilaf', '800', '500', aKind: 'dish', aSource: 'cooked', aKcal: '187.5', aExpires: _day(-1), aIsExpired: true),
       ],
     };
@@ -153,13 +155,16 @@ class _Cooked
 
 class _FakeApi extends ApiSvc
 {
-  final List<(String, double, WasteReason)> wasted = [];
+  final List<(String, double, WasteReason?, StockMeasure?)> wasted = [];
+  final List<(String, double, StockMeasure, WasteReason?)> writeOffs = [];
+  final List<(String, Map<String, dynamic>)> fills = [];
+  final List<Map<String, dynamic>>? lots;
   final List<String?> activated = [];
   final List<_Cooked> cooked = [];
   final List<StockStoreRef?> loaded = [];
   final List<(String, DateTime?)> expiries = [];
 
-  _FakeApi() : super(Dio(), TokenStore(const FlutterSecureStorage()));
+  _FakeApi({this.lots}) : super(Dio(), TokenStore(const FlutterSecureStorage()));
 
   @override
   Future<StockSettings> getStockSettings() async => StockSettings.fromJson(_settingsJson());
@@ -176,13 +181,38 @@ class _FakeApi extends ApiSvc
   {
     loaded.add(aStore);
     final familyId = aStore?.familyId;
+    final custom = lots;
+    if (custom != null)
+    {
+      return StockData.fromJson({..._stockJson(), 'lots': custom});
+    }
     return StockData.fromJson(familyId == null ? _stockJson() : {..._stockJson(aFamilyId: familyId), 'lots': const []});
   }
 
   @override
-  Future<StockLot> wasteStockLot(String aId, double aQty, WasteReason aReason, String? aNote) async
+  Future<void> writeOffStockItem({
+    required StockStoreRef aStore,
+    required String aItemId,
+    required double aQty,
+    required StockMeasure aUnit,
+    WasteReason? aReason,
+    String? aNote,
+  }) async
   {
-    wasted.add((aId, aQty, aReason));
+    writeOffs.add((aItemId, aQty, aUnit, aReason));
+  }
+
+  @override
+  Future<DictItemDto> fillItem(String aId, Map<String, dynamic> aPayload) async
+  {
+    fills.add((aId, aPayload));
+    return _item({'id': aId, 'net_qty': aPayload['net_qty'], 'net_measure': aPayload['net_measure']});
+  }
+
+  @override
+  Future<StockLot> wasteStockLot(String aId, double aQty, WasteReason? aReason, String? aNote, {StockMeasure? aUnit}) async
+  {
+    wasted.add((aId, aQty, aReason, aUnit));
     return StockLot.fromJson(_lot(aId, 'Milk', '1860', '0'));
   }
 
@@ -341,7 +371,8 @@ void main()
     final eggs = _item({'nutrition': {'kcal': '157', 'piece_g': '60'}});
     expect(measureOfItem(eggs), StockMeasure.g);
     expect(pieceAmountOf(eggs, StockMeasure.g), 60);
-    expect(measureOfItem(_item({'kind': 'product', 'nutrition': <String, dynamic>{}})), StockMeasure.pcs);
+    expect(measureOfItem(_item({'unit': 'piece', 'nutrition': <String, dynamic>{}})), StockMeasure.pcs);
+    expect(measureOfItem(_item({'kind': 'product', 'nutrition': <String, dynamic>{}})), isNull);
     expect(measureOfItem(_item({'kind': 'service'})), isNull);
   });
 
@@ -377,17 +408,61 @@ void main()
     await aTester.pumpAndSettle();
     await aTester.tap(find.byKey(const ValueKey('stock.lot_menu.l3')));
     await aTester.pumpAndSettle();
-    await aTester.tap(find.text('Write off as waste'));
+    await aTester.tap(find.text('Write off from this batch'));
     await aTester.pumpAndSettle();
-    await aTester.enterText(find.byKey(const ValueKey('waste.qty')), '931');
+    await aTester.enterText(find.byKey(const ValueKey('writeoff.qty')), '931');
     await aTester.pump();
-    expect(aTester.widget<ElevatedButton>(find.byKey(const ValueKey('waste.save'))).onPressed, isNull);
-    await aTester.enterText(find.byKey(const ValueKey('waste.qty')), '200');
-    await aTester.tap(find.byKey(const ValueKey('waste.reason.leftovers')));
+    expect(aTester.widget<ElevatedButton>(find.byKey(const ValueKey('writeoff.save'))).onPressed, isNull);
+    await aTester.enterText(find.byKey(const ValueKey('writeoff.qty')), '200');
+    await aTester.tap(find.byKey(const ValueKey('writeoff.reason.leftovers')));
     await aTester.pump();
-    await aTester.tap(find.byKey(const ValueKey('waste.save')));
+    await aTester.tap(find.byKey(const ValueKey('writeoff.save')));
     await aTester.pumpAndSettle();
-    expect(api.wasted.single, ('l3', 200.0, WasteReason.leftovers));
+    expect(api.wasted.single, ('l3', 200.0, WasteReason.leftovers, StockMeasure.ml));
+  });
+
+  testWidgets('tapping a product writes it off in pieces or millilitres', (aTester) async
+  {
+    final api = _FakeApi();
+    await _pump(aTester, _routed(const StockScreen(), api));
+
+    expect(find.textContaining('930 ml (1 pcs)'), findsOneWidget);
+    await aTester.tap(find.text('Milk'));
+    await aTester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('stock.sheet.left')), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('stock.sheet.writeoff')));
+    await aTester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('writeoff.unit.pcs')), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('writeoff.unit.pcs')));
+    await aTester.pump();
+    expect(aTester.widget<TextField>(find.byKey(const ValueKey('writeoff.qty'))).controller!.text, '1');
+    await aTester.enterText(find.byKey(const ValueKey('writeoff.qty')), '1.5');
+    await aTester.pump();
+    expect(aTester.widget<ElevatedButton>(find.byKey(const ValueKey('writeoff.save'))).onPressed, isNull);
+    await aTester.enterText(find.byKey(const ValueKey('writeoff.qty')), '0.5');
+    await aTester.pump();
+    await aTester.tap(find.byKey(const ValueKey('writeoff.save')));
+    await aTester.pumpAndSettle();
+    expect(api.writeOffs.single, ('i2', 0.5, StockMeasure.pcs, null));
+  });
+
+  testWidgets('a product counted in pieces asks for the pack mass', (aTester) async
+  {
+    final api = _FakeApi(lots: [_lot('l9', 'Curd', '1', '1', aItemId: 'i9', aMeasure: 'pcs')]);
+    await _pump(aTester, _routed(const StockScreen(), api));
+
+    expect(find.textContaining('1 pcs · pack mass unknown'), findsOneWidget);
+    await aTester.tap(find.byKey(const ValueKey('stock.writeoff.item:i9')));
+    await aTester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('writeoff.unit.g')), findsNothing);
+    await aTester.tap(find.byKey(const ValueKey('writeoff.ask_pack')));
+    await aTester.pumpAndSettle();
+    await aTester.enterText(find.byKey(const ValueKey('pack.qty')), '290');
+    await aTester.pump();
+    await aTester.tap(find.byKey(const ValueKey('pack.save')));
+    await aTester.pumpAndSettle();
+    expect(api.fills.single.$1, 'i9');
+    expect(api.fills.single.$2, {'net_qty': '290', 'net_measure': 'g'});
   });
 
   testWidgets('cooking scales the recipe, shows stock and sends the real weight', (aTester) async
@@ -437,6 +512,8 @@ void main()
     final today = DateTime.now();
     expect(api.expiries.single, ('l3', DateTime(today.year, today.month, today.day + 7)));
 
+    await aTester.tap(find.text('Milk'));
+    await aTester.pumpAndSettle();
     await aTester.tap(find.byKey(const ValueKey('stock.lot_menu.l3')));
     await aTester.pumpAndSettle();
     await aTester.tap(find.text('Best before date'));
