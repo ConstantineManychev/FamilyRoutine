@@ -383,7 +383,7 @@ class _TimelineGridState extends State<_TimelineGrid>
                                 style: TextStyle(fontSize: 11, color: aContext.palette.inkMuted),
                               ),
                             ),
-                          if (isMultiDay && tick.hour == 0)
+                          if (isMultiDay && tick.hour == 0 && tick.isBefore(to))
                             Positioned(
                               left: (xOf(tick) + 4).clamp(0.0, trackWidth - 80),
                               width: 80,

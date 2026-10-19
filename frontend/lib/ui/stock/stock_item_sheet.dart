@@ -27,7 +27,10 @@ String lotLine(BuildContext aContext, StockLot aLot)
   return [
     DateFormat.MMMd(aContext.locale.toLanguageTag()).format(aLot.acquiredTs),
     sourceLabel(aLot.source),
-    'stock.left_of_total'.tr(args: [formatLotLeft(aContext, aLot), formatStockQty(aContext, aLot.qty, aLot.measure)]),
+    'stock.left_of_total'.tr(args: [
+      aLot.isUnmeasured ? formatStockQty(aContext, aLot.leftQty, aLot.measure) : formatLotLeft(aContext, aLot),
+      formatStockQty(aContext, aLot.qty, aLot.measure),
+    ]),
     if (cost != null && currCode != null) formatMoney(aContext, cost, currCode),
   ].join(' · ');
 }

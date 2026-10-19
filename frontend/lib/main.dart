@@ -35,6 +35,7 @@ Future<void> main() async
         path: 'assets/i18n',
         fallbackLocale: const Locale('en'),
         useFallbackTranslations: true,
+        ignorePluralRules: false,
         child: const AppRoot(),
       ),
     ),

@@ -886,9 +886,9 @@ class _PlotPainter extends CustomPainter
         final x = layout.xOf(tick.toUtc());
         aCanvas.drawLine(Offset(x, 0), Offset(x, layout.plotHeight), isMidnight && isMultiDay ? strong : grid);
         final labelY = layout.plotHeight + 9;
-        if (isMidnight && isMultiDay)
+        if (isMidnight && isMultiDay && tick.toUtc().isBefore(layout.end))
         {
-          _paintText(aCanvas, dayLabel(tick), Offset(x, labelY + 12), palette.inkSecondary, aIsCentered: true, aIsBold: true);
+          _paintText(aCanvas, dayLabel(tick), Offset(x + 4, labelY + 12), palette.inkSecondary, aIsBold: true);
         }
         if (step < 24)
         {
