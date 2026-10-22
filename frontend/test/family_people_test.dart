@@ -44,6 +44,8 @@ class _FakeApi extends ApiSvc
   final List<int> energyDays = [];
   final List<(String?, DateTime, double)> energyMarks = [];
   final List<(RoutineStatus, DateTime?, DateTime?, String?)> createdMarks = [];
+  final List<(String, PlanState)> savedOccurrences = [];
+  int timelineLoads = 0;
 
   _FakeApi() : super(Dio(), TokenStore(const FlutterSecureStorage()));
 
@@ -94,14 +96,43 @@ class _FakeApi extends ApiSvc
   }
 
   @override
+  Future<void> saveOccurrence(String aEventId, DateTime aOccDate, PlanState aState, {DateTime? aMovedStart}) async
+  {
+    savedOccurrences.add((aEventId, aState));
+  }
+
+  @override
   Future<TimelineDto> getTimeline({String? aFamilyId, required DateTime aFrom, required DateTime aTo}) async
   {
+    timelineLoads++;
+    final today = DateTime.now();
+    final lunch = DateTime(today.year, today.month, today.day, 13);
+    final isAccepted = savedOccurrences.isNotEmpty;
     return TimelineDto.fromJson({
       'family_id': aFamilyId,
       'family_name': 'Home',
       'members': [
         {'user_id': 'me', 'first_name': 'Anna', 'last_name': 'Test', 'is_me': true, 'can_edit': true, 'marks': const []},
-        {'user_id': 'kid', 'first_name': 'Kid', 'last_name': 'Test', 'is_me': false, 'is_managed': true, 'can_edit': true, 'marks': const []},
+        {
+          'user_id': 'kid', 'first_name': 'Kid', 'last_name': 'Test', 'is_me': false, 'is_managed': true, 'can_edit': true,
+          'marks': [
+            if (isAccepted)
+              {
+                'id': 'lunch-mark', 'status': 'meal', 'note': 'Lunch',
+                'start_ts': lunch.toUtc().toIso8601String(),
+                'end_ts': lunch.add(const Duration(minutes: 30)).toUtc().toIso8601String(),
+              },
+          ],
+          'plans': [
+            if (!isAccepted)
+              {
+                'event_id': 'lunch', 'occ_date': dateWire(lunch), 'date': dateWire(lunch), 'title': 'Lunch',
+                'category': 'meal', 'timing': 'fixed', 'start_ts': lunch.toUtc().toIso8601String(),
+                'end_ts': lunch.add(const Duration(minutes: 30)).toUtc().toIso8601String(), 'duration_min': 30,
+                'tz': 'UTC', 'repeat': 'daily', 'state': 'planned',
+              },
+          ],
+        },
         {'user_id': 'bob', 'first_name': 'Bob', 'last_name': 'Test', 'is_me': false, 'can_edit': false, 'marks': const []},
       ],
     });
@@ -313,6 +344,32 @@ void main()
     await aTester.tap(find.byKey(const ValueKey('timeline.range.days.14')));
     await aTester.pumpAndSettle();
     expect(find.byKey(const ValueKey('timeline.scroll')), findsOneWidget);
+    expect(aTester.takeException(), isNull);
+    await aTester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('a translucent plan on the timeline becomes a block once it is done', (aTester) async
+  {
+    await EasyLocalization.ensureInitialized();
+    await aTester.binding.setSurfaceSize(const Size(900, 900));
+    final api = _FakeApi();
+    await aTester.pumpWidget(_app(const FamilyTimelineCard(familyId: 'f1', title: 'Home'), aApi: api));
+    await aTester.pumpAndSettle();
+
+    final today = DateTime.now();
+    final plan = find.byKey(ValueKey('timeline.plan.lunch:${dateWire(today)}'));
+    expect(plan, findsOneWidget);
+    expect(find.text('Translucent blocks are plans. Mark a plan as done and it becomes a routine block.'), findsOneWidget);
+    await aTester.tap(plan);
+    await aTester.pumpAndSettle();
+    expect(find.text('Lunch'), findsOneWidget);
+    await aTester.tap(find.text('Done'));
+    await aTester.pumpAndSettle();
+
+    expect(api.savedOccurrences.single, ('lunch', PlanState.done));
+    expect(api.timelineLoads, greaterThan(1));
+    expect(plan, findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Kid Test — Meal')), findsOneWidget);
     expect(aTester.takeException(), isNull);
     await aTester.binding.setSurfaceSize(null);
   });

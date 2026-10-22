@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (SELECT 1 FROM meal_entries WHERE status_mark_id = $1) AS \"has_meals!\",\n               EXISTS (SELECT 1 FROM workout_sessions WHERE status_mark_id = $1)\n            OR EXISTS (SELECT 1 FROM work_task_events WHERE status_mark_id = $1) AS \"has_others!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_meals!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "has_others!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "d3b70de2392252db5d827f186bf6a906721679ea1c9e45341587de6e044ed0e9"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE plan_instances SET state = 'planned', done_ts = NULL, status_mark_id = NULL, updated_ts = NOW()\n        WHERE status_mark_id = $1\n        RETURNING event_id, occ_date\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "occ_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c805c59037109fa73c11885dc9a4e36283848fb3765e42011665ee103364bfe6"
+}

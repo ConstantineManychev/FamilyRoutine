@@ -509,20 +509,20 @@ async fn energy_day_draws_every_group_member_including_children(a_db: PgPool)
     let anna = row(&fam.anna.id.to_string());
     assert_eq!(anna["eaten"], 500);
     assert_eq!(anna["can_edit"], false);
-    let jump = anna["points"]
-        .as_array()
-        .unwrap()
-        .windows(2)
-        .find(|pair| pair[0]["ts"] == pair[1]["ts"])
-        .map(|pair| {
-            (
-                pair[0]["ts"].clone(),
-                pair[1]["kcal"].as_f64().unwrap() - pair[0]["kcal"].as_f64().unwrap(),
-            )
-        })
-        .unwrap();
-    assert_eq!(jump.0, ts(lunch).replace("+00:00", "Z"));
-    assert!((jump.1 - 500.0).abs() < 0.2);
+    let points = anna["points"].as_array().unwrap();
+    let value_at = |a_ts: DateTime<Utc>| {
+        points
+            .iter()
+            .find(|point| point["ts"] == ts(a_ts).replace("+00:00", "Z"))
+            .map(|point| point["kcal"].as_f64().unwrap())
+            .unwrap_or_else(|| panic!("no point at {a_ts}: {anna}"))
+    };
+    let burn = anna["daily_burn"]
+        .as_str()
+        .map_or(0.0, |value| value.parse::<f64>().unwrap());
+    let rise = value_at(lunch + Duration::minutes(20)) - value_at(lunch);
+    assert!((rise - (500.0 - burn / 72.0)).abs() < 0.5, "{anna}");
+    assert!(points.windows(2).all(|pair| pair[0]["ts"] != pair[1]["ts"]));
     let kid = row(&fam.kid);
     assert_eq!(kid["eaten"], 300);
     assert_eq!(kid["is_managed"], true);

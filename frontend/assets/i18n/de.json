@@ -802,7 +802,10 @@
     "block_created": "Block „{}“ hinzugefügt",
     "block_too_old": "Ein Block darf höchstens 31 Tage zurückliegen.",
     "block_too_far": "Ein Block muss innerhalb eines Tages enden.",
-    "tap_to_create": "Tippen Sie auf eine freie Stelle in Ihrer Zeile oder der eines Kindes, um einen Block hinzuzufügen."
+    "tap_to_create": "Tippen Sie auf eine freie Stelle in Ihrer Zeile oder der eines Kindes, um einen Block hinzuzufügen.",
+    "plan": "Plan",
+    "plan_tap": "Tippen zum Annehmen, Verschieben oder Überspringen",
+    "plans_hint": "Halbtransparente Blöcke sind Pläne. Markiere einen Plan als erledigt, dann wird er zu einem Tagesblock."
   },
   "catalog": {
     "scope": "Speichern in",
@@ -1816,7 +1819,7 @@
   "energy": {
     "title": "Kalorienbilanz",
     "empty": "Für diesen Tag gibt es noch keine Daten.",
-    "hint": "Die Bilanz wird fortgeführt und um Mitternacht nicht zurückgesetzt. Essen hebt die Linie, Kalorien werden gleichmäßig nach Erhaltungsbedarf verbraucht, Trainings verbrennen zusätzlich. Tippen Sie auf das Diagramm, um den genauen Wert zu diesem Zeitpunkt anzugeben; tippen Sie auf einen Namen, um die Linie auszublenden.",
+    "hint": "Die Bilanz wird fortgeführt und um Mitternacht nicht zurückgesetzt. Essen hebt die Linie allmählich während der Mahlzeit, Kalorien werden gleichmäßig nach Erhaltungsbedarf verbraucht, Trainings verbrennen zusätzlich. Tippen Sie auf das Diagramm, um den genauen Wert zu diesem Zeitpunkt anzugeben; tippen Sie auf einen Namen, um die Linie auszublenden.",
     "eaten": "gegessen {}",
     "burned": "verbraucht {}",
     "workouts": "Training {}",

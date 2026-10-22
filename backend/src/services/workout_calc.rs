@@ -2,7 +2,8 @@ const RESTING_MET: f64 = 1.0;
 const DEFAULT_MET: f64 = 5.0;
 const BASE_INTENSITY_FACTOR: f64 = 0.6;
 const INTENSITY_STEP: f64 = 0.08;
-const MAX_SESSION_HOURS: f64 = 6.0;
+pub const MAX_SESSION_HOURS: f64 = 6.0;
+const DEFAULT_INTENSITY: i32 = 5;
 
 pub struct ExerciseLoad
 {
@@ -35,6 +36,11 @@ pub fn session_kcal(a_average_met: f64, a_intensity: i32, a_weight_kg: f64, a_ho
     let net_met = (a_average_met * intensity_factor(a_intensity) - RESTING_MET).max(0.0);
     let hours = a_hours.clamp(0.0, MAX_SESSION_HOURS);
     (net_met * a_weight_kg * hours * 10.0).round() / 10.0
+}
+
+pub fn estimated_kcal(a_weight_kg: f64, a_hours: f64) -> f64
+{
+    session_kcal(DEFAULT_MET, DEFAULT_INTENSITY, a_weight_kg, a_hours)
 }
 
 #[cfg(test)]
@@ -70,5 +76,6 @@ mod tests
             session_kcal(5.0, 5, 80.0, 10.0),
             session_kcal(5.0, 5, 80.0, MAX_SESSION_HOURS)
         );
+        assert_eq!(estimated_kcal(80.0, 1.0), moderate);
     }
 }

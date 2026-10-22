@@ -417,8 +417,14 @@ Future<void> _startStatus(BuildContext aContext, WidgetRef aRef, Occurrence aOcc
   }
   try
   {
-    await aRef.read(apiProv).createMark(status, aNote: aOccurrence.title);
-    aRef.read(routineRevisionProv.notifier).state++;
+    final now = DateTime.now();
+    await aRef.read(apiProv).saveOccurrence(
+          aOccurrence.eventId,
+          aOccurrence.occDate,
+          PlanState.done,
+          aMovedStart: DateTime(now.year, now.month, now.day, now.hour, now.minute),
+        );
+    notifyPlannerChanged(aRef);
     if (aContext.mounted)
     {
       showInfoSnack(aContext, 'planner.status_started'.tr(args: [status.label]));

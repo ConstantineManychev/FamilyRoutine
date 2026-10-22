@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, NaiveTime, SecondsFormat, Utc};
 use common::{TestApp, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -37,6 +37,49 @@ async fn agenda(a_app: &TestApp, a_user: &TestUser, a_from: &str, a_to: &str, a_
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     body["occurrences"].as_array().unwrap().clone()
+}
+
+fn iso(a_ts: DateTime<Utc>) -> String
+{
+    a_ts.to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+async fn day_row(a_app: &TestApp, a_user: &TestUser, a_family: Option<&str>, a_day: DateTime<Utc>) -> Value
+{
+    let mut uri = format!(
+        "/api/routine/timeline?from={}&to={}",
+        iso(a_day),
+        iso(a_day + Duration::days(1))
+    );
+    if let Some(family) = a_family
+    {
+        uri.push_str(&format!("&family_id={family}"));
+    }
+    let (status, body) = send(a_app, a_user, Method::GET, &uri, None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|member| member["user_id"] == a_user.id.to_string())
+        .cloned()
+        .unwrap_or_else(|| body["members"][0].clone())
+}
+
+fn blocks(a_row: &Value) -> Vec<(String, String, Option<String>)>
+{
+    a_row["marks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|mark| {
+            (
+                mark["status"].as_str().unwrap().to_string(),
+                mark["start_ts"].as_str().unwrap().to_string(),
+                mark["end_ts"].as_str().map(str::to_string),
+            )
+        })
+        .collect()
 }
 
 fn find<'a>(a_items: &'a [Value], a_title: &str, a_date: &str) -> &'a Value
@@ -411,4 +454,223 @@ async fn training_slots_start_workouts_and_are_completed_by_them(a_db: PgPool)
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(not_training["field"], "program_id");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn accepted_plans_become_routine_blocks(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let bob = app.user("bob@example.com").await;
+    let home = app.family(&alice, "Дом").await;
+    app.join(&alice, &bob, &home, "standard").await;
+
+    let day = (Utc::now() - Duration::days(1)).date_naive();
+    let midnight = day.and_time(NaiveTime::MIN).and_utc();
+    let at = |a_hours: i64, a_minutes: i64| midnight + Duration::hours(a_hours) + Duration::minutes(a_minutes);
+    let (status, mark) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/routine/marks",
+        Some(json!({ "status": "home", "start_ts": iso(at(8, 0)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{mark}");
+    let id = event(
+        &app,
+        &alice,
+        json!({
+            "title": "Обед", "category": "meal", "timing": "fixed", "start_date": day, "start_time": "13:00:00",
+            "duration_min": 30, "tz": "UTC"
+        }),
+    )
+    .await;
+    let occurrence = format!("/api/plan/events/{id}/occurrences/{day}");
+
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
+    assert_eq!(row["plans"][0]["title"], "Обед");
+    assert_eq!(row["plans"][0]["start_ts"], iso(at(13, 0)));
+    assert_eq!(blocks(&row).len(), 1);
+    let (status, bob_view) = send(
+        &app,
+        &bob,
+        Method::GET,
+        &format!(
+            "/api/routine/timeline?from={}&to={}&family_id={home}",
+            iso(midnight),
+            iso(midnight + Duration::days(1))
+        ),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{bob_view}");
+    let alice_for_bob = bob_view["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|member| member["user_id"] == alice.id.to_string())
+        .cloned()
+        .unwrap();
+    assert_eq!(alice_for_bob["plans"], json!([]));
+    assert_eq!(alice_for_bob["marks"].as_array().unwrap().len(), 1);
+    let shared = day_row(&app, &alice, Some(&home), midnight).await;
+    assert_eq!(shared["plans"].as_array().unwrap().len(), 1);
+
+    let (status, reply) = send(&app, &alice, Method::PUT, &occurrence, Some(json!({ "state": "done" }))).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{reply}");
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["plans"], json!([]));
+    assert_eq!(
+        blocks(&row),
+        vec![
+            ("home".to_string(), iso(at(8, 0)), Some(iso(at(13, 0)))),
+            ("meal".to_string(), iso(at(13, 0)), Some(iso(at(13, 30)))),
+            ("home".to_string(), iso(at(13, 30)), None),
+        ]
+    );
+    assert_eq!(row["marks"][1]["note"], "Обед");
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(
+        blocks(&row),
+        vec![
+            ("home".to_string(), iso(at(8, 0)), Some(iso(at(14, 0)))),
+            ("meal".to_string(), iso(at(14, 0)), Some(iso(at(14, 30)))),
+            ("home".to_string(), iso(at(14, 30)), None),
+        ]
+    );
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "planned", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(blocks(&row), vec![("home".to_string(), iso(at(8, 0)), None)]);
+    assert_eq!(row["plans"][0]["start_ts"], iso(at(14, 0)));
+
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    let meal_id = row["marks"][1]["id"].as_str().unwrap().to_string();
+    let (status, entry) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/nutrition/entries",
+        Some(json!({ "date": day, "status_mark_id": meal_id, "quick": { "title": "Суп", "kcal": "300" } })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{entry}");
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "planned", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["marks"][1]["id"], meal_id.as_str());
+    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
+
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["marks"][1]["id"], meal_id.as_str());
+    assert_eq!(row["plans"], json!([]));
+    let (status, details) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/routine/marks/{meal_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{details}");
+    assert_eq!(details["meals"]["entries"].as_array().unwrap().len(), 1, "{details}");
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::DELETE,
+        &format!("/api/routine/marks/{meal_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let items = agenda(&app, &alice, &day.to_string(), &day.to_string(), "UTC").await;
+    assert_eq!(items[0]["state"], "planned");
+    assert_eq!(items[0]["start_ts"], iso(at(14, 0)));
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
+
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    let renamed_id = row["marks"][1]["id"].as_str().unwrap().to_string();
+    let (status, renamed) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &format!("/api/routine/marks/{renamed_id}"),
+        Some(json!({ "status": "meal", "note": "Обед с коллегами", "start_ts": iso(at(14, 0)), "end_ts": iso(at(14, 30)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{renamed}");
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "done", "moved_start": iso(at(15, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["marks"][1]["start_ts"], iso(at(15, 0)));
+    assert_eq!(row["marks"][1]["note"], "Обед с коллегами");
+    send(
+        &app,
+        &alice,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "planned", "moved_start": iso(at(15, 0)) })),
+    )
+    .await;
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["marks"][1]["note"], "Обед с коллегами");
+    assert_eq!(row["plans"][0]["start_ts"], iso(at(15, 0)));
 }

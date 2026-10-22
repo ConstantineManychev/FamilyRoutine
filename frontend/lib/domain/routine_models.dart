@@ -1,4 +1,5 @@
 import 'finance_models.dart';
+import 'planner_models.dart';
 
 enum RoutineStatus
 {
@@ -54,6 +55,7 @@ class TimelineMemberDto
   final bool isManaged;
   final bool canEdit;
   final List<StatusMarkDto> marks;
+  final List<Occurrence> plans;
 
   const TimelineMemberDto({
     required this.userId,
@@ -63,6 +65,7 @@ class TimelineMemberDto
     this.isManaged = false,
     bool? canEdit,
     required this.marks,
+    this.plans = const [],
   }) : canEdit = canEdit ?? isMe;
 
   String get fullName => '$fName $lName'.trim();
@@ -88,6 +91,9 @@ class TimelineMemberDto
         canEdit: aJson['can_edit'] as bool?,
         marks: (aJson['marks'] as List? ?? const [])
             .map((aItem) => StatusMarkDto.fromJson(aItem as Map<String, dynamic>))
+            .toList(),
+        plans: (aJson['plans'] as List? ?? const [])
+            .map((aItem) => Occurrence.fromJson(aItem as Map<String, dynamic>))
             .toList(),
       );
 }

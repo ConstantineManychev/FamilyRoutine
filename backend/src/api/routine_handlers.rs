@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Duration, Utc};
 use shared_schema::{
-    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkDetailsQuery, MarkMealsDto, PersonQuery,
+    CreateMarkRequest, LinkMarkMealsRequest, MarkDetailsDto, MarkDetailsQuery, MarkMealsDto, PersonQuery, PlanState,
     RoutineStatus, StatusMarkDto, TimelineDto, TimelineMemberDto, TimelineQuery, UpdateMarkRequest,
 };
 use sqlx::PgConnection;
@@ -13,11 +13,13 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::nutrition_handlers::{load_norm, mark_entries, require_meal_mark};
+use crate::api::planner_handlers::load_occurrences;
 use crate::api::study_handlers::mark_study;
 use crate::api::training_handlers::load_session;
 use crate::api::work_handlers::mark_work;
 use crate::domain::errors::ApiError;
 use crate::domain::validation::clean_optional_text;
+use crate::notify::replan;
 use crate::security::authz::require_member;
 use crate::security::profile_access::{acting_for, is_editor, require_editor};
 use crate::services::nutrition::sum;
@@ -455,22 +457,144 @@ pub async fn delete_mark(
     ApiPath(a_id): ApiPath<Uuid>,
 ) -> Result<StatusCode, ApiError>
 {
-    let mut conn = a_state.db.acquire().await?;
-    let owner_id = mark_owner(&mut conn, a_user.user_id, a_id).await?;
+    let mut tx = a_state.db.begin().await?;
+    let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
+    let is_plan_reopened = reopen_plan_of_mark(&mut tx, a_id).await?;
     let deleted = sqlx::query!(
         "DELETE FROM status_marks WHERE id = $1 AND user_id = $2",
         a_id,
         owner_id
     )
-    .execute(&mut *conn)
+    .execute(&mut *tx)
     .await?;
 
     if deleted.rows_affected() == 0
     {
         return Err(ApiError::NotFound);
     }
+    if is_plan_reopened
+    {
+        replan(&mut tx, owner_id).await?;
+    }
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn reopen_plan_of_mark(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<bool, ApiError>
+{
+    let reopened = sqlx::query!(
+        r#"
+        UPDATE plan_instances SET state = 'planned', done_ts = NULL, status_mark_id = NULL, updated_ts = NOW()
+        WHERE status_mark_id = $1
+        RETURNING event_id, occ_date
+        "#,
+        a_mark_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    let Some(reopened) = reopened
+    else
+    {
+        return Ok(false);
+    };
+    sqlx::query!(
+        r#"
+        DELETE FROM plan_instances
+        WHERE event_id = $1 AND occ_date = $2 AND state = 'planned' AND moved_date IS NULL AND session_id IS NULL
+        "#,
+        reopened.event_id,
+        reopened.occ_date
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    Ok(true)
+}
+
+pub struct MarkLinks
+{
+    pub has_meals: bool,
+    pub has_others: bool,
+}
+
+impl MarkLinks
+{
+    pub fn is_used(&self) -> bool
+    {
+        self.has_meals || self.has_others
+    }
+}
+
+pub async fn mark_links(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<MarkLinks, ApiError>
+{
+    let links = sqlx::query!(
+        r#"
+        SELECT EXISTS (SELECT 1 FROM meal_entries WHERE status_mark_id = $1) AS "has_meals!",
+               EXISTS (SELECT 1 FROM workout_sessions WHERE status_mark_id = $1)
+            OR EXISTS (SELECT 1 FROM work_task_events WHERE status_mark_id = $1) AS "has_others!"
+        "#,
+        a_mark_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    Ok(MarkLinks {
+        has_meals: links.has_meals,
+        has_others: links.has_others,
+    })
+}
+
+pub async fn lift_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<(), ApiError>
+{
+    lock_user_marks(a_conn, a_user_id).await?;
+    let lifted = sqlx::query!(
+        "DELETE FROM status_marks WHERE id = $1 AND user_id = $2 RETURNING start_ts, end_ts",
+        a_mark_id,
+        a_user_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    let Some((start, end)) = lifted.and_then(|lifted| lifted.end_ts.map(|end| (lifted.start_ts, end)))
+    else
+    {
+        return Ok(());
+    };
+
+    let halves = sqlx::query!(
+        r#"
+        SELECT before.id AS before_id, after.id AS after_id, after.end_ts AS after_end
+        FROM status_marks before
+        JOIN status_marks after
+          ON after.user_id = before.user_id AND after.start_ts = $3
+         AND after.status = before.status AND after.note IS NOT DISTINCT FROM before.note
+        WHERE before.user_id = $1 AND before.end_ts = $2
+        LIMIT 1
+        "#,
+        a_user_id,
+        start,
+        end
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    let Some(halves) = halves
+    else
+    {
+        return Ok(());
+    };
+    if mark_links(a_conn, halves.after_id).await?.is_used()
+    {
+        return Ok(());
+    }
+    sqlx::query!("DELETE FROM status_marks WHERE id = $1", halves.after_id)
+        .execute(&mut *a_conn)
+        .await?;
+    sqlx::query!(
+        "UPDATE status_marks SET end_ts = $2 WHERE id = $1",
+        halves.before_id,
+        halves.after_end
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    Ok(())
 }
 
 pub async fn timeline(
@@ -553,23 +677,48 @@ pub async fn timeline(
         });
     }
 
-    let members = members
-        .into_iter()
-        .map(|member| TimelineMemberDto {
+    let mut conn = a_state.db.acquire().await?;
+    let mut dtos = Vec::with_capacity(members.len());
+    for member in members
+    {
+        let plans = if member.can_edit
+        {
+            load_occurrences(
+                &mut conn,
+                member.user_id,
+                a_query.from.date_naive(),
+                a_query.to.date_naive(),
+            )
+            .await?
+            .into_iter()
+            .filter(|plan| {
+                plan.state == PlanState::Planned
+                    && plan.session_id.is_none()
+                    && plan.start_ts < a_query.to
+                    && plan.end_ts > a_query.from
+            })
+            .collect()
+        }
+        else
+        {
+            Vec::new()
+        };
+        dtos.push(TimelineMemberDto {
             is_me: member.user_id == a_user.user_id,
             marks: marks_by_user.remove(&member.user_id).unwrap_or_default(),
+            plans,
             user_id: member.user_id,
             first_name: member.first_name,
             last_name: member.last_name,
             is_managed: member.is_managed,
             can_edit: member.can_edit,
-        })
-        .collect();
+        });
+    }
 
     Ok(Json(TimelineDto {
         family_id: a_query.family_id,
         family_name,
-        members,
+        members: dtos,
     }))
 }
 

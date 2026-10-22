@@ -6,7 +6,8 @@ const DAY_SECONDS: f64 = 86_400.0;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FoodEvent
 {
-    pub ts: DateTime<Utc>,
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
     pub kcal: f64,
 }
 
@@ -45,6 +46,30 @@ pub struct EnergyCurve
     pub burned_base: f64,
     pub burned_workouts: f64,
     pub value: f64,
+}
+
+struct Flow
+{
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    rate: f64,
+}
+
+impl FoodEvent
+{
+    pub fn instant(a_ts: DateTime<Utc>, a_kcal: f64) -> Self
+    {
+        Self {
+            start: a_ts,
+            end: a_ts,
+            kcal: a_kcal,
+        }
+    }
+
+    fn is_instant(&self) -> bool
+    {
+        self.end <= self.start
+    }
 }
 
 fn seconds(a_from: DateTime<Utc>, a_to: DateTime<Utc>) -> f64
@@ -90,6 +115,29 @@ pub fn carried_value(
     a_base + a_eaten - burned - base_rate(a_daily_burn) * seconds(a_since, a_until)
 }
 
+fn flows_of<I>(a_spans: I, a_from: DateTime<Utc>, a_until: DateTime<Utc>) -> Vec<Flow>
+where
+    I: Iterator<Item = (DateTime<Utc>, DateTime<Utc>, f64)>,
+{
+    a_spans
+        .filter(|(start, end, kcal)| end > start && *end > a_from && *start < a_until && *kcal > 0.0)
+        .map(|(start, end, kcal)| Flow {
+            start: start.clamp(a_from, a_until),
+            end: end.clamp(a_from, a_until),
+            rate: kcal / seconds(start, end),
+        })
+        .collect()
+}
+
+fn rate_between(a_flows: &[Flow], a_moment: DateTime<Utc>, a_next: DateTime<Utc>) -> f64
+{
+    a_flows
+        .iter()
+        .filter(|flow| flow.start <= a_moment && flow.end >= a_next)
+        .map(|flow| flow.rate)
+        .sum()
+}
+
 pub fn energy_curve(a_input: CurveInput<'_>) -> EnergyCurve
 {
     let from = a_input.from;
@@ -106,24 +154,25 @@ pub fn energy_curve(a_input: CurveInput<'_>) -> EnergyCurve
     }
 
     let rate = base_rate(a_input.daily_burn);
-    let clamp = |a_ts: DateTime<Utc>| a_ts.clamp(from, until);
-    let spans: Vec<(DateTime<Utc>, DateTime<Utc>, f64)> = a_input
-        .workouts
-        .iter()
-        .filter(|span| span.end > span.start && span.end > from && span.start < until && span.kcal > 0.0)
-        .map(|span| {
-            (
-                clamp(span.start),
-                clamp(span.end),
-                span.kcal / seconds(span.start, span.end),
-            )
-        })
-        .collect();
-    let foods: Vec<(DateTime<Utc>, f64)> = a_input
+    let workouts = flows_of(
+        a_input.workouts.iter().map(|span| (span.start, span.end, span.kcal)),
+        from,
+        until,
+    );
+    let intakes = flows_of(
+        a_input
+            .foods
+            .iter()
+            .filter(|food| !food.is_instant())
+            .map(|food| (food.start, food.end, food.kcal)),
+        from,
+        until,
+    );
+    let jumps: Vec<(DateTime<Utc>, f64)> = a_input
         .foods
         .iter()
-        .filter(|food| food.kcal > 0.0 && food.ts >= from && food.ts <= until)
-        .map(|food| (food.ts, food.kcal))
+        .filter(|food| food.is_instant() && food.kcal > 0.0 && food.start >= from && food.start <= until)
+        .map(|food| (food.start, food.kcal))
         .collect();
     let resets: Vec<(DateTime<Utc>, f64)> = a_input
         .resets
@@ -133,9 +182,9 @@ pub fn energy_curve(a_input: CurveInput<'_>) -> EnergyCurve
         .collect();
 
     let mut moments: Vec<DateTime<Utc>> = vec![from, until];
-    moments.extend(foods.iter().map(|(ts, _)| *ts));
+    moments.extend(jumps.iter().map(|(ts, _)| *ts));
     moments.extend(resets.iter().map(|(ts, _)| *ts));
-    moments.extend(spans.iter().flat_map(|(start, end, _)| [*start, *end]));
+    moments.extend(workouts.iter().chain(&intakes).flat_map(|flow| [flow.start, flow.end]));
     moments.sort();
     moments.dedup();
 
@@ -146,7 +195,7 @@ pub fn energy_curve(a_input: CurveInput<'_>) -> EnergyCurve
     for (index, moment) in moments.iter().enumerate()
     {
         points.push((*moment, rounded(value)));
-        let jump: f64 = foods.iter().filter(|(ts, _)| ts == moment).map(|(_, kcal)| kcal).sum();
+        let jump: f64 = jumps.iter().filter(|(ts, _)| ts == moment).map(|(_, kcal)| kcal).sum();
         if jump > 0.0
         {
             value += jump;
@@ -164,13 +213,11 @@ pub fn energy_curve(a_input: CurveInput<'_>) -> EnergyCurve
             break;
         };
         let interval = seconds(*moment, *next);
-        let workout_rate: f64 = spans
-            .iter()
-            .filter(|(start, end, _)| start <= moment && end >= next)
-            .map(|(_, _, rate)| rate)
-            .sum();
+        let workout_rate = rate_between(&workouts, *moment, *next);
+        let intake_rate = rate_between(&intakes, *moment, *next);
         burned_workouts += workout_rate * interval;
-        value -= (rate + workout_rate) * interval;
+        eaten += intake_rate * interval;
+        value += (intake_rate - rate - workout_rate) * interval;
     }
     points.dedup();
 
@@ -224,13 +271,7 @@ mod tests
             24,
             0.0,
             Some(2400.0),
-            &[
-                FoodEvent { ts: at(8), kcal: 600.0 },
-                FoodEvent {
-                    ts: at(13),
-                    kcal: 900.0,
-                },
-            ],
+            &[FoodEvent::instant(at(8), 600.0), FoodEvent::instant(at(13), 900.0)],
             &[],
             &[],
         );
@@ -251,6 +292,41 @@ mod tests
     }
 
     #[test]
+    fn a_meal_block_raises_the_balance_gradually_while_the_day_burns()
+    {
+        let lunch = FoodEvent {
+            start: at(13),
+            end: at(13) + Duration::minutes(30),
+            kcal: 500.0,
+        };
+        let result = curve(12, 14, 0.0, Some(2400.0), &[lunch], &[], &[]);
+        assert_eq!(
+            result.points,
+            vec![
+                (at(12), 0.0),
+                (at(13), -100.0),
+                (at(13) + Duration::minutes(30), 350.0),
+                (at(14), 300.0),
+            ]
+        );
+        assert!((result.eaten - 500.0).abs() < 1e-6);
+
+        let halfway = curve(12, 13, 0.0, Some(2400.0), &[lunch], &[], &[]);
+        assert_eq!(halfway.eaten, 0.0);
+        let during = energy_curve(CurveInput {
+            from: at(13),
+            until: at(13) + Duration::minutes(15),
+            start_value: 0.0,
+            daily_burn: None,
+            foods: &[lunch],
+            workouts: &[],
+            resets: &[],
+        });
+        assert!((during.eaten - 250.0).abs() < 1e-6);
+        assert!((during.value - 250.0).abs() < 1e-6);
+    }
+
+    #[test]
     fn the_next_day_continues_from_the_carried_value()
     {
         let result = curve(24, 30, 200.0, Some(2400.0), &[], &[], &[]);
@@ -266,10 +342,7 @@ mod tests
             12,
             0.0,
             Some(2400.0),
-            &[FoodEvent {
-                ts: at(20),
-                kcal: 500.0,
-            }],
+            &[FoodEvent::instant(at(20), 500.0)],
             &[WorkoutSpan {
                 start: at(9),
                 end: at(11),
@@ -294,7 +367,7 @@ mod tests
             12,
             -500.0,
             Some(2400.0),
-            &[FoodEvent { ts: at(6), kcal: 300.0 }],
+            &[FoodEvent::instant(at(6), 300.0)],
             &[],
             &[EnergyReset {
                 ts: at(6),

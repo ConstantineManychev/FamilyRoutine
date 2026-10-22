@@ -10,6 +10,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/range_days.dart';
+import '../planner/planner_common.dart';
 import 'dash_card.dart';
 import 'mark_sheet.dart';
 import 'new_block_dialog.dart';
@@ -27,6 +28,9 @@ const double _multiAxisHeight = 34;
 const double _minDayWidth = 120;
 const double _minTickGap = 40;
 const List<int> _hourSteps = [1, 2, 3, 6, 12, 24];
+const double _planTint = 0.3;
+const double _planFill = 0.75;
+const double _planInset = 2;
 
 DateTime _dayStart(DateTime aTs) => DateTime(aTs.year, aTs.month, aTs.day);
 
@@ -142,11 +146,17 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
     }
   }
 
+  Future<void> _openPlan(Occurrence aPlan) async
+  {
+    await showOccurrenceActions(context, ref, aPlan);
+  }
+
   @override
   Widget build(BuildContext aContext)
   {
     aContext.locale;
     ref.listen<int>(routineRevisionProv, (_, __) => _load());
+    ref.listen<int>(plannerRevisionProv, (_, __) => _load());
     final data = _data;
     final title = widget.title ?? data?.familyName ?? 'routine.my_day'.tr();
 
@@ -187,10 +197,13 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
           : const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
     }
 
-    final hasMarks = aData.members.any((aMember) => aMember.marks.isNotEmpty);
+    final hasMarks = aData.members.any((aMember) => aMember.marks.isNotEmpty || aMember.plans.isNotEmpty);
+    final hasPlans = aData.members.any((aMember) => aMember.plans.isNotEmpty);
     final usedStatuses = {
-      for (final member in aData.members)
+      for (final member in aData.members) ...[
         for (final mark in member.marks) mark.status,
+        for (final plan in member.plans) plan.category ?? RoutineStatus.other,
+      ],
     };
 
     return Column(
@@ -202,6 +215,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
           to: _to,
           members: aData.members,
           onOpenMark: (aMark) => openMarkSheet(context, aMark.id),
+          onOpenPlan: _openPlan,
           onCreate: _create,
         ),
         const SizedBox(height: 12),
@@ -216,6 +230,18 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
                 .map((aStatus) => _LegendItem(status: aStatus))
                 .toList(),
           ),
+        if (hasPlans) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const _PlanSwatch(),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('routine.plans_hint'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkMuted)),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 6),
         Text('routine.tap_to_create'.tr(), style: TextStyle(fontSize: 12, color: context.palette.inkMuted)),
         if (_error != null)
@@ -234,6 +260,7 @@ class _TimelineGrid extends StatefulWidget
   final DateTime to;
   final List<TimelineMemberDto> members;
   final ValueChanged<StatusMarkDto> onOpenMark;
+  final ValueChanged<Occurrence> onOpenPlan;
   final void Function(TimelineMemberDto aMember, DateTime aTs) onCreate;
 
   const _TimelineGrid({
@@ -242,6 +269,7 @@ class _TimelineGrid extends StatefulWidget
     required this.to,
     required this.members,
     required this.onOpenMark,
+    required this.onOpenPlan,
     required this.onCreate,
   });
 
@@ -409,6 +437,7 @@ class _TimelineGridState extends State<_TimelineGrid>
                               now: now,
                               xOf: xOf,
                               onOpenMark: widget.onOpenMark,
+                              onOpenPlan: widget.onOpenPlan,
                               onCreate: widget.members[index].canEdit
                                   ? (aX) => widget.onCreate(widget.members[index], tsOf(aX))
                                   : null,
@@ -514,6 +543,7 @@ class _MemberTrack extends StatelessWidget
   final DateTime now;
   final double Function(DateTime) xOf;
   final ValueChanged<StatusMarkDto> onOpenMark;
+  final ValueChanged<Occurrence> onOpenPlan;
   final ValueChanged<double>? onCreate;
 
   const _MemberTrack({
@@ -523,6 +553,7 @@ class _MemberTrack extends StatelessWidget
     required this.now,
     required this.xOf,
     required this.onOpenMark,
+    required this.onOpenPlan,
     this.onCreate,
   });
 
@@ -552,6 +583,28 @@ class _MemberTrack extends StatelessWidget
           duration: end.difference(mark.startTs),
           isMine: member.canEdit,
           onTap: () => onOpenMark(mark),
+        ),
+      ));
+    }
+    for (final plan in member.plans)
+    {
+      if (!plan.endTs.isAfter(from) || !plan.startTs.isBefore(to))
+      {
+        continue;
+      }
+      final left = xOf(plan.startTs);
+      final width = math.max(_blockGap * 2, xOf(plan.endTs) - left - _blockGap);
+      blocks.add(Positioned(
+        left: left,
+        width: width,
+        top: 0,
+        bottom: 0,
+        child: _PlanBlock(
+          key: ValueKey('timeline.plan.${plan.key}'),
+          plan: plan,
+          memberName: member.fullName,
+          width: width,
+          onTap: () => onOpenPlan(plan),
         ),
       ));
     }
@@ -629,6 +682,81 @@ class _MarkBlock extends StatelessWidget
           cursor: SystemMouseCursors.click,
           child: GestureDetector(onTap: onTap, child: block),
         ),
+      ),
+    );
+  }
+}
+
+class _PlanBlock extends StatelessWidget
+{
+  final Occurrence plan;
+  final String memberName;
+  final double width;
+  final VoidCallback onTap;
+
+  const _PlanBlock({
+    super.key,
+    required this.plan,
+    required this.memberName,
+    required this.width,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final status = plan.category ?? RoutineStatus.other;
+    final color = status.colorOf(aContext);
+    final lines = [
+      '$memberName — ${'routine.plan'.tr()}: ${plan.title}',
+      occurrenceTimeLabel(aContext, plan),
+      'routine.plan_tap'.tr(),
+    ];
+
+    final fill = Color.alphaBlend(color.withValues(alpha: _planTint), aContext.palette.surface);
+    final block = Container(
+      margin: const EdgeInsets.symmetric(vertical: _planInset),
+      decoration: BoxDecoration(
+        color: fill.withValues(alpha: _planFill),
+        border: Border.all(color: color, width: 1.5),
+        borderRadius: BorderRadius.circular(_blockRadius),
+      ),
+      alignment: Alignment.center,
+      child: width >= 20 ? Icon(status.icon, size: 12, color: color) : null,
+    );
+
+    return Semantics(
+      label: lines.join('. '),
+      button: true,
+      child: Tooltip(
+        message: lines.join('\n'),
+        triggerMode: TooltipTriggerMode.longPress,
+        waitDuration: const Duration(milliseconds: 150),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(onTap: onTap, child: block),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanSwatch extends StatelessWidget
+{
+  const _PlanSwatch();
+
+  @override
+  Widget build(BuildContext aContext)
+  {
+    final color = aContext.palette.inkSecondary;
+    final fill = Color.alphaBlend(color.withValues(alpha: _planTint), aContext.palette.surface);
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: fill.withValues(alpha: _planFill),
+        border: Border.all(color: color, width: 1.5),
+        borderRadius: BorderRadius.circular(3),
       ),
     );
   }

@@ -238,3 +238,139 @@ async fn balance_carries_over_midnight_and_corrections_reset_it(a_db: PgPool)
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn meals_rise_over_their_block_and_gym_blocks_burn(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let id = alice.id.to_string();
+    let (status, profile) = send(
+        &app,
+        &alice,
+        Method::PUT,
+        &format!("/api/people/{id}"),
+        Some(
+            json!({ "first_name": "Alice", "last_name": "Smith", "birth_date": "1990-05-17",
+                     "sex": "female", "activity": "light" }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{profile}");
+    let (status, entry) = send(
+        &app,
+        &alice,
+        Method::POST,
+        &format!("/api/people/{id}/entries"),
+        Some(json!({ "measured_ts": ts(Utc::now() - Duration::days(3)),
+                     "values": [{ "metric": "weight", "value": "60" }, { "metric": "height", "value": "168" }] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{entry}");
+
+    let day = (Utc::now() - Duration::days(1)).date_naive();
+    let midnight = day.and_time(NaiveTime::MIN).and_utc();
+    let lunch = midnight + Duration::hours(13);
+    let (status, mark) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/routine/marks",
+        Some(json!({ "status": "meal", "start_ts": ts(lunch), "end_ts": ts(lunch + Duration::minutes(30)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{mark}");
+    let (status, entry) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/nutrition/entries",
+        Some(json!({ "date": day, "status_mark_id": mark["id"], "quick": { "title": "Обед", "kcal": "500" } })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{entry}");
+    let gym = midnight + Duration::hours(18);
+    let (status, mark) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/routine/marks",
+        Some(json!({ "status": "gym", "start_ts": ts(gym), "end_ts": ts(gym + Duration::hours(1)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{mark}");
+
+    let (status, body) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/energy/day?date={day}&tz=UTC"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let mine = me(&body);
+    let burn: f64 = mine["daily_burn"].as_str().unwrap().parse().unwrap();
+    let points = mine["points"].as_array().unwrap();
+    let at = |a_ts: DateTime<Utc>| -> Vec<f64> {
+        points
+            .iter()
+            .filter(|point| point["ts"] == ts(a_ts))
+            .map(|point| point["kcal"].as_f64().unwrap())
+            .collect()
+    };
+    let before = at(lunch);
+    let after = at(lunch + Duration::minutes(30));
+    assert_eq!(before.len(), 1, "{mine}");
+    assert_eq!(after.len(), 1, "{mine}");
+    assert!((before[0] + burn * 13.0 / 24.0).abs() <= 1.0, "{mine}");
+    assert!((after[0] - before[0] - (500.0 - burn / 48.0)).abs() <= 1.0, "{mine}");
+    assert_eq!(mine["eaten"], 500);
+    assert_eq!(mine["burned_workouts"], 240);
+    assert_eq!(at(gym).len(), 1);
+    let gym_end = at(gym + Duration::hours(1));
+    assert!((at(gym)[0] - gym_end[0] - (240.0 + burn / 24.0)).abs() <= 1.0, "{mine}");
+
+    let late = midnight - Duration::minutes(20);
+    let (status, mark) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/routine/marks",
+        Some(json!({ "status": "meal", "start_ts": ts(late), "end_ts": ts(late + Duration::minutes(40)) })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{mark}");
+    send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/nutrition/entries",
+        Some(json!({ "date": day, "status_mark_id": mark["id"], "quick": { "title": "Ужин", "kcal": "600" } })),
+    )
+    .await;
+    let (_, one) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/energy/day?date={day}&tz=UTC"),
+        None,
+    )
+    .await;
+    let (_, two) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/energy/day?date={day}&tz=UTC&days=2"),
+        None,
+    )
+    .await;
+    let (one, two) = (me(&one), me(&two));
+    assert_eq!(one["eaten"], 800, "{one}");
+    assert_eq!(two["eaten"], 1100, "{two}");
+    assert!(
+        (one["start_kcal"].as_f64().unwrap() - (300.0 - burn)).abs() <= 1.0,
+        "{one}"
+    );
+    assert!((one["balance"].as_f64().unwrap() - two["balance"].as_f64().unwrap()).abs() <= 1.0);
+}

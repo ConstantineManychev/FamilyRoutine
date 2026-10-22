@@ -802,7 +802,10 @@
     "block_created": "Block “{}” added",
     "block_too_old": "A block can start at most 31 days ago.",
     "block_too_far": "A block must end within a day from now.",
-    "tap_to_create": "Tap an empty spot in your row or a child’s row to add a block."
+    "tap_to_create": "Tap an empty spot in your row or a child’s row to add a block.",
+    "plan": "Plan",
+    "plan_tap": "Tap to accept, move or skip",
+    "plans_hint": "Translucent blocks are plans. Mark a plan as done and it becomes a routine block."
   },
   "catalog": {
     "scope": "Keep in",
@@ -1816,7 +1819,7 @@
   "energy": {
     "title": "Calorie balance",
     "empty": "No data for this day yet.",
-    "hint": "The balance accumulates and does not reset at midnight. Food raises the line, calories burn evenly at maintenance level, workouts burn extra. Tap the chart to set the exact value at that time; tap a name to hide its line.",
+    "hint": "The balance accumulates and does not reset at midnight. Food raises the line gradually over the meal, calories burn evenly at maintenance level, workouts burn extra. Tap the chart to set the exact value at that time; tap a name to hide its line.",
     "eaten": "eaten {}",
     "burned": "burned {}",
     "workouts": "workouts {}",

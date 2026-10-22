@@ -802,7 +802,10 @@
     "block_created": "Bloc « {} » ajouté",
     "block_too_old": "Un bloc peut commencer au plus 31 jours en arrière.",
     "block_too_far": "Un bloc doit se terminer dans les 24 heures.",
-    "tap_to_create": "Touchez un espace libre de votre ligne ou de celle d’un enfant pour ajouter un bloc."
+    "tap_to_create": "Touchez un espace libre de votre ligne ou de celle d’un enfant pour ajouter un bloc.",
+    "plan": "Plan",
+    "plan_tap": "Touchez pour accepter, déplacer ou ignorer",
+    "plans_hint": "Les blocs translucides sont des plans. Marquez un plan comme fait et il devient un bloc de la journée."
   },
   "catalog": {
     "scope": "Enregistrer dans",
@@ -1816,7 +1819,7 @@
   "energy": {
     "title": "Bilan calorique",
     "empty": "Pas encore de données pour ce jour.",
-    "hint": "Le bilan se cumule et n’est pas remis à zéro à minuit. Les repas font monter la ligne, les calories se dépensent régulièrement au niveau d’entretien, les entraînements brûlent en plus. Touchez le graphique pour saisir la valeur exacte à ce moment ; touchez un nom pour masquer sa ligne.",
+    "hint": "Le bilan se cumule et n’est pas remis à zéro à minuit. Les repas font monter la ligne progressivement pendant le repas, les calories se dépensent régulièrement au niveau d’entretien, les entraînements brûlent en plus. Touchez le graphique pour saisir la valeur exacte à ce moment ; touchez un nom pour masquer sa ligne.",
     "eaten": "mangé {}",
     "burned": "dépensé {}",
     "workouts": "entraînements {}",
