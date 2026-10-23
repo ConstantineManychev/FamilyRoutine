@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(SUM(kcal), 0) AS \"kcal!\", COALESCE(SUM(prot), 0) AS \"prot!\",\n               COALESCE(SUM(fat), 0) AS \"fat!\", COALESCE(SUM(carb), 0) AS \"carb!\"\n        FROM meal_entries\n        WHERE user_id = $1 AND eaten_on = $2\n          AND NOT EXISTS (SELECT 1 FROM status_marks pm WHERE pm.id = status_mark_id AND pm.is_planned)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kcal!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 1,
+        "name": "prot!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "fat!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "carb!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "8a0cda55be99bc86ad32bea41b32c43dd2f06f29ec959ef4c7b5320dc40f7afd"
+}

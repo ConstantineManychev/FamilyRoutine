@@ -140,9 +140,16 @@ pub struct OccurrenceDto
     pub program_id: Option<Uuid>,
     pub day_name: Option<String>,
     pub session_id: Option<Uuid>,
+    pub status_mark_id: Option<Uuid>,
     pub is_session_active: bool,
     pub conflicts: Vec<OccurrenceRefDto>,
     pub overload: Option<OverloadDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanBlockDto
+{
+    pub mark_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize)]

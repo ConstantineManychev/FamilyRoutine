@@ -810,14 +810,17 @@ async fn require_day_capacity(
     Ok(())
 }
 
-pub async fn meal_mark_start(
-    a_conn: &mut PgConnection,
-    a_user_id: Uuid,
-    a_mark_id: Uuid,
-) -> Result<DateTime<Utc>, ApiError>
+pub struct MealMark
 {
-    sqlx::query_scalar!(
-        "SELECT start_ts FROM status_marks WHERE id = $1 AND user_id = $2 AND status = 'meal'",
+    pub start_ts: DateTime<Utc>,
+    pub is_planned: bool,
+}
+
+pub async fn meal_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<MealMark, ApiError>
+{
+    sqlx::query_as!(
+        MealMark,
+        "SELECT start_ts, is_planned FROM status_marks WHERE id = $1 AND user_id = $2 AND status = 'meal'",
         a_mark_id,
         a_user_id
     )
@@ -826,9 +829,48 @@ pub async fn meal_mark_start(
     .ok_or(ApiError::Validation("status_mark_id"))
 }
 
-pub async fn require_meal_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<(), ApiError>
+pub async fn consume_mark_entries(
+    a_conn: &mut PgConnection,
+    a_actor_id: Uuid,
+    a_entry_ids: &[Uuid],
+) -> Result<(), ApiError>
 {
-    meal_mark_start(a_conn, a_user_id, a_mark_id).await.map(|_| ())
+    let entries = sqlx::query!(
+        r#"
+        SELECT id, source AS "source: MealSource", item_id, batch_id, grams
+        FROM meal_entries
+        WHERE id = ANY($1)
+        ORDER BY created_ts, id
+        "#,
+        a_entry_ids
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    for entry in entries
+    {
+        if entry.source != MealSource::Dish || entry.batch_id.is_some()
+        {
+            take_from_stock(a_conn, a_actor_id, entry.id, entry.item_id, entry.batch_id, entry.grams).await?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn release_mark_entries(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<(), ApiError>
+{
+    sqlx::query!(
+        "DELETE FROM stock_moves WHERE meal_entry_id IN (SELECT id FROM meal_entries WHERE status_mark_id = $1)",
+        a_mark_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    sqlx::query!(
+        "UPDATE meal_entries SET stock_short = NULL WHERE status_mark_id = $1",
+        a_mark_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    Ok(())
 }
 
 fn require_near(a_date: NaiveDate, a_mark_start: DateTime<Utc>) -> Result<(), ApiError>
@@ -897,8 +939,8 @@ pub async fn create_entry(
         }
         _ => return Err(ApiError::Validation("source")),
     };
-    let mark_start = meal_mark_start(&mut tx, person_id, a_req.status_mark_id).await?;
-    require_near(date, mark_start)?;
+    let mark = meal_mark(&mut tx, person_id, a_req.status_mark_id).await?;
+    require_near(date, mark.start_ts)?;
     require_day_capacity(&mut tx, person_id, date, 1).await?;
 
     let per_100 = snapshot.per_100;
@@ -938,7 +980,7 @@ pub async fn create_entry(
     .fetch_one(&mut *tx)
     .await?;
     let mut entry = MealEntryDto::from(row);
-    if entry.source != MealSource::Dish || entry.batch_id.is_some()
+    if !mark.is_planned && (entry.source != MealSource::Dish || entry.batch_id.is_some())
     {
         entry.stock_short = take_from_stock(
             &mut tx,
@@ -1001,12 +1043,21 @@ pub async fn update_entry(
         }
         _ => return Err(ApiError::Validation("source")),
     };
+    let is_planned = match current.status_mark_id
+    {
+        Some(mark_id) => meal_mark(&mut tx, owner_id, mark_id).await?.is_planned,
+        None => false,
+    };
     let mark_id = match a_req.status_mark_id
     {
         Some(mark_id) =>
         {
-            let mark_start = meal_mark_start(&mut tx, owner_id, mark_id).await?;
-            require_near(date, mark_start)?;
+            let mark = meal_mark(&mut tx, owner_id, mark_id).await?;
+            require_near(date, mark.start_ts)?;
+            if mark.is_planned != is_planned
+            {
+                return Err(ApiError::Validation("status_mark_id"));
+            }
             Some(mark_id)
         }
         None => current.status_mark_id,
@@ -1110,6 +1161,7 @@ pub async fn nutrition_day(
                status_mark_id, batch_id, stock_short, created_ts
         FROM meal_entries
         WHERE user_id = $1 AND eaten_on = $2
+          AND NOT EXISTS (SELECT 1 FROM status_marks pm WHERE pm.id = status_mark_id AND pm.is_planned)
         ORDER BY created_ts, id
         "#,
         person_id,
@@ -1124,7 +1176,8 @@ pub async fn nutrition_day(
         r#"
         SELECT id, status AS "status: RoutineStatus", note, start_ts, end_ts
         FROM status_marks
-        WHERE user_id = $1 AND status = 'meal' AND ((start_ts >= $2 AND start_ts < $3) OR id = ANY($4))
+        WHERE user_id = $1 AND status = 'meal' AND NOT is_planned
+          AND ((start_ts >= $2 AND start_ts < $3) OR id = ANY($4))
         ORDER BY start_ts
         "#,
         person_id,
@@ -1452,6 +1505,7 @@ pub async fn person_norm(
                COALESCE(SUM(fat), 0) AS "fat!", COALESCE(SUM(carb), 0) AS "carb!"
         FROM meal_entries
         WHERE user_id = $1 AND eaten_on = $2
+          AND NOT EXISTS (SELECT 1 FROM status_marks pm WHERE pm.id = status_mark_id AND pm.is_planned)
         "#,
         a_id,
         date
@@ -1550,14 +1604,15 @@ pub async fn copy_meals(
     let date = check_date(a_req.date, "date")?;
     let mut tx = a_state.db.begin().await?;
     let person_id = acting_for(&mut tx, a_user.user_id, a_req.person_id).await?;
-    let start = meal_mark_start(&mut tx, person_id, a_req.status_mark_id).await?;
+    let target = meal_mark(&mut tx, person_id, a_req.status_mark_id).await?;
+    let start = target.start_ts;
     require_near(date, start)?;
     let same_time = start - Duration::hours(COPY_BACK_HOURS);
     let source = sqlx::query!(
         r#"
         SELECT m.id, m.start_ts
         FROM status_marks m
-        WHERE m.user_id = $1 AND m.status = 'meal' AND m.id <> $2 AND m.start_ts BETWEEN $3 AND $4
+        WHERE m.user_id = $1 AND m.status = 'meal' AND NOT m.is_planned AND m.id <> $2 AND m.start_ts BETWEEN $3 AND $4
           AND EXISTS (SELECT 1 FROM meal_entries e WHERE e.status_mark_id = m.id)
         ORDER BY ABS(EXTRACT(EPOCH FROM (m.start_ts - $5))), m.start_ts
         LIMIT 1
@@ -1608,7 +1663,7 @@ pub async fn copy_meals(
     )
     .fetch_all(&mut *tx)
     .await?;
-    for entry in &copied
+    for entry in copied.iter().filter(|_| !target.is_planned)
     {
         if entry.source != MealSource::Dish || entry.batch_id.is_some()
         {

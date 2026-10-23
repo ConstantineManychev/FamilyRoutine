@@ -54,7 +54,7 @@ async fn food_sum(
                         ELSE COALESCE(m.end_ts, m.start_ts + make_interval(mins => $5)) END AS end_ts
             FROM meal_entries me
             LEFT JOIN status_marks m ON m.id = me.status_mark_id
-            WHERE me.user_id = $1
+            WHERE me.user_id = $1 AND NOT COALESCE(m.is_planned, FALSE)
         )
         SELECT COALESCE(SUM(
             CASE WHEN end_ts <= start_ts THEN kcal
@@ -112,7 +112,7 @@ async fn workout_spans(
             SELECT m.user_id, m.start_ts,
                    COALESCE(m.end_ts, LEAST($4, m.start_ts + make_interval(secs => $5))) AS end_ts
             FROM status_marks m
-            WHERE m.user_id = ANY($1) AND m.status = 'gym'
+            WHERE m.user_id = ANY($1) AND m.status = 'gym' AND NOT m.is_planned
               AND NOT EXISTS (SELECT 1 FROM workout_sessions s WHERE s.status_mark_id = m.id)
         )
         SELECT g.user_id, g.start_ts, g.end_ts AS "end_ts!",
@@ -178,7 +178,7 @@ async fn start_of(
                 SELECT LEAST(
                     (SELECT MIN(COALESCE(m.start_ts, me.created_ts))
                      FROM meal_entries me LEFT JOIN status_marks m ON m.id = me.status_mark_id
-                     WHERE me.user_id = $1),
+                     WHERE me.user_id = $1 AND NOT COALESCE(m.is_planned, FALSE)),
                     (SELECT MIN(started_ts) FROM workout_sessions
                      WHERE user_id = $1 AND finished_ts IS NOT NULL AND kcal IS NOT NULL),
                     (SELECT MIN(ts) FROM energy_marks WHERE user_id = $1)
@@ -256,7 +256,7 @@ pub async fn energy_day(
                         ELSE COALESCE(m.end_ts, m.start_ts + make_interval(mins => $4)) END AS end_ts
             FROM meal_entries me
             LEFT JOIN status_marks m ON m.id = me.status_mark_id
-            WHERE me.user_id = ANY($1)
+            WHERE me.user_id = ANY($1) AND NOT COALESCE(m.is_planned, FALSE)
         )
         SELECT user_id AS "user_id!", start_ts AS "start_ts!", end_ts AS "end_ts!", kcal AS "kcal!"
         FROM food

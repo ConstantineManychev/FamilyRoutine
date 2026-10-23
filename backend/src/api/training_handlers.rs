@@ -42,6 +42,7 @@ const MAX_TZ_OFFSET_MIN: i32 = 14 * 60;
 const MAX_BACKDATE_DAYS: i64 = 7;
 const CLOCK_SKEW_MINUTES: i64 = 5;
 const MAX_SESSION_HOURS: i64 = 12;
+const PLANNED_INTENSITY: i32 = 5;
 const DEFAULT_SESSIONS_LIMIT: i64 = 20;
 const MAX_SESSIONS_LIMIT: i64 = 200;
 const WEIGHT_SCALE: u32 = 2;
@@ -637,6 +638,73 @@ pub async fn begin_session(
     }
 
     Ok(session_id)
+}
+
+pub async fn record_planned_session(
+    a_conn: &mut PgConnection,
+    a_user_id: Uuid,
+    a_day_id: Uuid,
+    a_started_ts: DateTime<Utc>,
+    a_finished_ts: DateTime<Utc>,
+    a_mark_id: Uuid,
+) -> Result<Option<Uuid>, ApiError>
+{
+    let Some(day) = sqlx::query!(
+        r#"
+        SELECT d.id, d.name, p.id AS program_id, p.name AS program_name
+        FROM program_days d JOIN training_programs p ON p.id = d.program_id
+        WHERE d.id = $1 AND p.user_id = $2
+        "#,
+        a_day_id,
+        a_user_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?
+    else
+    {
+        return Ok(None);
+    };
+
+    let session_id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO workout_sessions (
+            user_id, program_id, day_id, program_name, day_name, started_ts, finished_ts, intensity, status_mark_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id
+        "#,
+        a_user_id,
+        day.program_id,
+        day.id,
+        day.program_name,
+        day.name,
+        a_started_ts,
+        a_finished_ts,
+        PLANNED_INTENSITY,
+        a_mark_id
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    prefill_session(a_conn, a_user_id, session_id, day.id, a_started_ts).await?;
+    sqlx::query!(
+        r#"
+        UPDATE session_sets SET is_done = TRUE
+        WHERE session_exercise_id IN (SELECT id FROM session_exercises WHERE session_id = $1)
+        "#,
+        session_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    update_kcal(
+        a_conn,
+        a_user_id,
+        session_id,
+        a_started_ts,
+        a_finished_ts,
+        PLANNED_INTENSITY,
+    )
+    .await?;
+    Ok(Some(session_id))
 }
 
 pub async fn exercise_progress(

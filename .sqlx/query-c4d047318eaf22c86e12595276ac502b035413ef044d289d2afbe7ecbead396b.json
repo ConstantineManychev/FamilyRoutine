@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT m.id FROM plan_instances i JOIN status_marks m ON m.id = i.status_mark_id AND m.is_planned\n        WHERE i.session_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c4d047318eaf22c86e12595276ac502b035413ef044d289d2afbe7ecbead396b"
+}

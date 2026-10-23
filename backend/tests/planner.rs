@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::{Method, StatusCode};
-use chrono::{DateTime, Duration, NaiveTime, SecondsFormat, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use common::{TestApp, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -64,6 +64,26 @@ async fn day_row(a_app: &TestApp, a_user: &TestUser, a_family: Option<&str>, a_d
         .find(|member| member["user_id"] == a_user.id.to_string())
         .cloned()
         .unwrap_or_else(|| body["members"][0].clone())
+}
+
+async fn eaten_on(a_app: &TestApp, a_user: &TestUser, a_day: NaiveDate) -> i64
+{
+    let (_, body) = send(
+        a_app,
+        a_user,
+        Method::GET,
+        &format!("/api/energy/day?date={a_day}&tz=UTC"),
+        None,
+    )
+    .await;
+    body["people"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|person| person["is_me"] == true)
+        .unwrap()["eaten"]
+        .as_i64()
+        .unwrap()
 }
 
 fn blocks(a_row: &Value) -> Vec<(String, String, Option<String>)>
@@ -280,11 +300,16 @@ async fn single_occurrences_are_moved_skipped_and_completed(a_db: PgPool)
         Some(json!({ "state": "planned" })),
     )
     .await;
-    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM plan_instances")
+    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM plan_instances WHERE status_mark_id IS NULL")
         .fetch_one(&a_db)
         .await
         .unwrap();
     assert_eq!(rows, 2);
+    let drafts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM status_marks WHERE is_planned")
+        .fetch_one(&a_db)
+        .await
+        .unwrap();
+    assert_eq!(drafts, 1);
     let items = agenda(&app, &alice, "2026-11-06", "2026-11-06", "UTC").await;
     assert_eq!(items[0]["is_moved"], false);
 
@@ -457,7 +482,7 @@ async fn training_slots_start_workouts_and_are_completed_by_them(a_db: PgPool)
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn accepted_plans_become_routine_blocks(a_db: PgPool)
+async fn plan_blocks_hold_details_and_apply_them_when_done(a_db: PgPool)
 {
     let app = TestApp::new(a_db);
     let alice = app.user("alice@example.com").await;
@@ -487,36 +512,57 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
     )
     .await;
     let occurrence = format!("/api/plan/events/{id}/occurrences/{day}");
-
     let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
     assert_eq!(row["plans"][0]["title"], "Обед");
-    assert_eq!(row["plans"][0]["start_ts"], iso(at(13, 0)));
+    assert_eq!(row["plans"][0]["status_mark_id"], Value::Null);
     assert_eq!(blocks(&row).len(), 1);
-    let (status, bob_view) = send(
+
+    let (status, opened) = send(&app, &alice, Method::POST, &format!("{occurrence}/block"), None).await;
+    assert_eq!(status, StatusCode::OK, "{opened}");
+    let block_id = opened["mark_id"].as_str().unwrap().to_string();
+    let (_, again) = send(&app, &alice, Method::POST, &format!("{occurrence}/block"), None).await;
+    assert_eq!(again["mark_id"], block_id.as_str());
+    let block_uri = format!("/api/routine/marks/{block_id}");
+    let (status, details) = send(&app, &alice, Method::GET, &block_uri, None).await;
+    assert_eq!(status, StatusCode::OK, "{details}");
+    assert_eq!(details["is_planned"], true);
+    assert_eq!(details["plan"]["title"], "Обед");
+    assert_eq!(details["plan"]["state"], "planned");
+    assert_eq!(details["mark"]["start_ts"], iso(at(13, 0)));
+    assert_eq!(details["mark"]["end_ts"], iso(at(13, 30)));
+    assert_eq!(
+        send(&app, &bob, Method::GET, &block_uri, None).await.0,
+        StatusCode::NOT_FOUND
+    );
+
+    let (status, entry) = send(
         &app,
-        &bob,
+        &alice,
+        Method::POST,
+        "/api/nutrition/entries",
+        Some(json!({ "date": day, "status_mark_id": block_id, "quick": { "title": "Суп", "kcal": "500" } })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{entry}");
+    let row = day_row(&app, &alice, None, midnight).await;
+    assert_eq!(row["plans"][0]["status_mark_id"], block_id.as_str());
+    assert_eq!(blocks(&row).len(), 1);
+    assert_eq!(eaten_on(&app, &alice, day).await, 0);
+    let (_, diary) = send(
+        &app,
+        &alice,
         Method::GET,
-        &format!(
-            "/api/routine/timeline?from={}&to={}&family_id={home}",
-            iso(midnight),
-            iso(midnight + Duration::days(1))
-        ),
+        &format!("/api/nutrition/day?date={day}"),
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "{bob_view}");
-    let alice_for_bob = bob_view["members"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|member| member["user_id"] == alice.id.to_string())
-        .cloned()
-        .unwrap();
-    assert_eq!(alice_for_bob["plans"], json!([]));
-    assert_eq!(alice_for_bob["marks"].as_array().unwrap().len(), 1);
-    let shared = day_row(&app, &alice, Some(&home), midnight).await;
-    assert_eq!(shared["plans"].as_array().unwrap().len(), 1);
+    assert_eq!(diary["total"]["kcal"], "0");
+    for (method, body) in [(Method::PUT, Some(json!({ "status": "meal" }))), (Method::DELETE, None)]
+    {
+        let (status, reply) = send(&app, &alice, method, &block_uri, body).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{reply}");
+        assert_eq!(reply["code"], "PLANNED_MARK");
+    }
 
     let (status, reply) = send(&app, &alice, Method::PUT, &occurrence, Some(json!({ "state": "done" }))).await;
     assert_eq!(status, StatusCode::NO_CONTENT, "{reply}");
@@ -530,9 +576,22 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
             ("home".to_string(), iso(at(13, 30)), None),
         ]
     );
-    assert_eq!(row["marks"][1]["note"], "Обед");
+    assert_eq!(row["marks"][1]["id"], block_id.as_str());
+    assert_eq!(eaten_on(&app, &alice, day).await, 500);
+    let (_, diary) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/nutrition/day?date={day}"),
+        None,
+    )
+    .await;
+    assert_eq!(diary["total"]["kcal"], "500");
+    let (_, details) = send(&app, &alice, Method::GET, &block_uri, None).await;
+    assert_eq!(details["is_planned"], false);
+    assert_eq!(details["plan"]["state"], "done");
 
-    let (status, _) = send(
+    send(
         &app,
         &alice,
         Method::PUT,
@@ -540,7 +599,6 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
         Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
     let row = day_row(&app, &alice, None, midnight).await;
     assert_eq!(
         blocks(&row),
@@ -550,8 +608,9 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
             ("home".to_string(), iso(at(14, 30)), None),
         ]
     );
+    assert_eq!(row["marks"][1]["id"], block_id.as_str());
 
-    let (status, _) = send(
+    send(
         &app,
         &alice,
         Method::PUT,
@@ -559,10 +618,14 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
         Some(json!({ "state": "planned", "moved_start": iso(at(14, 0)) })),
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
     let row = day_row(&app, &alice, None, midnight).await;
     assert_eq!(blocks(&row), vec![("home".to_string(), iso(at(8, 0)), None)]);
     assert_eq!(row["plans"][0]["start_ts"], iso(at(14, 0)));
+    assert_eq!(row["plans"][0]["status_mark_id"], block_id.as_str());
+    assert_eq!(eaten_on(&app, &alice, day).await, 0);
+    let (_, details) = send(&app, &alice, Method::GET, &block_uri, None).await;
+    assert_eq!(details["is_planned"], true);
+    assert_eq!(details["meals"]["entries"].as_array().unwrap().len(), 1);
 
     send(
         &app,
@@ -572,105 +635,188 @@ async fn accepted_plans_become_routine_blocks(a_db: PgPool)
         Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
     )
     .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    let meal_id = row["marks"][1]["id"].as_str().unwrap().to_string();
-    let (status, entry) = send(
+    assert_eq!(eaten_on(&app, &alice, day).await, 500);
+    let (status, _) = send(&app, &alice, Method::DELETE, &block_uri, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let items = agenda(&app, &alice, &day.to_string(), &day.to_string(), "UTC").await;
+    assert_eq!(items[0]["state"], "planned");
+    assert_eq!(items[0]["status_mark_id"], Value::Null);
+
+    let (status, opened) = send(&app, &alice, Method::POST, &format!("{occurrence}/block"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let draft_id = opened["mark_id"].as_str().unwrap().to_string();
+    send(
         &app,
         &alice,
         Method::POST,
         "/api/nutrition/entries",
-        Some(json!({ "date": day, "status_mark_id": meal_id, "quick": { "title": "Суп", "kcal": "300" } })),
+        Some(json!({ "date": day, "status_mark_id": draft_id, "quick": { "title": "Хлеб", "kcal": "100" } })),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED, "{entry}");
-    send(
+    let (status, _) = send(
         &app,
         &alice,
         Method::PUT,
-        &occurrence,
-        Some(json!({ "state": "planned", "moved_start": iso(at(14, 0)) })),
+        &format!("/api/plan/events/{id}"),
+        Some(json!({
+            "title": "Поздний обед", "category": "meal", "timing": "fixed", "start_date": day, "start_time": "15:00:00",
+            "duration_min": 45, "tz": "UTC"
+        })),
     )
     .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["marks"][1]["id"], meal_id.as_str());
-    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
-
-    send(
-        &app,
-        &alice,
-        Method::PUT,
-        &occurrence,
-        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
-    )
-    .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["marks"][1]["id"], meal_id.as_str());
-    assert_eq!(row["plans"], json!([]));
-    let (status, details) = send(
+    assert_eq!(status, StatusCode::OK);
+    let (_, details) = send(
         &app,
         &alice,
         Method::GET,
-        &format!("/api/routine/marks/{meal_id}"),
+        &format!("/api/routine/marks/{draft_id}"),
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "{details}");
-    assert_eq!(details["meals"]["entries"].as_array().unwrap().len(), 1, "{details}");
+    assert_eq!(details["mark"]["start_ts"], iso(at(14, 0)));
+    assert_eq!(details["mark"]["end_ts"], iso(at(14, 45)));
+    assert_eq!(details["mark"]["note"], "Поздний обед");
+
+    let (status, _) = send(&app, &alice, Method::DELETE, &format!("/api/plan/events/{id}"), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        send(
+            &app,
+            &alice,
+            Method::GET,
+            &format!("/api/routine/marks/{draft_id}"),
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(eaten_on(&app, &alice, day).await, 0);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn done_training_plans_record_the_programme_workout(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::POST,
+        &format!("/api/people/{}/entries", alice.id),
+        Some(json!({ "measured_ts": iso(Utc::now() - Duration::days(3)), "values": [{ "metric": "weight", "value": "70" }] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (_, exercises) = send(&app, &alice, Method::GET, "/api/dicts/exercises", None).await;
+    let bench = exercises
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exercise| exercise["code"] == "bench_press")
+        .unwrap()["id"]
+        .clone();
+    let (status, program) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/training/programs",
+        Some(json!({
+            "name": "Сплит",
+            "schedule_mode": "queue",
+            "days": [
+                { "name": "A", "exercises": [{ "ex_id": bench, "sets": 3, "reps_min": 8, "reps_max": 10, "weight_kg": "40" }] },
+                { "name": "B", "exercises": [{ "ex_id": bench, "sets": 2, "reps_min": 5, "reps_max": 5 }] }
+            ]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{program}");
+    let program_id = program["id"].as_str().unwrap();
+
+    let day = (Utc::now() - Duration::days(1)).date_naive();
+    let midnight = day.and_time(NaiveTime::MIN).and_utc();
+    let gym = event(
+        &app,
+        &alice,
+        json!({
+            "title": "Сплит", "timing": "fixed", "start_date": day, "start_time": "18:00:00", "duration_min": 60,
+            "tz": "UTC", "program_id": program_id
+        }),
+    )
+    .await;
+    let occurrence = format!("/api/plan/events/{gym}/occurrences/{day}");
+    let (_, opened) = send(&app, &alice, Method::POST, &format!("{occurrence}/block"), None).await;
+    let block_id = opened["mark_id"].as_str().unwrap().to_string();
+    let (_, details) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/routine/marks/{block_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(details["is_planned"], true);
+    assert_eq!(details["mark"]["status"], "gym");
+    assert_eq!(details["workout"], Value::Null);
+    assert_eq!(details["plan"]["program_id"], program_id);
+
+    let (status, reply) = send(&app, &alice, Method::PUT, &occurrence, Some(json!({ "state": "done" }))).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{reply}");
+    let (_, details) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/routine/marks/{block_id}"),
+        None,
+    )
+    .await;
+    let workout = &details["workout"];
+    assert_eq!(workout["day_name"], "A");
+    assert_eq!(workout["started_ts"], iso(midnight + Duration::hours(18)));
+    assert_eq!(workout["finished_ts"], iso(midnight + Duration::hours(19)));
+    assert_eq!(workout["exercises"][0]["sets"].as_array().unwrap().len(), 3);
+    assert!(workout["exercises"][0]["sets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|set| set["is_done"] == true));
+    assert!(workout["kcal"].as_str().is_some(), "{workout}");
+    let (_, plan) = send(&app, &alice, Method::GET, "/api/training/plan?tz=UTC", None).await;
+    assert_eq!(plan["upcoming"][0]["day_name"], "B", "{plan}");
+    let items = agenda(&app, &alice, &day.to_string(), &day.to_string(), "UTC").await;
+    assert_eq!(items[0]["session_id"], workout["id"]);
+    let (_, energy) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/energy/day?date={day}&tz=UTC"),
+        None,
+    )
+    .await;
+    assert!(energy["people"][0]["burned_workouts"].as_i64().unwrap() > 0, "{energy}");
 
     let (status, _) = send(
         &app,
         &alice,
-        Method::DELETE,
-        &format!("/api/routine/marks/{meal_id}"),
-        None,
+        Method::PUT,
+        &occurrence,
+        Some(json!({ "state": "planned" })),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, sessions) = send(&app, &alice, Method::GET, "/api/training/sessions", None).await;
+    assert_eq!(sessions.as_array().unwrap().len(), 0, "{sessions}");
+    let (_, details) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/routine/marks/{block_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(details["is_planned"], true);
+    assert_eq!(details["workout"], Value::Null);
     let items = agenda(&app, &alice, &day.to_string(), &day.to_string(), "UTC").await;
-    assert_eq!(items[0]["state"], "planned");
-    assert_eq!(items[0]["start_ts"], iso(at(14, 0)));
-    let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["plans"].as_array().unwrap().len(), 1);
-
-    send(
-        &app,
-        &alice,
-        Method::PUT,
-        &occurrence,
-        Some(json!({ "state": "done", "moved_start": iso(at(14, 0)) })),
-    )
-    .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    let renamed_id = row["marks"][1]["id"].as_str().unwrap().to_string();
-    let (status, renamed) = send(
-        &app,
-        &alice,
-        Method::PUT,
-        &format!("/api/routine/marks/{renamed_id}"),
-        Some(json!({ "status": "meal", "note": "Обед с коллегами", "start_ts": iso(at(14, 0)), "end_ts": iso(at(14, 30)) })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{renamed}");
-    send(
-        &app,
-        &alice,
-        Method::PUT,
-        &occurrence,
-        Some(json!({ "state": "done", "moved_start": iso(at(15, 0)) })),
-    )
-    .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["marks"][1]["start_ts"], iso(at(15, 0)));
-    assert_eq!(row["marks"][1]["note"], "Обед с коллегами");
-    send(
-        &app,
-        &alice,
-        Method::PUT,
-        &occurrence,
-        Some(json!({ "state": "planned", "moved_start": iso(at(15, 0)) })),
-    )
-    .await;
-    let row = day_row(&app, &alice, None, midnight).await;
-    assert_eq!(row["marks"][1]["note"], "Обед с коллегами");
-    assert_eq!(row["plans"][0]["start_ts"], iso(at(15, 0)));
+    assert_eq!(items[0]["session_id"], Value::Null);
 }

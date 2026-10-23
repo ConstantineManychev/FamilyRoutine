@@ -214,6 +214,7 @@ class Occurrence
   final String? programId;
   final String? dayName;
   final String? sessionId;
+  final String? statusMarkId;
   final bool isSessionActive;
   final List<OccurrenceRef> conflicts;
   final Overload? overload;
@@ -236,6 +237,7 @@ class Occurrence
     this.programId,
     this.dayName,
     this.sessionId,
+    this.statusMarkId,
     this.isSessionActive = false,
     this.conflicts = const [],
     this.overload,
@@ -269,6 +271,7 @@ class Occurrence
         programId: aJson['program_id'] as String?,
         dayName: aJson['day_name'] as String?,
         sessionId: aJson['session_id'] as String?,
+        statusMarkId: aJson['status_mark_id'] as String?,
         isSessionActive: aJson['is_session_active'] as bool? ?? false,
         conflicts: (aJson['conflicts'] as List<dynamic>? ?? const [])
             .map((aItem) => OccurrenceRef.fromJson(aItem as Map<String, dynamic>))

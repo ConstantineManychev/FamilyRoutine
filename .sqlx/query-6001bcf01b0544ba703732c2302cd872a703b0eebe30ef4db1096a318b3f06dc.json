@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM status_marks WHERE id = ANY($1) AND is_planned",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6001bcf01b0544ba703732c2302cd872a703b0eebe30ef4db1096a318b3f06dc"
+}

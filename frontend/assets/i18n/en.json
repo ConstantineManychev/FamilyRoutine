@@ -84,7 +84,8 @@
     "STOCK_FROM_RECEIPT": "This lot comes from a receipt: remove it in the receipt (the “Add products to stock” switch) or write it off",
     "TOO_MANY_LOTS": "Too many lots in this store",
     "PUSH_UNAVAILABLE": "Push notifications are not configured on the server",
-    "TOO_MANY_MARKS": "Too many balance corrections: delete old ones."
+    "TOO_MANY_MARKS": "Too many balance corrections: delete old ones.",
+    "PLANNED_MARK": "This is a planned block: mark it as done, move it or skip it through the plan."
   },
   "sidebar": {
     "routine": "Routine",
@@ -804,8 +805,17 @@
     "block_too_far": "A block must end within a day from now.",
     "tap_to_create": "Tap an empty spot in your row or a child’s row to add a block.",
     "plan": "Plan",
-    "plan_tap": "Tap to accept, move or skip",
-    "plans_hint": "Translucent blocks are plans. Mark a plan as done and it becomes a routine block."
+    "plan_tap": "Tap to open the plan",
+    "plans_hint": "Translucent blocks are plans. Tap a plan to add food, tasks or notes in advance; marking it done turns it into a routine block.",
+    "plan_done": "Done",
+    "plan_skipped": "Skipped",
+    "plan_waiting": "Planned",
+    "plan_meal_hint": "This is a plan: add what you are going to eat. The calories reach the balance and the diary, and the food leaves your stock, once you mark the plan as done.",
+    "plan_workout_hint": "Marking it done records the programme workout with all its sets, just as if you had trained in the app.",
+    "plan_block_hint": "This is a plan: the block appears in your routine once you mark it as done.",
+    "plan_now": "Start now",
+    "plan_workout": "Planned workout: {} · {}",
+    "no_meals_plan": "Nothing yet. Add what you are going to eat."
   },
   "catalog": {
     "scope": "Keep in",
@@ -1188,7 +1198,8 @@
     "status_started": "Status: {}",
     "series_hint": "Changes apply to every repeat. To move or skip a single day, use the event menu in the schedule.",
     "minutes_short": "{} min",
-    "repeats_badge": "repeats"
+    "repeats_badge": "repeats",
+    "program_schedule": "The repeat comes from the programme schedule; you can change it."
   },
   "nutrition": {
     "title": "Food diary",

@@ -84,7 +84,8 @@
     "STOCK_FROM_RECEIPT": "Diese Charge stammt aus einem Beleg: Entferne sie im Beleg (Schalter „Produkte einlagern“) oder buche sie ab",
     "TOO_MANY_LOTS": "Zu viele Chargen in diesem Lager",
     "PUSH_UNAVAILABLE": "Push-Benachrichtigungen sind auf dem Server nicht eingerichtet",
-    "TOO_MANY_MARKS": "Zu viele Bilanzkorrekturen: Löschen Sie alte."
+    "TOO_MANY_MARKS": "Zu viele Bilanzkorrekturen: Löschen Sie alte.",
+    "PLANNED_MARK": "Das ist ein geplanter Block: Markiere ihn über den Plan als erledigt, verschiebe oder überspringe ihn."
   },
   "sidebar": {
     "routine": "Routine",
@@ -804,8 +805,17 @@
     "block_too_far": "Ein Block muss innerhalb eines Tages enden.",
     "tap_to_create": "Tippen Sie auf eine freie Stelle in Ihrer Zeile oder der eines Kindes, um einen Block hinzuzufügen.",
     "plan": "Plan",
-    "plan_tap": "Tippen zum Annehmen, Verschieben oder Überspringen",
-    "plans_hint": "Halbtransparente Blöcke sind Pläne. Markiere einen Plan als erledigt, dann wird er zu einem Tagesblock."
+    "plan_tap": "Tippen, um den Plan zu öffnen",
+    "plans_hint": "Halbtransparente Blöcke sind Pläne. Tippe auf einen Plan, um vorab Essen, Aufgaben oder Notizen hinzuzufügen; mit „Erledigt“ wird er zu einem Tagesblock.",
+    "plan_done": "Erledigt",
+    "plan_skipped": "Übersprungen",
+    "plan_waiting": "Geplant",
+    "plan_meal_hint": "Das ist ein Plan: Füge hinzu, was du essen willst. Die Kalorien fließen in Bilanz und Tagebuch, und die Lebensmittel werden aus dem Vorrat abgebucht, sobald du den Plan als erledigt markierst.",
+    "plan_workout_hint": "Mit „Erledigt“ wird das Training des Programms mit allen Sätzen erfasst – so, als hättest du es in der App absolviert.",
+    "plan_block_hint": "Das ist ein Plan: Der Block erscheint im Tagesablauf, sobald du ihn als erledigt markierst.",
+    "plan_now": "Jetzt starten",
+    "plan_workout": "Geplantes Training: {} · {}",
+    "no_meals_plan": "Noch leer. Füge hinzu, was du essen willst."
   },
   "catalog": {
     "scope": "Speichern in",
@@ -1188,7 +1198,8 @@
     "status_started": "Status: {}",
     "series_hint": "Änderungen gelten für alle Wiederholungen. Einen einzelnen Tag verschieben oder überspringen Sie im Menü des Termins im Plan.",
     "minutes_short": "{} Min.",
-    "repeats_badge": "Wiederholung"
+    "repeats_badge": "Wiederholung",
+    "program_schedule": "Die Wiederholung stammt aus dem Programmplan und kann geändert werden."
   },
   "nutrition": {
     "title": "Ernährungstagebuch",

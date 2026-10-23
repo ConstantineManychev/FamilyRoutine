@@ -148,7 +148,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
 
   Future<void> _openPlan(Occurrence aPlan) async
   {
-    await showOccurrenceActions(context, ref, aPlan);
+    await openOccurrenceBlock(context, ref, aPlan);
   }
 
   @override

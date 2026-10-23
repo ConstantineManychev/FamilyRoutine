@@ -1,9 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:family_routine/core/api_svc.dart';
+import 'package:family_routine/core/token_store.dart';
 import 'package:family_routine/domain/models.dart';
 import 'package:family_routine/ui/common/app_theme.dart';
+import 'package:family_routine/ui/planner/plan_event_editor_screen.dart';
 import 'package:family_routine/ui/planner/planner_common.dart';
 import 'package:flutter/material.dart';
+import 'package:family_routine/providers/api_prov.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,9 +49,37 @@ class _KeyLoader extends AssetLoader
   Future<Map<String, dynamic>> load(String aPath, Locale aLocale) async => const {};
 }
 
-Widget _localized(Widget aChild)
+class _ProgramApi extends ApiSvc
+{
+  _ProgramApi() : super(Dio(), TokenStore(const FlutterSecureStorage()));
+
+  @override
+  Future<List<String>> getTimeZones() async => const ['UTC', 'Europe/Kyiv'];
+
+  @override
+  Future<List<ProgramListItem>> getPrograms({String? aPersonId}) async => const [
+        ProgramListItem(id: 'p1', name: 'Fullbody', mode: ScheduleMode.weekdays, isActive: true, dayCount: 2),
+      ];
+
+  @override
+  Future<TrainingProgram> getProgram(String aId) async => const TrainingProgram(
+        id: 'p1',
+        name: 'Fullbody',
+        mode: ScheduleMode.weekdays,
+        isActive: true,
+        days: [
+          ProgramDay(id: 'd1', name: 'A', weekdays: [1, 3]),
+          ProgramDay(id: 'd2', name: 'B', weekdays: [5]),
+        ],
+      );
+}
+
+Widget _localized(Widget aChild, {ApiSvc? aApi})
 {
   return ProviderScope(
+    overrides: [
+      if (aApi != null) apiProv.overrideWithValue(aApi),
+    ],
     child: EasyLocalization(
       supportedLocales: const [Locale('en')],
       path: 'unused',
@@ -182,5 +216,27 @@ void main()
     expect(find.text('planner.start_training'), findsNothing);
     await aTester.tap(find.byType(Checkbox));
     expect(doneValue, isTrue);
+  });
+
+  testWidgets('choosing a programme pulls its weekly schedule into the event', (aTester) async
+  {
+    await aTester.binding.setSurfaceSize(const Size(420, 2000));
+    addTearDown(() => aTester.binding.setSurfaceSize(null));
+    await aTester.pumpWidget(_localized(const PlanEventEditorScreen(), aApi: _ProgramApi()));
+    await aTester.pumpAndSettle();
+
+    await aTester.tap(find.text('planner.training_none'));
+    await aTester.pumpAndSettle();
+    await aTester.tap(find.text('Fullbody').last);
+    await aTester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('editor.program_schedule')), findsOneWidget);
+    expect(find.byKey(const ValueKey('repeat:PlanRepeat.weekly')), findsOneWidget);
+    final selected = aTester
+        .widgetList<FilterChip>(find.byType(FilterChip))
+        .map((aChip) => aChip.selected)
+        .toList();
+    expect(selected, [true, false, true, false, true, false, false]);
+    expect(aTester.takeException(), isNull);
   });
 }

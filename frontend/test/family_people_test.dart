@@ -101,6 +101,48 @@ class _FakeApi extends ApiSvc
     savedOccurrences.add((aEventId, aState));
   }
 
+  final List<String> openedBlocks = [];
+
+  @override
+  Future<String> openOccurrenceBlock(String aEventId, DateTime aOccDate) async
+  {
+    openedBlocks.add(aEventId);
+    return 'lunch-mark';
+  }
+
+  @override
+  Future<MarkDetails> getMarkDetails(String aId) async
+  {
+    final today = DateTime.now();
+    final lunch = DateTime(today.year, today.month, today.day, 13);
+    final isDone = savedOccurrences.isNotEmpty;
+    final start = lunch.toUtc().toIso8601String();
+    final end = lunch.add(const Duration(minutes: 30)).toUtc().toIso8601String();
+    return MarkDetails.fromJson({
+      'mark': {'id': aId, 'status': 'meal', 'note': 'Lunch', 'start_ts': start, 'end_ts': end},
+      'owner_id': 'kid',
+      'owner_name': 'Kid Test',
+      'is_mine': false,
+      'can_edit': true,
+      'is_planned': !isDone,
+      'plan': {
+        'event_id': 'lunch', 'occ_date': dateWire(lunch), 'date': dateWire(lunch), 'title': 'Lunch', 'category': 'meal',
+        'timing': 'fixed', 'start_ts': start, 'end_ts': end, 'duration_min': 30, 'tz': 'UTC', 'repeat': 'daily',
+        'state': isDone ? 'done' : 'planned', 'status_mark_id': aId,
+      },
+      'is_details_hidden': false,
+      'meals': {
+        'total': _macros('450'),
+        'entries': [
+          {
+            'id': 'soup', 'date': dateWire(lunch), 'source': 'quick', 'title': 'Soup', 'kcal_100': null,
+            'total': _macros('450'), 'status_mark_id': aId, 'created_ts': start,
+          },
+        ],
+      },
+    });
+  }
+
   @override
   Future<TimelineDto> getTimeline({String? aFamilyId, required DateTime aFrom, required DateTime aTo}) async
   {
@@ -348,10 +390,10 @@ void main()
     await aTester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('a translucent plan on the timeline becomes a block once it is done', (aTester) async
+  testWidgets('a plan opens its block card with food and becomes a block once it is done', (aTester) async
   {
     await EasyLocalization.ensureInitialized();
-    await aTester.binding.setSurfaceSize(const Size(900, 900));
+    await aTester.binding.setSurfaceSize(const Size(900, 1200));
     final api = _FakeApi();
     await aTester.pumpWidget(_app(const FamilyTimelineCard(familyId: 'f1', title: 'Home'), aApi: api));
     await aTester.pumpAndSettle();
@@ -359,14 +401,29 @@ void main()
     final today = DateTime.now();
     final plan = find.byKey(ValueKey('timeline.plan.lunch:${dateWire(today)}'));
     expect(plan, findsOneWidget);
-    expect(find.text('Translucent blocks are plans. Mark a plan as done and it becomes a routine block.'), findsOneWidget);
+    expect(find.textContaining('Translucent blocks are plans.'), findsOneWidget);
     await aTester.tap(plan);
     await aTester.pumpAndSettle();
-    expect(find.text('Lunch'), findsOneWidget);
-    await aTester.tap(find.text('Done'));
-    await aTester.pumpAndSettle();
 
+    expect(api.openedBlocks, ['lunch']);
+    expect(find.byKey(const ValueKey('mark.plan')), findsOneWidget);
+    expect(find.text('Plan: Lunch'), findsOneWidget);
+    expect(find.text('Soup'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mark.add_food')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mark.link_meals')), findsNothing);
+    expect(find.byKey(const ValueKey('mark.save')), findsNothing);
+    expect(find.byKey(const ValueKey('mark.delete')), findsNothing);
+    expect(find.textContaining('once you mark the plan as done'), findsOneWidget);
+
+    await aTester.tap(find.byKey(const ValueKey('mark.plan.done')));
+    await aTester.pumpAndSettle();
     expect(api.savedOccurrences.single, ('lunch', PlanState.done));
+    expect(find.byKey(const ValueKey('mark.plan.undo')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mark.save')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mark.link_meals')), findsOneWidget);
+
+    await aTester.tapAt(const Offset(10, 10));
+    await aTester.pumpAndSettle();
     expect(api.timelineLoads, greaterThan(1));
     expect(plan, findsNothing);
     expect(find.bySemanticsLabel(RegExp('Kid Test — Meal')), findsOneWidget);

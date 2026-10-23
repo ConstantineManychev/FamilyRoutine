@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE work_task_events SET status_mark_id = $2 WHERE status_mark_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0e07dd16c18d468e785409c910d800e3545630d7fb0d99dd8b25cd06c9cd89fe"
+}

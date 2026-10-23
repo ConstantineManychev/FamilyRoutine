@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE plan_instances SET state = 'planned', done_ts = NULL, is_session_auto = FALSE, updated_ts = NOW()\n        WHERE session_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eb1afd5304b7027329b877fe806a89998de91891fb9dc7b5c225126c0e72d81e"
+}

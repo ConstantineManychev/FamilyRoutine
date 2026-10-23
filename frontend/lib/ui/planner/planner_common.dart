@@ -8,6 +8,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
+import '../routine/mark_sheet.dart';
 import '../routine/routine_style.dart';
 import '../training/training_revision.dart';
 
@@ -58,6 +59,27 @@ Future<void> startTrainingSlot(BuildContext aContext, WidgetRef aRef, String aEv
   }
 }
 
+Future<void> openOccurrenceBlock(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
+{
+  final String markId;
+  try
+  {
+    markId = aOccurrence.statusMarkId ?? await aRef.read(apiProv).openOccurrenceBlock(aOccurrence.eventId, aOccurrence.occDate);
+  }
+  catch (aError)
+  {
+    if (aContext.mounted)
+    {
+      showErrorSnack(aContext, aError);
+    }
+    return;
+  }
+  if (aContext.mounted)
+  {
+    await openMarkSheet(aContext, markId);
+  }
+}
+
 Future<void> openSession(BuildContext aContext, WidgetRef aRef, String aSessionId) async
 {
   await aContext.push('/app/training/sessions/$aSessionId');
@@ -95,7 +117,7 @@ class OccurrenceList extends ConsumerWidget
             occurrence: item,
             isNow: isOccurrenceNow(item, now),
             isToday: DateUtils.isSameDay(item.startTs, now),
-            onTap: () => showOccurrenceActions(aContext, aRef, item),
+            onTap: () => openOccurrenceBlock(aContext, aRef, item),
             onDoneChanged: (aIsDone) => setOccurrenceState(aContext, aRef, item, aIsDone ? PlanState.done : PlanState.planned),
             onStartTraining: () => startOrContinueTraining(aContext, aRef, item),
           ),
@@ -140,14 +162,10 @@ class OccurrenceTile extends StatelessWidget
     ].join(' · ');
 
     final canStartTraining = item.isTraining && !item.isDone && !item.isSkipped && (isToday || item.isSessionActive);
-    final Widget? trailing;
+    final Widget trailing;
     if (item.isTraining && item.isDone)
     {
       trailing = Icon(AppIcons.checkCircle, color: palette.positive);
-    }
-    else if (item.isTraining)
-    {
-      trailing = null;
     }
     else
     {
@@ -240,10 +258,8 @@ class OccurrenceTile extends StatelessWidget
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                trailing,
-              ],
+              const SizedBox(width: 8),
+              trailing,
             ],
           ),
         ),
@@ -365,7 +381,7 @@ Future<void> showOccurrenceActions(BuildContext aContext, WidgetRef aRef, Occurr
   }
 }
 
-Future<void> _move(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
+Future<DateTime?> pickMoveStart(BuildContext aContext, Occurrence aOccurrence) async
 {
   final now = DateTime.now();
   final date = await showDatePicker(
@@ -377,14 +393,30 @@ Future<void> _move(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence
   );
   if (date == null || !aContext.mounted)
   {
-    return;
+    return null;
   }
   final time = await showTimePicker(
     context: aContext,
     initialTime: TimeOfDay.fromDateTime(aOccurrence.startTs),
     helpText: 'planner.move_title'.tr(),
   );
-  if (time == null || !aContext.mounted)
+  if (time == null)
+  {
+    return null;
+  }
+  return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+}
+
+DateTime currentMinute()
+{
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day, now.hour, now.minute);
+}
+
+Future<void> _move(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
+{
+  final start = await pickMoveStart(aContext, aOccurrence);
+  if (start == null || !aContext.mounted)
   {
     return;
   }
@@ -395,7 +427,7 @@ Future<void> _move(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence
           aOccurrence.eventId,
           aOccurrence.occDate,
           aOccurrence.state,
-          aMovedStart: DateTime(date.year, date.month, date.day, time.hour, time.minute),
+          aMovedStart: start,
         );
     notifyPlannerChanged(aRef);
   }
@@ -417,12 +449,11 @@ Future<void> _startStatus(BuildContext aContext, WidgetRef aRef, Occurrence aOcc
   }
   try
   {
-    final now = DateTime.now();
     await aRef.read(apiProv).saveOccurrence(
           aOccurrence.eventId,
           aOccurrence.occDate,
           PlanState.done,
-          aMovedStart: DateTime(now.year, now.month, now.day, now.hour, now.minute),
+          aMovedStart: currentMinute(),
         );
     notifyPlannerChanged(aRef);
     if (aContext.mounted)

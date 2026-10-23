@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT start_ts, is_planned FROM status_marks WHERE id = $1 AND user_id = $2 AND status = 'meal'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_planned",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8afd0d1ff58374f31e61ceb2b14b38b0a05c3563f3c432cd74aa3addeead75ac"
+}

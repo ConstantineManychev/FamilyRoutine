@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -56,6 +58,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
   String? _programId;
   List<ProgramDay> _programDays = const [];
   String? _dayId;
+  bool _isScheduleFromProgram = false;
 
   Object? _loadError;
   bool _isLoading = true;
@@ -235,6 +238,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
       _programId = aProgramId;
       _dayId = null;
       _programDays = const [];
+      _isScheduleFromProgram = false;
     });
     if (aProgramId == null)
     {
@@ -250,10 +254,14 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
 
     try
     {
-      final days = (await ref.read(apiProv).getProgram(aProgramId)).days;
+      final program = await ref.read(apiProv).getProgram(aProgramId);
       if (mounted && _programId == aProgramId)
       {
-        setState(() => _programDays = days);
+        setState(()
+        {
+          _programDays = program.days;
+          _isScheduleFromProgram = _applyProgramSchedule(program);
+        });
       }
     }
     catch (aError)
@@ -263,6 +271,38 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
         showErrorSnack(context, aError);
       }
     }
+  }
+
+  bool _applyProgramSchedule(TrainingProgram aProgram)
+  {
+    final days = aProgram.days;
+    if (days.isEmpty)
+    {
+      return false;
+    }
+    switch (aProgram.mode)
+    {
+      case ScheduleMode.weekdays:
+        final mask = days.fold<int>(
+          0,
+          (aMask, aDay) => aDay.weekdays.fold<int>(aMask, (aBits, aWeekday) => aBits | (1 << (aWeekday - DateTime.monday))),
+        );
+        if (mask == 0)
+        {
+          return false;
+        }
+        _repeat = PlanRepeat.weekly;
+        _weekdayMask = mask & _fullWeekMask;
+        _everyCtrl.text = '1';
+      case ScheduleMode.intervals:
+        final gap = days.map((aDay) => aDay.restDaysAfter).reduce(math.min) + 1;
+        _repeat = PlanRepeat.daily;
+        _everyCtrl.text = '${gap.clamp(1, _maxRepeatEvery)}';
+      case ScheduleMode.queue:
+        return false;
+    }
+    _dayId = null;
+    return true;
   }
 
   void _toggleWeekday(int aBit)
@@ -517,6 +557,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
         ),
         gap,
         DropdownButtonFormField<PlanRepeat>(
+          key: ValueKey('repeat:$_repeat'),
           initialValue: _repeat,
           isExpanded: true,
           decoration: _decoration('planner.repeat'),
@@ -593,6 +634,15 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
             ],
             onChanged: (aValue) => setState(() => _dayId = aValue),
           ),
+          if (_isScheduleFromProgram)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'planner.program_schedule'.tr(),
+                key: const ValueKey('editor.program_schedule'),
+                style: TextStyle(fontSize: 12, color: context.palette.inkMuted),
+              ),
+            ),
         ],
         gap,
         TextField(

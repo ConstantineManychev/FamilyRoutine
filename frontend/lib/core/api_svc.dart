@@ -1284,6 +1284,12 @@ class ApiSvc
         if (aMovedStart != null) 'moved_start': aMovedStart.toUtc().toIso8601String(),
       });
 
+  Future<String> openOccurrenceBlock(String aEventId, DateTime aOccDate) async
+  {
+    final res = await _dio.post('/api/plan/events/$aEventId/occurrences/${dateWire(aOccDate)}/block');
+    return (res.data as Map<String, dynamic>)['mark_id'] as String;
+  }
+
   Future<WorkoutSession> startOccurrence(String aEventId, DateTime aOccDate) async
   {
     final res = await _dio.post('/api/plan/events/$aEventId/occurrences/${dateWire(aOccDate)}/start');

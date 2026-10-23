@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT i.state AS \"state: PlanState\", i.moved_date, i.moved_time, i.session_id, i.is_session_auto,\n               m.id AS \"mark_id?\", m.is_planned AS \"is_planned?\", m.start_ts AS \"mark_start?\", m.end_ts AS mark_end\n        FROM plan_instances i\n        LEFT JOIN status_marks m ON m.id = i.status_mark_id\n        WHERE i.event_id = $1 AND i.occ_date = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state: PlanState",
+        "type_info": {
+          "Custom": {
+            "name": "plan_state_t",
+            "kind": {
+              "Enum": [
+                "planned",
+                "done",
+                "skipped"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "moved_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "moved_time",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 3,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_session_auto",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "mark_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_planned?",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "mark_start?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "mark_end",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "24c68393ddd6977dd02fbf2264d7c53e07c84cce901f77686cb094cdc805fe25"
+}

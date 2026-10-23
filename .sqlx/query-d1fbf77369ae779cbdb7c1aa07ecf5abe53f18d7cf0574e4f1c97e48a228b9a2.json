@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH food AS (\n            SELECT me.user_id, me.kcal::float8 AS kcal,\n                   COALESCE(m.start_ts, me.created_ts) AS start_ts,\n                   CASE WHEN m.id IS NULL THEN me.created_ts\n                        ELSE COALESCE(m.end_ts, m.start_ts + make_interval(mins => $4)) END AS end_ts\n            FROM meal_entries me\n            LEFT JOIN status_marks m ON m.id = me.status_mark_id\n            WHERE me.user_id = ANY($1) AND NOT COALESCE(m.is_planned, FALSE)\n        )\n        SELECT user_id AS \"user_id!\", start_ts AS \"start_ts!\", end_ts AS \"end_ts!\", kcal AS \"kcal!\"\n        FROM food\n        WHERE start_ts < $3 AND end_ts >= $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "start_ts!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "end_ts!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "kcal!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d1fbf77369ae779cbdb7c1aa07ecf5abe53f18d7cf0574e4f1c97e48a228b9a2"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT id\n                FROM workout_sessions\n                WHERE user_id = $1\n                  AND (status_mark_id = $2 OR (NOT $5 AND started_ts >= $3 AND started_ts < COALESCE($4, NOW())))\n                ORDER BY (status_mark_id IS NOT DISTINCT FROM $2) DESC, started_ts DESC\n                LIMIT 1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f451a56e128685907231381150b3283c641112153bf82dfe6982e1cf7bd2a04e"
+}

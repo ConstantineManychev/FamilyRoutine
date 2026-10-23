@@ -248,6 +248,10 @@ pub fn build_router(a_state: AppState) -> Router
             post(planner_handlers::start_occurrence),
         )
         .route(
+            "/plan/events/:id/occurrences/:date/block",
+            post(planner_handlers::ensure_block),
+        )
+        .route(
             "/families",
             get(fam_handlers::list_families).post(fam_handlers::create_family),
         )

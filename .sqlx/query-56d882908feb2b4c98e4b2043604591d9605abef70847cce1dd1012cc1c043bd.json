@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT d.id, d.name, p.id AS program_id, p.name AS program_name\n        FROM program_days d JOIN training_programs p ON p.id = d.program_id\n        WHERE d.id = $1 AND p.user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "program_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "program_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "56d882908feb2b4c98e4b2043604591d9605abef70847cce1dd1012cc1c043bd"
+}

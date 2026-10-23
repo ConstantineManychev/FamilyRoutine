@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE status_marks SET end_ts = $3\n        WHERE user_id = $1 AND id <> $2 AND NOT is_planned AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $3)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4b2fcb02ad7bd18a5ce63ebda1b88a1dcfd433e7c8930af34314ab94b504c812"
+}
