@@ -4,6 +4,7 @@ import 'package:family_routine/core/api_svc.dart';
 import 'package:family_routine/core/token_store.dart';
 import 'package:family_routine/domain/models.dart';
 import 'package:family_routine/ui/common/app_theme.dart';
+import 'package:family_routine/ui/planner/plan_content_editor.dart';
 import 'package:family_routine/ui/planner/plan_event_editor_screen.dart';
 import 'package:family_routine/ui/planner/planner_common.dart';
 import 'package:flutter/material.dart';
@@ -238,5 +239,54 @@ void main()
         .toList();
     expect(selected, [true, false, true, false, true, false, false]);
     expect(aTester.takeException(), isNull);
+  });
+
+  testWidgets('work plans collect a to-do list that is sent only for work', (aTester) async
+  {
+    final draft = PlanContentDraft();
+    await aTester.pumpWidget(_localized(PlanContentEditor(category: RoutineStatus.work, draft: draft)));
+    await aTester.pumpAndSettle();
+
+    await aTester.enterText(find.byKey(const ValueKey('plan.task_field')), '  Отчёт  ');
+    await aTester.tap(find.byKey(const ValueKey('plan.add_task')));
+    await aTester.pump();
+    await aTester.enterText(find.byKey(const ValueKey('plan.task_field')), 'Созвон');
+    await aTester.testTextInput.receiveAction(TextInputAction.done);
+    await aTester.pump();
+
+    expect(draft.tasks, ['Отчёт', 'Созвон']);
+    expect(find.text('Отчёт'), findsOneWidget);
+    await aTester.tap(find.descendant(of: find.byKey(const ValueKey('plan.task.0')), matching: find.byType(IconButton)));
+    await aTester.pump();
+    expect(draft.tasks, ['Созвон']);
+    expect(draft.toJson(RoutineStatus.work), {
+      'foods': const [],
+      'tasks': [
+        {'title': 'Созвон'},
+      ],
+      'studies': const [],
+    });
+    expect(draft.toJson(RoutineStatus.meal)['tasks'], isEmpty);
+  });
+
+  test('plan foods round-trip into the inputs the server expects', ()
+  {
+    final content = PlanContent.fromJson({
+      'foods': [
+        {'id': 'f1', 'source': 'item', 'item_id': 'i1', 'title': 'Гречка', 'grams': '200', 'total': {'kcal': '220', 'prot': '8', 'fat': '2', 'carb': '42'}},
+        {'id': 'f2', 'source': 'dish', 'dish_id': 'd1', 'title': 'Борщ', 'grams': '300', 'portions': '1.5', 'total': {'kcal': '180', 'prot': '6', 'fat': '5', 'carb': '20'}},
+        {'id': 'f3', 'source': 'quick', 'title': 'Компот', 'total': {'kcal': '80', 'prot': '0', 'fat': '0', 'carb': '19.5'}},
+      ],
+      'total': {'kcal': '480', 'prot': '14', 'fat': '7', 'carb': '81.5'},
+    });
+    final draft = PlanContentDraft.of(content);
+    expect(draft.kcal, 480);
+    expect(draft.toJson(RoutineStatus.meal)['foods'], [
+      {'item_id': 'i1', 'grams': '200'},
+      {'dish_id': 'd1', 'portions': '1.5'},
+      {
+        'quick': {'title': 'Компот', 'kcal': '80', 'prot': '0', 'fat': '0', 'carb': '19.5'},
+      },
+    ]);
   });
 }

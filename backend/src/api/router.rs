@@ -241,15 +241,15 @@ pub fn build_router(a_state: AppState) -> Router
         )
         .route(
             "/plan/events/:id/occurrences/:date",
-            put(planner_handlers::save_occurrence),
+            get(planner_handlers::occurrence_details).put(planner_handlers::save_occurrence),
+        )
+        .route(
+            "/plan/events/:id/occurrences/:date/content",
+            put(planner_handlers::save_occurrence_content).delete(planner_handlers::reset_occurrence_content),
         )
         .route(
             "/plan/events/:id/occurrences/:date/start",
             post(planner_handlers::start_occurrence),
-        )
-        .route(
-            "/plan/events/:id/occurrences/:date/block",
-            post(planner_handlers::ensure_block),
         )
         .route(
             "/families",

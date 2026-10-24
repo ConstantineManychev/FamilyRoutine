@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE plan_instances SET day_id = NULL\n        WHERE event_id = $1 AND day_id IS NOT NULL\n          AND NOT EXISTS (SELECT 1 FROM program_days d WHERE d.id = day_id AND d.program_id IS NOT DISTINCT FROM $2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6e1699d1c15d5c5260e623bed4c554be3a14e6d448d76ab5f0a8ff6677d6931"
+}

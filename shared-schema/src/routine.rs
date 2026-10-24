@@ -74,7 +74,6 @@ pub struct MarkDetailsDto
     pub owner_name: String,
     pub is_mine: bool,
     pub can_edit: bool,
-    pub is_planned: bool,
     pub plan: Option<OccurrenceDto>,
     pub is_details_hidden: bool,
     pub workout: Option<SessionDto>,

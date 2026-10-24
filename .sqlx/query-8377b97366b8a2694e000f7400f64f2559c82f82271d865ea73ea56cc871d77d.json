@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT before.id AS before_id, after.id AS after_id, after.end_ts AS after_end\n        FROM status_marks before\n        JOIN status_marks after\n          ON after.user_id = before.user_id AND after.start_ts = $3\n         AND after.status = before.status AND after.note IS NOT DISTINCT FROM before.note\n        WHERE before.user_id = $1 AND before.end_ts = $2\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "before_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "after_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "after_end",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "8377b97366b8a2694e000f7400f64f2559c82f82271d865ea73ea56cc871d77d"
+}

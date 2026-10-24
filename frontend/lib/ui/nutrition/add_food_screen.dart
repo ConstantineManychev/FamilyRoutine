@@ -21,13 +21,30 @@ const double _maxQuickKcal = 10000;
 const double _maxQuickGrams = 1000;
 const int _maxTitleLen = 200;
 
+class PickedFood
+{
+  final String title;
+  final double kcal;
+  final Map<String, dynamic> payload;
+
+  const PickedFood({required this.title, required this.kcal, required this.payload});
+}
+
+Future<PickedFood?> pickPlanFood(BuildContext aContext, {String? aPersonId})
+{
+  return Navigator.of(aContext).push<PickedFood>(
+    MaterialPageRoute(builder: (_) => AddFoodScreen(date: DateTime.now(), personId: aPersonId, isPicking: true)),
+  );
+}
+
 class AddFoodScreen extends ConsumerStatefulWidget
 {
   final DateTime date;
   final String? markId;
   final String? personId;
+  final bool isPicking;
 
-  const AddFoodScreen({super.key, required this.date, this.markId, this.personId});
+  const AddFoodScreen({super.key, required this.date, this.markId, this.personId, this.isPicking = false});
 
   @override
   ConsumerState<AddFoodScreen> createState() => _AddFoodScreenState();
@@ -52,9 +69,23 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   void initState()
   {
     super.initState();
-    _loadMeals();
+    if (!widget.isPicking)
+    {
+      _loadMeals();
+    }
     _loadRecent();
     _loadDishes();
+  }
+
+  double _kcalOf(Macros aPer100, AmountResult aResult, double? aPortionG)
+  {
+    final grams = aResult.grams ?? (aResult.portions ?? 0) * (aPortionG ?? 0);
+    return aPer100.kcal * grams / 100;
+  }
+
+  void _pick(String aTitle, double aKcal, Map<String, dynamic> aPayload)
+  {
+    Navigator.of(context).pop(PickedFood(title: aTitle, kcal: aKcal, payload: aPayload));
   }
 
   Future<void> _loadMeals({String? aMarkId}) async
@@ -238,12 +269,18 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     {
       return;
     }
+    if (widget.isPicking)
+    {
+      final per100 = Macros.fromNutrition(item.nutrition);
+      _pick(item.name, _kcalOf(per100, result, item.nutrition.pieceG), {'item_id': item.id, ...result.toJson()});
+      return;
+    }
     await _save(item.name, {'item_id': item.id, ...result.toJson()});
   }
 
   Future<void> _pickDish(Dish aDish, {double? aGrams, double? aPortions}) async
   {
-    final batches = await dishBatches(ref.read(apiProv), aDish.id);
+    final batches = widget.isPicking ? const <CookBatch>[] : await dishBatches(ref.read(apiProv), aDish.id);
     if (!mounted)
     {
       return;
@@ -256,6 +293,11 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     );
     if (result == null || !mounted)
     {
+      return;
+    }
+    if (widget.isPicking)
+    {
+      _pick(aDish.name, _kcalOf(aDish.per100, result, aDish.portionG), {'dish_id': aDish.id, ...result.toJson()});
       return;
     }
     await _save(aDish.name, {'dish_id': aDish.id, ...result.toJson()});
@@ -328,7 +370,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     }
     final title = _quickTitle.text.trim();
     String? wire(TextEditingController aCtrl) => _quickValue(aCtrl)?.toString();
-    await _save(title.isEmpty ? 'nutrition.quick_title'.tr() : title, {
+    final payload = {
       'quick': {
         'title': title.isEmpty ? null : title,
         'kcal': wire(_quickKcal),
@@ -336,7 +378,13 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
         'fat': wire(_quickFat),
         'carb': wire(_quickCarb),
       },
-    });
+    };
+    if (widget.isPicking)
+    {
+      _pick(title.isEmpty ? 'nutrition.quick_title'.tr() : title, _quickValue(_quickKcal) ?? 0, payload);
+      return;
+    }
+    await _save(title.isEmpty ? 'nutrition.quick_title'.tr() : title, payload);
     if (mounted)
     {
       for (final ctrl in [_quickTitle, _quickKcal, _quickProt, _quickFat, _quickCarb])
@@ -487,7 +535,9 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     final target = _target;
     final people = ref.watch(peopleProv).valueOrNull ?? const <PersonRef>[];
     final person = people.where((aPerson) => aPerson.id == widget.personId).firstOrNull;
-    final title = 'nutrition.add_title'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(widget.date)]);
+    final title = widget.isPicking
+        ? 'planner.pick_food'.tr()
+        : 'nutrition.add_title'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(widget.date)]);
 
     return DefaultTabController(
       length: 3,
@@ -496,6 +546,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!widget.isPicking)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: meals == null || target == null

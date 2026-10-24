@@ -85,7 +85,7 @@
     "TOO_MANY_LOTS": "Trop de lots dans cette réserve",
     "PUSH_UNAVAILABLE": "Les notifications push ne sont pas configurées sur le serveur",
     "TOO_MANY_MARKS": "Trop de corrections du bilan : supprimez les anciennes.",
-    "PLANNED_MARK": "C’est un bloc prévu : marquez-le comme fait, déplacez-le ou ignorez-le via le plan."
+    "PLAN_DONE": "Le plan est déjà fait — remettez-le d’abord en plan."
   },
   "sidebar": {
     "routine": "Routine",
@@ -806,16 +806,12 @@
     "tap_to_create": "Touchez un espace libre de votre ligne ou de celle d’un enfant pour ajouter un bloc.",
     "plan": "Plan",
     "plan_tap": "Touchez pour ouvrir le plan",
-    "plans_hint": "Les blocs translucides sont des plans. Touchez un plan pour ajouter à l’avance repas, tâches ou notes ; le marquer comme fait le transforme en bloc de la journée.",
+    "plans_hint": "Les blocs translucides sont des plans. Touchez un plan pour voir son contenu, modifier ce jour ou le marquer comme fait.",
     "plan_done": "Fait",
     "plan_skipped": "Ignoré",
     "plan_waiting": "Prévu",
-    "plan_meal_hint": "C’est un plan : ajoutez ce que vous allez manger. Les calories rejoignent le bilan et le journal, et les produits sortent du stock dès que vous marquez le plan comme fait.",
-    "plan_workout_hint": "Le marquer comme fait enregistre la séance du programme avec toutes ses séries, comme si vous l’aviez faite dans l’application.",
-    "plan_block_hint": "C’est un plan : le bloc apparaît dans la journée dès que vous le marquez comme fait.",
     "plan_now": "Commencer maintenant",
-    "plan_workout": "Séance prévue : {} · {}",
-    "no_meals_plan": "Rien pour l’instant. Ajoutez ce que vous allez manger."
+    "from_plan": "Du plan : {}"
   },
   "catalog": {
     "scope": "Enregistrer dans",
@@ -1199,7 +1195,29 @@
     "series_hint": "Les modifications s'appliquent à toutes les répétitions. Pour déplacer ou passer un seul jour, utilisez le menu de l'événement dans l'agenda.",
     "minutes_short": "{} min",
     "repeats_badge": "répétition",
-    "program_schedule": "La répétition vient du calendrier du programme ; vous pouvez la modifier."
+    "program_schedule": "La répétition vient du calendrier du programme ; vous pouvez la modifier.",
+    "pick_food": "Repas du plan",
+    "content_food": "Quoi manger",
+    "content_tasks": "Tâches",
+    "content_study": "Études",
+    "add_food": "Ajouter un aliment",
+    "add_task": "Ajouter une tâche",
+    "task_hint": "Nouvelle tâche",
+    "add_study": "Ajouter un sujet",
+    "study_topic": "Sujet",
+    "study_note": "Quoi faire (facultatif)",
+    "no_topics": "Créez d’abord des sujets dans Études.",
+    "content_hint": "Cela vaut pour tout le plan. Vous pouvez le modifier pour un seul jour dans la fiche de l’événement.",
+    "content_total": "Total",
+    "content_empty": "Rien n’est défini dans le plan.",
+    "day_custom": "modifié pour ce jour",
+    "apply_hint": "Une fois marqué comme fait, le repas rejoint le journal et le bilan et sort du stock, les tâches deviennent des tâches du jour, les notes vont dans Études et la séance est enregistrée selon le programme.",
+    "open_block": "Ouvrir le bloc",
+    "edit_day": "Modifier ce jour",
+    "edit_day_title": "{} · {}",
+    "edit_day_hint": "Les changements ne concernent que ce jour ; les autres jours restent comme dans tout le plan.",
+    "training_day_same": "Comme dans le plan",
+    "reset_day": "Comme dans tout le plan"
   },
   "nutrition": {
     "title": "Journal alimentaire",

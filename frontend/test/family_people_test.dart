@@ -101,44 +101,29 @@ class _FakeApi extends ApiSvc
     savedOccurrences.add((aEventId, aState));
   }
 
-  final List<String> openedBlocks = [];
-
   @override
-  Future<String> openOccurrenceBlock(String aEventId, DateTime aOccDate) async
-  {
-    openedBlocks.add(aEventId);
-    return 'lunch-mark';
-  }
-
-  @override
-  Future<MarkDetails> getMarkDetails(String aId) async
+  Future<OccurrenceDetails> getOccurrence(String aEventId, DateTime aOccDate) async
   {
     final today = DateTime.now();
     final lunch = DateTime(today.year, today.month, today.day, 13);
     final isDone = savedOccurrences.isNotEmpty;
     final start = lunch.toUtc().toIso8601String();
     final end = lunch.add(const Duration(minutes: 30)).toUtc().toIso8601String();
-    return MarkDetails.fromJson({
-      'mark': {'id': aId, 'status': 'meal', 'note': 'Lunch', 'start_ts': start, 'end_ts': end},
-      'owner_id': 'kid',
-      'owner_name': 'Kid Test',
-      'is_mine': false,
-      'can_edit': true,
-      'is_planned': !isDone,
-      'plan': {
+    return OccurrenceDetails.fromJson({
+      'occurrence': {
         'event_id': 'lunch', 'occ_date': dateWire(lunch), 'date': dateWire(lunch), 'title': 'Lunch', 'category': 'meal',
         'timing': 'fixed', 'start_ts': start, 'end_ts': end, 'duration_min': 30, 'tz': 'UTC', 'repeat': 'daily',
-        'state': isDone ? 'done' : 'planned', 'status_mark_id': aId,
+        'state': isDone ? 'done' : 'planned', 'status_mark_id': isDone ? 'lunch-mark' : null,
       },
-      'is_details_hidden': false,
-      'meals': {
-        'total': _macros('450'),
-        'entries': [
-          {
-            'id': 'soup', 'date': dateWire(lunch), 'source': 'quick', 'title': 'Soup', 'kcal_100': null,
-            'total': _macros('450'), 'status_mark_id': aId, 'created_ts': start,
-          },
+      'owner_id': 'kid',
+      'is_custom': false,
+      'content': {
+        'foods': [
+          {'id': 'soup', 'source': 'quick', 'title': 'Soup', 'is_ml': false, 'total': _macros('450')},
         ],
+        'total': _macros('450'),
+        'tasks': const [],
+        'studies': const [],
       },
     });
   }
@@ -390,7 +375,7 @@ void main()
     await aTester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('a plan opens its block card with food and becomes a block once it is done', (aTester) async
+  testWidgets('a plan shows its content and becomes a block once it is done', (aTester) async
   {
     await EasyLocalization.ensureInitialized();
     await aTester.binding.setSurfaceSize(const Size(900, 1200));
@@ -405,22 +390,18 @@ void main()
     await aTester.tap(plan);
     await aTester.pumpAndSettle();
 
-    expect(api.openedBlocks, ['lunch']);
-    expect(find.byKey(const ValueKey('mark.plan')), findsOneWidget);
-    expect(find.text('Plan: Lunch'), findsOneWidget);
     expect(find.text('Soup'), findsOneWidget);
-    expect(find.byKey(const ValueKey('mark.add_food')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mark.link_meals')), findsNothing);
-    expect(find.byKey(const ValueKey('mark.save')), findsNothing);
-    expect(find.byKey(const ValueKey('mark.delete')), findsNothing);
-    expect(find.textContaining('once you mark the plan as done'), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.total')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.edit_day')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.edit_series')), findsOneWidget);
+    expect(find.textContaining('the food goes to the diary'), findsOneWidget);
 
-    await aTester.tap(find.byKey(const ValueKey('mark.plan.done')));
+    await aTester.tap(find.byKey(const ValueKey('plan.done')));
     await aTester.pumpAndSettle();
     expect(api.savedOccurrences.single, ('lunch', PlanState.done));
-    expect(find.byKey(const ValueKey('mark.plan.undo')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mark.save')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mark.link_meals')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.undo')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.open_block')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan.edit_day')), findsNothing);
 
     await aTester.tapAt(const Offset(10, 10));
     await aTester.pumpAndSettle();

@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO study_notes (topic_id, user_id, body, note_ts, plan_event_id, plan_occ_date)\n                SELECT topic_id, $3, note, $4, event_id, $5\n                FROM plan_studies\n                WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2 AND note IS NOT NULL\n                ORDER BY position\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Uuid",
+        "Timestamptz",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4efbcf398277d0388b3885f251d72512e323e76d498e0f2041d568a0c108b06e"
+}

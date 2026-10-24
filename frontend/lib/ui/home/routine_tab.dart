@@ -44,28 +44,31 @@ class _RoutineTabState extends ConsumerState<RoutineTab> with AutomaticKeepAlive
     aContext.locale;
     final fams = ref.watch(famsProv).valueOrNull ?? const <FamDto>[];
 
-    return ListView(
+    return SingleChildScrollView(
       key: const PageStorageKey('home.routine'),
       padding: tabPadding(aContext),
-      children: [
-        const TodayPlanBlock(),
-        const SizedBox(height: _blockGap),
-        const WorkTodayBlock(),
-        const SizedBox(height: _blockGap),
-        const StudyTodayBlock(),
-        for (final fam in fams) ...[
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const TodayPlanBlock(),
           const SizedBox(height: _blockGap),
-          FamilyTimelineCard(key: ValueKey('timeline:${fam.id}'), familyId: fam.id, title: fam.name),
+          const WorkTodayBlock(),
+          const SizedBox(height: _blockGap),
+          const StudyTodayBlock(),
+          for (final fam in fams) ...[
+            const SizedBox(height: _blockGap),
+            FamilyTimelineCard(key: ValueKey('timeline:${fam.id}'), familyId: fam.id, title: fam.name),
+          ],
+          const SizedBox(height: _blockGap),
+          const EnergyChartBlock(),
+          const SizedBox(height: _blockGap),
+          const NutritionTodayBlock(),
+          const SizedBox(height: _blockGap),
+          const StockTodayBlock(),
+          const SizedBox(height: _blockGap),
+          const TrainingPeopleBlock(),
         ],
-        const SizedBox(height: _blockGap),
-        const EnergyChartBlock(),
-        const SizedBox(height: _blockGap),
-        const NutritionTodayBlock(),
-        const SizedBox(height: _blockGap),
-        const StockTodayBlock(),
-        const SizedBox(height: _blockGap),
-        const TrainingPeopleBlock(),
-      ],
+      ),
     );
   }
 }

@@ -85,7 +85,7 @@
     "TOO_MANY_LOTS": "Zu viele Chargen in diesem Lager",
     "PUSH_UNAVAILABLE": "Push-Benachrichtigungen sind auf dem Server nicht eingerichtet",
     "TOO_MANY_MARKS": "Zu viele Bilanzkorrekturen: Löschen Sie alte.",
-    "PLANNED_MARK": "Das ist ein geplanter Block: Markiere ihn über den Plan als erledigt, verschiebe oder überspringe ihn."
+    "PLAN_DONE": "Der Plan ist bereits erledigt – setze ihn zuerst zurück."
   },
   "sidebar": {
     "routine": "Routine",
@@ -806,16 +806,12 @@
     "tap_to_create": "Tippen Sie auf eine freie Stelle in Ihrer Zeile oder der eines Kindes, um einen Block hinzuzufügen.",
     "plan": "Plan",
     "plan_tap": "Tippen, um den Plan zu öffnen",
-    "plans_hint": "Halbtransparente Blöcke sind Pläne. Tippe auf einen Plan, um vorab Essen, Aufgaben oder Notizen hinzuzufügen; mit „Erledigt“ wird er zu einem Tagesblock.",
+    "plans_hint": "Halbtransparente Blöcke sind Pläne. Tippe auf einen Plan, um seinen Inhalt zu sehen, diesen Tag zu ändern oder ihn als erledigt zu markieren.",
     "plan_done": "Erledigt",
     "plan_skipped": "Übersprungen",
     "plan_waiting": "Geplant",
-    "plan_meal_hint": "Das ist ein Plan: Füge hinzu, was du essen willst. Die Kalorien fließen in Bilanz und Tagebuch, und die Lebensmittel werden aus dem Vorrat abgebucht, sobald du den Plan als erledigt markierst.",
-    "plan_workout_hint": "Mit „Erledigt“ wird das Training des Programms mit allen Sätzen erfasst – so, als hättest du es in der App absolviert.",
-    "plan_block_hint": "Das ist ein Plan: Der Block erscheint im Tagesablauf, sobald du ihn als erledigt markierst.",
     "plan_now": "Jetzt starten",
-    "plan_workout": "Geplantes Training: {} · {}",
-    "no_meals_plan": "Noch leer. Füge hinzu, was du essen willst."
+    "from_plan": "Aus dem Plan: {}"
   },
   "catalog": {
     "scope": "Speichern in",
@@ -1199,7 +1195,29 @@
     "series_hint": "Änderungen gelten für alle Wiederholungen. Einen einzelnen Tag verschieben oder überspringen Sie im Menü des Termins im Plan.",
     "minutes_short": "{} Min.",
     "repeats_badge": "Wiederholung",
-    "program_schedule": "Die Wiederholung stammt aus dem Programmplan und kann geändert werden."
+    "program_schedule": "Die Wiederholung stammt aus dem Programmplan und kann geändert werden.",
+    "pick_food": "Essen für den Plan",
+    "content_food": "Was essen",
+    "content_tasks": "Aufgaben",
+    "content_study": "Lernen",
+    "add_food": "Essen hinzufügen",
+    "add_task": "Aufgabe hinzufügen",
+    "task_hint": "Neue Aufgabe",
+    "add_study": "Thema hinzufügen",
+    "study_topic": "Thema",
+    "study_note": "Was tun (optional)",
+    "no_topics": "Lege zuerst Themen unter „Lernen“ an.",
+    "content_hint": "Das gilt für den ganzen Plan. Für einen einzelnen Tag kannst du es in der Terminkarte ändern.",
+    "content_total": "Gesamt",
+    "content_empty": "Im Plan ist nichts festgelegt.",
+    "day_custom": "für diesen Tag geändert",
+    "apply_hint": "Mit „Erledigt“ kommt das Essen ins Tagebuch und in die Bilanz und wird aus dem Vorrat abgebucht, Aufgaben werden Tagesaufgaben, Notizen kommen ins Lernen und das Training wird nach Programm erfasst.",
+    "open_block": "Block öffnen",
+    "edit_day": "Diesen Tag ändern",
+    "edit_day_title": "{} · {}",
+    "edit_day_hint": "Änderungen gelten nur für diesen Tag; andere Tage bleiben wie im ganzen Plan.",
+    "training_day_same": "Wie im Plan",
+    "reset_day": "Wie im ganzen Plan"
   },
   "nutrition": {
     "title": "Ernährungstagebuch",

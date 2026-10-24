@@ -10,6 +10,7 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/feedback.dart';
 import '../common/range_days.dart';
+import '../planner/plan_occurrence_sheet.dart';
 import '../planner/planner_common.dart';
 import 'dash_card.dart';
 import 'mark_sheet.dart';
@@ -148,7 +149,7 @@ class _FamilyTimelineCardState extends ConsumerState<FamilyTimelineCard>
 
   Future<void> _openPlan(Occurrence aPlan) async
   {
-    await openOccurrenceBlock(context, ref, aPlan);
+    await showPlanOccurrence(context, ref, aPlan);
   }
 
   @override

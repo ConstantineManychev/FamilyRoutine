@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT i.is_custom, i.moved_date, i.day_id, d.name AS \"day_name?\"\n        FROM plan_instances i LEFT JOIN program_days d ON d.id = i.day_id\n        WHERE i.event_id = $1 AND i.occ_date = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_custom",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "moved_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "day_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "day_name?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "cd4f68e5d5b92a29090667c001e7743480bb8a24a2eb332bb79cc76a85dba8eb"
+}

@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, user_id, status AS \"status: RoutineStatus\", note, start_ts, end_ts\n        FROM status_marks\n        WHERE user_id = ANY($1) AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $2)\n        ORDER BY user_id, start_ts\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: RoutineStatus",
+        "type_info": {
+          "Custom": {
+            "name": "curr_status_t",
+            "kind": {
+              "Enum": [
+                "home",
+                "work",
+                "school",
+                "gym",
+                "transit",
+                "other",
+                "sleep",
+                "meal",
+                "leisure"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "note",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "start_ts",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "end_ts",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "d0313952886120c1c56a839bd78df157c9d74ea33d04ed4733dde5e5cdfbce00"
+}

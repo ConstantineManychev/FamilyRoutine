@@ -85,7 +85,7 @@
     "TOO_MANY_LOTS": "Too many lots in this store",
     "PUSH_UNAVAILABLE": "Push notifications are not configured on the server",
     "TOO_MANY_MARKS": "Too many balance corrections: delete old ones.",
-    "PLANNED_MARK": "This is a planned block: mark it as done, move it or skip it through the plan."
+    "PLAN_DONE": "The plan is already done — return it to the plan first."
   },
   "sidebar": {
     "routine": "Routine",
@@ -806,16 +806,12 @@
     "tap_to_create": "Tap an empty spot in your row or a child’s row to add a block.",
     "plan": "Plan",
     "plan_tap": "Tap to open the plan",
-    "plans_hint": "Translucent blocks are plans. Tap a plan to add food, tasks or notes in advance; marking it done turns it into a routine block.",
+    "plans_hint": "Translucent blocks are plans. Tap a plan to see what it holds, change this day or mark it done.",
     "plan_done": "Done",
     "plan_skipped": "Skipped",
     "plan_waiting": "Planned",
-    "plan_meal_hint": "This is a plan: add what you are going to eat. The calories reach the balance and the diary, and the food leaves your stock, once you mark the plan as done.",
-    "plan_workout_hint": "Marking it done records the programme workout with all its sets, just as if you had trained in the app.",
-    "plan_block_hint": "This is a plan: the block appears in your routine once you mark it as done.",
     "plan_now": "Start now",
-    "plan_workout": "Planned workout: {} · {}",
-    "no_meals_plan": "Nothing yet. Add what you are going to eat."
+    "from_plan": "From the plan: {}"
   },
   "catalog": {
     "scope": "Keep in",
@@ -1199,7 +1195,29 @@
     "series_hint": "Changes apply to every repeat. To move or skip a single day, use the event menu in the schedule.",
     "minutes_short": "{} min",
     "repeats_badge": "repeats",
-    "program_schedule": "The repeat comes from the programme schedule; you can change it."
+    "program_schedule": "The repeat comes from the programme schedule; you can change it.",
+    "pick_food": "Food for the plan",
+    "content_food": "What to eat",
+    "content_tasks": "Tasks",
+    "content_study": "Study",
+    "add_food": "Add food",
+    "add_task": "Add task",
+    "task_hint": "New task",
+    "add_study": "Add topic",
+    "study_topic": "Topic",
+    "study_note": "What to do (optional)",
+    "no_topics": "Create topics in Study first.",
+    "content_hint": "This is set for the whole plan. You can change it for a single day in the event card.",
+    "content_total": "Total",
+    "content_empty": "Nothing is set in the plan.",
+    "day_custom": "changed for this day",
+    "apply_hint": "When you mark it done, the food goes to the diary and balance and leaves your stock, tasks become tasks of the day, notes go to Study and the workout is recorded from the programme.",
+    "open_block": "Open block",
+    "edit_day": "Change this day",
+    "edit_day_title": "{} · {}",
+    "edit_day_hint": "Changes apply to this day only; other days stay as in the whole plan.",
+    "training_day_same": "As in the plan",
+    "reset_day": "As in the whole plan"
   },
   "nutrition": {
     "title": "Food diary",

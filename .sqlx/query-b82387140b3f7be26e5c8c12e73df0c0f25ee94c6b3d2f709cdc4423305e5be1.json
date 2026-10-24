@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM meal_entries WHERE plan_event_id = $1 AND plan_occ_date = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b82387140b3f7be26e5c8c12e73df0c0f25ee94c6b3d2f709cdc4423305e5be1"
+}

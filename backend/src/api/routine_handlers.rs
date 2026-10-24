@@ -12,8 +12,8 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
-use crate::api::nutrition_handlers::{load_norm, mark_entries, meal_mark};
-use crate::api::planner_handlers::{load_occurrences, mark_plan};
+use crate::api::nutrition_handlers::{load_norm, mark_entries, require_meal_mark};
+use crate::api::planner_handlers::{load_occurrences, mark_plan, reopen_plan_by_mark};
 use crate::api::study_handlers::mark_study;
 use crate::api::training_handlers::load_session;
 use crate::api::work_handlers::mark_work;
@@ -51,7 +51,6 @@ struct OwnedMarkRow
     note: Option<String>,
     start_ts: DateTime<Utc>,
     end_ts: Option<DateTime<Utc>>,
-    is_planned: bool,
     first_name: String,
     last_name: String,
 }
@@ -89,7 +88,7 @@ pub async fn create_mark(
     lock_user_marks(&mut tx, person_id).await?;
 
     let recent = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "count!" FROM status_marks WHERE user_id = $1 AND start_ts > $2 AND NOT is_planned"#,
+        r#"SELECT COUNT(*) AS "count!" FROM status_marks WHERE user_id = $1 AND start_ts > $2"#,
         person_id,
         now - Duration::days(MAX_PAST_DAYS + 1)
     )
@@ -117,9 +116,10 @@ pub async fn update_mark(
     let mut tx = a_state.db.begin().await?;
     let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
     lock_user_marks(&mut tx, owner_id).await?;
-    let current = sqlx::query!(
+    let current = sqlx::query_as!(
+        StatusMarkDto,
         r#"
-        SELECT status AS "status: RoutineStatus", start_ts, end_ts, is_planned
+        SELECT id, status AS "status: RoutineStatus", note, start_ts, end_ts
         FROM status_marks
         WHERE id = $1 AND user_id = $2
         FOR UPDATE
@@ -130,10 +130,6 @@ pub async fn update_mark(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(ApiError::NotFound)?;
-    if current.is_planned
-    {
-        return Err(ApiError::Conflict("PLANNED_MARK"));
-    }
 
     let is_time_change = a_req.start_ts.is_some() || a_req.end_ts.is_some() || a_req.is_open_end;
     let (start, end) = if is_time_change
@@ -208,8 +204,7 @@ async fn reschedule(
         r#"
         SELECT id, start_ts, end_ts
         FROM status_marks
-        WHERE user_id = $1 AND id <> $2 AND NOT is_planned AND start_ts >= $3
-          AND ($4::timestamptz IS NULL OR start_ts < $4)
+        WHERE user_id = $1 AND id <> $2 AND start_ts >= $3 AND ($4::timestamptz IS NULL OR start_ts < $4)
         ORDER BY start_ts
         "#,
         a_user_id,
@@ -249,7 +244,7 @@ async fn reschedule(
     sqlx::query!(
         r#"
         UPDATE status_marks SET end_ts = $3
-        WHERE user_id = $1 AND id <> $2 AND NOT is_planned AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $3)
+        WHERE user_id = $1 AND id <> $2 AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $3)
         "#,
         a_user_id,
         a_id,
@@ -274,7 +269,7 @@ pub async fn current_mark(
         r#"
         SELECT id, status AS "status: RoutineStatus", note, start_ts, end_ts
         FROM status_marks
-        WHERE user_id = $1 AND NOT is_planned AND start_ts <= NOW() AND (end_ts IS NULL OR end_ts > NOW())
+        WHERE user_id = $1 AND start_ts <= NOW() AND (end_ts IS NULL OR end_ts > NOW())
         ORDER BY start_ts DESC
         LIMIT 1
         "#,
@@ -319,10 +314,7 @@ pub async fn link_mark_meals(
 
     let mut tx = a_state.db.begin().await?;
     let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
-    if meal_mark(&mut tx, owner_id, a_id).await?.is_planned
-    {
-        return Err(ApiError::Conflict("PLANNED_MARK"));
-    }
+    require_meal_mark(&mut tx, owner_id, a_id).await?;
     let found = sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!" FROM meal_entries WHERE user_id = $1 AND id = ANY($2)"#,
         owner_id,
@@ -370,7 +362,7 @@ async fn build_details(
     let row = sqlx::query_as!(
         OwnedMarkRow,
         r#"
-        SELECT m.id, m.user_id, m.status AS "status: RoutineStatus", m.note, m.start_ts, m.end_ts, m.is_planned,
+        SELECT m.id, m.user_id, m.status AS "status: RoutineStatus", m.note, m.start_ts, m.end_ts,
                u.first_name, u.last_name
         FROM status_marks m
         JOIN users u ON u.id = m.user_id
@@ -384,10 +376,6 @@ async fn build_details(
 
     let is_mine = row.user_id == a_viewer_id;
     let can_edit = is_editor(a_conn, a_viewer_id, row.user_id).await?;
-    if row.is_planned && !can_edit
-    {
-        return Err(ApiError::NotFound);
-    }
     let plan = if can_edit
     {
         mark_plan(a_conn, row.user_id, row.id).await?
@@ -411,15 +399,14 @@ async fn build_details(
                 SELECT id
                 FROM workout_sessions
                 WHERE user_id = $1
-                  AND (status_mark_id = $2 OR (NOT $5 AND started_ts >= $3 AND started_ts < COALESCE($4, NOW())))
+                  AND (status_mark_id = $2 OR (started_ts >= $3 AND started_ts < COALESCE($4, NOW())))
                 ORDER BY (status_mark_id IS NOT DISTINCT FROM $2) DESC, started_ts DESC
                 LIMIT 1
                 "#,
                 row.user_id,
                 row.id,
                 row.start_ts,
-                row.end_ts,
-                row.is_planned
+                row.end_ts
             )
             .fetch_optional(&mut *a_conn)
             .await?;
@@ -464,7 +451,6 @@ async fn build_details(
         owner_name: format!("{} {}", row.first_name, row.last_name),
         is_mine,
         can_edit,
-        is_planned: row.is_planned,
         plan,
         is_details_hidden,
         workout,
@@ -482,14 +468,7 @@ pub async fn delete_mark(
 {
     let mut tx = a_state.db.begin().await?;
     let owner_id = mark_owner(&mut tx, a_user.user_id, a_id).await?;
-    let is_planned = sqlx::query_scalar!("SELECT is_planned FROM status_marks WHERE id = $1", a_id)
-        .fetch_one(&mut *tx)
-        .await?;
-    if is_planned
-    {
-        return Err(ApiError::Conflict("PLANNED_MARK"));
-    }
-    let is_plan_reopened = reopen_plan_of_mark(&mut tx, a_id).await?;
+    let is_plan_reopened = reopen_plan_by_mark(&mut tx, a_id).await?.is_some();
     let deleted = sqlx::query!(
         "DELETE FROM status_marks WHERE id = $1 AND user_id = $2",
         a_id,
@@ -509,46 +488,6 @@ pub async fn delete_mark(
     tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn reopen_plan_of_mark(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<bool, ApiError>
-{
-    sqlx::query!(
-        r#"
-        DELETE FROM workout_sessions
-        WHERE id IN (SELECT session_id FROM plan_instances WHERE status_mark_id = $1 AND is_session_auto)
-        "#,
-        a_mark_id
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    let reopened = sqlx::query!(
-        r#"
-        UPDATE plan_instances
-        SET state = 'planned', done_ts = NULL, status_mark_id = NULL, is_session_auto = FALSE, updated_ts = NOW()
-        WHERE status_mark_id = $1
-        RETURNING event_id, occ_date
-        "#,
-        a_mark_id
-    )
-    .fetch_optional(&mut *a_conn)
-    .await?;
-    let Some(reopened) = reopened
-    else
-    {
-        return Ok(false);
-    };
-    sqlx::query!(
-        r#"
-        DELETE FROM plan_instances
-        WHERE event_id = $1 AND occ_date = $2 AND state = 'planned' AND moved_date IS NULL AND session_id IS NULL
-        "#,
-        reopened.event_id,
-        reopened.occ_date
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    Ok(true)
 }
 
 pub struct MarkLinks
@@ -583,21 +522,17 @@ pub async fn mark_links(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<Ma
     })
 }
 
-pub async fn withdraw_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<(), ApiError>
+pub async fn lift_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id: Uuid) -> Result<(), ApiError>
 {
     lock_user_marks(a_conn, a_user_id).await?;
-    let withdrawn = sqlx::query!(
-        r#"
-        UPDATE status_marks SET is_planned = TRUE
-        WHERE id = $1 AND user_id = $2 AND NOT is_planned
-        RETURNING start_ts, end_ts
-        "#,
+    let lifted = sqlx::query!(
+        "DELETE FROM status_marks WHERE id = $1 AND user_id = $2 RETURNING start_ts, end_ts",
         a_mark_id,
         a_user_id
     )
     .fetch_optional(&mut *a_conn)
     .await?;
-    let Some((start, end)) = withdrawn.and_then(|withdrawn| withdrawn.end_ts.map(|end| (withdrawn.start_ts, end)))
+    let Some((start, end)) = lifted.and_then(|lifted| lifted.end_ts.map(|end| (lifted.start_ts, end)))
     else
     {
         return Ok(());
@@ -608,9 +543,9 @@ pub async fn withdraw_mark(a_conn: &mut PgConnection, a_user_id: Uuid, a_mark_id
         SELECT before.id AS before_id, after.id AS after_id, after.end_ts AS after_end
         FROM status_marks before
         JOIN status_marks after
-          ON after.user_id = before.user_id AND after.start_ts = $3 AND NOT after.is_planned
+          ON after.user_id = before.user_id AND after.start_ts = $3
          AND after.status = before.status AND after.note IS NOT DISTINCT FROM before.note
-        WHERE before.user_id = $1 AND before.end_ts = $2 AND NOT before.is_planned
+        WHERE before.user_id = $1 AND before.end_ts = $2
         LIMIT 1
         "#,
         a_user_id,
@@ -699,7 +634,7 @@ pub async fn timeline(
         r#"
         SELECT id, user_id, status AS "status: RoutineStatus", note, start_ts, end_ts
         FROM status_marks
-        WHERE user_id = ANY($1) AND NOT is_planned AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $2)
+        WHERE user_id = ANY($1) AND start_ts < $3 AND (end_ts IS NULL OR end_ts > $2)
         ORDER BY user_id, start_ts
         "#,
         &ids,
@@ -766,34 +701,30 @@ pub async fn timeline(
     }))
 }
 
-struct OuterMark
-{
-    status: RoutineStatus,
-    note: Option<String>,
-    end_ts: Option<DateTime<Utc>>,
-}
-
-async fn clear_span(
+pub async fn place_mark(
     a_conn: &mut PgConnection,
     a_user_id: Uuid,
+    a_status: RoutineStatus,
+    a_note: Option<String>,
     a_start: DateTime<Utc>,
     a_end: Option<DateTime<Utc>>,
-) -> Result<(Option<DateTime<Utc>>, Option<OuterMark>), ApiError>
+) -> Result<StatusMarkDto, ApiError>
 {
+    lock_user_marks(a_conn, a_user_id).await?;
+
     sqlx::query!(
-        "DELETE FROM status_marks WHERE user_id = $1 AND start_ts = $2 AND NOT is_planned",
+        "DELETE FROM status_marks WHERE user_id = $1 AND start_ts = $2",
         a_user_id,
         a_start
     )
     .execute(&mut *a_conn)
     .await?;
 
-    let outer = sqlx::query_as!(
-        OuterMark,
+    let outer = sqlx::query!(
         r#"
         SELECT status AS "status: RoutineStatus", note, end_ts
         FROM status_marks
-        WHERE user_id = $1 AND NOT is_planned AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
+        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
         ORDER BY start_ts DESC
         LIMIT 1
         "#,
@@ -806,7 +737,7 @@ async fn clear_span(
     sqlx::query!(
         r#"
         UPDATE status_marks SET end_ts = $2
-        WHERE user_id = $1 AND NOT is_planned AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
+        WHERE user_id = $1 AND start_ts < $2 AND (end_ts IS NULL OR end_ts > $2)
         "#,
         a_user_id,
         a_start
@@ -815,7 +746,7 @@ async fn clear_span(
     .await?;
 
     let next_start = sqlx::query_scalar!(
-        "SELECT MIN(start_ts) FROM status_marks WHERE user_id = $1 AND NOT is_planned AND start_ts > $2",
+        "SELECT MIN(start_ts) FROM status_marks WHERE user_id = $1 AND start_ts > $2",
         a_user_id,
         a_start
     )
@@ -827,53 +758,7 @@ async fn clear_span(
         (Some(end), Some(next)) => Some(end.min(next)),
         (end, next) => end.or(next),
     };
-    Ok((end, outer))
-}
 
-async fn resume_outer(
-    a_conn: &mut PgConnection,
-    a_user_id: Uuid,
-    a_outer: Option<OuterMark>,
-    a_wanted_end: Option<DateTime<Utc>>,
-    a_placed_end: Option<DateTime<Utc>>,
-) -> Result<(), ApiError>
-{
-    let (Some(outer), Some(resume)) = (a_outer, a_wanted_end.filter(|_| a_placed_end == a_wanted_end))
-    else
-    {
-        return Ok(());
-    };
-    if outer.end_ts.is_some_and(|outer_end| outer_end <= resume)
-    {
-        return Ok(());
-    }
-    sqlx::query!(
-        r#"
-        INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
-        VALUES ($1, $2, $3, $4, $5)
-        "#,
-        a_user_id,
-        outer.status as RoutineStatus,
-        outer.note,
-        resume,
-        outer.end_ts
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    Ok(())
-}
-
-pub async fn place_mark(
-    a_conn: &mut PgConnection,
-    a_user_id: Uuid,
-    a_status: RoutineStatus,
-    a_note: Option<String>,
-    a_start: DateTime<Utc>,
-    a_end: Option<DateTime<Utc>>,
-) -> Result<StatusMarkDto, ApiError>
-{
-    lock_user_marks(a_conn, a_user_id).await?;
-    let (end, outer) = clear_span(a_conn, a_user_id, a_start, a_end).await?;
     let mark = sqlx::query_as!(
         StatusMarkDto,
         r#"
@@ -889,33 +774,28 @@ pub async fn place_mark(
     )
     .fetch_one(&mut *a_conn)
     .await?;
-    resume_outer(a_conn, a_user_id, outer, a_end, end).await?;
-    Ok(mark)
-}
 
-pub async fn realize_mark(
-    a_conn: &mut PgConnection,
-    a_user_id: Uuid,
-    a_mark_id: Uuid,
-    a_start: DateTime<Utc>,
-    a_end: DateTime<Utc>,
-) -> Result<(), ApiError>
-{
-    lock_user_marks(a_conn, a_user_id).await?;
-    let (end, outer) = clear_span(a_conn, a_user_id, a_start, Some(a_end)).await?;
-    sqlx::query!(
-        r#"
-        UPDATE status_marks SET is_planned = FALSE, start_ts = $3, end_ts = $4
-        WHERE id = $1 AND user_id = $2
-        "#,
-        a_mark_id,
-        a_user_id,
-        a_start,
-        end
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    resume_outer(a_conn, a_user_id, outer, Some(a_end), end).await
+    if let (Some(outer), Some(resume)) = (outer, a_end.filter(|_| end == a_end))
+    {
+        if outer.end_ts.is_none_or(|outer_end| outer_end > resume)
+        {
+            sqlx::query!(
+                r#"
+                INSERT INTO status_marks (user_id, status, note, start_ts, end_ts)
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+                a_user_id,
+                outer.status as RoutineStatus,
+                outer.note,
+                resume,
+                outer.end_ts
+            )
+            .execute(&mut *a_conn)
+            .await?;
+        }
+    }
+
+    Ok(mark)
 }
 
 async fn mark_owner(a_conn: &mut PgConnection, a_viewer_id: Uuid, a_id: Uuid) -> Result<Uuid, ApiError>

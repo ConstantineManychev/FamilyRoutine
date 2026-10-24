@@ -29,7 +29,7 @@ const MAX_GOAL: i64 = 100_000;
 const PERCENT_TARGET: i64 = 100;
 const GOAL_SCALE: u32 = 1;
 const MAX_NOTE_PAST_DAYS: i64 = 3660;
-const MAX_NOTE_FUTURE_DAYS: i64 = 366;
+const MAX_NOTE_FUTURE_DAYS: i64 = 1;
 
 struct TopicRow
 {

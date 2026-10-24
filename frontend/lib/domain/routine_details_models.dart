@@ -29,7 +29,6 @@ class MarkDetails
   final String ownerName;
   final bool isMine;
   final bool canEdit;
-  final bool isPlanned;
   final Occurrence? plan;
   final bool isDetailsHidden;
   final WorkoutSession? workout;
@@ -43,7 +42,6 @@ class MarkDetails
     this.ownerName = '',
     this.isMine = false,
     this.canEdit = false,
-    this.isPlanned = false,
     this.plan,
     this.isDetailsHidden = false,
     this.workout,
@@ -58,7 +56,6 @@ class MarkDetails
         ownerName: aJson['owner_name'] as String? ?? '',
         isMine: aJson['is_mine'] as bool? ?? false,
         canEdit: aJson['can_edit'] as bool? ?? aJson['is_mine'] as bool? ?? false,
-        isPlanned: aJson['is_planned'] as bool? ?? false,
         plan: aJson['plan'] is Map<String, dynamic> ? Occurrence.fromJson(aJson['plan'] as Map<String, dynamic>) : null,
         isDetailsHidden: aJson['is_details_hidden'] as bool? ?? false,
         workout: aJson['workout'] is Map<String, dynamic> ? WorkoutSession.fromJson(aJson['workout'] as Map<String, dynamic>) : null,

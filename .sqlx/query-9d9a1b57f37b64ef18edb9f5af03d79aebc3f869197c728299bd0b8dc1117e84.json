@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meal_entries SET eaten_on = $3 WHERE plan_event_id = $1 AND plan_occ_date = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d9a1b57f37b64ef18edb9f5af03d79aebc3f869197c728299bd0b8dc1117e84"
+}

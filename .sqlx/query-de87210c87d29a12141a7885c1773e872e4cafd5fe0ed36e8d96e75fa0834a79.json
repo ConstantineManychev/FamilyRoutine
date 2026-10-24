@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM study_notes WHERE plan_event_id = $1 AND plan_occ_date = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "de87210c87d29a12141a7885c1773e872e4cafd5fe0ed36e8d96e75fa0834a79"
+}

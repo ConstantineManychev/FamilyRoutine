@@ -8,9 +8,9 @@ import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
-import '../routine/mark_sheet.dart';
 import '../routine/routine_style.dart';
 import '../training/training_revision.dart';
+import 'plan_occurrence_sheet.dart';
 
 final StateProvider<int> plannerRevisionProv = StateProvider<int>((aRef) => 0);
 
@@ -59,27 +59,6 @@ Future<void> startTrainingSlot(BuildContext aContext, WidgetRef aRef, String aEv
   }
 }
 
-Future<void> openOccurrenceBlock(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
-{
-  final String markId;
-  try
-  {
-    markId = aOccurrence.statusMarkId ?? await aRef.read(apiProv).openOccurrenceBlock(aOccurrence.eventId, aOccurrence.occDate);
-  }
-  catch (aError)
-  {
-    if (aContext.mounted)
-    {
-      showErrorSnack(aContext, aError);
-    }
-    return;
-  }
-  if (aContext.mounted)
-  {
-    await openMarkSheet(aContext, markId);
-  }
-}
-
 Future<void> openSession(BuildContext aContext, WidgetRef aRef, String aSessionId) async
 {
   await aContext.push('/app/training/sessions/$aSessionId');
@@ -117,7 +96,7 @@ class OccurrenceList extends ConsumerWidget
             occurrence: item,
             isNow: isOccurrenceNow(item, now),
             isToday: DateUtils.isSameDay(item.startTs, now),
-            onTap: () => openOccurrenceBlock(aContext, aRef, item),
+            onTap: () => showPlanOccurrence(aContext, aRef, item),
             onDoneChanged: (aIsDone) => setOccurrenceState(aContext, aRef, item, aIsDone ? PlanState.done : PlanState.planned),
             onStartTraining: () => startOrContinueTraining(aContext, aRef, item),
           ),
@@ -293,8 +272,6 @@ class _Issue extends StatelessWidget
   }
 }
 
-enum _OccurrenceAction { done, planned, skip, move, startTraining, startStatus, edit }
-
 Future<void> setOccurrenceState(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence, PlanState aState) async
 {
   try
@@ -308,76 +285,6 @@ Future<void> setOccurrenceState(BuildContext aContext, WidgetRef aRef, Occurrenc
     {
       showErrorSnack(aContext, aError);
     }
-  }
-}
-
-Future<void> showOccurrenceActions(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
-{
-  final item = aOccurrence;
-  final isToday = DateUtils.isSameDay(item.startTs, DateTime.now());
-  final action = await showModalBottomSheet<_OccurrenceAction>(
-    context: aContext,
-    useRootNavigator: true,
-    builder: (aSheetContext)
-    {
-      Widget tile(_OccurrenceAction aAction, IconData aIcon, String aLabel) => ListTile(
-            leading: Icon(aIcon),
-            title: Text(aLabel),
-            onTap: () => Navigator.of(aSheetContext).pop(aAction),
-          );
-
-      return SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${DateFormat.MMMEd(aContext.locale.toLanguageTag()).format(item.startTs)} · ${occurrenceTimeLabel(aContext, item)}'),
-              ),
-              const Divider(height: 1),
-              if (item.isTraining && !item.isDone && (isToday || item.isSessionActive))
-                tile(
-                  _OccurrenceAction.startTraining,
-                  AppIcons.dumbbell,
-                  item.isSessionActive ? 'planner.continue_training'.tr() : 'planner.start_training'.tr(),
-                ),
-              if (!item.isTraining && item.category != null && isToday && !item.isDone)
-                tile(_OccurrenceAction.startStatus, item.category!.icon, 'planner.start_status'.tr(args: [item.category!.label])),
-              if (!item.isDone && !item.isSkipped) tile(_OccurrenceAction.done, AppIcons.checkCircle, 'planner.done'.tr()),
-              if (item.isDone || item.isSkipped)
-                tile(_OccurrenceAction.planned, AppIcons.history, item.isDone ? 'planner.undo_done'.tr() : 'planner.unskip'.tr()),
-              if (!item.isSkipped && !item.isDone) tile(_OccurrenceAction.skip, AppIcons.x, 'planner.skip'.tr()),
-              tile(_OccurrenceAction.move, AppIcons.calendarClock, 'planner.move'.tr()),
-              tile(_OccurrenceAction.edit, AppIcons.edit, 'planner.edit_series'.tr()),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-  if (action == null || !aContext.mounted)
-  {
-    return;
-  }
-
-  switch (action)
-  {
-    case _OccurrenceAction.done:
-      await setOccurrenceState(aContext, aRef, item, PlanState.done);
-    case _OccurrenceAction.planned:
-      await setOccurrenceState(aContext, aRef, item, PlanState.planned);
-    case _OccurrenceAction.skip:
-      await setOccurrenceState(aContext, aRef, item, PlanState.skipped);
-    case _OccurrenceAction.move:
-      await _move(aContext, aRef, item);
-    case _OccurrenceAction.startTraining:
-      await startOrContinueTraining(aContext, aRef, item);
-    case _OccurrenceAction.startStatus:
-      await _startStatus(aContext, aRef, item);
-    case _OccurrenceAction.edit:
-      await aContext.push('/app/planner/events/${item.eventId}');
-      notifyPlannerChanged(aRef);
   }
 }
 
@@ -411,61 +318,4 @@ DateTime currentMinute()
 {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day, now.hour, now.minute);
-}
-
-Future<void> _move(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
-{
-  final start = await pickMoveStart(aContext, aOccurrence);
-  if (start == null || !aContext.mounted)
-  {
-    return;
-  }
-
-  try
-  {
-    await aRef.read(apiProv).saveOccurrence(
-          aOccurrence.eventId,
-          aOccurrence.occDate,
-          aOccurrence.state,
-          aMovedStart: start,
-        );
-    notifyPlannerChanged(aRef);
-  }
-  catch (aError)
-  {
-    if (aContext.mounted)
-    {
-      showErrorSnack(aContext, aError);
-    }
-  }
-}
-
-Future<void> _startStatus(BuildContext aContext, WidgetRef aRef, Occurrence aOccurrence) async
-{
-  final status = aOccurrence.category;
-  if (status == null)
-  {
-    return;
-  }
-  try
-  {
-    await aRef.read(apiProv).saveOccurrence(
-          aOccurrence.eventId,
-          aOccurrence.occDate,
-          PlanState.done,
-          aMovedStart: currentMinute(),
-        );
-    notifyPlannerChanged(aRef);
-    if (aContext.mounted)
-    {
-      showInfoSnack(aContext, 'planner.status_started'.tr(args: [status.label]));
-    }
-  }
-  catch (aError)
-  {
-    if (aContext.mounted)
-    {
-      showErrorSnack(aContext, aError);
-    }
-  }
 }

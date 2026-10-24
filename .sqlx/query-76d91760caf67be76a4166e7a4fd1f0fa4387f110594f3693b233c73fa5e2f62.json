@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT LEAST(\n                    (SELECT MIN(COALESCE(m.start_ts, me.created_ts))\n                     FROM meal_entries me LEFT JOIN status_marks m ON m.id = me.status_mark_id\n                     WHERE me.user_id = $1),\n                    (SELECT MIN(started_ts) FROM workout_sessions\n                     WHERE user_id = $1 AND finished_ts IS NOT NULL AND kcal IS NOT NULL),\n                    (SELECT MIN(ts) FROM energy_marks WHERE user_id = $1)\n                ) AS first\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "first",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "76d91760caf67be76a4166e7a4fd1f0fa4387f110594f3693b233c73fa5e2f62"
+}

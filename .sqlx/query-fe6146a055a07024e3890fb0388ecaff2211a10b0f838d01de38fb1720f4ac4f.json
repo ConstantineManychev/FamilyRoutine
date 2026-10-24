@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO meal_entries (\n            user_id, eaten_on, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, plan_event_id, plan_occ_date,\n            created_ts\n        )\n        SELECT $3, $4, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,\n               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, $5, event_id, $6,\n               NOW() + position * INTERVAL '1 microsecond'\n        FROM plan_foods\n        WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2\n        ORDER BY position\n        RETURNING id, source AS \"source: MealSource\", item_id, batch_id, grams\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "source: MealSource",
+        "type_info": {
+          "Custom": {
+            "name": "meal_source_t",
+            "kind": {
+              "Enum": [
+                "item",
+                "dish",
+                "quick"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "grams",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Uuid",
+        "Date",
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "fe6146a055a07024e3890fb0388ecaff2211a10b0f838d01de38fb1720f4ac4f"
+}

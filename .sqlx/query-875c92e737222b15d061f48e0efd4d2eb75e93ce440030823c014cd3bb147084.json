@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE work_tasks SET deleted_ts = NOW(), updated_ts = NOW()\n        WHERE plan_event_id = $1 AND plan_occ_date = $2 AND deleted_ts IS NULL\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "875c92e737222b15d061f48e0efd4d2eb75e93ce440030823c014cd3bb147084"
+}

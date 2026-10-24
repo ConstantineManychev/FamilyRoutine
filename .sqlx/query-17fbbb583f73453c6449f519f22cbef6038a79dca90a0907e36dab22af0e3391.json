@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id, s.event_id, s.topic_id, t.title AS topic_title, s.note\n        FROM plan_studies s\n        JOIN study_topics t ON t.id = s.topic_id\n        WHERE s.event_id = ANY($1) AND s.occ_date IS NOT DISTINCT FROM $2\n        ORDER BY s.event_id, s.position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "topic_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "topic_title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "note",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "17fbbb583f73453c6449f519f22cbef6038a79dca90a0907e36dab22af0e3391"
+}

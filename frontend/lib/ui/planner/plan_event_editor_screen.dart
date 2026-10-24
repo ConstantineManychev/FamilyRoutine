@@ -13,6 +13,7 @@ import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import '../routine/routine_style.dart';
+import 'plan_content_editor.dart';
 import 'planner_common.dart';
 
 const int _minDurationMin = 5;
@@ -59,6 +60,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
   List<ProgramDay> _programDays = const [];
   String? _dayId;
   bool _isScheduleFromProgram = false;
+  PlanContentDraft _content = PlanContentDraft();
 
   Object? _loadError;
   bool _isLoading = true;
@@ -143,6 +145,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
     _tz = aEvent.tz;
     _programId = aEvent.programId;
     _dayId = aEvent.dayId;
+    _content = PlanContentDraft.of(aEvent.content);
   }
 
   int get _windowMin
@@ -364,6 +367,7 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
       aUntilDate: _repeat == PlanRepeat.once ? null : _untilDate,
       aProgramId: _programId,
       aDayId: _programId == null ? null : _dayId,
+      aContent: _content.toJson(_category),
     );
 
     setState(() => _isSaving = true);
@@ -500,6 +504,36 @@ class _PlanEventEditorScreenState extends ConsumerState<PlanEventEditorScreen>
           ],
           onChanged: (aValue) => setState(() => _category = aValue),
         ),
+        if (hasPlanContent(_category)) ...[
+          gap,
+          Container(
+            key: const ValueKey('editor.content'),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: aContext.palette.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PlanContentEditor(
+                  key: ValueKey('content:$_category'),
+                  category: _category,
+                  draft: _content,
+                  personId: _ownerId,
+                  isEnabled: !_isSaving,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'planner.content_hint'.tr(),
+                    style: TextStyle(fontSize: 12, color: aContext.palette.inkMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         gap,
         SegmentedButton<PlanTiming>(
           showSelectedIcon: false,

@@ -430,6 +430,13 @@ pub async fn merge_item(
     .execute(&mut *tx)
     .await?;
     sqlx::query!(
+        "UPDATE plan_foods SET item_id = $2 WHERE item_id = $1",
+        a_id,
+        a_req.target_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
         "UPDATE dish_ingredients SET item_id = $2 WHERE item_id = $1",
         a_id,
         a_req.target_id

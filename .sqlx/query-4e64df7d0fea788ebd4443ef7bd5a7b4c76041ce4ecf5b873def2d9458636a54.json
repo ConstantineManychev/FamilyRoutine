@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO work_tasks (user_id, kind, title, start_on, plan_event_id, plan_occ_date)\n        SELECT $3, 'day', title, $4, event_id, $5\n        FROM plan_tasks\n        WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2\n        ORDER BY position\n        RETURNING id, title\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "4e64df7d0fea788ebd4443ef7bd5a7b4c76041ce4ecf5b873def2d9458636a54"
+}

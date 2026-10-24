@@ -299,7 +299,7 @@ async fn progress_rolls_up_and_branch_notes_name_their_source(a_db: PgPool)
             &alice,
             Method::POST,
             &format!("/api/study/topics/{course}/notes"),
-            Some(json!({ "body": "Из будущего", "note_ts": iso(now + Duration::days(400)) }))
+            Some(json!({ "body": "Из будущего", "note_ts": iso(now + Duration::days(5)) }))
         )
         .await
         .0,

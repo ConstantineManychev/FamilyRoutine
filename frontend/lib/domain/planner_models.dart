@@ -1,4 +1,5 @@
 import 'finance_models.dart';
+import 'nutrition_models.dart';
 import 'routine_models.dart';
 
 enum PlanTiming
@@ -87,6 +88,7 @@ class PlanEvent
   final String? programName;
   final String? dayId;
   final String? dayName;
+  final PlanContent content;
 
   const PlanEvent({
     required this.id,
@@ -108,6 +110,7 @@ class PlanEvent
     this.programName,
     this.dayId,
     this.dayName,
+    this.content = PlanContent.empty,
   });
 
   factory PlanEvent.fromJson(Map<String, dynamic> aJson) => PlanEvent(
@@ -130,6 +133,7 @@ class PlanEvent
         programName: aJson['program_name'] as String?,
         dayId: aJson['day_id'] as String?,
         dayName: aJson['day_name'] as String?,
+        content: PlanContent.fromJson(aJson['content']),
       );
 
   static Map<String, dynamic> payload({
@@ -148,6 +152,7 @@ class PlanEvent
     DateTime? aUntilDate,
     String? aProgramId,
     String? aDayId,
+    Map<String, dynamic> aContent = const {},
   }) => {
         'title': aTitle,
         if (aNote != null && aNote.trim().isNotEmpty) 'note': aNote.trim(),
@@ -164,7 +169,153 @@ class PlanEvent
         if (aUntilDate != null) 'until_date': dateWire(aUntilDate),
         if (aProgramId != null) 'program_id': aProgramId,
         if (aDayId != null) 'day_id': aDayId,
+        'content': aContent,
       };
+}
+
+class PlanFood
+{
+  final String id;
+  final MealSource source;
+  final String? itemId;
+  final String? dishId;
+  final String? title;
+  final double? grams;
+  final double? portions;
+  final bool isMl;
+  final Macros total;
+
+  const PlanFood({
+    required this.id,
+    required this.source,
+    this.itemId,
+    this.dishId,
+    this.title,
+    this.grams,
+    this.portions,
+    this.isMl = false,
+    this.total = Macros.zero,
+  });
+
+  factory PlanFood.fromJson(Map<String, dynamic> aJson) => PlanFood(
+        id: aJson['id'] as String,
+        source: MealSource.parse(aJson['source']),
+        itemId: aJson['item_id'] as String?,
+        dishId: aJson['dish_id'] as String?,
+        title: aJson['title'] as String?,
+        grams: parseDecimalOrNull(aJson['grams']),
+        portions: parseDecimalOrNull(aJson['portions']),
+        isMl: aJson['is_ml'] as bool? ?? false,
+        total: Macros.fromJson(aJson['total']),
+      );
+
+  Map<String, dynamic> get input => switch (source)
+      {
+        MealSource.quick => {
+            'quick': {
+              'title': title,
+              'kcal': amountWire(total.kcal),
+              'prot': amountWire(total.prot),
+              'fat': amountWire(total.fat),
+              'carb': amountWire(total.carb),
+            },
+          },
+        _ => {
+            if (itemId != null) 'item_id': itemId,
+            if (dishId != null) 'dish_id': dishId,
+            if (portions != null) 'portions': amountWire(portions!) else 'grams': amountWire(grams ?? 0),
+          },
+      };
+}
+
+String amountWire(double aValue) => aValue == aValue.roundToDouble() ? aValue.toStringAsFixed(0) : aValue.toString();
+
+class PlanTask
+{
+  final String? id;
+  final String title;
+
+  const PlanTask({this.id, required this.title});
+
+  factory PlanTask.fromJson(Map<String, dynamic> aJson) => PlanTask(id: aJson['id'] as String?, title: aJson['title'] as String);
+}
+
+class PlanStudy
+{
+  final String? id;
+  final String topicId;
+  final String topicTitle;
+  final String? note;
+
+  const PlanStudy({this.id, required this.topicId, required this.topicTitle, this.note});
+
+  factory PlanStudy.fromJson(Map<String, dynamic> aJson) => PlanStudy(
+        id: aJson['id'] as String?,
+        topicId: aJson['topic_id'] as String,
+        topicTitle: aJson['topic_title'] as String? ?? '',
+        note: aJson['note'] as String?,
+      );
+}
+
+class PlanContent
+{
+  final List<PlanFood> foods;
+  final Macros total;
+  final List<PlanTask> tasks;
+  final List<PlanStudy> studies;
+
+  const PlanContent({this.foods = const [], this.total = Macros.zero, this.tasks = const [], this.studies = const []});
+
+  static const PlanContent empty = PlanContent();
+
+  bool get isEmpty => foods.isEmpty && tasks.isEmpty && studies.isEmpty;
+
+  factory PlanContent.fromJson(Object? aJson)
+  {
+    if (aJson is! Map<String, dynamic>)
+    {
+      return empty;
+    }
+    return PlanContent(
+      foods: (aJson['foods'] as List? ?? const []).map((aItem) => PlanFood.fromJson(aItem as Map<String, dynamic>)).toList(),
+      total: Macros.fromJsonOrNull(aJson['total']) ?? Macros.zero,
+      tasks: (aJson['tasks'] as List? ?? const []).map((aItem) => PlanTask.fromJson(aItem as Map<String, dynamic>)).toList(),
+      studies: (aJson['studies'] as List? ?? const [])
+          .map((aItem) => PlanStudy.fromJson(aItem as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class OccurrenceDetails
+{
+  final Occurrence occurrence;
+  final String ownerId;
+  final bool isCustom;
+  final PlanContent content;
+  final String? programName;
+  final String? dayId;
+  final String? dayName;
+
+  const OccurrenceDetails({
+    required this.occurrence,
+    required this.ownerId,
+    this.isCustom = false,
+    this.content = PlanContent.empty,
+    this.programName,
+    this.dayId,
+    this.dayName,
+  });
+
+  factory OccurrenceDetails.fromJson(Map<String, dynamic> aJson) => OccurrenceDetails(
+        occurrence: Occurrence.fromJson(aJson['occurrence'] as Map<String, dynamic>),
+        ownerId: aJson['owner_id'] as String,
+        isCustom: aJson['is_custom'] as bool? ?? false,
+        content: PlanContent.fromJson(aJson['content']),
+        programName: aJson['program_name'] as String?,
+        dayId: aJson['day_id'] as String?,
+        dayName: aJson['day_name'] as String?,
+      );
 }
 
 class OccurrenceRef

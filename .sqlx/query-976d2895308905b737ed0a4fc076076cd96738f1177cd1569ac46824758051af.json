@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE work_tasks SET start_on = $3, updated_ts = NOW()\n        WHERE plan_event_id = $1 AND plan_occ_date = $2 AND done_on IS NULL AND deleted_ts IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "976d2895308905b737ed0a4fc076076cd96738f1177cd1569ac46824758051af"
+}

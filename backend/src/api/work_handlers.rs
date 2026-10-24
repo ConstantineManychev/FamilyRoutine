@@ -343,6 +343,72 @@ pub async fn create_task(
     Ok((StatusCode::CREATED, Json(details)))
 }
 
+pub async fn create_plan_tasks(
+    a_conn: &mut PgConnection,
+    a_owner_id: Uuid,
+    a_event_id: Uuid,
+    a_scope: Option<NaiveDate>,
+    a_occ_date: NaiveDate,
+    a_day: NaiveDate,
+) -> Result<(), ApiError>
+{
+    let created = sqlx::query!(
+        r#"
+        INSERT INTO work_tasks (user_id, kind, title, start_on, plan_event_id, plan_occ_date)
+        SELECT $3, 'day', title, $4, event_id, $5
+        FROM plan_tasks
+        WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2
+        ORDER BY position
+        RETURNING id, title
+        "#,
+        a_event_id,
+        a_scope,
+        a_owner_id,
+        a_day,
+        a_occ_date
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    for task in created
+    {
+        let event = NewEvent {
+            new_value: Some(task.title.as_str()),
+            ..NewEvent::plain(TaskEventKind::Created, a_day)
+        };
+        append_event(a_conn, task.id, event).await?;
+    }
+    Ok(())
+}
+
+pub async fn archive_plan_tasks(
+    a_conn: &mut PgConnection,
+    a_event_id: Uuid,
+    a_occ_date: NaiveDate,
+) -> Result<(), ApiError>
+{
+    let archived = sqlx::query_scalar!(
+        r#"
+        UPDATE work_tasks SET deleted_ts = NOW(), updated_ts = NOW()
+        WHERE plan_event_id = $1 AND plan_occ_date = $2 AND deleted_ts IS NULL
+        RETURNING id
+        "#,
+        a_event_id,
+        a_occ_date
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+    for task_id in archived
+    {
+        append_event(
+            a_conn,
+            task_id,
+            NewEvent::plain(TaskEventKind::Deleted, Utc::now().date_naive()),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 pub async fn update_task(
     State(a_state): State<AppState>,
     a_user: AuthUser,

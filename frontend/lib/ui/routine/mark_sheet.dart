@@ -11,7 +11,7 @@ import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../nutrition/nutrition_diary_screen.dart' show addFoodPath;
 import '../nutrition/nutrition_format.dart';
-import '../planner/planner_common.dart' show currentMinute, notifyPlannerChanged, occurrenceTimeLabel, pickMoveStart;
+import '../planner/planner_common.dart' show notifyPlannerChanged;
 import '../training/training_format.dart' show describeSets;
 import '../study/study_block_panel.dart';
 import '../work/work_block_panel.dart';
@@ -364,83 +364,17 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     }
   }
 
-  Future<void> _refreshAfterPlan() async
+  Future<void> _undoPlan(Occurrence aPlan) async
   {
-    notifyPlannerChanged(ref);
-    notifyNutritionChanged(ref);
+    setState(() => _isBusy = true);
     try
     {
-      final details = await ref.read(apiProv).getMarkDetails(widget.markId);
-      if (mounted)
-      {
-        setState(()
-        {
-          _details = details;
-          _status = details.mark.status;
-          _start = details.mark.startTs;
-          _end = details.mark.endTs;
-          _noteCtrl.text = details.mark.note ?? '';
-        });
-      }
-    }
-    catch (_)
-    {
+      await ref.read(apiProv).saveOccurrence(aPlan.eventId, aPlan.occDate, PlanState.planned);
+      notifyPlannerChanged(ref);
+      notifyNutritionChanged(ref);
       if (mounted)
       {
         Navigator.of(context).pop();
-      }
-    }
-  }
-
-  Future<void> _savePlan(Occurrence aPlan, PlanState aState, {DateTime? aMovedStart}) async
-  {
-    setState(() => _isBusy = true);
-    try
-    {
-      await ref.read(apiProv).saveOccurrence(aPlan.eventId, aPlan.occDate, aState, aMovedStart: aMovedStart);
-      await _refreshAfterPlan();
-    }
-    catch (aError)
-    {
-      if (mounted)
-      {
-        showErrorSnack(context, aError);
-      }
-    }
-    finally
-    {
-      if (mounted)
-      {
-        setState(() => _isBusy = false);
-      }
-    }
-  }
-
-  Future<void> _movePlan(Occurrence aPlan) async
-  {
-    final start = await pickMoveStart(context, aPlan);
-    if (start != null && mounted)
-    {
-      await _savePlan(aPlan, aPlan.state, aMovedStart: start);
-    }
-  }
-
-  Future<void> _startPlanTraining(Occurrence aPlan) async
-  {
-    final sessionId = aPlan.sessionId;
-    if (aPlan.isSessionActive && sessionId != null)
-    {
-      _leaveTo('/app/training/sessions/$sessionId', aIsReturning: false);
-      return;
-    }
-    setState(() => _isBusy = true);
-    try
-    {
-      final session = await ref.read(apiProv).startOccurrence(aPlan.eventId, aPlan.occDate);
-      notifyPlannerChanged(ref);
-      if (mounted)
-      {
-        _leaveTo('/app/training/sessions/${session.id}', aIsReturning: false);
       }
     }
     catch (aError)
@@ -505,9 +439,9 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _MarkHeader(details: aDetails),
-                if (aDetails.plan != null && aDetails.canEdit) _buildPlan(aContext, aDetails, aDetails.plan!),
+                if (aDetails.plan != null && aDetails.canEdit) _buildPlan(aContext, aDetails.plan!),
                 _buildPanel(aContext, aDetails),
-                if (aDetails.canEdit && !aDetails.isPlanned) ...[
+                if (aDetails.canEdit) ...[
                   const SizedBox(height: 20),
                   Text('routine.edit_mark'.tr(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
@@ -551,7 +485,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
             ),
           ),
         ),
-        if (aDetails.canEdit && !aDetails.isPlanned)
+        if (aDetails.canEdit)
           Padding(
             padding: EdgeInsets.fromLTRB(12, 4, 20, 12 + aMedia.padding.bottom),
             child: Row(
@@ -622,21 +556,9 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
     );
   }
 
-  Widget _buildPlan(BuildContext aContext, MarkDetails aDetails, Occurrence aPlan)
+  Widget _buildPlan(BuildContext aContext, Occurrence aPlan)
   {
     final palette = aContext.palette;
-    final isToday = DateUtils.isSameDay(aPlan.startTs, DateTime.now());
-    final isOpen = !aPlan.isDone && !aPlan.isSkipped;
-    final stateKey = aPlan.isDone ? 'routine.plan_done' : (aPlan.isSkipped ? 'routine.plan_skipped' : 'routine.plan_waiting');
-    final canStartTraining = aPlan.isTraining && isOpen && (isToday || aPlan.isSessionActive);
-    final hintKey = switch (aDetails.mark.status)
-    {
-      _ when !aDetails.isPlanned => null,
-      RoutineStatus.meal => 'routine.plan_meal_hint',
-      RoutineStatus.gym when aPlan.isTraining => 'routine.plan_workout_hint',
-      _ => 'routine.plan_block_hint',
-    };
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -654,73 +576,21 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                 Icon(AppIcons.calendarClock, size: 18, color: palette.inkSecondary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    '${'routine.plan'.tr()}: ${aPlan.title}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                  child: Text('routine.from_plan'.tr(args: [aPlan.title]), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
-                Text(stateKey.tr(), key: const ValueKey('mark.plan.state'), style: TextStyle(fontSize: 12, color: palette.inkSecondary)),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              [
-                '${DateFormat.MMMEd(aContext.locale.toLanguageTag()).format(aPlan.startTs)} · ${occurrenceTimeLabel(aContext, aPlan)}',
-                if (aPlan.isTraining) aPlan.dayName ?? 'planner.training_next_day'.tr(),
-              ].join(' · '),
-              style: TextStyle(fontSize: 12, color: palette.inkSecondary),
-            ),
-            if (hintKey != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(hintKey.tr(), style: TextStyle(fontSize: 12, color: palette.inkMuted)),
-              ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (isOpen)
-                  FilledButton.icon(
-                    key: const ValueKey('mark.plan.done'),
-                    onPressed: _isBusy ? null : () => _savePlan(aPlan, PlanState.done),
-                    icon: const Icon(AppIcons.checkCircle, size: 16),
-                    label: Text('planner.done'.tr()),
-                  )
-                else
-                  OutlinedButton.icon(
-                    key: const ValueKey('mark.plan.undo'),
-                    onPressed: _isBusy ? null : () => _savePlan(aPlan, PlanState.planned),
-                    icon: const Icon(AppIcons.history, size: 16),
-                    label: Text(aPlan.isDone ? 'planner.undo_done'.tr() : 'planner.unskip'.tr()),
-                  ),
-                if (canStartTraining)
-                  FilledButton.tonalIcon(
-                    key: const ValueKey('mark.plan.training'),
-                    onPressed: _isBusy ? null : () => _startPlanTraining(aPlan),
-                    icon: const Icon(AppIcons.dumbbell, size: 16),
-                    label: Text(aPlan.isSessionActive ? 'planner.continue_training'.tr() : 'planner.start_training'.tr()),
-                  ),
-                if (isOpen && !aPlan.isTraining && isToday)
-                  OutlinedButton.icon(
-                    key: const ValueKey('mark.plan.now'),
-                    onPressed: _isBusy ? null : () => _savePlan(aPlan, PlanState.done, aMovedStart: currentMinute()),
-                    icon: const Icon(AppIcons.zap, size: 16),
-                    label: Text('routine.plan_now'.tr()),
-                  ),
                 OutlinedButton.icon(
-                  key: const ValueKey('mark.plan.move'),
-                  onPressed: _isBusy ? null : () => _movePlan(aPlan),
-                  icon: const Icon(AppIcons.calendarClock, size: 16),
-                  label: Text('planner.move'.tr()),
+                  key: const ValueKey('mark.plan.undo'),
+                  onPressed: _isBusy ? null : () => _undoPlan(aPlan),
+                  icon: const Icon(AppIcons.history, size: 16),
+                  label: Text('planner.undo_done'.tr()),
                 ),
-                if (isOpen)
-                  TextButton.icon(
-                    key: const ValueKey('mark.plan.skip'),
-                    onPressed: _isBusy ? null : () => _savePlan(aPlan, PlanState.skipped),
-                    icon: const Icon(AppIcons.x, size: 16),
-                    label: Text('planner.skip'.tr()),
-                  ),
                 TextButton.icon(
                   key: const ValueKey('mark.plan.edit'),
                   onPressed: _isBusy ? null : () => _leaveTo('/app/planner/events/${aPlan.eventId}'),
@@ -773,14 +643,6 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
   Widget _buildWorkout(BuildContext aContext, MarkDetails aDetails)
   {
     final session = aDetails.workout;
-    final plan = aDetails.plan;
-    if (session == null && aDetails.isPlanned && plan != null && plan.isTraining)
-    {
-      return _PanelNote(
-        icon: AppIcons.dumbbell,
-        text: 'routine.plan_workout'.tr(args: [plan.title, plan.dayName ?? 'planner.training_next_day'.tr()]),
-      );
-    }
     if (session == null)
     {
       return _PanelNote(
@@ -896,12 +758,7 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
         const SizedBox(height: 8),
         if (meals.entries.isEmpty)
           Text(
-            switch (aDetails)
-            {
-              MarkDetails(isPlanned: true) => 'routine.no_meals_plan'.tr(),
-              MarkDetails(canEdit: true) => 'routine.no_meals_mine'.tr(),
-              _ => 'routine.no_meals'.tr(),
-            },
+            aDetails.canEdit ? 'routine.no_meals_mine'.tr() : 'routine.no_meals'.tr(),
             style: TextStyle(color: palette.inkMuted),
           )
         else
@@ -940,13 +797,12 @@ class _MarkSheetState extends ConsumerState<MarkSheet>
                   icon: const Icon(AppIcons.history, size: 16),
                   label: Text('nutrition.copy_meal'.tr()),
                 ),
-                if (!aDetails.isPlanned)
-                  TextButton.icon(
-                    key: const ValueKey('mark.link_meals'),
-                    onPressed: _isBusy ? null : () => _linkEntries(mark),
-                    icon: const Icon(AppIcons.link, size: 16),
-                    label: Text('routine.link_meals'.tr()),
-                  ),
+                TextButton.icon(
+                  key: const ValueKey('mark.link_meals'),
+                  onPressed: _isBusy ? null : () => _linkEntries(mark),
+                  icon: const Icon(AppIcons.link, size: 16),
+                  label: Text('routine.link_meals'.tr()),
+                ),
                 FilledButton.tonalIcon(
                   key: const ValueKey('mark.add_food'),
                   onPressed: _isBusy

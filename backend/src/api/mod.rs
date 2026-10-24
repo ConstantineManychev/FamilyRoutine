@@ -13,6 +13,7 @@ pub mod item_handlers;
 pub mod notify_handlers;
 pub mod nutrition_handlers;
 pub mod place_handlers;
+pub mod plan_content;
 pub mod planner_handlers;
 pub mod product_cat_handlers;
 pub mod profile_handlers;

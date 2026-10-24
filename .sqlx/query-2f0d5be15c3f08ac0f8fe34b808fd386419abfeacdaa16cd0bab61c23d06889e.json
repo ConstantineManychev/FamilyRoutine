@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE plan_instances SET is_custom = FALSE, day_id = NULL, updated_ts = NOW()\n        WHERE event_id = $1 AND occ_date = $2\n        RETURNING state AS \"state: PlanState\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state: PlanState",
+        "type_info": {
+          "Custom": {
+            "name": "plan_state_t",
+            "kind": {
+              "Enum": [
+                "planned",
+                "done",
+                "skipped"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2f0d5be15c3f08ac0f8fe34b808fd386419abfeacdaa16cd0bab61c23d06889e"
+}

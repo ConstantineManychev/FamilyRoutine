@@ -85,7 +85,7 @@
     "TOO_MANY_LOTS": "该仓库批次过多",
     "PUSH_UNAVAILABLE": "服务器未配置推送通知",
     "TOO_MANY_MARKS": "热量校正过多：请删除旧的校正。",
-    "PLANNED_MARK": "这是计划中的块：请通过计划将其标记为完成、移动或跳过。"
+    "PLAN_DONE": "该计划已完成，请先恢复为计划。"
   },
   "sidebar": {
     "routine": "日常",
@@ -806,16 +806,12 @@
     "tap_to_create": "点击自己或孩子那一行的空白处即可添加时段。",
     "plan": "计划",
     "plan_tap": "点按以打开计划",
-    "plans_hint": "半透明的块是计划。点按计划可提前添加饮食、任务或笔记；标记为完成后，它会成为日程块。",
+    "plans_hint": "半透明的块是计划。点按计划可查看内容、修改这一天或标记为完成。",
     "plan_done": "已完成",
     "plan_skipped": "已跳过",
     "plan_waiting": "已计划",
-    "plan_meal_hint": "这是计划：添加你打算吃的东西。将计划标记为完成后，热量会计入平衡和日记，食物会从库存中扣除。",
-    "plan_workout_hint": "标记为完成后，会按计划记录整套训练及所有组，就像你在应用里完成一样。",
-    "plan_block_hint": "这是计划：标记为完成后，该块会出现在日程中。",
     "plan_now": "现在开始",
-    "plan_workout": "计划训练：{} · {}",
-    "no_meals_plan": "暂无内容。添加你打算吃的东西。"
+    "from_plan": "来自计划：{}"
   },
   "catalog": {
     "scope": "保存位置",
@@ -1199,7 +1195,29 @@
     "series_hint": "修改会应用到所有重复。要改期或跳过某一天，请在日程表中使用该日程的菜单。",
     "minutes_short": "{} 分钟",
     "repeats_badge": "重复",
-    "program_schedule": "重复规则来自训练计划的安排，可以修改。"
+    "program_schedule": "重复规则来自训练计划的安排，可以修改。",
+    "pick_food": "计划中的饮食",
+    "content_food": "吃什么",
+    "content_tasks": "任务",
+    "content_study": "学习",
+    "add_food": "添加食物",
+    "add_task": "添加任务",
+    "task_hint": "新任务",
+    "add_study": "添加主题",
+    "study_topic": "主题",
+    "study_note": "要做什么（可选）",
+    "no_topics": "请先在“学习”中创建主题。",
+    "content_hint": "这是整个计划的设置。可以在事件卡片中为某一天单独修改。",
+    "content_total": "合计",
+    "content_empty": "计划中没有设置内容。",
+    "day_custom": "已为这一天修改",
+    "apply_hint": "标记为完成后，食物会计入日记和平衡并从库存扣除，任务会成为当天任务，笔记会进入学习，训练会按计划记录。",
+    "open_block": "打开日程块",
+    "edit_day": "修改这一天",
+    "edit_day_title": "{} · {}",
+    "edit_day_hint": "修改只影响这一天，其他日期保持整个计划的设置。",
+    "training_day_same": "与计划相同",
+    "reset_day": "与整个计划相同"
   },
   "nutrition": {
     "title": "饮食日记",

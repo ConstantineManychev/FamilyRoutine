@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meal_entries SET status_mark_id = NULL WHERE status_mark_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "24deeded8f5bea87780c20a28346f0268311383d23c3f9f16af0af07ad251758"
+}

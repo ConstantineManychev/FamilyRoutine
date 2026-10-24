@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM plan_tasks WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "35c51d189df25e61e4b4620aa4df71902bc21e4b73919cea0e4ceb195a7961f3"
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE study_notes SET note_ts = note_ts + ($3::timestamptz - $4::timestamptz), updated_ts = NOW()\n        WHERE plan_event_id = $1 AND plan_occ_date = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "952e1a2be3b5bc51c19e9122dd4a9ef3c8fd5c7a4a3104e2b1f85dea7937b549"
+}

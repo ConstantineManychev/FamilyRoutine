@@ -1,8 +1,9 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::RoutineStatus;
+use crate::{MacrosDto, MealSource, QuickEntryRequest, RoutineStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "plan_timing_t", rename_all = "snake_case")]
@@ -57,6 +58,108 @@ pub struct PlanEventDto
     pub program_name: Option<String>,
     pub day_id: Option<Uuid>,
     pub day_name: Option<String>,
+    pub content: PlanContentDto,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanFoodDto
+{
+    pub id: Uuid,
+    pub source: MealSource,
+    pub item_id: Option<Uuid>,
+    pub dish_id: Option<Uuid>,
+    pub title: Option<String>,
+    pub grams: Option<Decimal>,
+    pub portions: Option<Decimal>,
+    pub portion_g: Option<Decimal>,
+    pub is_ml: bool,
+    pub total: MacrosDto,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanTaskDto
+{
+    pub id: Uuid,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanStudyDto
+{
+    pub id: Uuid,
+    pub topic_id: Uuid,
+    pub topic_title: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PlanContentDto
+{
+    pub foods: Vec<PlanFoodDto>,
+    pub total: MacrosDto,
+    pub tasks: Vec<PlanTaskDto>,
+    pub studies: Vec<PlanStudyDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanFoodInput
+{
+    #[serde(default)]
+    pub item_id: Option<Uuid>,
+    #[serde(default)]
+    pub dish_id: Option<Uuid>,
+    #[serde(default)]
+    pub quick: Option<QuickEntryRequest>,
+    #[serde(default)]
+    pub grams: Option<Decimal>,
+    #[serde(default)]
+    pub portions: Option<Decimal>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanTaskInput
+{
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanStudyInput
+{
+    pub topic_id: Uuid,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PlanContentInput
+{
+    #[serde(default)]
+    pub foods: Vec<PlanFoodInput>,
+    #[serde(default)]
+    pub tasks: Vec<PlanTaskInput>,
+    #[serde(default)]
+    pub studies: Vec<PlanStudyInput>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SaveOccurrenceContentRequest
+{
+    #[serde(flatten)]
+    pub content: PlanContentInput,
+    #[serde(default)]
+    pub day_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OccurrenceDetailsDto
+{
+    pub occurrence: OccurrenceDto,
+    pub owner_id: Uuid,
+    pub is_custom: bool,
+    pub content: PlanContentDto,
+    pub program_name: Option<String>,
+    pub day_id: Option<Uuid>,
+    pub day_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -88,6 +191,8 @@ pub struct SavePlanEventRequest
     pub program_id: Option<Uuid>,
     #[serde(default)]
     pub day_id: Option<Uuid>,
+    #[serde(default)]
+    pub content: Option<PlanContentInput>,
 }
 
 fn default_every() -> i32
@@ -144,12 +249,6 @@ pub struct OccurrenceDto
     pub is_session_active: bool,
     pub conflicts: Vec<OccurrenceRefDto>,
     pub overload: Option<OverloadDto>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PlanBlockDto
-{
-    pub mark_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize)]

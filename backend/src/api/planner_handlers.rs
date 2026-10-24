@@ -6,16 +6,19 @@ use axum::Json;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Offset, Timelike, Utc};
 use chrono_tz::{Tz, TZ_VARIANTS};
 use shared_schema::{
-    AgendaDto, AgendaQuery, OccurrenceDto, OccurrenceRefDto, OverloadDto, PersonQuery, PlanBlockDto, PlanEventDto,
-    PlanRepeat, PlanSlotDto, PlanState, PlanTiming, RoutineStatus, SaveOccurrenceRequest, SavePlanEventRequest,
-    SessionDto,
+    AgendaDto, AgendaQuery, OccurrenceDetailsDto, OccurrenceDto, OccurrenceRefDto, OverloadDto, PersonQuery,
+    PlanContentDto, PlanEventDto, PlanRepeat, PlanSlotDto, PlanState, PlanTiming, RoutineStatus,
+    SaveOccurrenceContentRequest, SaveOccurrenceRequest, SavePlanEventRequest, SessionDto,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
-use crate::api::nutrition_handlers::{consume_mark_entries, release_mark_entries};
-use crate::api::routine_handlers::{realize_mark, withdraw_mark};
+use crate::api::plan_content::{
+    apply_content, clear_content, drop_foreign_content, load_content, load_contents, revert_content, save_content,
+    shift_content, ApplyTarget,
+};
+use crate::api::routine_handlers::{lift_mark, mark_links, place_mark};
 use crate::api::training_handlers::{begin_session, load_session, program_plan, record_planned_session};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text};
@@ -71,6 +74,7 @@ struct InstanceRow
     moved_time: Option<NaiveTime>,
     session_id: Option<Uuid>,
     status_mark_id: Option<Uuid>,
+    day_name: Option<String>,
     is_session_active: bool,
 }
 
@@ -116,7 +120,7 @@ impl EventRow
         self.window_min.unwrap_or(self.duration_min)
     }
 
-    fn into_dto(self) -> PlanEventDto
+    fn into_dto(self, a_content: PlanContentDto) -> PlanEventDto
     {
         PlanEventDto {
             id: self.id,
@@ -138,6 +142,7 @@ impl EventRow
             program_name: self.program_name,
             day_id: self.day_id,
             day_name: self.day_name,
+            content: a_content,
         }
     }
 }
@@ -182,7 +187,17 @@ pub async fn list_events(
     let mut conn = a_state.db.acquire().await?;
     let owner_id = acting_for(&mut conn, a_user.user_id, a_query.person_id).await?;
     let events = load_events(&mut conn, owner_id, None).await?;
-    Ok(Json(events.into_iter().map(EventRow::into_dto).collect()))
+    let ids: Vec<Uuid> = events.iter().map(|event| event.id).collect();
+    let mut contents = load_contents(&mut conn, &ids, None).await?;
+    Ok(Json(
+        events
+            .into_iter()
+            .map(|event| {
+                let content = contents.remove(&event.id).unwrap_or_default();
+                event.into_dto(content)
+            })
+            .collect(),
+    ))
 }
 
 pub async fn get_event(
@@ -193,9 +208,9 @@ pub async fn get_event(
 {
     let mut conn = a_state.db.acquire().await?;
     let owner_id = event_owner(&mut conn, a_user.user_id, a_id).await?;
-    load_event(&mut conn, owner_id, a_id)
-        .await
-        .map(|event| Json(event.into_dto()))
+    let event = load_event(&mut conn, owner_id, a_id).await?;
+    let content = load_content(&mut conn, a_id, None).await?;
+    Ok(Json(event.into_dto(content)))
 }
 
 pub async fn create_event(
@@ -246,11 +261,16 @@ pub async fn create_event(
     )
     .fetch_one(&mut *tx)
     .await?;
+    if let Some(content) = &a_req.content
+    {
+        save_content(&mut tx, a_user.user_id, owner_id, id, None, clean.category, content).await?;
+    }
 
     replan(&mut tx, owner_id).await?;
     let event = load_event(&mut tx, owner_id, id).await?;
+    let content = load_content(&mut tx, id, None).await?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(event.into_dto())))
+    Ok((StatusCode::CREATED, Json(event.into_dto(content))))
 }
 
 pub async fn update_event(
@@ -293,12 +313,28 @@ pub async fn update_event(
     )
     .execute(&mut *tx)
     .await?;
+    drop_foreign_content(&mut tx, a_id, clean.category).await?;
+    if let Some(content) = &a_req.content
+    {
+        save_content(&mut tx, a_user.user_id, owner_id, a_id, None, clean.category, content).await?;
+    }
+    sqlx::query!(
+        r#"
+        UPDATE plan_instances SET day_id = NULL
+        WHERE event_id = $1 AND day_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM program_days d WHERE d.id = day_id AND d.program_id IS NOT DISTINCT FROM $2)
+        "#,
+        a_id,
+        a_req.program_id
+    )
+    .execute(&mut *tx)
+    .await?;
 
-    let event = load_event(&mut tx, owner_id, a_id).await?;
-    resync_event_blocks(&mut tx, &event).await?;
     replan(&mut tx, owner_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
+    let content = load_content(&mut tx, a_id, None).await?;
     tx.commit().await?;
-    Ok(Json(event.into_dto()))
+    Ok(Json(event.into_dto(content)))
 }
 
 pub async fn delete_event(
@@ -309,16 +345,6 @@ pub async fn delete_event(
 {
     let mut tx = a_state.db.begin().await?;
     let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
-    let planned = sqlx::query_scalar!(
-        r#"
-        SELECT m.id FROM plan_instances i JOIN status_marks m ON m.id = i.status_mark_id AND m.is_planned
-        WHERE i.event_id = $1
-        "#,
-        a_id
-    )
-    .fetch_all(&mut *tx)
-    .await?;
-    drop_planned_marks(&mut tx, &planned).await?;
     let deleted = sqlx::query!("DELETE FROM plan_events WHERE id = $1 AND user_id = $2", a_id, owner_id)
         .execute(&mut *tx)
         .await?;
@@ -387,21 +413,28 @@ pub async fn save_occurrence(
     .execute(&mut *tx)
     .await?;
     sync_plan_mark(&mut tx, a_user.user_id, owner_id, &event, a_date).await?;
-    sqlx::query!(
-        r#"
-        DELETE FROM plan_instances
-        WHERE event_id = $1 AND occ_date = $2 AND state = 'planned' AND moved_date IS NULL AND session_id IS NULL
-          AND status_mark_id IS NULL
-        "#,
-        a_id,
-        a_date
-    )
-    .execute(&mut *tx)
-    .await?;
+    drop_plain_instance(&mut tx, a_id, a_date).await?;
 
     replan(&mut tx, owner_id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn drop_plain_instance(a_conn: &mut PgConnection, a_event_id: Uuid, a_occ_date: NaiveDate)
+    -> Result<(), ApiError>
+{
+    sqlx::query!(
+        r#"
+        DELETE FROM plan_instances
+        WHERE event_id = $1 AND occ_date = $2 AND state = 'planned' AND moved_date IS NULL AND session_id IS NULL
+          AND status_mark_id IS NULL AND NOT is_custom AND day_id IS NULL
+        "#,
+        a_event_id,
+        a_occ_date
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    Ok(())
 }
 
 fn occurrence_span(
@@ -417,63 +450,253 @@ fn occurrence_span(
     (start, start + Duration::minutes(i64::from(a_event.duration_min)))
 }
 
-struct PlanBlockRow
+fn apply_target(a_event: &EventRow, a_occ_date: NaiveDate) -> ApplyTarget
+{
+    ApplyTarget {
+        event_id: a_event.id,
+        occ_date: a_occ_date,
+        category: a_event.category,
+        zone: a_event.zone(),
+    }
+}
+
+struct PlanMarkRow
 {
     state: PlanState,
     moved_date: Option<NaiveDate>,
     moved_time: Option<NaiveTime>,
     session_id: Option<Uuid>,
     is_session_auto: bool,
+    day_id: Option<Uuid>,
     mark_id: Option<Uuid>,
-    is_planned: Option<bool>,
+    mark_status: Option<RoutineStatus>,
+    mark_note: Option<String>,
     mark_start: Option<DateTime<Utc>>,
-    mark_end: Option<DateTime<Utc>>,
 }
 
-async fn plan_block(
+async fn sync_plan_mark(
     a_conn: &mut PgConnection,
-    a_event_id: Uuid,
+    a_actor_id: Uuid,
+    a_owner_id: Uuid,
+    a_event: &EventRow,
     a_occ_date: NaiveDate,
-) -> Result<Option<PlanBlockRow>, ApiError>
+) -> Result<(), ApiError>
 {
-    Ok(sqlx::query_as!(
-        PlanBlockRow,
+    let Some(row) = sqlx::query_as!(
+        PlanMarkRow,
         r#"
-        SELECT i.state AS "state: PlanState", i.moved_date, i.moved_time, i.session_id, i.is_session_auto,
-               m.id AS "mark_id?", m.is_planned AS "is_planned?", m.start_ts AS "mark_start?", m.end_ts AS mark_end
+        SELECT i.state AS "state: PlanState", i.moved_date, i.moved_time, i.session_id, i.is_session_auto, i.day_id,
+               m.id AS "mark_id?", m.status AS "mark_status?: RoutineStatus", m.note AS "mark_note?",
+               m.start_ts AS "mark_start?"
         FROM plan_instances i
         LEFT JOIN status_marks m ON m.id = i.status_mark_id
         WHERE i.event_id = $1 AND i.occ_date = $2
         "#,
-        a_event_id,
+        a_event.id,
         a_occ_date
     )
     .fetch_optional(&mut *a_conn)
-    .await?)
+    .await?
+    else
+    {
+        return Ok(());
+    };
+
+    let span = occurrence_span(a_event, a_occ_date, row.moved_date, row.moved_time);
+    let is_session_owned = row.session_id.is_some() && !row.is_session_auto;
+    let is_wanted = row.state == PlanState::Done && !is_session_owned;
+    match (is_wanted, row.mark_id.zip(row.mark_start))
+    {
+        (true, None) => apply_occurrence(a_conn, a_actor_id, a_owner_id, a_event, a_occ_date, &row, span).await,
+        (false, Some((mark_id, _))) => revert_occurrence(a_conn, a_owner_id, a_event, a_occ_date, &row, mark_id).await,
+        (true, Some((mark_id, mark_start))) if mark_start != span.0 =>
+        {
+            move_occurrence(
+                a_conn,
+                a_owner_id,
+                a_event,
+                a_occ_date,
+                &row,
+                (mark_id, mark_start),
+                span,
+            )
+            .await
+        }
+        _ => Ok(()),
+    }
 }
 
-async fn insert_planned_mark(
+async fn apply_occurrence(
+    a_conn: &mut PgConnection,
+    a_actor_id: Uuid,
+    a_owner_id: Uuid,
+    a_event: &EventRow,
+    a_occ_date: NaiveDate,
+    a_row: &PlanMarkRow,
+    a_span: (DateTime<Utc>, DateTime<Utc>),
+) -> Result<(), ApiError>
+{
+    let (start, end) = a_span;
+    let status = a_event.category.unwrap_or(RoutineStatus::Other);
+    let twin = sqlx::query_scalar!(
+        r#"
+        SELECT m.id FROM status_marks m
+        WHERE m.user_id = $1 AND m.start_ts = $2 AND m.status = $3
+          AND NOT EXISTS (SELECT 1 FROM plan_instances i WHERE i.status_mark_id = m.id)
+        "#,
+        a_owner_id,
+        start,
+        status as RoutineStatus
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?;
+    let mark_id = match twin
+    {
+        Some(mark_id) => mark_id,
+        None =>
+        {
+            place_mark(
+                a_conn,
+                a_owner_id,
+                status,
+                Some(a_event.title.clone()),
+                start,
+                Some(end),
+            )
+            .await?
+            .id
+        }
+    };
+    sqlx::query!(
+        "UPDATE plan_instances SET status_mark_id = $3 WHERE event_id = $1 AND occ_date = $2",
+        a_event.id,
+        a_occ_date,
+        mark_id
+    )
+    .execute(&mut *a_conn)
+    .await?;
+    apply_content(
+        a_conn,
+        a_actor_id,
+        a_owner_id,
+        &apply_target(a_event, a_occ_date),
+        mark_id,
+        start,
+    )
+    .await?;
+
+    if a_row.session_id.is_some()
+    {
+        return Ok(());
+    }
+    let day_id = match a_row.day_id
+    {
+        Some(day_id) => Some(day_id),
+        None => training_day(a_conn, a_owner_id, a_event).await?,
+    };
+    let Some(day_id) = day_id
+    else
+    {
+        return Ok(());
+    };
+    if let Some(session_id) = record_planned_session(a_conn, a_owner_id, day_id, start, end, mark_id).await?
+    {
+        sqlx::query!(
+            "UPDATE plan_instances SET session_id = $3, is_session_auto = TRUE WHERE event_id = $1 AND occ_date = $2",
+            a_event.id,
+            a_occ_date,
+            session_id
+        )
+        .execute(&mut *a_conn)
+        .await?;
+    }
+    Ok(())
+}
+
+async fn revert_occurrence(
     a_conn: &mut PgConnection,
     a_owner_id: Uuid,
     a_event: &EventRow,
     a_occ_date: NaiveDate,
-    a_start: DateTime<Utc>,
-    a_end: DateTime<Utc>,
-) -> Result<Uuid, ApiError>
+    a_row: &PlanMarkRow,
+    a_mark_id: Uuid,
+) -> Result<(), ApiError>
 {
-    let mark_id = sqlx::query_scalar!(
+    revert_content(a_conn, a_event.id, a_occ_date).await?;
+    if let Some(session_id) = a_row.session_id.filter(|_| a_row.is_session_auto)
+    {
+        sqlx::query!("DELETE FROM workout_sessions WHERE id = $1", session_id)
+            .execute(&mut *a_conn)
+            .await?;
+    }
+    sqlx::query!(
         r#"
-        INSERT INTO status_marks (user_id, status, note, start_ts, end_ts, is_planned)
-        VALUES ($1, $2, $3, $4, $5, TRUE)
-        RETURNING id
+        UPDATE plan_instances SET status_mark_id = NULL, is_session_auto = FALSE
+        WHERE event_id = $1 AND occ_date = $2
         "#,
-        a_owner_id,
-        a_event.category.unwrap_or(RoutineStatus::Other) as RoutineStatus,
-        a_event.title,
-        a_start,
-        a_end
+        a_event.id,
+        a_occ_date
     )
-    .fetch_one(&mut *a_conn)
+    .execute(&mut *a_conn)
+    .await?;
+
+    let status = a_event.category.unwrap_or(RoutineStatus::Other);
+    let is_untouched = a_row.mark_status == Some(status) && a_row.mark_note.as_deref() == Some(a_event.title.as_str());
+    if is_untouched && !mark_links(a_conn, a_mark_id).await?.is_used()
+    {
+        lift_mark(a_conn, a_owner_id, a_mark_id).await?;
+    }
+    Ok(())
+}
+
+async fn move_occurrence(
+    a_conn: &mut PgConnection,
+    a_owner_id: Uuid,
+    a_event: &EventRow,
+    a_occ_date: NaiveDate,
+    a_row: &PlanMarkRow,
+    a_mark: (Uuid, DateTime<Utc>),
+    a_span: (DateTime<Utc>, DateTime<Utc>),
+) -> Result<(), ApiError>
+{
+    let (old_id, old_start) = a_mark;
+    let (start, end) = a_span;
+    let auto_session = a_row.session_id.filter(|_| a_row.is_session_auto);
+    if let Some(session_id) = auto_session
+    {
+        sqlx::query!(
+            "UPDATE workout_sessions SET status_mark_id = NULL WHERE id = $1",
+            session_id
+        )
+        .execute(&mut *a_conn)
+        .await?;
+    }
+    let entries = sqlx::query_scalar!("SELECT id FROM meal_entries WHERE status_mark_id = $1", old_id)
+        .fetch_all(&mut *a_conn)
+        .await?;
+    let status = a_row.mark_status.unwrap_or(RoutineStatus::Other);
+    let note = a_row.mark_note.clone();
+    if mark_links(a_conn, old_id).await?.has_others
+    {
+        sqlx::query!(
+            "UPDATE meal_entries SET status_mark_id = NULL WHERE status_mark_id = $1",
+            old_id
+        )
+        .execute(&mut *a_conn)
+        .await?;
+    }
+    else
+    {
+        lift_mark(a_conn, a_owner_id, old_id).await?;
+    }
+
+    let mark_id = place_mark(a_conn, a_owner_id, status, note, start, Some(end)).await?.id;
+    sqlx::query!(
+        "UPDATE meal_entries SET status_mark_id = $1 WHERE id = ANY($2)",
+        mark_id,
+        &entries
+    )
+    .execute(&mut *a_conn)
     .await?;
     sqlx::query!(
         "UPDATE plan_instances SET status_mark_id = $3 WHERE event_id = $1 AND occ_date = $2",
@@ -483,41 +706,19 @@ async fn insert_planned_mark(
     )
     .execute(&mut *a_conn)
     .await?;
-    Ok(mark_id)
-}
-
-async fn drop_planned_marks(a_conn: &mut PgConnection, a_mark_ids: &[Uuid]) -> Result<(), ApiError>
-{
-    sqlx::query!(
-        r#"
-        DELETE FROM meal_entries
-        WHERE status_mark_id IN (SELECT id FROM status_marks WHERE id = ANY($1) AND is_planned)
-        "#,
-        a_mark_ids
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    sqlx::query!("DELETE FROM status_marks WHERE id = ANY($1) AND is_planned", a_mark_ids)
+    if let Some(session_id) = auto_session
+    {
+        sqlx::query!(
+            "UPDATE workout_sessions SET status_mark_id = $2, started_ts = $3, finished_ts = $4 WHERE id = $1",
+            session_id,
+            mark_id,
+            start,
+            end
+        )
         .execute(&mut *a_conn)
         .await?;
-    Ok(())
-}
-
-async fn date_mark_entries(
-    a_conn: &mut PgConnection,
-    a_event: &EventRow,
-    a_mark_id: Uuid,
-    a_start: DateTime<Utc>,
-) -> Result<(), ApiError>
-{
-    sqlx::query!(
-        "UPDATE meal_entries SET eaten_on = $2 WHERE status_mark_id = $1",
-        a_mark_id,
-        local_date(a_event.zone(), a_start)
-    )
-    .execute(&mut *a_conn)
-    .await?;
-    Ok(())
+    }
+    shift_content(a_conn, &apply_target(a_event, a_occ_date), old_start, start).await
 }
 
 async fn training_day(a_conn: &mut PgConnection, a_owner_id: Uuid, a_event: &EventRow)
@@ -540,251 +741,42 @@ async fn training_day(a_conn: &mut PgConnection, a_owner_id: Uuid, a_event: &Eve
     )
 }
 
-async fn accept_block(
-    a_conn: &mut PgConnection,
-    a_actor_id: Uuid,
-    a_owner_id: Uuid,
-    a_event: &EventRow,
-    a_occ_date: NaiveDate,
-    a_planned_id: Uuid,
-    a_span: (DateTime<Utc>, DateTime<Utc>),
-) -> Result<(), ApiError>
+pub async fn reopen_plan_by_mark(a_conn: &mut PgConnection, a_mark_id: Uuid) -> Result<Option<Uuid>, ApiError>
 {
-    let (start, end) = a_span;
-    let status = sqlx::query_scalar!(
-        r#"SELECT status AS "status: RoutineStatus" FROM status_marks WHERE id = $1"#,
-        a_planned_id
-    )
-    .fetch_one(&mut *a_conn)
-    .await?;
-    let entries = sqlx::query_scalar!("SELECT id FROM meal_entries WHERE status_mark_id = $1", a_planned_id)
-        .fetch_all(&mut *a_conn)
-        .await?;
-    let twin = sqlx::query_scalar!(
+    let Some(link) = sqlx::query!(
         r#"
-        SELECT m.id FROM status_marks m
-        WHERE m.user_id = $1 AND m.start_ts = $2 AND m.status = $3 AND NOT m.is_planned
-          AND NOT EXISTS (SELECT 1 FROM plan_instances i WHERE i.status_mark_id = m.id)
+        SELECT i.event_id, i.occ_date, i.session_id, i.is_session_auto, e.user_id
+        FROM plan_instances i JOIN plan_events e ON e.id = i.event_id
+        WHERE i.status_mark_id = $1
         "#,
-        a_owner_id,
-        start,
-        status as RoutineStatus
+        a_mark_id
     )
     .fetch_optional(&mut *a_conn)
-    .await?;
-
-    let mark_id = match twin
+    .await?
+    else
     {
-        Some(twin_id) =>
-        {
-            sqlx::query!(
-                "UPDATE meal_entries SET status_mark_id = $2 WHERE status_mark_id = $1",
-                a_planned_id,
-                twin_id
-            )
-            .execute(&mut *a_conn)
-            .await?;
-            sqlx::query!(
-                "UPDATE work_task_events SET status_mark_id = $2 WHERE status_mark_id = $1",
-                a_planned_id,
-                twin_id
-            )
-            .execute(&mut *a_conn)
-            .await?;
-            sqlx::query!(
-                "UPDATE plan_instances SET status_mark_id = $3 WHERE event_id = $1 AND occ_date = $2",
-                a_event.id,
-                a_occ_date,
-                twin_id
-            )
-            .execute(&mut *a_conn)
-            .await?;
-            sqlx::query!("DELETE FROM status_marks WHERE id = $1", a_planned_id)
-                .execute(&mut *a_conn)
-                .await?;
-            twin_id
-        }
-        None =>
-        {
-            realize_mark(a_conn, a_owner_id, a_planned_id, start, end).await?;
-            a_planned_id
-        }
+        return Ok(None);
     };
-    date_mark_entries(a_conn, a_event, mark_id, start).await?;
-    consume_mark_entries(a_conn, a_actor_id, &entries).await?;
-
-    if let Some(day_id) = training_day(a_conn, a_owner_id, a_event).await?
-    {
-        if let Some(session_id) = record_planned_session(a_conn, a_owner_id, day_id, start, end, mark_id).await?
-        {
-            sqlx::query!(
-                r#"
-                UPDATE plan_instances SET session_id = $3, is_session_auto = TRUE, done_ts = COALESCE(done_ts, NOW())
-                WHERE event_id = $1 AND occ_date = $2
-                "#,
-                a_event.id,
-                a_occ_date,
-                session_id
-            )
-            .execute(&mut *a_conn)
-            .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn reopen_block(
-    a_conn: &mut PgConnection,
-    a_owner_id: Uuid,
-    a_event: &EventRow,
-    a_occ_date: NaiveDate,
-    a_block: &PlanBlockRow,
-    a_mark_id: Uuid,
-    a_span: (DateTime<Utc>, DateTime<Utc>),
-) -> Result<(), ApiError>
-{
-    release_mark_entries(a_conn, a_mark_id).await?;
-    if let Some(session_id) = a_block.session_id.filter(|_| a_block.is_session_auto)
+    revert_content(a_conn, link.event_id, link.occ_date).await?;
+    if let Some(session_id) = link.session_id.filter(|_| link.is_session_auto)
     {
         sqlx::query!("DELETE FROM workout_sessions WHERE id = $1", session_id)
             .execute(&mut *a_conn)
             .await?;
-        sqlx::query!(
-            "UPDATE plan_instances SET is_session_auto = FALSE WHERE event_id = $1 AND occ_date = $2",
-            a_event.id,
-            a_occ_date
-        )
-        .execute(&mut *a_conn)
-        .await?;
     }
-    withdraw_mark(a_conn, a_owner_id, a_mark_id).await?;
-    let (start, end) = a_span;
     sqlx::query!(
-        "UPDATE status_marks SET start_ts = $2, end_ts = $3 WHERE id = $1",
-        a_mark_id,
-        start,
-        end
+        r#"
+        UPDATE plan_instances
+        SET state = 'planned', done_ts = NULL, status_mark_id = NULL, is_session_auto = FALSE, updated_ts = NOW()
+        WHERE event_id = $1 AND occ_date = $2
+        "#,
+        link.event_id,
+        link.occ_date
     )
     .execute(&mut *a_conn)
     .await?;
-    date_mark_entries(a_conn, a_event, a_mark_id, start).await
-}
-
-async fn sync_plan_mark(
-    a_conn: &mut PgConnection,
-    a_actor_id: Uuid,
-    a_owner_id: Uuid,
-    a_event: &EventRow,
-    a_occ_date: NaiveDate,
-) -> Result<(), ApiError>
-{
-    let Some(block) = plan_block(a_conn, a_event.id, a_occ_date).await?
-    else
-    {
-        return Ok(());
-    };
-    let span = occurrence_span(a_event, a_occ_date, block.moved_date, block.moved_time);
-    let is_done = block.state == PlanState::Done;
-    let is_session_owned = block.session_id.is_some() && !block.is_session_auto;
-
-    match (block.mark_id, block.is_planned)
-    {
-        (Some(mark_id), Some(true)) if is_done && !is_session_owned =>
-        {
-            accept_block(a_conn, a_actor_id, a_owner_id, a_event, a_occ_date, mark_id, span).await
-        }
-        (Some(mark_id), Some(true)) =>
-        {
-            if block.mark_start != Some(span.0) || block.mark_end != Some(span.1)
-            {
-                sqlx::query!(
-                    "UPDATE status_marks SET start_ts = $2, end_ts = $3 WHERE id = $1",
-                    mark_id,
-                    span.0,
-                    span.1
-                )
-                .execute(&mut *a_conn)
-                .await?;
-                date_mark_entries(a_conn, a_event, mark_id, span.0).await?;
-            }
-            Ok(())
-        }
-        (Some(mark_id), Some(false)) if !is_done =>
-        {
-            reopen_block(a_conn, a_owner_id, a_event, a_occ_date, &block, mark_id, span).await
-        }
-        (Some(mark_id), Some(false)) if block.mark_start != Some(span.0) =>
-        {
-            withdraw_mark(a_conn, a_owner_id, mark_id).await?;
-            realize_mark(a_conn, a_owner_id, mark_id, span.0, span.1).await?;
-            date_mark_entries(a_conn, a_event, mark_id, span.0).await?;
-            if let Some(session_id) = block.session_id.filter(|_| block.is_session_auto)
-            {
-                sqlx::query!(
-                    "UPDATE workout_sessions SET started_ts = $2, finished_ts = $3 WHERE id = $1",
-                    session_id,
-                    span.0,
-                    span.1
-                )
-                .execute(&mut *a_conn)
-                .await?;
-            }
-            Ok(())
-        }
-        (None, _) if is_done && !is_session_owned =>
-        {
-            let mark_id = insert_planned_mark(a_conn, a_owner_id, a_event, a_occ_date, span.0, span.1).await?;
-            accept_block(a_conn, a_actor_id, a_owner_id, a_event, a_occ_date, mark_id, span).await
-        }
-        _ => Ok(()),
-    }
-}
-
-pub async fn ensure_block(
-    State(a_state): State<AppState>,
-    a_user: AuthUser,
-    ApiPath((a_id, a_date)): ApiPath<(Uuid, NaiveDate)>,
-) -> Result<Json<PlanBlockDto>, ApiError>
-{
-    let mut tx = a_state.db.begin().await?;
-    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
-    let event = load_event(&mut tx, owner_id, a_id).await?;
-    if !event.rule().occurs_on(a_date)
-    {
-        return Err(ApiError::NotFound);
-    }
-    sqlx::query!(
-        "INSERT INTO plan_instances (event_id, occ_date) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        a_id,
-        a_date
-    )
-    .execute(&mut *tx)
-    .await?;
-    let block = plan_block(&mut tx, a_id, a_date).await?.ok_or(ApiError::NotFound)?;
-
-    let session_mark = match block.session_id
-    {
-        Some(session_id) =>
-        {
-            sqlx::query_scalar!("SELECT status_mark_id FROM workout_sessions WHERE id = $1", session_id)
-                .fetch_one(&mut *tx)
-                .await?
-        }
-        None => None,
-    };
-    let mark_id = match (block.mark_id, session_mark)
-    {
-        (Some(mark_id), _) | (None, Some(mark_id)) => mark_id,
-        (None, None) =>
-        {
-            let (start, end) = occurrence_span(&event, a_date, block.moved_date, block.moved_time);
-            let mark_id = insert_planned_mark(&mut tx, owner_id, &event, a_date, start, end).await?;
-            sync_plan_mark(&mut tx, a_user.user_id, owner_id, &event, a_date).await?;
-            mark_id
-        }
-    };
-    tx.commit().await?;
-    Ok(Json(PlanBlockDto { mark_id }))
+    drop_plain_instance(a_conn, link.event_id, link.occ_date).await?;
+    Ok(Some(link.user_id))
 }
 
 pub async fn mark_plan(
@@ -793,17 +785,12 @@ pub async fn mark_plan(
     a_mark_id: Uuid,
 ) -> Result<Option<OccurrenceDto>, ApiError>
 {
-    let link = sqlx::query!(
-        r#"
-        SELECT i.event_id, i.occ_date, i.moved_date
-        FROM plan_instances i
-        WHERE i.status_mark_id = $1
-        "#,
+    let Some(link) = sqlx::query!(
+        "SELECT event_id, occ_date, moved_date FROM plan_instances WHERE status_mark_id = $1",
         a_mark_id
     )
     .fetch_optional(&mut *a_conn)
-    .await?;
-    let Some(link) = link
+    .await?
     else
     {
         return Ok(None);
@@ -815,67 +802,152 @@ pub async fn mark_plan(
         .find(|occurrence| occurrence.event_id == link.event_id && occurrence.occ_date == link.occ_date))
 }
 
-async fn resync_event_blocks(a_conn: &mut PgConnection, a_event: &EventRow) -> Result<(), ApiError>
+pub async fn occurrence_details(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_id, a_date)): ApiPath<(Uuid, NaiveDate)>,
+) -> Result<Json<OccurrenceDetailsDto>, ApiError>
 {
-    let blocks = sqlx::query!(
-        r#"
-        SELECT i.occ_date, i.moved_date, i.moved_time, m.id AS mark_id, m.status AS "status: RoutineStatus"
-        FROM plan_instances i
-        JOIN status_marks m ON m.id = i.status_mark_id AND m.is_planned
-        WHERE i.event_id = $1
-        "#,
-        a_event.id
-    )
-    .fetch_all(&mut *a_conn)
-    .await?;
-    let status = a_event.category.unwrap_or(RoutineStatus::Other);
-    let mut gone = Vec::new();
-    for block in blocks
+    let mut conn = a_state.db.acquire().await?;
+    let owner_id = event_owner(&mut conn, a_user.user_id, a_id).await?;
+    let event = load_event(&mut conn, owner_id, a_id).await?;
+    if !event.rule().occurs_on(a_date)
     {
-        if !a_event.rule().occurs_on(block.occ_date)
-        {
-            gone.push(block.mark_id);
-            continue;
-        }
-        if block.status == RoutineStatus::Meal && status != RoutineStatus::Meal
-        {
-            sqlx::query!("DELETE FROM meal_entries WHERE status_mark_id = $1", block.mark_id)
-                .execute(&mut *a_conn)
-                .await?;
-        }
-        let (start, end) = occurrence_span(a_event, block.occ_date, block.moved_date, block.moved_time);
-        sqlx::query!(
-            "UPDATE status_marks SET status = $2, note = $3, start_ts = $4, end_ts = $5 WHERE id = $1",
-            block.mark_id,
-            status as RoutineStatus,
-            a_event.title,
-            start,
-            end
-        )
-        .execute(&mut *a_conn)
-        .await?;
-        date_mark_entries(a_conn, a_event, block.mark_id, start).await?;
+        return Err(ApiError::NotFound);
     }
-    drop_planned_marks(a_conn, &gone).await
+    details_of(&mut conn, owner_id, &event, a_date).await.map(Json)
 }
 
-async fn drop_session_slot_block(
+async fn details_of(
     a_conn: &mut PgConnection,
-    a_event_id: Uuid,
+    a_owner_id: Uuid,
+    a_event: &EventRow,
     a_occ_date: NaiveDate,
-) -> Result<(), ApiError>
+) -> Result<OccurrenceDetailsDto, ApiError>
 {
-    let mark_ids = sqlx::query_scalar!(
+    let instance = sqlx::query!(
         r#"
-        SELECT m.id FROM plan_instances i JOIN status_marks m ON m.id = i.status_mark_id AND m.is_planned
+        SELECT i.is_custom, i.moved_date, i.day_id, d.name AS "day_name?"
+        FROM plan_instances i LEFT JOIN program_days d ON d.id = i.day_id
         WHERE i.event_id = $1 AND i.occ_date = $2
         "#,
-        a_event_id,
+        a_event.id,
         a_occ_date
     )
-    .fetch_all(&mut *a_conn)
+    .fetch_optional(&mut *a_conn)
     .await?;
-    drop_planned_marks(a_conn, &mark_ids).await
+    let is_custom = instance.as_ref().is_some_and(|instance| instance.is_custom);
+    let day = instance
+        .as_ref()
+        .and_then(|instance| instance.moved_date)
+        .unwrap_or(a_occ_date);
+    let occurrence = load_occurrences(a_conn, a_owner_id, day, day)
+        .await?
+        .into_iter()
+        .find(|occurrence| occurrence.event_id == a_event.id && occurrence.occ_date == a_occ_date)
+        .ok_or(ApiError::NotFound)?;
+    let content = load_content(a_conn, a_event.id, is_custom.then_some(a_occ_date)).await?;
+    let custom_day = instance.and_then(|instance| instance.day_id.zip(instance.day_name));
+    Ok(OccurrenceDetailsDto {
+        occurrence,
+        owner_id: a_owner_id,
+        is_custom,
+        content,
+        program_name: a_event.program_name.clone(),
+        day_id: custom_day.as_ref().map(|(id, _)| *id).or(a_event.day_id),
+        day_name: custom_day.map(|(_, name)| name).or_else(|| a_event.day_name.clone()),
+    })
+}
+
+pub async fn save_occurrence_content(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_id, a_date)): ApiPath<(Uuid, NaiveDate)>,
+    ApiJson(a_req): ApiJson<SaveOccurrenceContentRequest>,
+) -> Result<Json<OccurrenceDetailsDto>, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
+    if !event.rule().occurs_on(a_date)
+    {
+        return Err(ApiError::NotFound);
+    }
+    if let Some(day_id) = a_req.day_id
+    {
+        let is_valid = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM program_days WHERE id = $1 AND program_id IS NOT DISTINCT FROM $2) AS "is_valid!""#,
+            day_id,
+            event.program_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if !is_valid
+        {
+            return Err(ApiError::Validation("day_id"));
+        }
+    }
+    let state = sqlx::query_scalar!(
+        r#"
+        INSERT INTO plan_instances (event_id, occ_date, is_custom, day_id, updated_ts)
+        VALUES ($1, $2, TRUE, $3, NOW())
+        ON CONFLICT (event_id, occ_date) DO UPDATE SET is_custom = TRUE, day_id = EXCLUDED.day_id, updated_ts = NOW()
+        RETURNING state AS "state: PlanState"
+        "#,
+        a_id,
+        a_date,
+        a_req.day_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if state == PlanState::Done
+    {
+        return Err(ApiError::Conflict("PLAN_DONE"));
+    }
+    save_content(
+        &mut tx,
+        a_user.user_id,
+        owner_id,
+        a_id,
+        Some(a_date),
+        event.category,
+        &a_req.content,
+    )
+    .await?;
+    let details = details_of(&mut tx, owner_id, &event, a_date).await?;
+    tx.commit().await?;
+    Ok(Json(details))
+}
+
+pub async fn reset_occurrence_content(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath((a_id, a_date)): ApiPath<(Uuid, NaiveDate)>,
+) -> Result<Json<OccurrenceDetailsDto>, ApiError>
+{
+    let mut tx = a_state.db.begin().await?;
+    let owner_id = event_owner(&mut tx, a_user.user_id, a_id).await?;
+    let event = load_event(&mut tx, owner_id, a_id).await?;
+    let state = sqlx::query_scalar!(
+        r#"
+        UPDATE plan_instances SET is_custom = FALSE, day_id = NULL, updated_ts = NOW()
+        WHERE event_id = $1 AND occ_date = $2
+        RETURNING state AS "state: PlanState"
+        "#,
+        a_id,
+        a_date
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if state == Some(PlanState::Done)
+    {
+        return Err(ApiError::Conflict("PLAN_DONE"));
+    }
+    clear_content(&mut tx, a_id, Some(a_date)).await?;
+    drop_plain_instance(&mut tx, a_id, a_date).await?;
+    let details = details_of(&mut tx, owner_id, &event, a_date).await?;
+    tx.commit().await?;
+    Ok(Json(details))
 }
 
 pub async fn start_occurrence(
@@ -891,21 +963,21 @@ pub async fn start_occurrence(
     {
         return Err(ApiError::NotFound);
     }
-    let program_id = event.program_id.ok_or(ApiError::Validation("program_id"))?;
-
-    let day_id = match event.day_id
+    event.program_id.ok_or(ApiError::Validation("program_id"))?;
+    let custom_day = sqlx::query_scalar!(
+        "SELECT day_id FROM plan_instances WHERE event_id = $1 AND occ_date = $2",
+        a_id,
+        a_date
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .flatten();
+    let day_id = match custom_day
     {
         Some(day_id) => Some(day_id),
-        None =>
-        {
-            let offset = zone_offset(event.zone(), Utc::now());
-            program_plan(&mut tx, owner_id, Some(program_id), offset, PLAN_HORIZON_DAYS)
-                .await?
-                .and_then(|(_, upcoming)| upcoming.first().map(|planned| planned.day_id))
-        }
+        None => training_day(&mut tx, owner_id, &event).await?,
     };
 
-    drop_session_slot_block(&mut tx, a_id, a_date).await?;
     let session_id = begin_session(&mut tx, owner_id, day_id, None).await?;
     sqlx::query!(
         r#"
@@ -920,6 +992,7 @@ pub async fn start_occurrence(
     )
     .execute(&mut *tx)
     .await?;
+    sync_plan_mark(&mut tx, a_user.user_id, owner_id, &event, a_date).await?;
 
     let dto = load_session(&mut tx, owner_id, session_id).await?;
     tx.commit().await?;
@@ -952,16 +1025,6 @@ pub async fn complete_session_slot(
     )
     .execute(&mut *a_conn)
     .await?;
-    let planned = sqlx::query_scalar!(
-        r#"
-        SELECT m.id FROM plan_instances i JOIN status_marks m ON m.id = i.status_mark_id AND m.is_planned
-        WHERE i.session_id = $1
-        "#,
-        a_session_id
-    )
-    .fetch_all(&mut *a_conn)
-    .await?;
-    drop_planned_marks(a_conn, &planned).await?;
     let Some(program_id) = a_program_id.filter(|_| linked.rows_affected() == 0)
     else
     {
@@ -996,7 +1059,7 @@ pub async fn complete_session_slot(
     )
     .execute(&mut *a_conn)
     .await?;
-    drop_session_slot_block(a_conn, slot.event_id, slot.occ_date).await
+    Ok(())
 }
 
 pub async fn reopen_session_slot(a_conn: &mut PgConnection, a_session_id: Uuid) -> Result<(), ApiError>
@@ -1184,10 +1247,12 @@ pub async fn load_occurrences(
         InstanceRow,
         r#"
         SELECT i.event_id, i.occ_date, i.state AS "state: PlanState", i.moved_date, i.moved_time, i.session_id,
-               i.status_mark_id, COALESCE(s.finished_ts IS NULL AND s.id IS NOT NULL, FALSE) AS "is_session_active!"
+               i.status_mark_id, d.name AS "day_name?",
+               COALESCE(s.finished_ts IS NULL AND s.id IS NOT NULL, FALSE) AS "is_session_active!"
         FROM plan_instances i
         JOIN plan_events e ON e.id = i.event_id
         LEFT JOIN workout_sessions s ON s.id = i.session_id
+        LEFT JOIN program_days d ON d.id = i.day_id
         WHERE e.user_id = $1 AND (i.occ_date BETWEEN $2 AND $3 OR i.moved_date BETWEEN $2 AND $3)
         "#,
         a_user_id,
@@ -1267,7 +1332,10 @@ pub async fn load_occurrences(
             is_moved: draft.date != draft.occ_date
                 || draft.instance.is_some_and(|instance| instance.moved_time.is_some()),
             program_id: draft.event.program_id,
-            day_name: draft.event.day_name.clone(),
+            day_name: draft
+                .instance
+                .and_then(|instance| instance.day_name.clone())
+                .or_else(|| draft.event.day_name.clone()),
             session_id: draft.instance.and_then(|instance| instance.session_id),
             status_mark_id: draft.instance.and_then(|instance| instance.status_mark_id),
             is_session_active: draft.instance.is_some_and(|instance| instance.is_session_active),

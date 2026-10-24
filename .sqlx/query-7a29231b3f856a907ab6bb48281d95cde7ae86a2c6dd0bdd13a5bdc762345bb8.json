@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE plan_instances SET session_id = $3, is_session_auto = TRUE WHERE event_id = $1 AND occ_date = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7a29231b3f856a907ab6bb48281d95cde7ae86a2c6dd0bdd13a5bdc762345bb8"
+}
