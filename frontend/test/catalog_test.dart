@@ -44,6 +44,7 @@ class _FakeApi extends ApiSvc
     bool aIsMine = false,
     ItemKind? aKind,
     String? aCatId,
+    bool aIsInStock = false,
   }) async =>
       [
         const DictItemDto(id: 'i1', name: 'Maasdam President 200 g', kind: ItemKind.food, unit: ItemUnit.piece, catId: 'maasdam'),

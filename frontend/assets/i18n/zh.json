@@ -85,7 +85,8 @@
     "TOO_MANY_LOTS": "该仓库批次过多",
     "PUSH_UNAVAILABLE": "服务器未配置推送通知",
     "TOO_MANY_MARKS": "热量校正过多：请删除旧的校正。",
-    "PLAN_DONE": "该计划已完成，请先恢复为计划。"
+    "PLAN_DONE": "该计划已完成，请先恢复为计划。",
+    "CAT_NO_FOOD": "该分类中没有带营养信息的食品"
   },
   "sidebar": {
     "routine": "日常",
@@ -1217,7 +1218,8 @@
     "edit_day_title": "{} · {}",
     "edit_day_hint": "修改只影响这一天，其他日期保持整个计划的设置。",
     "training_day_same": "与计划相同",
-    "reset_day": "与整个计划相同"
+    "reset_day": "与整个计划相同",
+    "food_from_cat": "该分类的任意食品 · {}"
   },
   "nutrition": {
     "title": "饮食日记",
@@ -1354,7 +1356,17 @@
     "no_meals": "还没有用餐。设置“用餐”状态或添加食物后，这一餐会出现在日程时间轴上。",
     "unlinked": "未归入用餐",
     "unlinked_hint": "“用餐”时段已删除或更改了类型。点按记录可将其移入某一餐。",
-    "open_block": "打开时间轴上的时段"
+    "open_block": "打开时间轴上的时段",
+    "stock_only": "仅限库存",
+    "in_stock": "库存中",
+    "stock_empty": "库存中没有合适的食物。关闭“仅限库存”即可从整个目录中选择。",
+    "nothing_in_stock": "库存中未找到",
+    "no_dishes_in_stock": "库存中没有做好的菜",
+    "tab_cats": "分类",
+    "cat_in_stock": "库存：{}",
+    "cat_hint": "可以选择任意层级的分类。计划完成时会从库存中取用：先用最早过期的，再用最早购买的。",
+    "cat_estimate_stock": "营养值是库存中该分类食品的平均值，完成计划时会按实际取用计算",
+    "cat_estimate_catalog": "目前库存中没有，营养值是目录中该分类食品的平均值"
   },
   "cats": {
     "title": "商品分类",

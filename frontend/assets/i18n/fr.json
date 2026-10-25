@@ -85,7 +85,8 @@
     "TOO_MANY_LOTS": "Trop de lots dans cette réserve",
     "PUSH_UNAVAILABLE": "Les notifications push ne sont pas configurées sur le serveur",
     "TOO_MANY_MARKS": "Trop de corrections du bilan : supprimez les anciennes.",
-    "PLAN_DONE": "Le plan est déjà fait — remettez-le d’abord en plan."
+    "PLAN_DONE": "Le plan est déjà fait — remettez-le d’abord en plan.",
+    "CAT_NO_FOOD": "Cette catégorie ne contient aucun produit avec des valeurs nutritives"
   },
   "sidebar": {
     "routine": "Routine",
@@ -1217,7 +1218,8 @@
     "edit_day_title": "{} · {}",
     "edit_day_hint": "Les changements ne concernent que ce jour ; les autres jours restent comme dans tout le plan.",
     "training_day_same": "Comme dans le plan",
-    "reset_day": "Comme dans tout le plan"
+    "reset_day": "Comme dans tout le plan",
+    "food_from_cat": "n’importe quel produit de la catégorie · {}"
   },
   "nutrition": {
     "title": "Journal alimentaire",
@@ -1354,7 +1356,17 @@
     "no_meals": "Aucun repas pour l’instant. Indiquez le statut « Repas » ou ajoutez un aliment : le repas apparaîtra sur la frise du jour.",
     "unlinked": "Hors repas",
     "unlinked_hint": "Le bloc « Repas » a été supprimé ou a changé de type. Touchez une entrée pour la placer dans un repas.",
-    "open_block": "Ouvrir le bloc de la frise"
+    "open_block": "Ouvrir le bloc de la frise",
+    "stock_only": "En stock uniquement",
+    "in_stock": "En stock",
+    "stock_empty": "Rien de convenable en stock. Désactivez « En stock uniquement » pour choisir dans tout le catalogue.",
+    "nothing_in_stock": "Rien trouvé en stock",
+    "no_dishes_in_stock": "Aucun plat cuisiné en stock",
+    "tab_cats": "Catégories",
+    "cat_in_stock": "en stock : {}",
+    "cat_hint": "Vous pouvez choisir une catégorie de n’importe quel niveau. Quand le plan est fait, la quantité est prise dans le stock : d’abord ce qui expire en premier, puis ce qui a été acheté en premier.",
+    "cat_estimate_stock": "Les valeurs nutritives sont la moyenne des produits de la catégorie en stock ; les valeurs exactes sont calculées quand le plan est fait",
+    "cat_estimate_catalog": "Rien de cette catégorie n’est en stock, les valeurs nutritives sont donc la moyenne de ses produits du catalogue"
   },
   "cats": {
     "title": "Catégories de produits",

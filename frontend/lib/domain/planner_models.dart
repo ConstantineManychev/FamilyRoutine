@@ -179,6 +179,7 @@ class PlanFood
   final MealSource source;
   final String? itemId;
   final String? dishId;
+  final String? catId;
   final String? title;
   final double? grams;
   final double? portions;
@@ -190,6 +191,7 @@ class PlanFood
     required this.source,
     this.itemId,
     this.dishId,
+    this.catId,
     this.title,
     this.grams,
     this.portions,
@@ -202,6 +204,7 @@ class PlanFood
         source: MealSource.parse(aJson['source']),
         itemId: aJson['item_id'] as String?,
         dishId: aJson['dish_id'] as String?,
+        catId: aJson['cat_id'] as String?,
         title: aJson['title'] as String?,
         grams: parseDecimalOrNull(aJson['grams']),
         portions: parseDecimalOrNull(aJson['portions']),
@@ -223,6 +226,7 @@ class PlanFood
         _ => {
             if (itemId != null) 'item_id': itemId,
             if (dishId != null) 'dish_id': dishId,
+            if (catId != null) 'cat_id': catId,
             if (portions != null) 'portions': amountWire(portions!) else 'grams': amountWire(grams ?? 0),
           },
       };

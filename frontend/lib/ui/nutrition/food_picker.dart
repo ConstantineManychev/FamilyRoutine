@@ -33,8 +33,15 @@ class FoodSearchPanel extends ConsumerStatefulWidget
   final ValueChanged<DictItemDto> onPick;
   final List<Widget> idleChildren;
   final bool isAutofocus;
+  final bool isStockOnly;
 
-  const FoodSearchPanel({super.key, required this.onPick, this.idleChildren = const [], this.isAutofocus = false});
+  const FoodSearchPanel({
+    super.key,
+    required this.onPick,
+    this.idleChildren = const [],
+    this.isAutofocus = false,
+    this.isStockOnly = false,
+  });
 
   @override
   ConsumerState<FoodSearchPanel> createState() => _FoodSearchPanelState();
@@ -48,6 +55,17 @@ class _FoodSearchPanelState extends ConsumerState<FoodSearchPanel>
   List<DictItemDto>? _results;
   Object? _error;
   bool _isBusy = false;
+
+  @override
+  void didUpdateWidget(covariant FoodSearchPanel aOldWidget)
+  {
+    super.didUpdateWidget(aOldWidget);
+    if (aOldWidget.isStockOnly != widget.isStockOnly && _query.isNotEmpty)
+    {
+      _results = null;
+      _load(_query);
+    }
+  }
 
   @override
   void dispose()
@@ -81,8 +99,11 @@ class _FoodSearchPanelState extends ConsumerState<FoodSearchPanel>
   {
     try
     {
-      final items = await ref.read(apiProv).getItems(aQuery: aQuery, aLimit: _searchLimit, aKind: ItemKind.food);
-      if (mounted && aQuery == _query)
+      final isStockOnly = widget.isStockOnly;
+      final items = await ref
+          .read(apiProv)
+          .getItems(aQuery: aQuery, aLimit: _searchLimit, aKind: ItemKind.food, aIsInStock: isStockOnly);
+      if (mounted && aQuery == _query && isStockOnly == widget.isStockOnly)
       {
         setState(() => _results = items);
       }
@@ -171,7 +192,7 @@ class _FoodSearchPanelState extends ConsumerState<FoodSearchPanel>
     else
     {
       body = [
-        if (results.isEmpty) BlockEmpty('nutrition.nothing_found'.tr()),
+        if (results.isEmpty) BlockEmpty(widget.isStockOnly ? 'nutrition.nothing_in_stock'.tr() : 'nutrition.nothing_found'.tr()),
         for (final item in results)
           ListTile(
             onTap: () => _accept(item),
@@ -182,11 +203,12 @@ class _FoodSearchPanelState extends ConsumerState<FoodSearchPanel>
               style: TextStyle(color: item.nutrition.kcal == null ? palette.warning : palette.inkSecondary),
             ),
           ),
-        ListTile(
-          onTap: () => _create(_query),
-          leading: Icon(AppIcons.plusCircle, color: aContext.colors.primary),
-          title: Text('nutrition.create_product'.tr(args: [_query])),
-        ),
+        if (!widget.isStockOnly)
+          ListTile(
+            onTap: () => _create(_query),
+            leading: Icon(AppIcons.plusCircle, color: aContext.colors.primary),
+            title: Text('nutrition.create_product'.tr(args: [_query])),
+          ),
       ];
     }
 

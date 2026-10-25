@@ -6,8 +6,8 @@ use axum::Json;
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
-    ActivityLevel, CopyMealsDto, CopyMealsRequest, DayMealDto, DishDto, DishIngredientDto, DishQuery, GoalMode,
-    ItemKind, ItemUnit, MacrosDto, MealEntryDto, MealSource, NewMealEntryRequest, NormGap, NutritionDayDto,
+    ActivityLevel, CatEstimateDto, CopyMealsDto, CopyMealsRequest, DayMealDto, DishDto, DishIngredientDto, DishQuery,
+    GoalMode, ItemKind, ItemUnit, MacrosDto, MealEntryDto, MealSource, NewMealEntryRequest, NormGap, NutritionDayDto,
     NutritionDayQuery, NutritionGoalDto, NutritionNormDto, PersonNormDto, PersonNormQuery, PersonQuery, PlanFoodInput,
     QuickEntryRequest, RecentFoodDto, RoutineStatus, SaveDishRequest, SaveGoalRequest, Sex, StatusMarkDto,
     UpdateMealEntryRequest,
@@ -17,7 +17,8 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::stock_handlers::{
-    consume_batch, consume_item, entry_store, load_batch, require_visible_batch, Consumer,
+    active_store, consume_batch, consume_item, entry_store, insert_moves, load_batch, pick_portions,
+    require_visible_batch, store_today, Consumer, Portion, StockPool, Store,
 };
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{clean_optional_text, clean_text, contains_pattern};
@@ -26,6 +27,7 @@ use crate::services::nutrition::{
     amount, clean_custom, clean_goal, daily_norm, dish_math, for_grams, is_child, portion_grams, sum, BodyProfile,
     GoalSettings, Ingredient,
 };
+use crate::services::stock::Take;
 use crate::state::AppState;
 
 const MAX_DISHES_PER_USER: i64 = 300;
@@ -124,6 +126,7 @@ pub struct Snapshot
     pub source: MealSource,
     pub item_id: Option<Uuid>,
     pub dish_id: Option<Uuid>,
+    pub cat_id: Option<Uuid>,
     pub batch_id: Option<Uuid>,
     pub title: Option<String>,
     pub grams: Option<Decimal>,
@@ -635,6 +638,7 @@ fn quick_snapshot(a_quick: &QuickEntryRequest) -> Result<Snapshot, ApiError>
         source: MealSource::Quick,
         item_id: None,
         dish_id: None,
+        cat_id: None,
         batch_id: None,
         title: clean_optional_text(a_quick.title.as_deref(), MAX_TITLE_LEN, "quick.title")?,
         grams: None,
@@ -672,6 +676,7 @@ async fn item_snapshot(
         source: MealSource::Item,
         item_id: Some(a_item_id),
         dish_id: None,
+        cat_id: None,
         batch_id: None,
         title: Some(item.name),
         grams: Some(grams),
@@ -717,6 +722,7 @@ async fn dish_snapshot(
         source: MealSource::Dish,
         item_id: None,
         dish_id: Some(a_dish_id),
+        cat_id: None,
         batch_id: a_batch_id,
         title: Some(title),
         grams: Some(grams),
@@ -728,20 +734,141 @@ async fn dish_snapshot(
     })
 }
 
+pub struct CatGuess
+{
+    pub title: String,
+    pub per_100: MacrosDto,
+    pub is_ml: bool,
+    pub is_in_stock: bool,
+}
+
+pub async fn guess_cat(a_conn: &mut PgConnection, a_user_id: Uuid, a_cat_id: Uuid) -> Result<CatGuess, ApiError>
+{
+    let title = sqlx::query_scalar!("SELECT name FROM product_cats WHERE id = $1", a_cat_id)
+        .fetch_optional(&mut *a_conn)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let store = active_store(a_conn, a_user_id).await?;
+    let today = store_today(a_conn, store).await?;
+    let guess = sqlx::query!(
+        r#"
+        WITH RECURSIVE sub AS (
+            SELECT id FROM product_cats WHERE id = $1
+            UNION ALL
+            SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id
+        ),
+        candidates AS (
+            SELECT i.kcal, COALESCE(i.prot, 0) AS prot, COALESCE(i.fat, 0) AS fat, COALESCE(i.carb, 0) AS carb,
+                   i.unit = 'liter' AS is_ml,
+                   EXISTS (
+                       SELECT 1 FROM stock_lots l
+                       WHERE l.item_id = i.id AND l.kind = 'item'
+                         AND l.owner_id IS NOT DISTINCT FROM $2 AND l.family_id IS NOT DISTINCT FROM $3
+                         AND (l.expires_on IS NULL OR l.expires_on >= $4)
+                         AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)
+                   ) AS is_in_stock
+            FROM items i
+            WHERE i.type = 'food' AND i.kcal IS NOT NULL AND i.cat_id IN (SELECT id FROM sub)
+        ),
+        chosen AS (
+            SELECT * FROM candidates
+            WHERE is_in_stock OR NOT EXISTS (SELECT 1 FROM candidates WHERE is_in_stock)
+        )
+        SELECT AVG(kcal) AS kcal, AVG(prot) AS prot, AVG(fat) AS fat, AVG(carb) AS carb,
+               BOOL_AND(is_ml) AS is_ml, BOOL_OR(is_in_stock) AS is_in_stock
+        FROM chosen
+        "#,
+        a_cat_id,
+        store.owner_id,
+        store.family_id,
+        today
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    let kcal = guess.kcal.ok_or(ApiError::Conflict("CAT_NO_FOOD"))?;
+    let per_100 = MacrosDto {
+        kcal: kcal.round_dp(2).normalize(),
+        prot: guess.prot.unwrap_or_default().round_dp(2).normalize(),
+        fat: guess.fat.unwrap_or_default().round_dp(2).normalize(),
+        carb: guess.carb.unwrap_or_default().round_dp(2).normalize(),
+    };
+    Ok(CatGuess {
+        title,
+        per_100,
+        is_ml: guess.is_ml.unwrap_or(false),
+        is_in_stock: guess.is_in_stock.unwrap_or(false),
+    })
+}
+
+async fn cat_snapshot(
+    a_conn: &mut PgConnection,
+    a_viewer_id: Uuid,
+    a_cat_id: Uuid,
+    a_grams: Option<Decimal>,
+    a_portions: Option<Decimal>,
+) -> Result<Snapshot, ApiError>
+{
+    let (Some(grams), None) = (a_grams, a_portions)
+    else
+    {
+        return Err(ApiError::Validation("grams"));
+    };
+    let grams = bounded(grams, MAX_ENTRY_G, "grams")?;
+    let guess = match guess_cat(a_conn, a_viewer_id, a_cat_id).await
+    {
+        Err(ApiError::NotFound) => return Err(ApiError::Validation("cat_id")),
+        other => other?,
+    };
+    Ok(Snapshot {
+        source: MealSource::Item,
+        item_id: None,
+        dish_id: None,
+        cat_id: Some(a_cat_id),
+        batch_id: None,
+        title: Some(guess.title),
+        grams: Some(grams),
+        portions: None,
+        portion_g: None,
+        is_ml: guess.is_ml,
+        per_100: Some(guess.per_100),
+        total: for_grams(guess.per_100, grams),
+    })
+}
+
+pub async fn cat_estimate(
+    State(a_state): State<AppState>,
+    a_user: AuthUser,
+    ApiPath(a_id): ApiPath<Uuid>,
+) -> Result<Json<CatEstimateDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    let guess = guess_cat(&mut conn, a_user.user_id, a_id).await?;
+    Ok(Json(CatEstimateDto {
+        cat_id: a_id,
+        per_100: guess.per_100,
+        is_ml: guess.is_ml,
+        is_in_stock: guess.is_in_stock,
+    }))
+}
+
 pub async fn food_snapshot(
     a_conn: &mut PgConnection,
     a_viewer_id: Uuid,
     a_food: &PlanFoodInput,
 ) -> Result<Snapshot, ApiError>
 {
-    match (a_food.item_id, a_food.dish_id, a_food.quick.as_ref())
+    match (a_food.item_id, a_food.dish_id, a_food.cat_id, a_food.quick.as_ref())
     {
-        (Some(item_id), None, None) => item_snapshot(a_conn, item_id, a_food.grams, a_food.portions).await,
-        (None, Some(dish_id), None) =>
+        (Some(item_id), None, None, None) => item_snapshot(a_conn, item_id, a_food.grams, a_food.portions).await,
+        (None, Some(dish_id), None, None) =>
         {
             dish_snapshot(a_conn, a_viewer_id, dish_id, None, a_food.grams, a_food.portions).await
         }
-        (None, None, Some(quick)) if a_food.grams.is_none() && a_food.portions.is_none() => quick_snapshot(quick),
+        (None, None, Some(cat_id), None) =>
+        {
+            cat_snapshot(a_conn, a_viewer_id, cat_id, a_food.grams, a_food.portions).await
+        }
+        (None, None, None, Some(quick)) if a_food.grams.is_none() && a_food.portions.is_none() => quick_snapshot(quick),
         _ => Err(ApiError::Validation("source")),
     }
 }
@@ -755,6 +882,272 @@ pub struct PlanMeal
     pub mark_id: Uuid,
 }
 
+struct PlannedFood
+{
+    source: MealSource,
+    item_id: Option<Uuid>,
+    dish_id: Option<Uuid>,
+    cat_id: Option<Uuid>,
+    title: Option<String>,
+    grams: Option<Decimal>,
+    portions: Option<Decimal>,
+    portion_g: Option<Decimal>,
+    is_ml: bool,
+    kcal_100: Option<Decimal>,
+    prot_100: Option<Decimal>,
+    fat_100: Option<Decimal>,
+    carb_100: Option<Decimal>,
+    kcal: Decimal,
+    prot: Decimal,
+    fat: Decimal,
+    carb: Decimal,
+}
+
+impl PlannedFood
+{
+    fn snapshot(&self) -> Snapshot
+    {
+        Snapshot {
+            source: self.source,
+            item_id: self.item_id,
+            dish_id: self.dish_id,
+            cat_id: None,
+            batch_id: None,
+            title: self.title.clone(),
+            grams: self.grams,
+            portions: self.portions,
+            portion_g: self.portion_g,
+            is_ml: self.is_ml,
+            per_100: item_per_100(self.kcal_100, self.prot_100, self.fat_100, self.carb_100),
+            total: MacrosDto {
+                kcal: self.kcal,
+                prot: self.prot,
+                fat: self.fat,
+                carb: self.carb,
+            },
+        }
+    }
+
+    fn pool(&self) -> Option<StockPool>
+    {
+        match (self.source, self.item_id, self.dish_id, self.cat_id)
+        {
+            (MealSource::Item, _, _, Some(cat_id)) => Some(StockPool::Cat(cat_id)),
+            (MealSource::Item, Some(item_id), _, None) => Some(StockPool::Item(item_id)),
+            (MealSource::Dish, _, Some(dish_id), _) => Some(StockPool::Dish(dish_id)),
+            _ => None,
+        }
+    }
+}
+
+struct Serving
+{
+    snapshot: Snapshot,
+    takes: Vec<Take>,
+    short: Option<Decimal>,
+}
+
+impl Serving
+{
+    fn plain(a_snapshot: Snapshot) -> Self
+    {
+        Self {
+            snapshot: a_snapshot,
+            takes: Vec::new(),
+            short: None,
+        }
+    }
+
+    fn add_short(&mut self, a_short: Decimal)
+    {
+        let grams = self.snapshot.grams.unwrap_or_default() + a_short;
+        self.snapshot.grams = Some(grams);
+        self.snapshot.portions = None;
+        self.snapshot.portion_g = None;
+        if let Some(per_100) = self.snapshot.per_100
+        {
+            self.snapshot.total = for_grams(per_100, grams);
+        }
+        self.short = Some(self.short.unwrap_or_default() + a_short);
+    }
+}
+
+async fn portion_snapshot(
+    a_conn: &mut PgConnection,
+    a_actor_id: Uuid,
+    a_food: &PlannedFood,
+    a_portion: &Portion,
+) -> Result<Snapshot, ApiError>
+{
+    match (a_portion.item_id, a_portion.batch_id, a_food.dish_id)
+    {
+        (_, Some(batch_id), Some(dish_id)) =>
+        {
+            dish_snapshot(a_conn, a_actor_id, dish_id, Some(batch_id), Some(a_portion.grams), None).await
+        }
+        (Some(item_id), None, _) => item_snapshot(a_conn, item_id, Some(a_portion.grams), None).await,
+        _ => Err(ApiError::Validation("source")),
+    }
+}
+
+async fn fallback_cat_item(
+    a_conn: &mut PgConnection,
+    a_owner_id: Uuid,
+    a_cat_id: Uuid,
+) -> Result<Option<Uuid>, ApiError>
+{
+    Ok(sqlx::query_scalar!(
+        r#"
+        WITH RECURSIVE sub AS (
+            SELECT id FROM product_cats WHERE id = $2
+            UNION ALL
+            SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id
+        )
+        SELECT i.id
+        FROM items i
+        WHERE i.type = 'food' AND i.kcal IS NOT NULL AND i.cat_id IN (SELECT id FROM sub)
+        ORDER BY (
+                     SELECT MAX(e.created_ts) FROM meal_entries e WHERE e.user_id = $1 AND e.item_id = i.id
+                 ) DESC NULLS LAST,
+                 (i.owner_id IS NOT DISTINCT FROM $1) DESC,
+                 LOWER(i.name),
+                 i.id
+        LIMIT 1
+        "#,
+        a_owner_id,
+        a_cat_id
+    )
+    .fetch_optional(&mut *a_conn)
+    .await?)
+}
+
+async fn plan_servings(
+    a_conn: &mut PgConnection,
+    a_actor_id: Uuid,
+    a_owner_id: Uuid,
+    a_store: Store,
+    a_food: &PlannedFood,
+) -> Result<Vec<Serving>, ApiError>
+{
+    let (Some(pool), Some(grams)) = (a_food.pool(), a_food.grams)
+    else
+    {
+        return Ok(vec![Serving::plain(a_food.snapshot())]);
+    };
+    let (portions, short) = pick_portions(a_conn, a_store, pool, grams).await?;
+    if let StockPool::Item(_) = pool
+    {
+        let takes = portions.into_iter().flat_map(|portion| portion.takes).collect();
+        return Ok(vec![Serving {
+            snapshot: a_food.snapshot(),
+            takes,
+            short: Some(short.min(grams)),
+        }]);
+    }
+
+    let mut servings = Vec::with_capacity(portions.len());
+    for portion in &portions
+    {
+        servings.push(Serving {
+            snapshot: portion_snapshot(a_conn, a_actor_id, a_food, portion).await?,
+            takes: portion.takes.clone(),
+            short: Some(Decimal::ZERO),
+        });
+    }
+    if short <= Decimal::ZERO
+    {
+        if let ([serving], StockPool::Dish(_), Some(_)) = (servings.as_mut_slice(), pool, a_food.portions)
+        {
+            serving.snapshot.portions = a_food.portions;
+            serving.snapshot.portion_g = a_food.portion_g;
+        }
+        return Ok(servings);
+    }
+    if let Some(last) = servings.last_mut()
+    {
+        last.add_short(short);
+        return Ok(servings);
+    }
+    match (pool, a_food.cat_id)
+    {
+        (StockPool::Cat(_), Some(cat_id)) => match fallback_cat_item(a_conn, a_owner_id, cat_id).await?
+        {
+            Some(item_id) => Ok(vec![Serving {
+                snapshot: item_snapshot(a_conn, item_id, Some(grams), None).await?,
+                takes: Vec::new(),
+                short: Some(grams),
+            }]),
+            None => Ok(vec![Serving::plain(Snapshot {
+                source: MealSource::Quick,
+                item_id: None,
+                dish_id: None,
+                cat_id: None,
+                batch_id: None,
+                title: a_food.title.clone(),
+                grams: None,
+                portions: None,
+                portion_g: None,
+                is_ml: false,
+                per_100: None,
+                total: a_food.snapshot().total,
+            })]),
+        },
+        _ => Ok(vec![Serving::plain(a_food.snapshot())]),
+    }
+}
+
+async fn insert_serving(
+    a_conn: &mut PgConnection,
+    a_actor_id: Uuid,
+    a_owner_id: Uuid,
+    a_meal: &PlanMeal,
+    a_serving: &Serving,
+) -> Result<(), ApiError>
+{
+    let snapshot = &a_serving.snapshot;
+    let per_100 = snapshot.per_100;
+    let id = sqlx::query_scalar!(
+        r#"
+        INSERT INTO meal_entries (
+            user_id, eaten_on, source, item_id, dish_id, batch_id, title, grams, portions, portion_g, is_ml,
+            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, plan_event_id, plan_occ_date,
+            stock_short, created_ts
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+            clock_timestamp()
+        )
+        RETURNING id
+        "#,
+        a_owner_id,
+        a_meal.eaten_on,
+        snapshot.source as MealSource,
+        snapshot.item_id,
+        snapshot.dish_id,
+        snapshot.batch_id,
+        snapshot.title,
+        snapshot.grams,
+        snapshot.portions,
+        snapshot.portion_g,
+        snapshot.is_ml,
+        per_100.map(|value| value.kcal),
+        per_100.map(|value| value.prot),
+        per_100.map(|value| value.fat),
+        per_100.map(|value| value.carb),
+        snapshot.total.kcal,
+        snapshot.total.prot,
+        snapshot.total.fat,
+        snapshot.total.carb,
+        a_meal.mark_id,
+        a_meal.event_id,
+        a_meal.occ_date,
+        a_serving.short
+    )
+    .fetch_one(&mut *a_conn)
+    .await?;
+    insert_moves(a_conn, &a_serving.takes, Consumer::Entry(id), a_actor_id).await
+}
+
 pub async fn eat_plan_foods(
     a_conn: &mut PgConnection,
     a_actor_id: Uuid,
@@ -762,45 +1155,33 @@ pub async fn eat_plan_foods(
     a_meal: &PlanMeal,
 ) -> Result<(), ApiError>
 {
-    let pending = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "count!" FROM plan_foods WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2"#,
-        a_meal.event_id,
-        a_meal.scope
-    )
-    .fetch_one(&mut *a_conn)
-    .await?;
-    if pending == 0
-    {
-        return Ok(());
-    }
-    require_day_capacity(a_conn, a_owner_id, a_meal.eaten_on, pending).await?;
-    let eaten = sqlx::query!(
+    let foods = sqlx::query_as!(
+        PlannedFood,
         r#"
-        INSERT INTO meal_entries (
-            user_id, eaten_on, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-            kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, status_mark_id, plan_event_id, plan_occ_date,
-            created_ts
-        )
-        SELECT $3, $4, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb, $5, event_id, $6,
-               NOW() + position * INTERVAL '1 microsecond'
+        SELECT source AS "source: MealSource", item_id, dish_id, cat_id, title, grams, portions, portion_g, is_ml,
+               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb
         FROM plan_foods
         WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2
         ORDER BY position
-        RETURNING id, source AS "source: MealSource", item_id, batch_id, grams
         "#,
         a_meal.event_id,
-        a_meal.scope,
-        a_owner_id,
-        a_meal.eaten_on,
-        a_meal.mark_id,
-        a_meal.occ_date
+        a_meal.scope
     )
     .fetch_all(&mut *a_conn)
     .await?;
-    for entry in eaten.into_iter().filter(|entry| entry.source != MealSource::Dish)
+    if foods.is_empty()
     {
-        take_from_stock(a_conn, a_actor_id, entry.id, entry.item_id, entry.batch_id, entry.grams).await?;
+        return Ok(());
+    }
+    let store = active_store(a_conn, a_actor_id).await?;
+    for food in &foods
+    {
+        let servings = plan_servings(a_conn, a_actor_id, a_owner_id, store, food).await?;
+        require_day_capacity(a_conn, a_owner_id, a_meal.eaten_on, servings.len() as i64).await?;
+        for serving in &servings
+        {
+            insert_serving(a_conn, a_actor_id, a_owner_id, a_meal, serving).await?;
+        }
     }
     Ok(())
 }

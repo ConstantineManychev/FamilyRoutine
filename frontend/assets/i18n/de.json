@@ -85,7 +85,8 @@
     "TOO_MANY_LOTS": "Zu viele Chargen in diesem Lager",
     "PUSH_UNAVAILABLE": "Push-Benachrichtigungen sind auf dem Server nicht eingerichtet",
     "TOO_MANY_MARKS": "Zu viele Bilanzkorrekturen: Löschen Sie alte.",
-    "PLAN_DONE": "Der Plan ist bereits erledigt – setze ihn zuerst zurück."
+    "PLAN_DONE": "Der Plan ist bereits erledigt – setze ihn zuerst zurück.",
+    "CAT_NO_FOOD": "Diese Kategorie hat keine Produkte mit Nährwerten"
   },
   "sidebar": {
     "routine": "Routine",
@@ -1217,7 +1218,8 @@
     "edit_day_title": "{} · {}",
     "edit_day_hint": "Änderungen gelten nur für diesen Tag; andere Tage bleiben wie im ganzen Plan.",
     "training_day_same": "Wie im Plan",
-    "reset_day": "Wie im ganzen Plan"
+    "reset_day": "Wie im ganzen Plan",
+    "food_from_cat": "beliebiges Produkt der Kategorie · {}"
   },
   "nutrition": {
     "title": "Ernährungstagebuch",
@@ -1354,7 +1356,17 @@
     "no_meals": "Noch keine Mahlzeiten. Setzen Sie den Status „Essen“ oder fügen Sie Essen hinzu – die Mahlzeit erscheint in der Tagesleiste.",
     "unlinked": "Ohne Mahlzeit",
     "unlinked_hint": "Der „Essen“-Block wurde gelöscht oder hat den Typ gewechselt. Tippen Sie auf einen Eintrag, um ihn einer Mahlzeit zuzuordnen.",
-    "open_block": "Block in der Tagesleiste öffnen"
+    "open_block": "Block in der Tagesleiste öffnen",
+    "stock_only": "Nur Vorrat",
+    "in_stock": "Im Vorrat",
+    "stock_empty": "Nichts Passendes im Vorrat. Schalten Sie „Nur Vorrat“ aus, um aus dem ganzen Katalog zu wählen.",
+    "nothing_in_stock": "Im Vorrat nichts gefunden",
+    "no_dishes_in_stock": "Keine gekochten Gerichte im Vorrat",
+    "tab_cats": "Kategorien",
+    "cat_in_stock": "im Vorrat: {}",
+    "cat_hint": "Sie können eine Kategorie jeder Ebene wählen. Wenn der Plan erledigt ist, wird die Menge aus dem Vorrat genommen: zuerst, was zuerst abläuft, dann, was zuerst gekauft wurde.",
+    "cat_estimate_stock": "Nährwerte sind der Durchschnitt der Produkte dieser Kategorie im Vorrat; die genauen Werte werden beim Erledigen berechnet",
+    "cat_estimate_catalog": "Davon ist gerade nichts im Vorrat, daher sind die Nährwerte der Durchschnitt der Katalogprodukte dieser Kategorie"
   },
   "cats": {
     "title": "Warengruppen",

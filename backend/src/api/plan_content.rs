@@ -29,6 +29,7 @@ struct FoodRow
     source: MealSource,
     item_id: Option<Uuid>,
     dish_id: Option<Uuid>,
+    cat_id: Option<Uuid>,
     title: Option<String>,
     grams: Option<Decimal>,
     portions: Option<Decimal>,
@@ -88,10 +89,10 @@ pub async fn save_content(
         sqlx::query!(
             r#"
             INSERT INTO plan_foods (
-                event_id, occ_date, position, source, item_id, dish_id, title, grams, portions, portion_g, is_ml,
-                kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb
+                event_id, occ_date, position, source, item_id, dish_id, cat_id, title, grams, portions, portion_g,
+                is_ml, kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             "#,
             a_event_id,
             a_scope,
@@ -99,6 +100,7 @@ pub async fn save_content(
             snapshot.source as MealSource,
             snapshot.item_id,
             snapshot.dish_id,
+            snapshot.cat_id,
             snapshot.title,
             snapshot.grams,
             snapshot.portions,
@@ -226,8 +228,8 @@ pub async fn load_contents(
     let foods = sqlx::query_as!(
         FoodRow,
         r#"
-        SELECT id, event_id, source AS "source: MealSource", item_id, dish_id, title, grams, portions, portion_g, is_ml,
-               kcal, prot, fat, carb
+        SELECT id, event_id, source AS "source: MealSource", item_id, dish_id, cat_id, title, grams, portions,
+               portion_g, is_ml, kcal, prot, fat, carb
         FROM plan_foods
         WHERE event_id = ANY($1) AND occ_date IS NOT DISTINCT FROM $2
         ORDER BY event_id, position
@@ -244,6 +246,7 @@ pub async fn load_contents(
             source: food.source,
             item_id: food.item_id,
             dish_id: food.dish_id,
+            cat_id: food.cat_id,
             title: food.title,
             grams: food.grams.map(|value| value.normalize()),
             portions: food.portions.map(|value| value.normalize()),

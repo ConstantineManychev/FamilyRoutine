@@ -652,3 +652,20 @@ class RecentFood
         per100: Macros.fromJsonOrNull(aJson['per_100']),
       );
 }
+
+class CatEstimate
+{
+  final String catId;
+  final Macros per100;
+  final bool isMl;
+  final bool isInStock;
+
+  const CatEstimate({required this.catId, required this.per100, this.isMl = false, this.isInStock = false});
+
+  factory CatEstimate.fromJson(Map<String, dynamic> aJson) => CatEstimate(
+        catId: aJson['cat_id'] as String,
+        per100: Macros.fromJson(aJson['per_100']),
+        isMl: aJson['is_ml'] as bool? ?? false,
+        isInStock: aJson['is_in_stock'] as bool? ?? false,
+      );
+}

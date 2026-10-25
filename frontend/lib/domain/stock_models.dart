@@ -444,3 +444,27 @@ class CookIngredient
 
   CookIngredient withGrams(double aGrams) => CookIngredient(itemId: itemId, itemName: itemName, grams: aGrams);
 }
+
+class StockFoods
+{
+  final Map<String, String?> itemCats;
+  final Set<String> dishIds;
+
+  const StockFoods({this.itemCats = const {}, this.dishIds = const {}});
+
+  factory StockFoods.fromJson(Map<String, dynamic> aJson) => StockFoods(
+        itemCats: {
+          for (final item in (aJson['items'] as List? ?? const []).cast<Map<String, dynamic>>())
+            item['item_id'] as String: item['cat_id'] as String?,
+        },
+        dishIds: {for (final id in aJson['dish_ids'] as List? ?? const []) id as String},
+      );
+
+  bool hasItem(String? aId) => aId != null && itemCats.containsKey(aId);
+
+  bool hasDish(String? aId) => aId != null && dishIds.contains(aId);
+
+  bool hasFood(RecentFood aFood) => aFood.dishId != null ? hasDish(aFood.dishId) : hasItem(aFood.itemId);
+
+  Set<String> get catIds => itemCats.values.whereType<String>().toSet();
+}

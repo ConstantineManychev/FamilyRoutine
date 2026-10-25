@@ -8,9 +8,9 @@ use chrono_tz::Tz;
 use rust_decimal::Decimal;
 use shared_schema::{
     BatchQuery, CookBatchDto, CookBatchItemDto, CookRequest, ItemKind, ItemUnit, MacrosDto, MoneyTotalDto, NetMeasure,
-    NewStockLotRequest, SaveStockSettingsRequest, SetLotExpiryRequest, StockDto, StockKind, StockLotDto, StockMeasure,
-    StockMoveDto, StockMoveKind, StockMovesDto, StockMovesQuery, StockQuery, StockSettingsDto, StockSource,
-    StockStoreDto, WasteReason, WasteRequest, WriteOffRequest,
+    NewStockLotRequest, SaveStockSettingsRequest, SetLotExpiryRequest, StockDto, StockFoodItemDto, StockFoodsDto,
+    StockKind, StockLotDto, StockMeasure, StockMoveDto, StockMoveKind, StockMovesDto, StockMovesQuery, StockQuery,
+    StockSettingsDto, StockSource, StockStoreDto, WasteReason, WasteRequest, WriteOffRequest,
 };
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -287,7 +287,7 @@ async fn store_name(a_conn: &mut PgConnection, a_store: Store) -> Result<Option<
     )
 }
 
-async fn insert_moves(
+pub async fn insert_moves(
     a_conn: &mut PgConnection,
     a_takes: &[Take],
     a_consumer: Consumer,
@@ -408,6 +408,156 @@ pub async fn consume_batch(
     );
     insert_moves(a_conn, &takes, Consumer::Entry(a_entry_id), a_user_id).await?;
     Ok(short)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StockPool
+{
+    Item(Uuid),
+    Cat(Uuid),
+    Dish(Uuid),
+}
+
+#[derive(Debug, Clone)]
+pub struct Portion
+{
+    pub item_id: Option<Uuid>,
+    pub batch_id: Option<Uuid>,
+    pub grams: Decimal,
+    pub takes: Vec<Take>,
+}
+
+pub async fn pick_portions(
+    a_conn: &mut PgConnection,
+    a_store: Store,
+    a_pool: StockPool,
+    a_grams: Decimal,
+) -> Result<(Vec<Portion>, Decimal), ApiError>
+{
+    lock_store(a_conn, a_store).await?;
+    let today = store_today(a_conn, a_store).await?;
+    let (item_id, cat_id, dish_id) = match a_pool
+    {
+        StockPool::Item(id) => (Some(id), None, None),
+        StockPool::Cat(id) => (None, Some(id), None),
+        StockPool::Dish(id) => (None, None, Some(id)),
+    };
+    let rows = sqlx::query!(
+        r#"
+        WITH RECURSIVE sub AS (
+            SELECT id FROM product_cats WHERE id = $4
+            UNION ALL
+            SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id
+        )
+        SELECT l.id, l.item_id, l.batch_id, l.measure AS "measure: StockMeasure", l.qty, l.cost, i.piece_g,
+               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS "left!"
+        FROM stock_lots l
+        LEFT JOIN items i ON i.id = l.item_id
+        LEFT JOIN cook_batches b ON b.id = l.batch_id
+        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2
+          AND (l.expires_on IS NULL OR l.expires_on >= $6)
+          AND (
+              (l.kind = 'item' AND l.item_id = $3)
+              OR (l.kind = 'item' AND i.type = 'food' AND i.kcal IS NOT NULL AND i.cat_id IN (SELECT id FROM sub))
+              OR (l.kind = 'dish' AND b.dish_id = $5)
+          )
+        ORDER BY l.expires_on NULLS LAST, l.acquired_ts, l.created_ts, l.id
+        "#,
+        a_store.owner_id,
+        a_store.family_id,
+        item_id,
+        cat_id,
+        dish_id,
+        today
+    )
+    .fetch_all(&mut *a_conn)
+    .await?;
+
+    let mut need = qty(a_grams);
+    let mut portions: Vec<Portion> = Vec::new();
+    for row in rows
+    {
+        if need <= Decimal::ZERO
+        {
+            break;
+        }
+        let lot = LotLeft {
+            id: row.id,
+            qty: row.qty,
+            left: row.left,
+            grams_per_unit: grams_per_unit(row.measure, row.piece_g),
+            cost: row.cost,
+        };
+        let (takes, short) = plan_takes(&[lot], need);
+        let used = need - short;
+        if takes.is_empty() || used <= Decimal::ZERO
+        {
+            continue;
+        }
+        need = short;
+        match portions
+            .iter_mut()
+            .find(|portion| portion.item_id == row.item_id && portion.batch_id == row.batch_id)
+        {
+            Some(portion) =>
+            {
+                portion.grams += used;
+                portion.takes.extend(takes);
+            }
+            None => portions.push(Portion {
+                item_id: row.item_id,
+                batch_id: row.batch_id,
+                grams: used,
+                takes,
+            }),
+        }
+    }
+    Ok((portions, need))
+}
+
+pub async fn stock_foods(State(a_state): State<AppState>, a_user: AuthUser) -> Result<Json<StockFoodsDto>, ApiError>
+{
+    let mut conn = a_state.db.acquire().await?;
+    let store = active_store(&mut conn, a_user.user_id).await?;
+    let today = store_today(&mut conn, store).await?;
+    let rows = sqlx::query!(
+        r#"
+        SELECT DISTINCT l.item_id, i.cat_id, b.dish_id
+        FROM stock_lots l
+        LEFT JOIN items i ON i.id = l.item_id
+        LEFT JOIN cook_batches b ON b.id = l.batch_id
+        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2
+          AND (l.expires_on IS NULL OR l.expires_on >= $3)
+          AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)
+          AND ((l.kind = 'item' AND i.type = 'food') OR (l.kind = 'dish' AND b.dish_id IS NOT NULL))
+        "#,
+        store.owner_id,
+        store.family_id,
+        today
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut items = Vec::new();
+    let mut dish_ids = Vec::new();
+    for row in rows
+    {
+        if let Some(item_id) = row.item_id
+        {
+            if !items.iter().any(|known: &StockFoodItemDto| known.item_id == item_id)
+            {
+                items.push(StockFoodItemDto {
+                    item_id,
+                    cat_id: row.cat_id,
+                });
+            }
+        }
+        if let Some(dish_id) = row.dish_id.filter(|id| !dish_ids.contains(id))
+        {
+            dish_ids.push(dish_id);
+        }
+    }
+    Ok(Json(StockFoodsDto { items, dish_ids }))
 }
 
 pub async fn entry_store(a_conn: &mut PgConnection, a_entry_id: Uuid, a_user_id: Uuid) -> Result<Store, ApiError>

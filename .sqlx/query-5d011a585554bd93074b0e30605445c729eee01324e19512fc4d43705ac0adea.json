@@ -1,20 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, event_id, source AS \"source: MealSource\", item_id, dish_id, title, grams, portions, portion_g, is_ml,\n               kcal, prot, fat, carb\n        FROM plan_foods\n        WHERE event_id = ANY($1) AND occ_date IS NOT DISTINCT FROM $2\n        ORDER BY event_id, position\n        ",
+  "query": "\n        SELECT source AS \"source: MealSource\", item_id, dish_id, cat_id, title, grams, portions, portion_g, is_ml,\n               kcal_100, prot_100, fat_100, carb_100, kcal, prot, fat, carb\n        FROM plan_foods\n        WHERE event_id = $1 AND occ_date IS NOT DISTINCT FROM $2\n        ORDER BY position\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 1,
-        "name": "event_id",
-        "type_info": "Uuid"
-      },
-      {
-        "ordinal": 2,
         "name": "source: MealSource",
         "type_info": {
           "Custom": {
@@ -30,83 +20,111 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 1,
         "name": "item_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 4,
+        "ordinal": 2,
         "name": "dish_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 5,
+        "ordinal": 3,
+        "name": "cat_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
         "name": "title",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "grams",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "portions",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "portion_g",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "is_ml",
         "type_info": "Bool"
       },
       {
+        "ordinal": 9,
+        "name": "kcal_100",
+        "type_info": "Numeric"
+      },
+      {
         "ordinal": 10,
-        "name": "kcal",
+        "name": "prot_100",
         "type_info": "Numeric"
       },
       {
         "ordinal": 11,
-        "name": "prot",
+        "name": "fat_100",
         "type_info": "Numeric"
       },
       {
         "ordinal": 12,
-        "name": "fat",
+        "name": "carb_100",
         "type_info": "Numeric"
       },
       {
         "ordinal": 13,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 14,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 15,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 16,
         "name": "carb",
         "type_info": "Numeric"
       }
     ],
     "parameters": {
       "Left": [
-        "UuidArray",
+        "Uuid",
         "Date"
       ]
     },
     "nullable": [
       false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
       false,
-      false,
       true,
       true,
       true,
       true,
-      true,
-      true,
-      false,
       false,
       false,
       false,
       false
     ]
   },
-  "hash": "668fe5183715639d7cfaa2423683d0397661c21161a3c0f1d0b5c7e5329bbb46"
+  "hash": "5d011a585554bd93074b0e30605445c729eee01324e19512fc4d43705ac0adea"
 }

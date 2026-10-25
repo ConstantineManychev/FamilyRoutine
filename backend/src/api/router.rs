@@ -79,6 +79,7 @@ pub fn build_router(a_state: AppState) -> Router
             put(nutrition_handlers::update_entry).delete(nutrition_handlers::delete_entry),
         )
         .route("/nutrition/recent", get(nutrition_handlers::recent_foods))
+        .route("/nutrition/cats/:id/estimate", get(nutrition_handlers::cat_estimate))
         .route("/nutrition/copy", post(nutrition_handlers::copy_meals))
         .route(
             "/nutrition/goal",
@@ -126,6 +127,7 @@ pub fn build_router(a_state: AppState) -> Router
         .route("/stock/cook", post(stock_handlers::cook))
         .route("/stock/batches", get(stock_handlers::list_batches))
         .route("/stock/moves", get(stock_handlers::list_moves))
+        .route("/stock/foods", get(stock_handlers::stock_foods))
         .route(
             "/notifications/settings",
             get(notify_handlers::get_settings).put(notify_handlers::save_settings),

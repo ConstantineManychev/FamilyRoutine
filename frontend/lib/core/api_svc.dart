@@ -437,6 +437,7 @@ class ApiSvc
     bool aIsMine = false,
     ItemKind? aKind,
     String? aCatId,
+    bool aIsInStock = false,
   }) async
   {
     final res = await _dio.get('/api/dicts/items', queryParameters: {
@@ -446,6 +447,7 @@ class ApiSvc
       if (aIsMine) 'is_mine': true,
       if (aKind != null) 'kind': aKind.name,
       if (aCatId != null) 'cat_id': aCatId,
+      if (aIsInStock) 'is_in_stock': true,
     });
     return _list(res.data, DictItemDto.fromJson);
   }
@@ -588,6 +590,12 @@ class ApiSvc
     return _list(res.data, RecentFood.fromJson);
   }
 
+  Future<CatEstimate> getCatEstimate(String aCatId) async
+  {
+    final res = await _dio.get('/api/nutrition/cats/$aCatId/estimate');
+    return CatEstimate.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<CopyResult> copyMealFromYesterday(String aMarkId, DateTime aDate, {String? aPersonId}) async
   {
     final res = await _dio.post('/api/nutrition/copy', data: {
@@ -654,6 +662,12 @@ class ApiSvc
   {
     final res = await _dio.put('/api/stock/settings', data: {'family_id': aFamilyId});
     return StockSettings.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<StockFoods> getStockFoods() async
+  {
+    final res = await _dio.get('/api/stock/foods');
+    return StockFoods.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<StockData> getStock({StockStoreRef? aStore}) async

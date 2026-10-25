@@ -295,3 +295,17 @@ pub struct StockMovesDto
     pub waste_pcs: Decimal,
     pub waste_costs: Vec<MoneyTotalDto>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StockFoodItemDto
+{
+    pub item_id: Uuid,
+    pub cat_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StockFoodsDto
+{
+    pub items: Vec<StockFoodItemDto>,
+    pub dish_ids: Vec<Uuid>,
+}

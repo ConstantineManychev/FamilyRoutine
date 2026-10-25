@@ -68,6 +68,7 @@ pub struct PlanFoodDto
     pub source: MealSource,
     pub item_id: Option<Uuid>,
     pub dish_id: Option<Uuid>,
+    pub cat_id: Option<Uuid>,
     pub title: Option<String>,
     pub grams: Option<Decimal>,
     pub portions: Option<Decimal>,
@@ -108,6 +109,8 @@ pub struct PlanFoodInput
     pub item_id: Option<Uuid>,
     #[serde(default)]
     pub dish_id: Option<Uuid>,
+    #[serde(default)]
+    pub cat_id: Option<Uuid>,
     #[serde(default)]
     pub quick: Option<QuickEntryRequest>,
     #[serde(default)]

@@ -9,6 +9,7 @@ import '../common/app_icons.dart';
 import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
+import '../dicts/product_cats.dart';
 import '../nutrition/nutrition_format.dart';
 import '../routine/mark_sheet.dart';
 import '../routine/routine_style.dart';
@@ -66,16 +67,18 @@ Future<void> showPlanOccurrence(BuildContext aContext, WidgetRef aRef, Occurrenc
   }
 }
 
-class PlanContentView extends StatelessWidget
+class PlanContentView extends ConsumerWidget
 {
   final OccurrenceDetails details;
 
   const PlanContentView({super.key, required this.details});
 
   @override
-  Widget build(BuildContext aContext)
+  Widget build(BuildContext aContext, WidgetRef aRef)
   {
     final palette = aContext.palette;
+    final hasCats = details.content.foods.any((aFood) => aFood.catId != null);
+    final tree = hasCats ? aRef.watch(productCatsProv).valueOrNull : null;
     final occurrence = details.occurrence;
     final content = details.content;
     final lines = <Widget>[];
@@ -111,11 +114,16 @@ class PlanContentView extends StatelessWidget
       case RoutineStatus.meal when content.foods.isNotEmpty:
         lines.addAll([
           for (final food in content.foods)
-            line(food.title ?? 'nutrition.quick_title'.tr(), aTrailing: formatKcal(aContext, food.total.kcal)),
+            line(
+              planFoodTitle(tree, aCatId: food.catId, aTitle: food.title),
+              aSubtitle: food.catId == null ? null : planCatLine(aContext, food.grams, aIsMl: food.isMl),
+              aTrailing: planFoodKcal(aContext, food.total.kcal, aIsEstimate: food.catId != null),
+            ),
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '${'planner.content_total'.tr()}: ${formatKcal(aContext, content.total.kcal)} · ${macrosLine(aContext, content.total)}',
+              '${'planner.content_total'.tr()}: ${planFoodKcal(aContext, content.total.kcal, aIsEstimate: hasCats)} · '
+              '${macrosLine(aContext, content.total)}',
               key: const ValueKey('plan.total'),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),

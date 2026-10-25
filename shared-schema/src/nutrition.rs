@@ -334,3 +334,12 @@ pub struct RecentFoodDto
     pub per_100: Option<MacrosDto>,
     pub last_ts: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CatEstimateDto
+{
+    pub cat_id: Uuid,
+    pub per_100: MacrosDto,
+    pub is_ml: bool,
+    pub is_in_stock: bool,
+}

@@ -7,11 +7,28 @@ import '../../domain/models.dart';
 import '../../providers/api_prov.dart';
 import '../common/app_icons.dart';
 import '../common/app_theme.dart';
+import '../dicts/product_cats.dart';
 import '../nutrition/add_food_screen.dart';
 import '../nutrition/nutrition_format.dart';
 
 const int _maxTaskLen = 200;
 const int _maxStudyNoteLen = 2000;
+
+String planFoodTitle(ProductCatTree? aTree, {String? aCatId, String? aTitle})
+{
+  final cat = aTree?[aCatId];
+  if (cat != null)
+  {
+    return catLabel(cat);
+  }
+  return aTitle ?? 'nutrition.quick_title'.tr();
+}
+
+String planFoodKcal(BuildContext aContext, double aKcal, {bool aIsEstimate = false}) =>
+    aIsEstimate ? '≈ ${formatKcal(aContext, aKcal)}' : formatKcal(aContext, aKcal);
+
+String planCatLine(BuildContext aContext, double? aGrams, {bool aIsMl = false}) =>
+    'planner.food_from_cat'.tr(args: [formatGrams(aContext, aGrams ?? 0, aIsMl: aIsMl)]);
 
 class PlanFoodDraft
 {
@@ -20,6 +37,10 @@ class PlanFoodDraft
   final Map<String, dynamic> payload;
 
   const PlanFoodDraft({required this.title, required this.kcal, required this.payload});
+
+  String? get catId => payload['cat_id'] as String?;
+
+  double? get grams => double.tryParse('${payload['grams']}');
 
   factory PlanFoodDraft.of(PlanFood aFood) => PlanFoodDraft(
         title: aFood.title ?? 'nutrition.quick_title'.tr(),
@@ -217,15 +238,18 @@ class _PlanContentEditorState extends ConsumerState<PlanContentEditor>
   Widget _foods(BuildContext aContext)
   {
     final draft = widget.draft;
+    final tree = ref.watch(productCatsProv).valueOrNull;
+    final hasEstimate = draft.foods.any((aFood) => aFood.catId != null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading(aContext, 'planner.content_food', aTrailing: formatKcal(aContext, draft.kcal)),
+        _heading(aContext, 'planner.content_food', aTrailing: planFoodKcal(aContext, draft.kcal, aIsEstimate: hasEstimate)),
         for (var index = 0; index < draft.foods.length; index++)
           _row(
             aKey: ValueKey('plan.food.$index'),
-            aTitle: draft.foods[index].title,
-            aTrailing: formatKcal(aContext, draft.foods[index].kcal),
+            aTitle: planFoodTitle(tree, aCatId: draft.foods[index].catId, aTitle: draft.foods[index].title),
+            aSubtitle: draft.foods[index].catId == null ? null : planCatLine(aContext, draft.foods[index].grams),
+            aTrailing: planFoodKcal(aContext, draft.foods[index].kcal, aIsEstimate: draft.foods[index].catId != null),
             aOnRemove: () => setState(() => draft.foods.removeAt(index)),
           ),
         Align(

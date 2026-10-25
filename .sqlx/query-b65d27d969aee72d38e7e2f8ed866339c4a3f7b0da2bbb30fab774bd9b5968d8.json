@@ -1,0 +1,118 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, event_id, source AS \"source: MealSource\", item_id, dish_id, cat_id, title, grams, portions,\n               portion_g, is_ml, kcal, prot, fat, carb\n        FROM plan_foods\n        WHERE event_id = ANY($1) AND occ_date IS NOT DISTINCT FROM $2\n        ORDER BY event_id, position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "source: MealSource",
+        "type_info": {
+          "Custom": {
+            "name": "meal_source_t",
+            "kind": {
+              "Enum": [
+                "item",
+                "dish",
+                "quick"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "dish_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "cat_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "grams",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "portions",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "portion_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "is_ml",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 14,
+        "name": "carb",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b65d27d969aee72d38e7e2f8ed866339c4a3f7b0da2bbb30fab774bd9b5968d8"
+}

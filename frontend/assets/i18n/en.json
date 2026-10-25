@@ -85,7 +85,8 @@
     "TOO_MANY_LOTS": "Too many lots in this store",
     "PUSH_UNAVAILABLE": "Push notifications are not configured on the server",
     "TOO_MANY_MARKS": "Too many balance corrections: delete old ones.",
-    "PLAN_DONE": "The plan is already done — return it to the plan first."
+    "PLAN_DONE": "The plan is already done — return it to the plan first.",
+    "CAT_NO_FOOD": "This category has no products with nutrition facts"
   },
   "sidebar": {
     "routine": "Routine",
@@ -1217,7 +1218,8 @@
     "edit_day_title": "{} · {}",
     "edit_day_hint": "Changes apply to this day only; other days stay as in the whole plan.",
     "training_day_same": "As in the plan",
-    "reset_day": "As in the whole plan"
+    "reset_day": "As in the whole plan",
+    "food_from_cat": "any product of the category · {}"
   },
   "nutrition": {
     "title": "Food diary",
@@ -1354,7 +1356,17 @@
     "no_meals": "No meals yet. Set the “Meal” status or add food, and the meal will appear on the day timeline.",
     "unlinked": "Not in a meal",
     "unlinked_hint": "The “Meal” block was deleted or changed type. Tap an entry to move it into a meal.",
-    "open_block": "Open the timeline block"
+    "open_block": "Open the timeline block",
+    "stock_only": "In stock only",
+    "in_stock": "In stock",
+    "stock_empty": "Nothing suitable in stock. Turn off “In stock only” to choose from the whole catalogue.",
+    "nothing_in_stock": "Nothing found in stock",
+    "no_dishes_in_stock": "No cooked dishes in stock",
+    "tab_cats": "Categories",
+    "cat_in_stock": "in stock: {}",
+    "cat_hint": "You can pick a category at any level. When the plan is done, the amount is taken from stock: whatever expires first, then whatever was bought first.",
+    "cat_estimate_stock": "Nutrition is the average of the category’s products in stock; exact values are counted when the plan is done",
+    "cat_estimate_catalog": "Nothing from it is in stock now, so nutrition is the average of the category’s catalogue products"
   },
   "cats": {
     "title": "Product categories",

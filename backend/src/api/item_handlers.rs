@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use shared_schema::{
     DictItemDto, FillItemRequest, ItemKind, ItemOwnerKind, ItemPriceDto, ItemPriceQuery, ItemPricesDto, ItemQuery,
@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::api::extract::{ApiJson, ApiPath, ApiQuery, AuthUser};
 use crate::api::place_handlers::require_visible_place;
-use crate::api::stock_handlers::rescale_item_stock;
+use crate::api::stock_handlers::{active_store, rescale_item_stock, store_today, Store};
 use crate::domain::errors::ApiError;
 use crate::domain::validation::{
     check_money, check_qty, clean_barcode, clean_optional_text, clean_text, contains_pattern, money,
@@ -75,6 +75,7 @@ struct ItemFilter<'a>
     is_mine: bool,
     kind: Option<ItemKind>,
     cat_id: Option<Uuid>,
+    stock: Option<(Store, NaiveDate)>,
 }
 
 struct ItemScope
@@ -161,6 +162,15 @@ pub async fn list_items(
 
     let mut conn = a_state.db.acquire().await?;
     let viewer = load_viewer(&a_state, &mut conn, a_user.user_id).await?;
+    let stock = if a_query.is_in_stock
+    {
+        let store = active_store(&mut conn, a_user.user_id).await?;
+        Some((store, store_today(&mut conn, store).await?))
+    }
+    else
+    {
+        None
+    };
     let filter = ItemFilter {
         pattern: pattern.as_deref(),
         prefix: prefix.as_deref(),
@@ -169,6 +179,7 @@ pub async fn list_items(
         is_mine: a_query.is_mine,
         kind: a_query.kind,
         cat_id: a_query.cat_id,
+        stock,
         ..ItemFilter::default()
     };
 
@@ -1001,6 +1012,16 @@ async fn query_items(
                   SELECT id FROM sub
               )
           )
+          AND (
+              NOT $13
+              OR i.id IN (
+                  SELECT l.item_id
+                  FROM stock_lots l
+                  WHERE l.owner_id IS NOT DISTINCT FROM $14 AND l.family_id IS NOT DISTINCT FROM $15
+                    AND l.kind = 'item' AND (l.expires_on IS NULL OR l.expires_on >= $16)
+                    AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)
+              )
+          )
         ORDER BY (i.barcode IS NOT NULL AND i.barcode IS NOT DISTINCT FROM $6) DESC,
                  ($9::text IS NOT NULL AND i.name ILIKE $9) DESC,
                  (i.owner_id IS NOT DISTINCT FROM $1) DESC,
@@ -1019,7 +1040,11 @@ async fn query_items(
         a_filter.prefix,
         a_limit,
         a_filter.kind as Option<ItemKind>,
-        a_filter.cat_id
+        a_filter.cat_id,
+        a_filter.stock.is_some(),
+        a_filter.stock.and_then(|(store, _)| store.owner_id),
+        a_filter.stock.and_then(|(store, _)| store.family_id),
+        a_filter.stock.map(|(_, today)| today)
     )
     .fetch_all(&mut *a_conn)
     .await?;

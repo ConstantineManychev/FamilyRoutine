@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT l.item_id, i.cat_id, b.dish_id\n        FROM stock_lots l\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND (l.expires_on IS NULL OR l.expires_on >= $3)\n          AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)\n          AND ((l.kind = 'item' AND i.type = 'food') OR (l.kind = 'dish' AND b.dish_id IS NOT NULL))\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "cat_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "dish_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "3c59e4798985b03516d403ee3bc2706a6d5fb09bd3e7db7a2329f1e62f546812"
+}

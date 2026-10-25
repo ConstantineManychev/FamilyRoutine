@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH RECURSIVE sub AS (\n            SELECT id FROM product_cats WHERE id = $4\n            UNION ALL\n            SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id\n        )\n        SELECT l.id, l.item_id, l.batch_id, l.measure AS \"measure: StockMeasure\", l.qty, l.cost, i.piece_g,\n               l.qty - COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0) AS \"left!\"\n        FROM stock_lots l\n        LEFT JOIN items i ON i.id = l.item_id\n        LEFT JOIN cook_batches b ON b.id = l.batch_id\n        WHERE l.owner_id IS NOT DISTINCT FROM $1 AND l.family_id IS NOT DISTINCT FROM $2\n          AND (l.expires_on IS NULL OR l.expires_on >= $6)\n          AND (\n              (l.kind = 'item' AND l.item_id = $3)\n              OR (l.kind = 'item' AND i.type = 'food' AND i.kcal IS NOT NULL AND i.cat_id IN (SELECT id FROM sub))\n              OR (l.kind = 'dish' AND b.dish_id = $5)\n          )\n        ORDER BY l.expires_on NULLS LAST, l.acquired_ts, l.created_ts, l.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "measure: StockMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "stock_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml",
+                "pcs"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "left!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "bbc63e91fff861c10ac938a837efe94dba68a01857c36e84fcf140b865ef5131"
+}

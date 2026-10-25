@@ -314,6 +314,12 @@ pub async fn delete_cat(
     sqlx::query!("UPDATE items SET cat_id = $2 WHERE cat_id = $1", a_id, parent_id)
         .execute(&mut *tx)
         .await?;
+    if let Some(parent_id) = parent_id
+    {
+        sqlx::query!("UPDATE plan_foods SET cat_id = $2 WHERE cat_id = $1", a_id, parent_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     sqlx::query!("DELETE FROM product_cats WHERE id = $1", a_id)
         .execute(&mut *tx)
         .await?;
@@ -354,6 +360,9 @@ pub async fn merge_cat(
     while let Some((source, target)) = pending.pop()
     {
         sqlx::query!("UPDATE items SET cat_id = $2 WHERE cat_id = $1", source, target)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!("UPDATE plan_foods SET cat_id = $2 WHERE cat_id = $1", source, target)
             .execute(&mut *tx)
             .await?;
         let children = sqlx::query!(

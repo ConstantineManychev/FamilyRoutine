@@ -11,8 +11,10 @@ import '../common/app_theme.dart';
 import '../common/feedback.dart';
 import '../common/page_frames.dart';
 import '../common/snap_tab_view.dart';
+import '../dicts/product_cats.dart';
 import 'amount_sheet.dart';
 import '../stock/stock_actions.dart';
+import 'food_cats_panel.dart';
 import 'food_picker.dart';
 import 'meal_target.dart';
 import 'nutrition_format.dart';
@@ -20,6 +22,7 @@ import 'nutrition_format.dart';
 const double _maxQuickKcal = 10000;
 const double _maxQuickGrams = 1000;
 const int _maxTitleLen = 200;
+const int _stockListLimit = 500;
 
 class PickedFood
 {
@@ -55,6 +58,9 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
   List<DayMeal>? _meals;
   MealTarget? _target;
   List<RecentFood>? _recent;
+  bool _isStockOnly = true;
+  StockFoods? _stock;
+  List<DictItemDto>? _stockItems;
   List<Dish>? _dishes;
   Object? _dishesError;
   String _dishQuery = '';
@@ -74,6 +80,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
       _loadMeals();
     }
     _loadRecent();
+    _loadStock();
     _loadDishes();
   }
 
@@ -147,6 +154,35 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     }
   }
 
+  Future<void> _loadStock() async
+  {
+    try
+    {
+      final api = ref.read(apiProv);
+      final stock = await api.getStockFoods();
+      final items = await api.getItems(aIsInStock: true, aKind: ItemKind.food, aLimit: _stockListLimit);
+      if (mounted)
+      {
+        setState(()
+        {
+          _stock = stock;
+          _stockItems = items;
+        });
+      }
+    }
+    catch (_)
+    {
+      if (mounted)
+      {
+        setState(()
+        {
+          _stock = const StockFoods();
+          _stockItems = const [];
+        });
+      }
+    }
+  }
+
   Future<void> _loadDishes() async
   {
     try
@@ -209,7 +245,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
           return;
         }
       }
-      await Future.wait([_loadMeals(aMarkId: markId), _loadRecent()]);
+      await Future.wait([_loadMeals(aMarkId: markId), _loadRecent(), _loadStock()]);
     }
     catch (aError)
     {
@@ -336,6 +372,39 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     }
   }
 
+  Future<void> _pickCat(ProductCat aCat) async
+  {
+    final title = catLabel(aCat);
+    CatEstimate estimate;
+    setState(() => _isBusy = true);
+    try
+    {
+      estimate = await ref.read(apiProv).getCatEstimate(aCat.id);
+    }
+    catch (aError)
+    {
+      if (mounted)
+      {
+        setState(() => _isBusy = false);
+        showErrorSnack(context, aError);
+      }
+      return;
+    }
+    if (!mounted)
+    {
+      return;
+    }
+    setState(() => _isBusy = false);
+    final result = await showAmountSheet(context, aTarget: AmountTarget.cat(title, estimate));
+    if (result == null || !mounted)
+    {
+      return;
+    }
+    _pick(title, _kcalOf(estimate.per100, result, null), {'cat_id': aCat.id, ...result.toJson()});
+  }
+
+  bool _isStocked(RecentFood aFood) => !_isStockOnly || (_stock?.hasFood(aFood) ?? false);
+
   Future<void> _newDish() async
   {
     await context.push('/app/dishes/new');
@@ -397,7 +466,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
 
   Widget _recentSection(BuildContext aContext)
   {
-    final recent = _recent;
+    final recent = _recent?.where(_isStocked).toList();
     if (recent == null || recent.isEmpty)
     {
       return const SizedBox.shrink();
@@ -422,6 +491,44 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     );
   }
 
+  Widget _stockSection(BuildContext aContext)
+  {
+    final palette = aContext.palette;
+    final items = _stockItems;
+    if (items == null)
+    {
+      return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
+    }
+    final recent = _recent?.where(_isStocked).toList() ?? const <RecentFood>[];
+    final recentIds = {for (final food in recent) food.itemId};
+    final rest = items.where((aItem) => !recentIds.contains(aItem.id)).toList();
+    if (rest.isEmpty)
+    {
+      return recent.isEmpty ? BlockEmpty('nutrition.stock_empty'.tr()) : const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text('nutrition.in_stock'.tr(), style: TextStyle(fontWeight: FontWeight.w700, color: palette.inkSecondary)),
+        ),
+        for (final item in rest)
+          ListTile(
+            key: ValueKey('nutrition.stock_item.${item.id}'),
+            onTap: _isBusy ? null : () => _pickItem(item),
+            leading: Icon(AppIcons.apple, color: palette.inkSecondary),
+            title: Text(item.name),
+            subtitle: Text(
+              foodSubtitle(aContext, item),
+              style: TextStyle(color: item.nutrition.kcal == null ? palette.warning : palette.inkSecondary),
+            ),
+            trailing: Icon(AppIcons.plus, color: aContext.colors.primary),
+          ),
+      ],
+    );
+  }
+
   Widget _dishesTab(BuildContext aContext)
   {
     final palette = aContext.palette;
@@ -430,12 +537,22 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
     {
       return ErrorRetry(error: _dishesError!, onRetry: _loadDishes);
     }
-    if (dishes == null)
+    if (dishes == null || (_isStockOnly && _stock == null))
     {
       return const Center(child: CircularProgressIndicator());
     }
     final query = _dishQuery.toLowerCase();
-    final visible = dishes.where((aDish) => query.isEmpty || aDish.name.toLowerCase().contains(query)).toList();
+    final stocked = dishes.where((aDish) => !_isStockOnly || (_stock?.hasDish(aDish.id) ?? false)).toList();
+    final visible = stocked.where((aDish) => query.isEmpty || aDish.name.toLowerCase().contains(query)).toList();
+    final String emptyKey;
+    if (stocked.isEmpty)
+    {
+      emptyKey = _isStockOnly ? 'nutrition.no_dishes_in_stock' : 'nutrition.no_dishes';
+    }
+    else
+    {
+      emptyKey = 'nutrition.nothing_found';
+    }
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -455,7 +572,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
             ),
           ),
         ),
-        if (visible.isEmpty) BlockEmpty(dishes.isEmpty ? 'nutrition.no_dishes'.tr() : 'nutrition.nothing_found'.tr()),
+        if (visible.isEmpty) BlockEmpty(emptyKey.tr()),
         for (final dish in visible)
           ListTile(
             onTap: _isBusy ? null : () => _pickDish(dish),
@@ -539,8 +656,15 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
         ? 'planner.pick_food'.tr()
         : 'nutrition.add_title'.tr(args: [DateFormat.MMMd(aContext.locale.toLanguageTag()).format(widget.date)]);
 
+    final tabs = [
+      Tab(text: 'nutrition.tab_products'.tr()),
+      if (widget.isPicking) Tab(key: const ValueKey('nutrition.tab_cats'), text: 'nutrition.tab_cats'.tr()),
+      Tab(text: 'nutrition.tab_dishes'.tr()),
+      Tab(text: 'nutrition.tab_quick'.tr()),
+    ];
+
     return DefaultTabController(
-      length: 3,
+      length: tabs.length,
       child: SubPage(
         title: person == null ? title : '$title · ${person.fullName}',
         child: Column(
@@ -559,19 +683,31 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen>
                       onChanged: (aTarget) => setState(() => _target = aTarget),
                     ),
             ),
-            TabBar(
-              tabs: [
-                Tab(text: 'nutrition.tab_products'.tr()),
-                Tab(text: 'nutrition.tab_dishes'.tr()),
-                Tab(text: 'nutrition.tab_quick'.tr()),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilterChip(
+                  key: const ValueKey('nutrition.stock_only'),
+                  label: Text('nutrition.stock_only'.tr()),
+                  selected: _isStockOnly,
+                  onSelected: (aValue) => setState(() => _isStockOnly = aValue),
+                ),
+              ),
             ),
+            TabBar(isScrollable: tabs.length > 3, tabAlignment: tabs.length > 3 ? TabAlignment.start : null, tabs: tabs),
             Expanded(
               child: Builder(
                 builder: (aTabContext) => SnapTabView(
                   controller: DefaultTabController.of(aTabContext),
                   children: [
-                    FoodSearchPanel(onPick: (aItem) => _pickItem(aItem), idleChildren: [_recentSection(aContext)]),
+                    FoodSearchPanel(
+                      isStockOnly: _isStockOnly,
+                      onPick: (aItem) => _pickItem(aItem),
+                      idleChildren: [_recentSection(aContext), if (_isStockOnly) _stockSection(aContext)],
+                    ),
+                    if (widget.isPicking)
+                      FoodCatsPanel(stock: _stock, isStockOnly: _isStockOnly, isEnabled: !_isBusy, onPick: _pickCat),
                     _dishesTab(aContext),
                     _quickTab(aContext),
                   ],

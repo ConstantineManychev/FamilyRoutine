@@ -708,6 +708,8 @@ pub struct ItemQuery
     pub kind: Option<ItemKind>,
     #[serde(default)]
     pub cat_id: Option<Uuid>,
+    #[serde(default)]
+    pub is_in_stock: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

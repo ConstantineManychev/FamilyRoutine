@@ -36,6 +36,7 @@ class AmountTarget
   final bool isDish;
   final bool isMl;
   final List<CookBatch> batches;
+  final String? hint;
 
   const AmountTarget({
     required this.title,
@@ -44,6 +45,7 @@ class AmountTarget
     this.isDish = false,
     this.isMl = false,
     this.batches = const [],
+    this.hint,
   });
 
   factory AmountTarget.item(DictItemDto aItem) => AmountTarget(
@@ -55,6 +57,13 @@ class AmountTarget
 
   factory AmountTarget.dish(Dish aDish, {List<CookBatch> aBatches = const []}) =>
       AmountTarget(title: aDish.name, per100: aDish.per100, portionG: aDish.portionG, isDish: true, batches: aBatches);
+
+  factory AmountTarget.cat(String aTitle, CatEstimate aEstimate) => AmountTarget(
+        title: aTitle,
+        per100: aEstimate.per100,
+        isMl: aEstimate.isMl,
+        hint: aEstimate.isInStock ? 'nutrition.cat_estimate_stock'.tr() : 'nutrition.cat_estimate_catalog'.tr(),
+      );
 
   factory AmountTarget.entry(MealEntry aEntry) => AmountTarget(
         title: entryTitle(aEntry),
@@ -273,6 +282,10 @@ class _AmountSheetState extends State<AmountSheet>
                     Text(target.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     Text(per100Line(aContext, per100, aIsMl: target.isMl), style: TextStyle(color: palette.inkSecondary)),
+                    if (target.hint != null) ...[
+                      const SizedBox(height: 2),
+                      Text(target.hint!, key: const ValueKey('amount.hint'), style: TextStyle(fontSize: 12, color: palette.inkMuted)),
+                    ],
                     if (portionG != null) ...[
                       const SizedBox(height: 2),
                       Text(

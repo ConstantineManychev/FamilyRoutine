@@ -1,0 +1,179 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH sharers AS (\n            SELECT DISTINCT theirs.user_id\n            FROM family_mems mine\n            JOIN family_mems theirs ON theirs.family_id = mine.family_id\n            WHERE mine.user_id = $1 AND theirs.user_id <> $1\n        )\n        SELECT\n            i.id,\n            i.name,\n            i.type AS \"kind: ItemKind\",\n            i.unit AS \"unit: ItemUnit\",\n            i.barcode,\n            i.kcal,\n            i.prot,\n            i.fat,\n            i.carb,\n            i.piece_g,\n            i.net_qty,\n            i.net_measure AS \"net_measure: NetMeasure\",\n            i.cat_id,\n            CASE\n                WHEN i.owner_id = $1 THEN 'me'\n                WHEN i.owner_id IS NULL OR LOWER(ou.email) = ANY($2) THEN 'catalog'\n                WHEN i.owner_id IN (SELECT user_id FROM sharers) THEN 'member'\n                ELSE 'user'\n            END AS \"owner_kind!\",\n            CASE\n                WHEN i.owner_id <> $1\n                     AND NOT COALESCE(LOWER(ou.email) = ANY($2), FALSE)\n                     AND i.owner_id IN (SELECT user_id FROM sharers)\n                    THEN ou.first_name || ' ' || ou.last_name\n            END AS owner_name,\n            (i.owner_id IS NOT DISTINCT FROM $1 OR $3) AS \"is_editable!\",\n            CASE\n                WHEN i.owner_id IS NOT DISTINCT FROM $1 OR $3 THEN item_used_by_others(i.id, $1)\n                ELSE FALSE\n            END AS \"is_in_use!\"\n        FROM items i\n        LEFT JOIN users ou ON ou.id = i.owner_id\n        WHERE ($4::uuid IS NULL OR i.id = $4)\n          AND ($5::text IS NULL OR i.name ILIKE $5 OR i.barcode = $6)\n          AND ($7::text IS NULL OR i.barcode = $7)\n          AND (NOT $8 OR i.owner_id IS NOT DISTINCT FROM $1)\n          AND ($11::item_t IS NULL OR i.type = $11)\n          AND (\n              $12::uuid IS NULL\n              OR i.cat_id IN (\n                  WITH RECURSIVE sub AS (\n                      SELECT id FROM product_cats WHERE id = $12\n                      UNION ALL\n                      SELECT c.id FROM product_cats c JOIN sub ON c.parent_id = sub.id\n                  )\n                  SELECT id FROM sub\n              )\n          )\n          AND (\n              NOT $13\n              OR i.id IN (\n                  SELECT l.item_id\n                  FROM stock_lots l\n                  WHERE l.owner_id IS NOT DISTINCT FROM $14 AND l.family_id IS NOT DISTINCT FROM $15\n                    AND l.kind = 'item' AND (l.expires_on IS NULL OR l.expires_on >= $16)\n                    AND l.qty > COALESCE((SELECT SUM(m.qty) FROM stock_moves m WHERE m.lot_id = l.id), 0)\n              )\n          )\n        ORDER BY (i.barcode IS NOT NULL AND i.barcode IS NOT DISTINCT FROM $6) DESC,\n                 ($9::text IS NOT NULL AND i.name ILIKE $9) DESC,\n                 (i.owner_id IS NOT DISTINCT FROM $1) DESC,\n                 LOWER(i.name),\n                 i.id\n        LIMIT $10\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ItemKind",
+        "type_info": {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unit: ItemUnit",
+        "type_info": {
+          "Custom": {
+            "name": "item_unit_t",
+            "kind": {
+              "Enum": [
+                "piece",
+                "kilogram",
+                "liter",
+                "meter",
+                "square_meter",
+                "hour"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "barcode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "kcal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "prot",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "fat",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "carb",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "piece_g",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "net_qty",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "net_measure: NetMeasure",
+        "type_info": {
+          "Custom": {
+            "name": "net_measure_t",
+            "kind": {
+              "Enum": [
+                "g",
+                "ml"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "cat_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 13,
+        "name": "owner_kind!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "owner_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "is_editable!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 16,
+        "name": "is_in_use!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "Bool",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Text",
+        "Int8",
+        {
+          "Custom": {
+            "name": "item_t",
+            "kind": {
+              "Enum": [
+                "product",
+                "service",
+                "food"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Bool",
+        "Uuid",
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a987b9c5993721697882a916785e42b116224b8bec74dea70b7a61edd8726299"
+}

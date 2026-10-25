@@ -1085,3 +1085,425 @@ async fn done_training_plans_record_the_chosen_programme_day(a_db: PgPool)
     let row = day_row(&app, &alice, None, midnight).await;
     assert_eq!(row["marks"], json!([]));
 }
+
+async fn food_item(a_app: &TestApp, a_user: &TestUser, a_name: &str, a_unit: &str, a_kcal: &str, a_cat: &str)
+    -> String
+{
+    let (status, item) = send(
+        a_app,
+        a_user,
+        Method::POST,
+        "/api/dicts/items",
+        Some(json!({ "name": a_name, "kind": "food", "unit": a_unit, "cat_id": a_cat,
+                     "nutrition": { "kcal": a_kcal, "prot": "3", "fat": "2", "carb": "4" } })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{item}");
+    item["id"].as_str().unwrap().to_string()
+}
+
+async fn stock_lot(
+    a_app: &TestApp,
+    a_user: &TestUser,
+    a_item: &str,
+    a_qty: &str,
+    a_unit: &str,
+    a_days_ago: i64,
+    a_expires: Option<i64>,
+)
+{
+    let today = Utc::now().date_naive();
+    let (status, lot) = send(
+        a_app,
+        a_user,
+        Method::POST,
+        "/api/stock/lots",
+        Some(json!({
+            "item_id": a_item, "qty": a_qty, "unit": a_unit, "acquired_on": today - Duration::days(a_days_ago),
+            "expires_on": a_expires.map(|days| today + Duration::days(days))
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{lot}");
+}
+
+async fn stock_left(a_app: &TestApp, a_user: &TestUser, a_title: &str) -> String
+{
+    let (status, stock) = send(a_app, a_user, Method::GET, "/api/stock", None).await;
+    assert_eq!(status, StatusCode::OK, "{stock}");
+    stock["lots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|lot| lot["title"] == a_title)
+        .map(|lot| lot["left_qty"].as_str().unwrap().parse::<f64>().unwrap())
+        .fold(0.0, |a_sum, a_left| a_sum + a_left)
+        .to_string()
+}
+
+async fn daily_meal_plan(a_app: &TestApp, a_user: &TestUser, a_title: &str, a_start: &str, a_foods: Value) -> Value
+{
+    let yesterday = (Utc::now() - Duration::days(1)).date_naive();
+    let (status, plan) = send(
+        a_app,
+        a_user,
+        Method::POST,
+        "/api/plan/events",
+        Some(json!({
+            "title": a_title, "category": "meal", "timing": "fixed", "start_date": yesterday, "start_time": a_start,
+            "duration_min": 20, "tz": "UTC", "repeat": "daily", "content": { "foods": a_foods }
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{plan}");
+    plan
+}
+
+async fn done_yesterday(a_app: &TestApp, a_user: &TestUser, a_plan: &Value, a_state: &str)
+{
+    let yesterday = (Utc::now() - Duration::days(1)).date_naive();
+    let (status, reply) = send(
+        a_app,
+        a_user,
+        Method::PUT,
+        &format!(
+            "/api/plan/events/{}/occurrences/{yesterday}",
+            a_plan["id"].as_str().unwrap()
+        ),
+        Some(json!({ "state": a_state })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{reply}");
+}
+
+async fn plan_entries(a_app: &TestApp, a_user: &TestUser, a_note: &str) -> Vec<(String, String, Option<String>)>
+{
+    let yesterday = (Utc::now() - Duration::days(1)).date_naive();
+    let (status, diary) = send(
+        a_app,
+        a_user,
+        Method::GET,
+        &format!("/api/nutrition/day?date={yesterday}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{diary}");
+    diary["meals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|meal| meal["mark"]["note"] == a_note)
+        .flat_map(|meal| meal["entries"].as_array().unwrap().clone())
+        .map(|entry| {
+            (
+                entry["title"].as_str().unwrap().to_string(),
+                entry["grams"].as_str().unwrap_or_default().to_string(),
+                entry["stock_short"].as_str().map(str::to_string),
+            )
+        })
+        .collect()
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn category_plans_take_whatever_the_store_holds_first(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let (_, tree) = send(&app, &alice, Method::GET, "/api/dicts/product-cats", None).await;
+    let cat = |a_code: &str| {
+        tree["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["code"] == a_code)
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let (dairy, milk, kefir_cat, cottage_cat, butter_cat) = (
+        cat("dairy"),
+        cat("dairy_milk"),
+        cat("dairy_kefir"),
+        cat("dairy_cottage"),
+        cat("dairy_butter"),
+    );
+    let (status, lean) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/dicts/product-cats",
+        Some(json!({ "name": "Молоко 1%", "parent_id": milk })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{lean}");
+    let lean = lean["id"].as_str().unwrap().to_string();
+
+    let lean_milk = food_item(&app, &alice, "Молоко 1%", "liter", "42", &lean).await;
+    let rich_milk = food_item(&app, &alice, "Молоко 3,5%", "liter", "60", &milk).await;
+    let kefir = food_item(&app, &alice, "Кефир", "liter", "50", &kefir_cat).await;
+    let cottage = food_item(&app, &alice, "Творог", "kilogram", "120", &cottage_cat).await;
+    food_item(&app, &alice, "Масло", "kilogram", "740", &butter_cat).await;
+    let grocery = cat("grocery");
+    let buckwheat = food_item(&app, &alice, "Гречка", "kilogram", "110", &grocery).await;
+    stock_lot(&app, &alice, &lean_milk, "1000", "ml", 2, None).await;
+    stock_lot(&app, &alice, &rich_milk, "500", "ml", 5, None).await;
+    stock_lot(&app, &alice, &kefir, "200", "ml", 1, Some(1)).await;
+    stock_lot(&app, &alice, &cottage, "100", "g", 10, None).await;
+    stock_lot(&app, &alice, &buckwheat, "900", "g", 30, None).await;
+
+    let (status, foods) = send(&app, &alice, Method::GET, "/api/stock/foods", None).await;
+    assert_eq!(status, StatusCode::OK, "{foods}");
+    assert_eq!(foods["items"].as_array().unwrap().len(), 5);
+    let (_, stocked) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/dicts/items?kind=food&is_in_stock=true&cat_id={dairy}"),
+        None,
+    )
+    .await;
+    let mut names: Vec<&str> = stocked
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["name"].as_str().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["Кефир", "Молоко 1%", "Молоко 3,5%", "Творог"]);
+
+    let (status, estimate) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/nutrition/cats/{dairy}/estimate"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{estimate}");
+    assert_eq!(
+        (estimate["per_100"]["kcal"].as_str(), estimate["is_in_stock"].as_bool()),
+        (Some("68"), Some(true))
+    );
+    let (_, butter_estimate) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/nutrition/cats/{butter_cat}/estimate"),
+        None,
+    )
+    .await;
+    assert_eq!(
+        (
+            butter_estimate["per_100"]["kcal"].as_str(),
+            butter_estimate["is_in_stock"].as_bool()
+        ),
+        (Some("740"), Some(false))
+    );
+    let (status, empty) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/nutrition/cats/{}/estimate", cat("household")),
+        None,
+    )
+    .await;
+    assert_eq!(
+        (status, empty["code"].as_str()),
+        (StatusCode::CONFLICT, Some("CAT_NO_FOOD"))
+    );
+
+    let snack = daily_meal_plan(
+        &app,
+        &alice,
+        "Перекус",
+        "11:00:00",
+        json!([{ "cat_id": dairy, "grams": "400" }]),
+    )
+    .await;
+    assert_eq!(snack["content"]["foods"][0]["cat_id"], dairy);
+    assert_eq!(snack["content"]["foods"][0]["grams"], "400");
+    assert_eq!(snack["content"]["total"]["kcal"], "272");
+    done_yesterday(&app, &alice, &snack, "done").await;
+    assert_eq!(
+        plan_entries(&app, &alice, "Перекус").await,
+        vec![
+            ("Кефир".to_string(), "200".to_string(), Some("0".to_string())),
+            ("Творог".to_string(), "100".to_string(), Some("0".to_string())),
+            ("Молоко 3,5%".to_string(), "100".to_string(), Some("0".to_string())),
+        ]
+    );
+    assert_eq!(stock_left(&app, &alice, "Кефир").await, "0");
+    assert_eq!(stock_left(&app, &alice, "Молоко 3,5%").await, "400");
+    assert_eq!(stock_left(&app, &alice, "Гречка").await, "900");
+    done_yesterday(&app, &alice, &snack, "planned").await;
+    assert_eq!(stock_left(&app, &alice, "Кефир").await, "200");
+    assert_eq!(stock_left(&app, &alice, "Молоко 3,5%").await, "500");
+
+    let any_milk = daily_meal_plan(
+        &app,
+        &alice,
+        "Молоко",
+        "15:00:00",
+        json!([{ "cat_id": milk, "grams": "600" }]),
+    )
+    .await;
+    done_yesterday(&app, &alice, &any_milk, "done").await;
+    assert_eq!(
+        plan_entries(&app, &alice, "Молоко").await,
+        vec![
+            ("Молоко 3,5%".to_string(), "500".to_string(), Some("0".to_string())),
+            ("Молоко 1%".to_string(), "100".to_string(), Some("0".to_string())),
+        ]
+    );
+
+    let only_lean = daily_meal_plan(
+        &app,
+        &alice,
+        "Ужин",
+        "19:00:00",
+        json!([{ "cat_id": lean, "grams": "1000" }]),
+    )
+    .await;
+    done_yesterday(&app, &alice, &only_lean, "done").await;
+    assert_eq!(
+        plan_entries(&app, &alice, "Ужин").await,
+        vec![("Молоко 1%".to_string(), "1000".to_string(), Some("100".to_string()))]
+    );
+    assert_eq!(stock_left(&app, &alice, "Молоко 1%").await, "0");
+
+    let (status, _) = send(
+        &app,
+        &alice,
+        Method::DELETE,
+        &format!("/api/dicts/product-cats/{lean}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, details) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!(
+            "/api/plan/events/{}/occurrences/{}",
+            only_lean["id"].as_str().unwrap(),
+            Utc::now().date_naive()
+        ),
+        None,
+    )
+    .await;
+    assert_eq!(details["content"]["foods"][0]["cat_id"], milk);
+
+    let butter = daily_meal_plan(
+        &app,
+        &alice,
+        "Завтрак",
+        "08:00:00",
+        json!([{ "cat_id": butter_cat, "grams": "10" }]),
+    )
+    .await;
+    done_yesterday(&app, &alice, &butter, "done").await;
+    assert_eq!(
+        plan_entries(&app, &alice, "Завтрак").await,
+        vec![("Масло".to_string(), "10".to_string(), Some("10".to_string()))]
+    );
+
+    let (status, wrong) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/plan/events",
+        Some(json!({
+            "title": "Пусто", "category": "meal", "timing": "fixed", "start_date": Utc::now().date_naive(),
+            "start_time": "21:00:00", "duration_min": 20, "tz": "UTC",
+            "content": { "foods": [{ "cat_id": dairy, "portions": "1" }] }
+        })),
+    )
+    .await;
+    assert_eq!(
+        (status, wrong["field"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("grams")),
+        "{wrong}"
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn planned_dishes_eat_the_oldest_cooked_batch(a_db: PgPool)
+{
+    let app = TestApp::new(a_db);
+    let alice = app.user("alice@example.com").await;
+    let (_, tree) = send(&app, &alice, Method::GET, "/api/dicts/product-cats", None).await;
+    let grains = tree["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["code"] == "grains")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let rice = food_item(&app, &alice, "Рис", "kilogram", "360", &grains).await;
+    stock_lot(&app, &alice, &rice, "1000", "g", 3, None).await;
+    let (status, dish) = send(
+        &app,
+        &alice,
+        Method::POST,
+        "/api/dishes",
+        Some(json!({ "name": "Рис отварной", "ingredients": [{ "item_id": rice, "grams": "100" }] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{dish}");
+    let dish_id = dish["id"].as_str().unwrap().to_string();
+    for (raw, cooked) in [("100", "300"), ("200", "500")]
+    {
+        let (status, batch) = send(
+            &app,
+            &alice,
+            Method::POST,
+            "/api/stock/cook",
+            Some(json!({ "dish_id": dish_id, "cooked_g": cooked, "ingredients": [{ "item_id": rice, "grams": raw }] })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{batch}");
+    }
+    let (_, foods) = send(&app, &alice, Method::GET, "/api/stock/foods", None).await;
+    assert_eq!(foods["dish_ids"], json!([dish_id]));
+
+    let lunch = daily_meal_plan(
+        &app,
+        &alice,
+        "Обед",
+        "13:00:00",
+        json!([{ "dish_id": dish_id, "grams": "400" }]),
+    )
+    .await;
+    done_yesterday(&app, &alice, &lunch, "done").await;
+    assert_eq!(
+        plan_entries(&app, &alice, "Обед").await,
+        vec![
+            ("Рис отварной".to_string(), "300".to_string(), Some("0".to_string())),
+            ("Рис отварной".to_string(), "100".to_string(), Some("0".to_string())),
+        ]
+    );
+    let (_, batches) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/stock/batches?dish_id={dish_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(batches.as_array().unwrap().len(), 1);
+    assert_eq!(batches[0]["left_g"], "400");
+    done_yesterday(&app, &alice, &lunch, "planned").await;
+    let (_, batches) = send(
+        &app,
+        &alice,
+        Method::GET,
+        &format!("/api/stock/batches?dish_id={dish_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(batches.as_array().unwrap().len(), 2);
+}
